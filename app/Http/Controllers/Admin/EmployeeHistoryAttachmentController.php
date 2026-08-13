@@ -19,6 +19,9 @@ class EmployeeHistoryAttachmentController extends Controller
     ): StreamedResponse {
         $download = $action->execute($employee, $type, $history);
 
-        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+        ]);
     }
 }

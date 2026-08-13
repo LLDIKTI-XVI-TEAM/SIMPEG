@@ -4,34 +4,6 @@
         $allDocuments   = collect($p->documents ?? []);
         $riwayatDokumen = $allDocuments;
 
-        $estimasiPangkatNext = $p->tanggal_kenaikan_pangkat_berikutnya
-            ? \Carbon\Carbon::parse($p->tanggal_kenaikan_pangkat_berikutnya)->format('d-m-Y')
-            : '-';
-        $estimasiKgbNext = $p->tanggal_kgb_berikutnya
-            ? \Carbon\Carbon::parse($p->tanggal_kgb_berikutnya)->format('d-m-Y')
-            : '-';
-
-        $now = \Carbon\Carbon::now();
-
-        // Gunakan estimasi tanggal pensiun dari controller (sudah prioritaskan manual/BUP)
-        $pensiunDate = $estimasiTanggalPensiun;
-        $estimasiPensiun = $pensiunDate ? $pensiunDate->format('d-m-Y') : '-';
-
-        $sisaPensiunStr = '-';
-        if ($pensiunDate) {
-            if ($pensiunDate->isFuture()) {
-                $diff = $now->diff($pensiunDate);
-                $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
-            } else {
-                if ($pensiunDate->isFuture()) {
-                    $diff = $now->diff($pensiunDate);
-                    $sisaPensiunStr = $diff->y . ' Tahun, ' . $diff->m . ' Bulan lagi';
-                } else {
-                    $sisaPensiunStr = 'Memasuki Usia Pensiun';
-                }
-            }
-        }
-
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
             && auth()->user()->hasPermission('employees.update');
@@ -112,7 +84,6 @@
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
-        showRiwayatStatus: false,
         editingPendidikan: null,
         editPendidikanError: '',
         editPendidikanForm: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
@@ -880,7 +851,18 @@
 
             {{-- TAB 1: PROFIL LENGKAP --}}
             <x-pegawai.detail.panel tab="profile" id-prefix="admin">
-                
+                <x-pegawai.detail.profile
+                    :employee="$p"
+                    :status-presentation="$statusPresentation"
+                    :active-position="$latestPosition"
+                    :latest-rank="$latestRank"
+                    :latest-status-history="$latestStatusHistory"
+                    :active-supervisor-assignments="collect([$currentSupervisor])->filter()"
+                    :retirement-date="$estimasiTanggalPensiun"
+                    :mask-sensitive="false"
+                    download-surface="admin"
+                >
+                    <x-slot:controls>
                 {{-- Toggle Flag Kinerja & Kepala Bagian --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
                     {{-- Status Kinerja --}}
@@ -1058,179 +1040,8 @@
                     </div>
                 </div>
 
-                {{-- Auto-Kalkulasi Jadwal --}}
-                <div class="space-y-3">
-                    <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5 flex items-center gap-1.5">
-                        Estimasi Jadwal Kepegawaian
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
-                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kenaikan Pangkat Terdekat</span>
-                            <p class="text-sm font-bold text-ink font-sans mt-1">{{ $estimasiPangkatNext }}</p>
-                            <p class="text-[9px] text-muted font-sans mt-0.5">(Estimasi 4 tahun sejak TMT)</p>
-                        </div>
-                        <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
-                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">KGB Terdekat</span>
-                            <p class="text-sm font-bold text-ink font-sans mt-1">{{ $estimasiKgbNext }}</p>
-                            <p class="text-[9px] text-muted font-sans mt-0.5">(Estimasi 2 tahun sejak TMT)</p>
-                        </div>
-                        <div class="rounded-lg border border-border bg-surface p-3 shadow-sm text-center">
-                            <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Estimasi Tanggal Pensiun</span>
-                            <p class="text-sm font-bold text-ink font-sans mt-1">{{ $estimasiPensiun }}</p>
-                            <p class="text-[9px] text-danger font-semibold mt-0.5" x-text="'Sisa: ' + '{{ $sisaPensiunStr }}'"></p>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Detail Biodata --}}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="space-y-4">
-                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Identitas & Data Pribadi</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                            <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Nama dengan Gelar</span>
-                                <p class="text-ink font-sans font-semibold">{{ $p->nama_dengan_gelar ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Nama Lengkap (tanpa gelar)</span>
-                                <p class="text-ink font-sans">{{ $p->nama_lengkap }}</p>
-                            </div>
-                            @if(auth()->user()->role !== 'pimpinan')
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">NIK (KTP)</span>
-                                <p class="text-ink font-bold">{{ $p->nik ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">No. Kartu Keluarga (KK)</span>
-                                <p class="text-ink font-bold">{{ $p->no_kk ?? '-' }}</p>
-                            </div>
-                            @endif
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Tempat / Tanggal Lahir</span>
-                                <p class="text-ink font-sans">{{ $p->tempat_lahir ?? '-' }}, {{ isset($p->tanggal_lahir) ? \Carbon\Carbon::parse($p->tanggal_lahir)->format('d-m-Y') : '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Jenis Kelamin</span>
-                                <p class="text-ink font-sans">{{ $p->jenis_kelamin === 'L' ? 'Laki-laki' : ($p->jenis_kelamin === 'P' ? 'Perempuan' : '-') }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Agama</span>
-                                <p class="text-ink font-sans">{{ $p->agama->nama ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Status Kawin</span>
-                                <p class="text-ink font-sans">{{ $p->statusKawin->nama ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Golongan Darah</span>
-                                <p class="text-ink font-sans font-bold">{{ $p->golongan_darah ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Kepala Lembaga</span>
-                                <p class="text-ink font-sans font-bold">{{ $p->is_kepala_lembaga ? 'Ya' : 'Tidak' }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Status Kepegawaian</h3>
-                            @if($p->statusHistories && $p->statusHistories->count() > 0)
-                            <button type="button" @click="showRiwayatStatus = true" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 shadow-sm cursor-pointer font-sans">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Lihat Riwayat
-                            </button>
-                            @endif
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Status Saat Ini</span>
-                                <p class="text-ink font-sans font-bold">{{ $p->statusPegawai->nama ?? $p->status_aktif ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Tanggal Efektif Status Kepegawaian</span>
-                                <p class="text-ink font-sans">{{ $statusEffectiveDate?->format('d-m-Y') ?? '-' }}</p>
-                            </div>
-                            @if($p->status_keterangan)
-                            <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Keterangan</span>
-                                <p class="text-ink font-sans">{{ $p->status_keterangan }}</p>
-                            </div>
-                            @endif
-                            <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Berkas SK Status</span>
-                                @if($p->status_berkas_path)
-                                    <p class="text-ink font-sans">
-                                        <a href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => $latestStatusHistory?->file_sk ? 'status' : 'status-snapshot', 'history' => $latestStatusHistory?->file_sk ? $latestStatusHistory : $p]) }}" target="_blank" class="text-primary hover:underline font-semibold">
-                                            {{ $p->status_nomor_berkas ?? 'Lihat Berkas' }}
-                                        </a>
-                                    </p>
-                                @else
-                                    <p class="text-muted font-sans">Tidak ada berkas terlampir.</p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Kontak & Rumah</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Email Dinas</span>
-                                <p class="text-ink font-sans">{{ '-' ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Email Pribadi</span>
-                                <p class="text-ink font-sans">{{ $p->email_pribadi ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Nomor HP</span>
-                                <p class="text-ink font-sans">{{ $p->no_hp ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Telepon Rumah</span>
-                                <p class="text-ink font-sans">{{ $p->no_telepon_rumah ?? '-' }}</p>
-                            </div>
-                            <div class="space-y-0.5 sm:col-span-2">
-                                <span class="font-semibold text-muted font-sans">Alamat</span>
-                                <p class="text-ink font-sans leading-relaxed">{{ $p->alamat ?? '-' }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Jabatan Kerja --}}
-                <div class="space-y-4 border-t border-border pt-4">
-                    <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Informasi Pekerjaan Utama</h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
-                        <div class="space-y-0.5">
-                            <span class="font-semibold text-muted font-sans">Jabatan Sekarang</span>
-                            <p class="text-ink font-sans font-bold">{{ $latestPosition?->jabatan?->nama ?? $latestPosition?->nama_jabatan ?? $p->jabatan_terakhir ?? '-' }}</p>
-                        </div>
-                        <div class="space-y-0.5">
-                            <span class="font-semibold text-muted font-sans">Unit Kerja</span>
-                            <p class="text-ink font-sans">{{ $latestPosition?->unitKerja?->nama ?? '-' }}</p>
-                        </div>
-                        <div class="space-y-0.5">
-                            <span class="font-semibold text-muted font-sans">Pangkat</span>
-                            <p class="text-ink font-sans font-bold">{{ $latestRank?->golongan?->nama ?? $p->pangkat_terakhir ?? '-' }}</p>
-                        </div>
-                        <div class="space-y-0.5">
-                            <span class="font-semibold text-muted font-sans">Golongan Saat Ini</span>
-                            <p class="text-ink font-sans font-bold">{{ $latestRank?->golongan?->kode ?? $p->golongan_terakhir ?? '-' }}</p>
-                        </div>
-                        <div class="space-y-0.5">
-                            <span class="font-semibold text-muted font-sans">Kelas Jabatan</span>
-                            <p class="text-ink font-sans font-bold">{{ $p->kelas_jabatan_terakhir ?? '-' }}</p>
-                        </div>
-                        <div class="space-y-0.5">
-                            <span class="font-semibold text-muted font-sans">TMT Golongan</span>
-                            <p class="text-ink">{{ $latestRank?->tmt_pangkat ? \Carbon\Carbon::parse($latestRank->tmt_pangkat)->format('d-m-Y') : '-' }}</p>
-                        </div>
-                    </div>
-                </div>
+                    </x-slot:controls>
+                </x-pegawai.detail.profile>
             </x-pegawai.detail.panel>
 
             {{-- TAB 2: DATA KELUARGA --}}
@@ -2271,83 +2082,6 @@
         </div>
     </div>
 
-    {{-- Modal: Riwayat Perubahan Status --}}
-    <div
-        x-show="showRiwayatStatus"
-        x-transition.opacity
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-        style="display: none;"
-        @keydown.escape.window="showRiwayatStatus = false"
-    >
-        <div
-            @click.outside="showRiwayatStatus = false"
-            class="w-full max-w-5xl rounded-xl bg-surface shadow-2xl overflow-hidden"
-        >
-            {{-- Header --}}
-            <div class="flex items-center justify-between border-b border-border bg-soft/50 px-6 py-4">
-                <h3 class="text-base font-bold text-ink font-sans">Riwayat Perubahan Status Kepegawaian</h3>
-                <button type="button" @click="showRiwayatStatus = false" class="text-muted hover:text-ink transition cursor-pointer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            {{-- Content: Grid 2 Kolom dengan Scroll --}}
-            <div class="px-6 py-5">
-                @if($p->statusHistories && $p->statusHistories->count() > 0)
-                <div class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                    @foreach($p->statusHistories->sortByDesc('tanggal_efektif') as $history)
-                    <div class="rounded-lg border {{ $history->is_latest ? 'border-primary bg-primary/5' : 'border-border bg-soft/30' }} p-4">
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-ink text-sm font-sans">{{ $history->status_nama }}</span>
-                                @if($history->is_latest)
-                                    <span class="inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-white uppercase">Aktif</span>
-                                @endif
-                            </div>
-                            <div class="text-xs text-muted font-sans space-y-1">
-                                <p>
-                                    <span class="font-semibold text-ink">Tanggal:</span>
-                                    {{ $history->tanggal_efektif->format('d M Y') }}
-                                </p>
-                                @if($history->keterangan)
-                                <p>
-                                    <span class="font-semibold text-ink">Keterangan:</span>
-                                    {{ Str::limit($history->keterangan, 100) }}
-                                </p>
-                                @endif
-                                @if($history->file_sk)
-                                <p class="pt-1">
-                                    <a href="{{ route('pegawai.history-attachments.download', ['employee' => $p, 'type' => 'status', 'history' => $history]) }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                        </svg>
-                                        Lihat SK
-                                    </a>
-                                </p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-                @else
-                <div class="rounded-lg border border-border bg-soft/30 p-8 text-center">
-                    <p class="text-sm text-muted font-sans">Belum ada riwayat perubahan status kepegawaian.</p>
-                </div>
-                @endif
-            </div>
-
-            {{-- Footer --}}
-            <div class="flex justify-end border-t border-border bg-soft/50 px-6 py-4">
-                <button type="button" @click="showRiwayatStatus = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer">
-                    Tutup
-                </button>
-            </div>
-        </div>
-    </div>
 
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">

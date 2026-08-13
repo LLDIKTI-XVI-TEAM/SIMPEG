@@ -9,6 +9,7 @@ use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeFamily;
 use App\Models\EmployeeStatusHistory;
+use App\Models\EwsConfig;
 use App\Models\Permission;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
@@ -245,6 +246,7 @@ class PimpinanEmployeeDetailTest extends TestCase
                 ->assertSee('data-employee-detail-shell', false)
                 ->assertSee('data-employee-detail-header', false)
                 ->assertSee('data-employee-detail-tabs', false)
+                ->assertSee('data-employee-detail-profile', false)
                 ->assertSee('aria-orientation="horizontal"', false)
                 ->assertSee('@keydown.right.prevent="moveTab(1)"', false)
                 ->assertSee('@keydown.left.prevent="moveTab(-1)"', false)
@@ -591,8 +593,13 @@ class PimpinanEmployeeDetailTest extends TestCase
         $this->actingAs(User::factory()->pimpinan()->create())
             ->get(route('pimpinan.pegawai.show', $employee))
             ->assertOk()
-            ->assertSee('04-03-2026')
-            ->assertDontSee('02-01-2025');
+            ->tap(function ($response): void {
+                $profileStart = strpos($response->getContent(), 'Status Kepegawaian');
+                $this->assertNotFalse($profileStart);
+                $currentStatusCard = substr($response->getContent(), $profileStart, 2500);
+                $this->assertStringContainsString('04-03-2026', $currentStatusCard);
+                $this->assertStringNotContainsString('02-01-2025', $currentStatusCard);
+            });
     }
 
     public function test_pimpinan_detail_menampilkan_field_profil_dan_pekerjaan_aktif_setara_admin(): void
@@ -630,6 +637,118 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertDontSee('Snapshot Jabatan Lama Marker');
     }
 
+    public function test_profil_pimpinan_menampilkan_informasi_non_mutasi_admin_secara_lengkap(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => '2027-04-01',
+            'tanggal_kgb_berikutnya' => '2028-05-02',
+            'is_kinerja_baik' => false,
+            'is_satyalancana_eligible' => false,
+            'satyalancana_note' => 'Belum memenuhi masa kerja marker',
+            'pangkat_terakhir' => 'Snapshot Pangkat Marker',
+        ]);
+        $golongan = RefGolongan::create(['kode' => 'III/Z', 'nama' => 'Pangkat Aktif Marker', 'urutan' => 98]);
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $golongan->id,
+            'tmt_pangkat' => '2026-03-04',
+            'is_latest' => true,
+        ]);
+        $statusHistory = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Riwayat Marker',
+            'keterangan' => 'Keterangan Riwayat Marker',
+            'tanggal_efektif' => '2026-06-07',
+            'nomor_berkas' => 'SK-STATUS-MARKER',
+            'file_sk' => 'pegawai/status-marker.pdf',
+            'is_latest' => true,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($statusHistory->file_sk, 'sk status privat');
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee));
+
+        $response->assertOk()
+            ->assertSee('Estimasi Jadwal Kepegawaian')
+            ->assertSee('01-04-2027')
+            ->assertSee('02-05-2028')
+            ->assertSee('Kinerja Tidak Baik')
+            ->assertSee('Kelayakan Satyalancana')
+            ->assertSee('Tidak Layak')
+            ->assertSee('Belum memenuhi masa kerja marker')
+            ->assertSee('Pangkat Aktif Marker')
+            ->assertSee('III/Z')
+            ->assertSee('04-03-2026')
+            ->assertSee('Riwayat Perubahan Status Kepegawaian')
+            ->assertSee('Status Riwayat Marker')
+            ->assertSee('Keterangan Riwayat Marker')
+            ->assertSee('SK-STATUS-MARKER')
+            ->assertSee(route('pimpinan.pegawai.status-attachments.download', [
+                'employee' => $employee,
+                'history' => $statusHistory,
+            ]), false)
+            ->assertDontSee('Toggle Kelayakan Satyalancana')
+            ->assertDontSee('Simpan Satyalancana');
+    }
+
+    public function test_profil_pimpinan_menampilkan_sk_status_snapshot_legacy_secara_fail_closed(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create([
+            'status_berkas_path' => 'pegawai/status-snapshot-legacy.pdf',
+            'status_nomor_berkas' => 'SK-STATUS-SNAPSHOT',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($employee->status_berkas_path, 'snapshot status privat');
+        $pimpinan = User::factory()->pimpinan()->create();
+        $url = route('pimpinan.pegawai.status-attachments.download', [
+            'employee' => $employee,
+            'history' => $employee,
+        ]);
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee('SK-STATUS-SNAPSHOT')
+            ->assertSee($url, false);
+
+        $downloadResponse = $this->actingAs($pimpinan)
+            ->get($url)
+            ->assertOk()
+            ->assertDownload();
+        $this->assertStringContainsString('no-store', (string) $downloadResponse->headers->get('Cache-Control'));
+
+        $otherEmployee = Employee::factory()->create();
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.status-attachments.download', [
+                'employee' => $otherEmployee,
+                'history' => $employee,
+            ]))
+            ->assertNotFound();
+        $this->actingAs($pimpinan)
+            ->get('/pimpinan/pegawai/'.$employee->id.'/status/bukan-uuid/unduh')
+            ->assertNotFound();
+
+        Storage::disk(Document::STORAGE_DISK)->delete($employee->status_berkas_path);
+        $this->actingAs($pimpinan)
+            ->get($url)
+            ->assertNotFound();
+    }
+
+    public function test_profil_pimpinan_memakai_fallback_bup_yang_sama_saat_tanggal_pensiun_kosong(): void
+    {
+        EwsConfig::setVal('pensiun_required_age_years', '60');
+        $employee = Employee::factory()->create([
+            'tanggal_lahir' => '1970-01-01',
+            'tanggal_pensiun' => null,
+        ]);
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee('01-01-2030');
+    }
+
     public function test_profil_pimpinan_memakai_snapshot_bila_tidak_ada_jabatan_berstatus_terbaru(): void
     {
         $employee = Employee::factory()->create([
@@ -665,6 +784,52 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_pimpinan_tidak_dapat_mengakses_payload_json_admin_yang_memuat_data_sensitif(): void
+    {
+        $employee = Employee::factory()->create();
+        EmployeeFamily::create([
+            'employee_id' => $employee->id,
+            'nama_anggota' => 'Keluarga Rahasia',
+            'hubungan' => 'Anak',
+            'nik' => '7101010101010001',
+            'tanggal_lahir' => '2012-01-01',
+            'jenis_kelamin' => 'L',
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP dan KK Rahasia',
+            'file_path' => 'pegawai/ktp-kk-rahasia.pdf',
+        ]);
+
+        $role = Role::where('name', 'pimpinan')->firstOrFail();
+        $role->permissions()->syncWithoutDetaching(
+            Permission::whereIn('name', [
+                'employee_families.read',
+                'discipline_records.read',
+                'employee_histories.read',
+            ])->pluck('id'),
+        );
+        $pimpinan = User::factory()->pimpinan()->create();
+        $adminPayloadUrls = [
+            "/api/v1/pegawai/{$employee->id}",
+            "/api/v1/pegawai/{$employee->id}/keluarga",
+            "/api/v1/pegawai/{$employee->id}/disiplin",
+            "/api/v1/pegawai/{$employee->id}/arsip-dokumen",
+            "/api/v1/pegawai/{$employee->id}/status-dokumen",
+            "/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan",
+            "/api/v1/pegawai/{$employee->id}/riwayat-jabatan",
+            "/api/v1/pegawai/{$employee->id}/riwayat-kgb",
+            "/api/v1/pegawai/{$employee->id}/riwayat-pendidikan",
+        ];
+
+        $actualStatuses = collect($adminPayloadUrls)
+            ->map(fn (string $url): int => $this->actingAs($pimpinan)->getJson($url)->getStatusCode())
+            ->all();
+
+        $this->assertSame(array_fill(0, count($adminPayloadUrls), 403), $actualStatuses);
+    }
+
     public function test_permission_employees_read_tetap_diwajibkan_untuk_detail_dan_unduhan_pimpinan(): void
     {
         Storage::fake(Document::STORAGE_DISK);
@@ -674,7 +839,19 @@ class PimpinanEmployeeDetailTest extends TestCase
 
         $employee = Employee::factory()->create();
         $document = $this->createStoredDocument($employee, 'permission-gate.pdf');
+        $statusHistory = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Permission Gate',
+            'tanggal_efektif' => '2026-08-01',
+            'file_sk' => 'pegawai/status-permission-gate.pdf',
+            'is_latest' => true,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($statusHistory->file_sk, 'sk status privat');
         $pimpinan = User::factory()->pimpinan()->create();
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.index'))
+            ->assertForbidden();
 
         $this->actingAs($pimpinan)
             ->get(route('pimpinan.pegawai.show', $employee))
@@ -683,6 +860,93 @@ class PimpinanEmployeeDetailTest extends TestCase
         $this->actingAs($pimpinan)
             ->get($this->pimpinanDocumentUrl($employee, $document))
             ->assertForbidden();
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.status-attachments.download', [
+                'employee' => $employee,
+                'history' => $statusHistory,
+            ]))
+            ->assertForbidden();
+    }
+
+    public function test_semua_route_mutasi_pegawai_memiliki_role_gate_admin_eksplisit(): void
+    {
+        $mutationRoutes = [
+            'api.v1.pegawai.store',
+            'api.v1.pegawai.check-identity',
+            'api.v1.pegawai.import.store',
+            'api.v1.pegawai.destroy',
+            'api.v1.pegawai.restore',
+            'api.v1.pegawai.keluarga.store',
+            'api.v1.pegawai.keluarga.update',
+            'api.v1.pegawai.keluarga.destroy',
+            'api.v1.pegawai.update',
+            'api.v1.pegawai.disiplin.store',
+            'api.v1.pegawai.berkas-lainnya.store',
+            'api.v1.pegawai.riwayat-kepangkatan.store',
+            'api.v1.pegawai.riwayat-jabatan.store',
+            'api.v1.pegawai.riwayat-kgb.store',
+            'api.v1.pegawai.riwayat-pendidikan.store',
+            'api.v1.pegawai.riwayat-pendidikan.update',
+            'api.v1.pegawai.riwayat-pendidikan.destroy',
+            'api.v1.pegawai.assign-atasan',
+        ];
+
+        foreach ($mutationRoutes as $routeName) {
+            $route = app('router')->getRoutes()->getByName($routeName);
+
+            $this->assertNotNull($route, "Route {$routeName} harus tersedia.");
+            $this->assertContains(
+                'role:super_admin,admin_kepegawaian',
+                $route->gatherMiddleware(),
+                "Route {$routeName} harus tetap fail-closed untuk role Pimpinan.",
+            );
+        }
+    }
+
+    public function test_pimpinan_tetap_dilarang_menghapus_keluarga_dan_pendidikan_meski_permission_mutasi_diberikan(): void
+    {
+        $role = Role::where('name', 'pimpinan')->firstOrFail();
+        $role->permissions()->syncWithoutDetaching(
+            Permission::whereIn('name', ['employee_families.delete', 'employee_histories.create'])->pluck('id'),
+        );
+        $pimpinan = User::factory()->pimpinan()->create();
+        $employee = Employee::factory()->create();
+        $family = EmployeeFamily::create([
+            'employee_id' => $employee->id,
+            'nama_anggota' => 'Keluarga Tetap Terlindungi',
+            'hubungan' => 'Anak',
+            'tanggal_lahir' => '2010-01-01',
+            'jenis_kelamin' => 'L',
+            'status_tunjangan' => true,
+        ]);
+        $jenjang = RefJenjangPendidikan::create([
+            'nama' => 'Jenjang Tetap Terlindungi',
+            'urutan' => 98,
+        ]);
+        $education = EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => $jenjang->id,
+            'nama_institusi' => 'Institusi Tetap Terlindungi',
+            'tahun_lulus' => 2020,
+        ]);
+
+        $this->actingAs($pimpinan)
+            ->withSession(['_token' => 'test-token'])
+            ->deleteJson(route('api.v1.pegawai.keluarga.destroy', [$employee, $family]), [], [
+                'X-CSRF-TOKEN' => 'test-token',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($pimpinan)
+            ->withSession(['_token' => 'test-token'])
+            ->deleteJson(route('api.v1.pegawai.riwayat-pendidikan.destroy', [$employee, $education]), [], [
+                'X-CSRF-TOKEN' => 'test-token',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('employee_families', ['id' => $family->id]);
+        $this->assertDatabaseHas('education_histories', ['id' => $education->id]);
     }
 
     public function test_pimpinan_dapat_mengunduh_dokumen_pegawai_melalui_backend_berotorisasi(): void

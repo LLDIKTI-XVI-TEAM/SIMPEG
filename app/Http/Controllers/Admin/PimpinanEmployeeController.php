@@ -113,7 +113,10 @@ class PimpinanEmployeeController extends Controller
     ) {
         $download = $action->execute($document, $employee->id, DocumentCategory::visibleToPimpinanKeys());
 
-        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+        ]);
     }
 
     public function downloadDisciplineAttachment(
@@ -124,6 +127,24 @@ class PimpinanEmployeeController extends Controller
         // Surface Pimpinan hanya membuka berkas hukuman disiplin; tipe riwayat lain tetap tidak dirutekan.
         $download = $action->execute($employee, 'discipline', $history);
 
-        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    public function downloadStatusAttachment(
+        Employee $employee,
+        string $history,
+        PrepareEmployeeHistoryAttachmentDownloadAction $action,
+    ) {
+        // UUID pegawai sendiri menandai snapshot legacy; UUID lain wajib record status milik pegawai target.
+        $type = hash_equals($employee->id, $history) ? 'status-snapshot' : 'status';
+        $download = $action->execute($employee, $type, $history);
+
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+        ]);
     }
 }

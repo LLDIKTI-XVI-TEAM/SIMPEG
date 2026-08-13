@@ -43,6 +43,9 @@ class ShowEmployeeDocumentStatusAction
         foreach ($employee->rankHistories as $history) {
             $records->push($this->record(
                 $disk,
+                $employee,
+                $history->id,
+                'rank',
                 'Pangkat',
                 $history->golongan?->nama ?? $history->golongan?->kode ?? 'Riwayat Pangkat',
                 'TMT Pangkat: '.$history->tmt_pangkat?->format('d/m/Y'),
@@ -55,6 +58,9 @@ class ShowEmployeeDocumentStatusAction
         foreach ($employee->positionHistories as $history) {
             $records->push($this->record(
                 $disk,
+                $employee,
+                $history->id,
+                'position',
                 'Jabatan',
                 $history->nama_jabatan,
                 'TMT Jabatan: '.$history->tmt_jabatan?->format('d/m/Y'),
@@ -67,6 +73,9 @@ class ShowEmployeeDocumentStatusAction
         foreach ($employee->salaryHistories as $history) {
             $records->push($this->record(
                 $disk,
+                $employee,
+                $history->id,
+                'salary',
                 'KGB',
                 'Gaji Pokok: Rp '.number_format((float) $history->gaji_pokok, 0, ',', '.'),
                 'TMT KGB: '.$history->tmt_kgb?->format('d/m/Y'),
@@ -79,6 +88,9 @@ class ShowEmployeeDocumentStatusAction
         foreach ($employee->appointments as $history) {
             $records->push($this->record(
                 $disk,
+                $employee,
+                $history->id,
+                'appointment',
                 'Pengangkatan',
                 $history->jenis_pengangkatan,
                 'TMT Pengangkatan: '.$history->tmt_pengangkatan?->format('d/m/Y'),
@@ -171,6 +183,9 @@ class ShowEmployeeDocumentStatusAction
      */
     private function record(
         Filesystem $disk,
+        Employee $employee,
+        string $historyId,
+        string $historyType,
         string $jenis,
         ?string $judul,
         string $detail,
@@ -187,8 +202,13 @@ class ShowEmployeeDocumentStatusAction
             'nomor_sk' => $nomorSk ?: '-',
             'tanggal_sk' => $tanggalSk ?: '-',
             'file_path' => $filePath,
-            // Riwayat tanpa arsip Document tidak memiliki identifier untuk route unduhan berotorisasi.
-            'file_url' => null,
+            'file_url' => $fileTersedia
+                ? route('pegawai.history-attachments.download', [
+                    'employee' => $employee,
+                    'type' => $historyType,
+                    'history' => $historyId,
+                ])
+                : null,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : (blank($filePath) ? 'File belum diunggah' : 'File tidak ditemukan'),
         ];

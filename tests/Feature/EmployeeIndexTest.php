@@ -361,6 +361,14 @@ class EmployeeIndexTest extends TestCase
             ->assertJsonPath('document_status.records.0.jenis', 'Pangkat')
             ->assertJsonPath('document_status.records.0.nomor_sk', 'SK-PANGKAT-DETAIL')
             ->assertJsonPath('document_status.records.0.file_tersedia', true)
+            ->assertJsonPath(
+                'document_status.records.0.file_url',
+                route('pegawai.history-attachments.download', [
+                    'employee' => $employee,
+                    'type' => 'rank',
+                    'history' => $employee->rankHistories()->firstOrFail(),
+                ]),
+            )
             ->assertJsonPath('document_status.total_dokumen', 3)
             ->assertJsonPath('document_status.dokumen_tersedia', 2)
             ->assertJsonFragment([
@@ -376,6 +384,12 @@ class EmployeeIndexTest extends TestCase
             ]);
         $this->assertStringNotContainsString('/storage/', $response->getContent());
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        $downloadResponse = $this->actingAs($user)
+            ->get($response->json('document_status.records.0.file_url'))
+            ->assertOk()
+            ->assertDownload();
+        $this->assertStringContainsString('no-store', (string) $downloadResponse->headers->get('Cache-Control'));
 
         Storage::disk(Document::STORAGE_DISK)->delete($filePath);
 

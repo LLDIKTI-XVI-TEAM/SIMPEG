@@ -626,7 +626,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/', fn () => redirect()->route('pimpinan.dashboard'));
             Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
 
-            Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])->name('pegawai.index');
+            // Daftar dan detail pegawai Pimpinan tetap memakai permission granular selain gate role.
+            Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])
+                ->middleware('permission:employees.read')
+                ->name('pegawai.index');
             Route::get('/pegawai/{employee}', [PimpinanEmployeeController::class, 'show'])
                 ->middleware('permission:employees.read')
                 ->whereUuid('employee')
@@ -641,6 +644,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('employee')
                 ->whereUuid('history')
                 ->name('pegawai.discipline-attachments.download');
+            Route::get('/pegawai/{employee}/status/{history}/unduh', [PimpinanEmployeeController::class, 'downloadStatusAttachment'])
+                ->middleware('permission:employees.read')
+                ->whereUuid('employee')
+                ->whereUuid('history')
+                ->name('pegawai.status-attachments.download');
 
             Route::get('/cuti', [PimpinanLeaveController::class, 'index'])->name('cuti.index');
             Route::get('/cuti/{leave}', [PimpinanLeaveController::class, 'show'])

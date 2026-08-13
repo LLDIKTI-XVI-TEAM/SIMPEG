@@ -59,12 +59,15 @@
 
             <div class="min-w-0 flex-1">
                 <x-pegawai.detail.panel tab="profile" id-prefix="pimpinan">
-                    @include('pegawai.partials.detail.profile-readonly', [
-                        'employee' => $p,
-                        'statusPresentation' => $statusPresentation,
-                        'activePosition' => $activePosition,
-                        'activeSupervisorAssignments' => $activeSupervisorAssignments,
-                    ])
+                    <x-pegawai.detail.profile
+                        :employee="$p"
+                        :status-presentation="$statusPresentation"
+                        :active-position="$activePosition"
+                        :latest-rank="$latestRank"
+                        :latest-status-history="$latestStatusHistory"
+                        :active-supervisor-assignments="$activeSupervisorAssignments"
+                        :retirement-date="$retirementDate"
+                    />
                 </x-pegawai.detail.panel>
 
                 <x-pegawai.detail.panel tab="keluarga" id-prefix="pimpinan">

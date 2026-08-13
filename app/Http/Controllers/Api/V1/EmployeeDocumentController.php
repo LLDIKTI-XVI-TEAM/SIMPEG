@@ -51,7 +51,8 @@ class EmployeeDocumentController extends Controller
      * langsung dari halaman detail pegawai.
      *
      * Hanya kategori non-SK yang diizinkan: ijazah, ktp_kk, lainnya.
-     * File disimpan ke disk publik di folder {employee_id}/{kategori}/.
+     * File disimpan ke disk privat di folder {employee_id}/{kategori}/ agar aksesnya
+     * selalu melewati endpoint yang menerapkan otorisasi dan scope pegawai.
      */
     public function storeBerkasLainnya(
         StoreBerkasLainnyaRequest $request,

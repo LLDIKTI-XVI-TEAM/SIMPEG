@@ -3,9 +3,12 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
+use App\Models\RankHistory;
 use App\Models\SupervisorAssignment;
 use App\Support\Documents\DocumentCategory;
+use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 
@@ -14,7 +17,7 @@ class PreparePimpinanEmployeeDetailAction
     /**
      * Menyiapkan seluruh data detail pegawai yang boleh dibaca Pimpinan tanpa membawa opsi mutasi Admin.
      *
-     * @return array{p: Employee, statusPresentation: array{label: string, badge: string, dot: string, effectiveDate: Carbon|null}, activePosition: PositionHistory|null, activeSupervisorAssignments: Collection<int, SupervisorAssignment>}
+     * @return array{p: Employee, statusPresentation: array{label: string, badge: string, dot: string, effectiveDate: Carbon|null}, activePosition: PositionHistory|null, latestRank: RankHistory|null, latestStatusHistory: EmployeeStatusHistory|null, activeSupervisorAssignments: Collection<int, SupervisorAssignment>, retirementDate: Carbon|null}
      */
     public function execute(string $employeeId): array
     {
@@ -45,11 +48,19 @@ class PreparePimpinanEmployeeDetailAction
                 'kelas_jabatan_terakhir',
                 'pendidikan_terakhir',
                 'prodi_pendidikan_terakhir',
+                'email',
                 'email_pribadi',
                 'no_hp',
                 'no_telepon_rumah',
                 'alamat',
                 'tanggal_pensiun',
+                'tanggal_kenaikan_pangkat_berikutnya',
+                'tanggal_kgb_berikutnya',
+                'pangkat_terakhir',
+                'status_berkas_path',
+                'status_nomor_berkas',
+                'is_satyalancana_eligible',
+                'satyalancana_note',
             ])
             ->with([
                 'agama:id,nama',
@@ -57,12 +68,21 @@ class PreparePimpinanEmployeeDetailAction
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,kode,nama,kelompok',
                 'statusHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'tanggal_efektif', 'is_latest'])
+                    ->select([
+                        'id',
+                        'employee_id',
+                        'status_nama',
+                        'keterangan',
+                        'tanggal_efektif',
+                        'nomor_berkas',
+                        'file_sk',
+                        'is_latest',
+                    ])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tanggal_efektif'),
                 'appointment',
                 'rankHistories' => fn ($query) => $query
-                    ->with('golongan:id,nama')
+                    ->with('golongan:id,kode,nama')
                     ->orderByDesc('tmt_pangkat'),
                 'positionHistories' => fn ($query) => $query
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
@@ -101,7 +121,7 @@ class PreparePimpinanEmployeeDetailAction
                             ->orWhereDate('tanggal_berakhir', '>=', today());
                     })
                     ->with([
-                        'supervisor:id,nama_lengkap,jabatan_terakhir',
+                        'supervisor:id,nama_lengkap,nip,jabatan_terakhir',
                         'supervisor.positionHistories' => fn ($positions) => $positions
                             ->select(['id', 'employee_id', 'unit_kerja_id', 'nama_jabatan', 'is_latest'])
                             ->where('is_latest', true)
@@ -110,34 +130,19 @@ class PreparePimpinanEmployeeDetailAction
             ])
             ->findOrFail($employeeId);
 
-        // Status reference adalah sumber utama; snapshot dipertahankan sebagai fallback kompatibilitas.
-        $statusLabel = $employee->statusPegawai?->nama ?? $employee->status_aktif ?? '-';
-        $statusCode = mb_strtolower(trim((string) ($employee->statusPegawai?->kode ?? '')));
-        $statusGroup = mb_strtolower(trim((string) ($employee->statusPegawai?->kelompok ?? '')));
-        $normalizedLabel = mb_strtolower(trim($statusLabel));
-        $isActive = $statusCode === 'aktif'
-            || in_array($statusGroup, ['aktif', 'aktif/khusus'], true)
-            || ($statusCode === '' && $normalizedLabel === 'aktif');
-        $isPensiun = $statusCode === 'pensiun'
-            || ($statusCode === '' && $normalizedLabel === 'pensiun');
-        $statusStyle = match (true) {
-            $isActive => ['badge' => 'bg-success/10 text-success', 'dot' => 'bg-success'],
-            $isPensiun => ['badge' => 'bg-danger/10 text-danger', 'dot' => 'bg-danger'],
-            default => ['badge' => 'bg-muted/10 text-muted', 'dot' => 'bg-muted'],
-        };
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
             ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
+        $latestRank = $employee->rankHistories->firstWhere('is_latest', true);
 
         return [
             'p' => $employee,
-            'statusPresentation' => [
-                'label' => $statusLabel,
-                'effectiveDate' => $employee->status_tanggal ?? $latestStatusHistory?->tanggal_efektif,
-                ...$statusStyle,
-            ],
+            'statusPresentation' => EmployeeProfilePresentation::status($employee, $latestStatusHistory),
             'activePosition' => $activePosition,
+            'latestRank' => $latestRank,
+            'latestStatusHistory' => $latestStatusHistory,
             'activeSupervisorAssignments' => $employee->supervisorAssignments,
+            'retirementDate' => EmployeeProfilePresentation::retirementDate($employee),
         ];
     }
 }

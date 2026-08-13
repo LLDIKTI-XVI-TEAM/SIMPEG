@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\DisciplineRecord;
-use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EwsConfig;
 use App\Models\PositionHistory;
@@ -17,6 +16,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeHistoryService
 {
@@ -241,8 +241,14 @@ class EmployeeHistoryService
 
         // Jika user memilih dari arsip dokumen, gunakan file_path dokumen sebagai file_sk
         if (empty($data['file_sk']) && ! empty($data['dokumen_id'])) {
-            $doc = Document::find($data['dokumen_id']);
-            $data['file_sk'] = $doc?->file_path;
+            $doc = $employee->documents()->find($data['dokumen_id']);
+            if ($doc === null) {
+                throw ValidationException::withMessages([
+                    'dokumen_id' => 'Dokumen SK harus dimiliki oleh pegawai yang sedang diproses.',
+                ]);
+            }
+
+            $data['file_sk'] = $doc->file_path;
         }
         unset($data['dokumen_id']);
 

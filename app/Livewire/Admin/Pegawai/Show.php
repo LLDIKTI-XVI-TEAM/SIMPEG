@@ -3,13 +3,13 @@
 namespace App\Livewire\Admin\Pegawai;
 
 use App\Models\Employee;
-use App\Models\EwsConfig;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefUnitKerja;
+use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -53,14 +53,7 @@ class Show extends Component
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
 
-        // Prioritaskan tanggal_pensiun manual jika diset, fallback ke kalkulasi BUP
-        $estimasiTanggalPensiun = $p->tanggal_pensiun;
-        if ($estimasiTanggalPensiun === null) {
-            $bupPensiunYears = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
-            $estimasiTanggalPensiun = $bupPensiunYears > 0 && $p->tanggal_lahir
-                ? $p->tanggal_lahir->copy()->addYears($bupPensiunYears)
-                : null;
-        }
+        $estimasiTanggalPensiun = EmployeeProfilePresentation::retirementDate($p);
 
         $currentSupervisor = $p->supervisorAssignments
             ->filter(fn ($assignment): bool => $assignment->tanggal_mulai->lte(today())
@@ -85,8 +78,8 @@ class Show extends Component
         // untuk data lama yang belum memiliki status_tanggal tersinkron.
         $latestStatusHistory = $p->statusHistories->firstWhere('is_latest', true)
             ?? $p->statusHistories->sortByDesc('tanggal_efektif')->first();
-        $statusEffectiveDate = $p->status_tanggal ?? $latestStatusHistory?->tanggal_efektif;
+        $statusPresentation = EmployeeProfilePresentation::status($p, $latestStatusHistory);
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusEffectiveDate', 'latestStatusHistory'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory'));
     }
 }

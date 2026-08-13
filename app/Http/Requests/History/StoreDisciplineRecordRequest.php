@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\History;
 
+use App\Models\Employee;
 use App\Support\SkFilePathRules;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -24,6 +25,9 @@ class StoreDisciplineRecordRequest extends FormRequest
 
     public function rules(): array
     {
+        $employee = $this->route('employee');
+        $employeeId = $employee instanceof Employee ? $employee->id : $employee;
+
         return [
             'jenis_hukuman' => ['required', Rule::in(['Ringan', 'Sedang', 'Berat'])],
             'deskripsi' => ['required', 'string', 'max:2000'],
@@ -32,7 +36,12 @@ class StoreDisciplineRecordRequest extends FormRequest
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
             'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
-            'dokumen_id' => ['nullable', 'uuid', 'exists:documents,id'],
+            // Arsip SK hanya boleh dipakai oleh riwayat pegawai pemiliknya agar berkas privat tidak berpindah scope.
+            'dokumen_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('documents', 'id')->where('employee_id', $employeeId),
+            ],
         ];
     }
 }

@@ -135,6 +135,32 @@ class DisciplineRecordTest extends TestCase
         ]);
     }
 
+    public function test_existing_document_discipline_must_belong_to_target_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $targetEmployee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $otherDocument = Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK milik pegawai lain',
+            'file_path' => 'pegawai-lain/sk-disiplin.pdf',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$targetEmployee->id}/disiplin", $this->validPayload([
+                'file_sk' => null,
+                'dokumen_id' => $otherDocument->id,
+            ]));
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['dokumen_id']);
+        $this->assertDatabaseMissing('discipline_records', [
+            'employee_id' => $targetEmployee->id,
+            'file_sk' => $otherDocument->file_path,
+        ]);
+    }
+
     public function test_sk_upload_rejects_disallowed_extension_even_when_content_is_pdf(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
