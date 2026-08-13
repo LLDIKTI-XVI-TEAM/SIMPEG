@@ -36,10 +36,19 @@ class UpdateEmployeeAction
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated, $employee);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
-                && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
+                && $this->dateChanged($employee->tanggal_akhir_kontrak?->toDateString(), $validated['tanggal_akhir_kontrak']);
+
+            $oldPensionDate = $employee->tanggal_pensiun?->toDateString();
+            $oldBirthDate = $employee->tanggal_lahir?->toDateString();
+            $pensionDateChanged = array_key_exists('tanggal_pensiun', $validated)
+                && $oldPensionDate !== $validated['tanggal_pensiun'];
+            $pensionFieldsChanged = $pensionDateChanged
+                || (array_key_exists('tanggal_lahir', $validated) && $oldBirthDate !== $validated['tanggal_lahir']);
+
             $rankHistoryChanged = false;
             $positionHistoryChanged = false;
             $salaryHistoryChanged = false;
+            $appointmentChanged = false;
 
             if ($request->hasFile('foto') && $request->file('foto')->isValid()) {
                 $validated['foto'] = $this->files->storePhoto($request->file('foto'));
@@ -210,9 +219,6 @@ class UpdateEmployeeAction
             if ($salaryHistoryChanged) {
                 $this->rebuildLatestSalary($employee);
             }
-            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged) {
-                $this->tmtCalculator->syncForEmployee($employee);
-            }
 
             // 4. Pengangkatan (Appointment)
             if ($request->filled('pengangkatan_jenis_pengangkatan')) {
@@ -256,8 +262,10 @@ class UpdateEmployeeAction
                 $appointment = $employee->appointment;
                 if ($appointment) {
                     $appointment->update($appointmentData);
+                    $appointmentChanged = true;
                 } else {
                     $employee->appointment()->create($appointmentData);
+                    $appointmentChanged = true;
                 }
 
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
@@ -277,6 +285,7 @@ class UpdateEmployeeAction
                 if ($pppkAppointment && $pppkAppointment->tmt_pengangkatan?->toDateString() !== $validated['pppk_tmt_pengangkatan']) {
                     $pppkAppointment->update(['tmt_pengangkatan' => $validated['pppk_tmt_pengangkatan']]);
                     $pppkContractChanged = true;
+                    $appointmentChanged = true;  // Track PPPK TMT changes for Satyalancana milestone
                 }
             }
 
@@ -299,11 +308,34 @@ class UpdateEmployeeAction
                 }
             }
 
+            // Satu sinkronisasi setelah seluruh penulisan memastikan semua sumber TMT direkonsiliasi bersama.
+            if ($rankHistoryChanged || $positionHistoryChanged || $salaryHistoryChanged || $pensionFieldsChanged || $pppkContractChanged || $appointmentChanged) {
+                if ($pensionDateChanged) {
+                    // Nilai non-null adalah keputusan resmi Admin; null mengembalikan sumber ke kalkulasi BUP.
+                    $this->tmtCalculator->syncForEmployee($employee, $employee->tanggal_pensiun !== null);
+                } else {
+                    $this->tmtCalculator->syncForEmployee($employee);
+                }
+            }
+
             $employee->refresh();
             AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
 
             return $employee;
         });
+    }
+
+    /**
+     * Compare two date values normalizing to Y-m-d to avoid false positives from
+     * format differences (e.g. toArray() returns Y-m-d H:i:s, validated sends Y-m-d).
+     */
+    private function dateChanged(mixed $old, mixed $new): bool
+    {
+        $normalize = fn (mixed $v): ?string => $v !== null
+            ? substr((string) $v, 0, 10)
+            : null;
+
+        return $normalize($old) !== $normalize($new);
     }
 
     private function normalizeEmployeeContract(array $data, ?Employee $employee = null): array

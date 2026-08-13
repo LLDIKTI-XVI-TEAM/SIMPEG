@@ -43,6 +43,9 @@ class CreateEmployeeAction
 
                 $employee = Employee::create($data);
                 $sourceHistoryChanged = false;
+                $hasAuthoritativePensionDate = array_key_exists('tanggal_pensiun', $data)
+                    && $data['tanggal_pensiun'] !== null
+                    && $data['tanggal_pensiun'] !== '';
 
                 // 1. Pangkat (RankHistory)
                 if ($request->filled('pangkat_golongan_id') || $request->filled('pangkat_no_sk') || $request->filled('pangkat_tmt_pangkat') || $request->hasFile('file_sk_pangkat')) {
@@ -162,11 +165,6 @@ class CreateEmployeeAction
                     $sourceHistoryChanged = true;
                 }
 
-                // Sinkronisasi ditunda sampai seluruh riwayat sumber tersimpan agar snapshot tidak membaca keadaan parsial.
-                if ($sourceHistoryChanged) {
-                    $this->tmtCalculator->syncForEmployee($employee);
-                }
-
                 // 4. Pengangkatan (Appointment)
                 if ($request->filled('pengangkatan_jenis_pengangkatan') || $request->filled('pengangkatan_no_sk') || $request->filled('pengangkatan_tmt_pengangkatan') || $request->hasFile('file_sk_pengangkatan')) {
                     $appointmentData = [
@@ -193,6 +191,7 @@ class CreateEmployeeAction
                     }
 
                     $employee->appointment()->create($appointmentData);
+                    $sourceHistoryChanged = true;
 
                     $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
                         strtoupper($data['pengangkatan_jenis_pengangkatan']),
@@ -200,6 +199,14 @@ class CreateEmployeeAction
                     if ($jenisPegawai) {
                         $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
                     }
+                }
+
+                // Sinkronisasi tunggal setelah seluruh riwayat sumber tersimpan mencegah kalkulasi memakai state parsial.
+                if ($hasAuthoritativePensionDate) {
+                    // Hint authoritative menjaga tanggal resmi dari form agar tidak ditimpa kalkulasi BUP.
+                    $this->tmtCalculator->syncForEmployee($employee, true);
+                } elseif ($sourceHistoryChanged) {
+                    $this->tmtCalculator->syncForEmployee($employee);
                 }
 
                 // 5. Berkas Lainnya (KTP, KK, SK Mutasi, SK Pensiun, atau jenis manual)

@@ -200,6 +200,51 @@ class EmployeeCreationTest extends TestCase
         $response->assertNotFound();
     }
 
+    public function test_creation_rejects_duplicate_email_case_insensitively(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Create an existing employee with specific case
+        Employee::factory()->create([
+            'email_pribadi' => 'Budi.Santoso@example.com',
+            'nip' => '199001012020121001',
+        ]);
+
+        $this->actingAs($user);
+
+        // Attempt to create another with different case
+        $payload = $this->validPayload(['email_pribadi' => 'budi.santoso@EXAMPLE.COM']);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $payload);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('email_pribadi');
+        $this->assertEquals(
+            'Email sudah terdaftar pada pegawai lain.',
+            $response->json('errors.email_pribadi.0')
+        );
+    }
+
+    public function test_creation_rejects_email_owned_by_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveEmployee = Employee::factory()->create([
+            'email_pribadi' => 'arsip.pegawai@example.com',
+        ]);
+        $inactiveEmployee->delete();
+
+        $this->actingAs($user);
+        $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload([
+            'email_pribadi' => 'ARSIP.PEGAWAI@example.com',
+        ]));
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('email_pribadi');
+        $this->assertSame(
+            'Email sudah terdaftar pada pegawai lain.',
+            $response->json('errors.email_pribadi.0'),
+        );
+    }
+
     private function postJsonWithCsrf(string $uri, array $data)
     {
         return $this->withSession(['_token' => 'test-token'])

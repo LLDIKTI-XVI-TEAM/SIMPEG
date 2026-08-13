@@ -3,14 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ApproveLeaveAction;
-use App\Actions\Cuti\BuildVerifierLeaveContextAction;
+use App\Actions\Cuti\BuildCutiDetailAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\PrepareLeaveRequestFormAction;
-use App\Actions\Cuti\PreviewLeaveBalanceAction;
 use App\Actions\Cuti\RecordDutyPostponementAction;
 use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
@@ -24,9 +23,8 @@ use App\Http\Requests\Cuti\ResubmitLeaveRequestRequest;
 use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
-use App\Services\LeaveApprovalService;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\Response;
 
 class CutiController extends Controller
@@ -69,55 +67,13 @@ class CutiController extends Controller
         return view('admin.cuti.form-pengajuan', $action->execute($employee));
     }
 
-    /**
-     * Menampilkan detail satu pengajuan cuti.
-     * Pegawai tanpa hak memantau hanya boleh membuka pengajuan miliknya sendiri (cegah akses lintas pegawai).
-     */
-    public function show($id, LeaveApprovalService $approvals, DownloadOfficialLeavePdfAction $pdfAction, PreviewLeaveBalanceAction $balancePreview, BuildVerifierLeaveContextAction $verifierContextAction)
+    /** Menampilkan detail cuti dari konteks baca yang telah diotorisasi Action. */
+    public function show(LeaveRequest $id, Request $request, BuildCutiDetailAction $action)
     {
-        $user = request()->user();
+        /** @var User $user */
+        $user = $request->user();
 
-        $cuti = LeaveRequest::query()
-            ->with(['employee', 'jenisCuti', 'proof', 'approvals.approver', 'steps.approver'])
-            ->findOrFail($id);
-
-        // Tombol setujui/tunda hanya muncul bila pengguna ini adalah approver tahap yang sedang menunggu
-        // DAN status pengajuan memang masih dapat diputus; otorisasi sebenarnya tetap ditegakkan ulang
-        // di service saat aksi dijalankan.
-        $stage = $approvals->pendingStage($cuti);
-        $isSnapshotApprover = $stage !== null
-            && $approvals->approverEmployeeIdForStage($cuti, $stage) === $user->employee_id;
-        $canAct = $isSnapshotApprover
-            && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
-        $canDownloadFormulir = $pdfAction->canDownload($cuti, $user);
-
-        // Akses baca memakai keberadaan snapshot approver, bukan izin bertindak, agar approver lama
-        // tetap dapat menelusuri pengajuan yang sudah dikembalikan ke pemohon.
-        if (! $user->hasPermission('cuti.read_all') && $cuti->employee_id !== $user->employee_id && ! $isSnapshotApprover && ! $canDownloadFormulir) {
-            abort(403);
-        }
-
-        $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
-        $isVerifierContext = $canAct || $user->hasPermission('cuti.read_all');
-        $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
-            ? $balancePreview->execute($cuti->employee, Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay())
-            : null;
-        $verifierContext = $isVerifierContext && $cuti->employee !== null
-            ? $verifierContextAction->execute($cuti->employee, $cuti->tanggal_mulai ?? now(), $cuti)
-            : null;
-
-        return view('admin.cuti.show', [
-            'cuti' => $cuti,
-            'canAct' => $canAct,
-            'isVerifierContext' => $isVerifierContext,
-            'canDownloadFormulir' => $canDownloadFormulir,
-            'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
-                && $cuti->employee_id === $user->employee_id,
-            'isRolloverReturn' => $isRolloverReturn,
-            'targetBalance' => $targetBalance,
-            'verifierContext' => $verifierContext,
-            'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
-        ]);
+        return view('admin.cuti.show', $action->execute($id, $user));
     }
 
     /**
