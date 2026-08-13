@@ -563,6 +563,7 @@
                         prodi:     h.jurusan ?? '-',
                         lulus:     h.tahun_lulus,
                         no_ijazah: h.no_ijazah ?? '-',
+                        download_url: h.download_url,
                     };
                 }
                 sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));

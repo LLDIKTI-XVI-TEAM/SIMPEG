@@ -683,6 +683,24 @@ class EmployeeShowTest extends TestCase
         ]), $row['download_url']);
     }
 
+    public function test_detail_page_preserves_education_download_url_after_metadata_update(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $content = $this->actingAs($admin)
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $updateHandler = Str::between(
+            $content,
+            'async submitEditPendidikan() {',
+            'async deletePendidikan(id, index) {',
+        );
+
+        $this->assertStringContainsString('download_url: h.download_url', $updateHandler);
+    }
+
     public function test_detail_admin_tidak_merender_tautan_attachment_yang_file_privatnya_hilang(): void
     {
         Storage::fake(Document::STORAGE_DISK);

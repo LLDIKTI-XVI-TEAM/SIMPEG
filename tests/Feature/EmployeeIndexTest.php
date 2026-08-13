@@ -402,6 +402,48 @@ class EmployeeIndexTest extends TestCase
             ->assertJsonPath('document_status.records.0.status_label', 'File tidak ditemukan');
     }
 
+    public function test_document_status_rejects_history_path_with_conflicting_document_scope(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
+        $filePath = 'ranks/sk/konflik-scope.pdf';
+        $history = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $rank->id,
+            'tmt_pangkat' => '2026-01-01',
+            'no_sk' => 'SK-PANGKAT-KONFLIK',
+            'tanggal_sk' => '2025-12-20',
+            'file_sk' => $filePath,
+            'is_latest' => true,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK milik pegawai lain');
+        Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => 'sk_pangkat',
+            'nama_dokumen' => 'SK Pangkat Pegawai Lain',
+            'file_path' => $filePath,
+        ]);
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.status_kelengkapan', 'tidak_lengkap')
+            ->assertJsonPath('document_status.file_tersedia', 0)
+            ->assertJsonPath('document_status.records.0.file_tersedia', false)
+            ->assertJsonPath('document_status.records.0.file_url', null);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => 'rank',
+                'history' => $history,
+            ]))
+            ->assertNotFound();
+    }
+
     private function assertEmployeeDocumentCompleteness(User $user, Employee $employee, string $expected): void
     {
         $this->actingAs($user)

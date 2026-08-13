@@ -76,7 +76,7 @@ class EmployeeHistoryAttachmentService
         return $this->availableEmployeePath(
             $employee,
             $history->getAttribute($config['path']),
-            $config['category'],
+            [$config['category']],
         );
     }
 
@@ -90,7 +90,11 @@ class EmployeeHistoryAttachmentService
         }
 
         if ($history->file_sk !== null) {
-            return $this->availablePath($employee, 'status', $history);
+            return $this->availableEmployeePath(
+                $employee,
+                $history->file_sk,
+                $this->statusDocumentCategories($history->status_nama),
+            );
         }
 
         $documents = $employee->relationLoaded('documents')
@@ -103,7 +107,15 @@ class EmployeeHistoryAttachmentService
     /** Snapshot legacy tetap boleh tanpa metadata, tetapi konflik metadata wajib ditolak. */
     public function availableStatusSnapshotPath(Employee $employee): ?string
     {
-        return $this->availableEmployeePath($employee, $employee->status_berkas_path, 'sk_status_pegawai');
+        $statusName = $employee->relationLoaded('statusPegawai')
+            ? $employee->statusPegawai?->nama
+            : $employee->statusPegawai()->value('nama');
+
+        return $this->availableEmployeePath(
+            $employee,
+            $employee->status_berkas_path,
+            $this->statusDocumentCategories($statusName ?? $employee->getRawOriginal('status_aktif')),
+        );
     }
 
     public function statusDownloadUrl(
@@ -131,7 +143,8 @@ class EmployeeHistoryAttachmentService
         return $this->statusRoute($employee, $employee, 'status-snapshot', $routeName, $includeType);
     }
 
-    private function availableEmployeePath(Employee $employee, mixed $path, string $category): ?string
+    /** @param list<string> $categories */
+    private function availableEmployeePath(Employee $employee, mixed $path, array $categories): ?string
     {
         if (! is_string($path) || $path === '' || ! Storage::disk(Document::STORAGE_DISK)->exists($path)) {
             return null;
@@ -143,9 +156,26 @@ class EmployeeHistoryAttachmentService
 
         $conflictingReferenceExists = collect($this->documentReferences[$path])
             ->contains(fn (array $reference): bool => ! hash_equals((string) $employee->id, $reference['employee_id'])
-                || $reference['jenis_dokumen'] !== $category);
+                || ! in_array($reference['jenis_dokumen'], $categories, true));
 
         return $conflictingReferenceExists ? null : $path;
+    }
+
+    /**
+     * SK pensiun dihasilkan alur persetujuan EWS sebagai SK status yang sah,
+     * tetapi kategorinya hanya boleh diterima saat status pegawai memang Pensiun.
+     *
+     * @return list<string>
+     */
+    private function statusDocumentCategories(?string $statusName): array
+    {
+        $categories = ['sk_status_pegawai'];
+
+        if (mb_strtolower(trim((string) $statusName)) === 'pensiun') {
+            $categories[] = 'sk_pensiun';
+        }
+
+        return $categories;
     }
 
     public function downloadUrl(

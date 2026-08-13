@@ -293,12 +293,20 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
         $otherEmployee = Employee::factory()->create();
         $statusPath = 'sk/status-cross-owner.pdf';
         $snapshotPath = 'sk/status-snapshot-wrong-category.pdf';
+        $nonPensionPath = 'sk/status-active-with-pension-category.pdf';
         $history = EmployeeStatusHistory::create([
             'employee_id' => $employee->id,
             'status_nama' => 'Aktif',
             'tanggal_efektif' => '2026-08-14',
             'file_sk' => $statusPath,
             'is_latest' => true,
+        ]);
+        $nonPensionHistory = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Aktif',
+            'tanggal_efektif' => '2026-08-13',
+            'file_sk' => $nonPensionPath,
+            'is_latest' => false,
         ]);
         $employee->update(['status_berkas_path' => $snapshotPath]);
         Document::create([
@@ -313,8 +321,15 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
             'nama_dokumen' => 'Identitas bukan SK status',
             'file_path' => $snapshotPath,
         ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pensiun',
+            'nama_dokumen' => 'SK pensiun bukan untuk status aktif',
+            'file_path' => $nonPensionPath,
+        ]);
         Storage::disk(Document::STORAGE_DISK)->put($statusPath, 'status pegawai lain');
         Storage::disk(Document::STORAGE_DISK)->put($snapshotPath, 'identitas sensitif');
+        Storage::disk(Document::STORAGE_DISK)->put($nonPensionPath, 'SK pensiun salah konteks');
         $admin = User::factory()->adminKepegawaian()->create();
         $pimpinan = User::factory()->pimpinan()->create();
         $adminStatusUrl = $this->url($employee, 'status', $history->id);
@@ -326,7 +341,14 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
 
         $this->actingAs($admin)->get($adminStatusUrl)->assertNotFound();
         $this->actingAs($admin)->get($adminSnapshotUrl)->assertNotFound();
+        $this->actingAs($admin)->get($this->url($employee, 'status', $nonPensionHistory->id))->assertNotFound();
         $this->actingAs($pimpinan)->get($pimpinanStatusUrl)->assertNotFound();
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.status-attachments.download', [
+                'employee' => $employee,
+                'history' => $nonPensionHistory,
+            ]))
+            ->assertNotFound();
         $this->actingAs($pimpinan)
             ->get(route('pimpinan.pegawai.show', $employee))
             ->assertOk()
