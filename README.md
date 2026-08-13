@@ -110,6 +110,66 @@ http://localhost:8000
 
 ---
 
+## Update Aplikasi (Menarik Perubahan Baru)
+
+Instalasi yang sudah berjalan tidak otomatis menyesuaikan schema database ketika kode baru
+ditarik. Migration **tidak** dijalankan pada startup container dan **tidak** dijalankan dari
+request HTTP, karena migration paralel dari beberapa container web/worker berisiko saling
+berebut (race condition) dan mengubah schema di luar kendali rilis.
+
+Jalankan langkah berikut **berurutan** setiap kali menarik perubahan yang memuat migration baru:
+
+```bash
+# 1. Ambil kode terbaru
+git pull
+
+# 2. Hentikan worker agar tidak ada job yang berjalan di atas schema lama
+podman compose stop queue scheduler
+
+# 3. Perbarui dependency bila composer.lock / package-lock.json berubah
+podman compose exec app composer install
+# Build asset dijalankan di host karena Node.js tidak tersedia di container app
+npm ci && npm run build
+
+# 4. Jalankan migration satu kali dari container app
+podman compose exec app php artisan migrate
+
+# 5. Bersihkan cache konfigurasi/route hasil build lama
+podman compose exec app php artisan optimize:clear
+
+# 6. Jalankan ulang aplikasi dan worker dengan kode + schema yang sudah sinkron
+podman compose up -d
+podman compose restart queue scheduler
+
+# 7. Verifikasi tidak ada migration yang tertinggal
+podman compose exec app php artisan migrate:status
+podman compose exec app php artisan about --only=environment
+```
+
+Catatan penting:
+
+- Langkah 4 harus selesai **sebelum** worker versi baru menerima job. Worker yang berjalan di
+  atas schema lama akan gagal menyimpan state batch dan job berpotensi berakhir di `failed_jobs`.
+- Pada instalasi dengan lebih dari satu container app/worker, jalankan `migrate` dari **satu**
+  container saja.
+- Untuk lingkungan yang melayani pengguna, aktifkan mode maintenance sebelum langkah 2 dan
+  matikan setelah langkah 6:
+
+  ```bash
+  podman compose exec app php artisan down
+  podman compose exec app php artisan up
+  ```
+
+- Jangan memakai `migrate:fresh`, `migrate:refresh`, atau `migrate:reset` pada database yang
+  sudah memuat data nyata; ketiganya menghapus data.
+
+> Prosedur rilis produksi kanonis (siapa yang menjalankan, jendela maintenance, dan strategi
+> rollback) belum ditetapkan dalam dokumen proyek. Sampai keputusan tersebut ada, prosedur di
+> atas menjadi acuan update manual dan tidak boleh diganti dengan auto-migration pada startup
+> container tanpa persetujuan eksplisit.
+
+---
+
 ## Perintah yang Sering Digunakan
 
 ### Container Management
@@ -363,6 +423,24 @@ podman compose logs db
 ```
 
 Tunggu beberapa detik setelah `podman compose up` agar PostgreSQL selesai inisialisasi.
+
+### Import pegawai menolak dengan pesan "Database aplikasi belum siap"
+
+Endpoint eksekusi import memeriksa kolom wajib tabel `import_batches` sebelum batch diklaim.
+Bila ada kolom yang belum tersedia, endpoint menolak dengan HTTP 503 dan tidak membuat batch,
+job, maupun data pegawai. Penyebab paling umum adalah migration yang belum dijalankan setelah
+menarik kode baru.
+
+Periksa dan jalankan migration yang tertinggal:
+
+```bash
+podman compose exec app php artisan migrate:status
+podman compose exec app php artisan migrate
+podman compose restart queue
+```
+
+Daftar kolom yang hilang dicatat pada `storage/logs/laravel.log` dengan konteks
+`import.pegawai.schema_readiness`.
 
 ---
 
