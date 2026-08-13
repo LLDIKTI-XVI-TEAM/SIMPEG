@@ -8,11 +8,12 @@ use App\Actions\Referensi\ToggleReferenceItemActiveAction;
 use App\Actions\Referensi\UpdateReferenceItemAction;
 use App\Http\Controllers\Admin\Concerns\RedirectsToDataMasterTab;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Referensi\DeleteProgramStudiRequest;
 use App\Http\Requests\Referensi\StoreProgramStudiRequest;
+use App\Http\Requests\Referensi\ToggleProgramStudiRequest;
 use App\Http\Requests\Referensi\UpdateProgramStudiRequest;
 use App\Models\RefProgramStudi;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 
 class DataMasterProgramStudiController extends Controller
 {
@@ -32,7 +33,7 @@ class DataMasterProgramStudiController extends Controller
         return $this->backToTab($request, 'Program studi berhasil diperbarui.');
     }
 
-    public function toggle(Request $request, RefProgramStudi $programStudi, ToggleReferenceItemActiveAction $action): RedirectResponse
+    public function toggle(ToggleProgramStudiRequest $request, RefProgramStudi $programStudi, ToggleReferenceItemActiveAction $action): RedirectResponse
     {
         $action->execute($programStudi, $request);
 
@@ -41,7 +42,7 @@ class DataMasterProgramStudiController extends Controller
             : 'Program studi berhasil dinonaktifkan.');
     }
 
-    public function destroy(Request $request, RefProgramStudi $programStudi, DeleteReferenceItemAction $action): RedirectResponse
+    public function destroy(DeleteProgramStudiRequest $request, RefProgramStudi $programStudi, DeleteReferenceItemAction $action): RedirectResponse
     {
         $action->execute($programStudi, $request);
 

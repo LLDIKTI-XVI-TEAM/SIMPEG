@@ -23,6 +23,9 @@ class CreateEducationHistoryAction
             // Kolom no_ijazah belum nullable di DB pada schema awal;
             // coerce null ke string kosong sebagai safety net sebelum migration dijalankan.
             $data['no_ijazah'] = $data['no_ijazah'] ?? '';
+            // Jurusan adalah snapshot legacy; CRUD baru hanya boleh
+            // menurunkannya dari data master yang dipilih.
+            unset($data['jurusan']);
             $this->syncProgramStudiSnapshot($data);
 
             $history = $employee->educationHistories()->create($data);

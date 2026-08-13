@@ -57,8 +57,10 @@ class EmployeeValidationRules
 
             // Pendidikan snapshot
             'pendidikan_terakhir' => ['nullable', 'string', 'max:50'],
-            'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
             'program_studi_id' => ['nullable', 'uuid', Rule::exists('ref_program_studi', 'id')->where('is_active', true)],
+            // Pengosongan harus eksplisit agar snapshot hasil import yang belum
+            // direkonsiliasi tidak terhapus hanya karena select mengirim nilai kosong.
+            'clear_program_studi' => ['sometimes', 'boolean'],
 
             // Pensiun
             // Jika diisi, ini adalah tanggal pensiun manual yang diprioritaskan EWS.

@@ -291,11 +291,13 @@ class CreateEmployeeAction
             $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
         }
 
-        if (array_key_exists('program_studi_id', $data)) {
-            $data['prodi_pendidikan_terakhir'] = $data['program_studi_id']
-                ? RefProgramStudi::find($data['program_studi_id'])?->nama
-                : null;
+        if (! empty($data['program_studi_id'])) {
+            $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        } else {
+            unset($data['program_studi_id'], $data['prodi_pendidikan_terakhir']);
         }
+
+        unset($data['clear_program_studi']);
 
         return $data;
     }

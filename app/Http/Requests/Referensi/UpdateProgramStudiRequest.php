@@ -4,10 +4,16 @@ namespace App\Http\Requests\Referensi;
 
 use App\Models\RefProgramStudi;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateProgramStudiRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('nama')) {
+            $this->merge(['nama' => preg_replace('/\s+/u', ' ', trim((string) $this->input('nama')))]);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->role === 'super_admin';
@@ -19,7 +25,19 @@ class UpdateProgramStudiRequest extends FormRequest
         $programStudiId = $programStudi instanceof RefProgramStudi ? $programStudi->id : null;
 
         return [
-            'nama' => ['required', 'string', 'max:255', Rule::unique('ref_program_studi', 'nama')->ignore($programStudiId)],
+            'nama' => [
+                'required',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail) use ($programStudiId): void {
+                    if (RefProgramStudi::query()
+                        ->whereRaw('LOWER(nama) = ?', [mb_strtolower((string) $value)])
+                        ->where('id', '!=', $programStudiId)
+                        ->exists()) {
+                        $fail('Nama program studi sudah tersedia.');
+                    }
+                },
+            ],
         ];
     }
 

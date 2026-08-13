@@ -178,6 +178,18 @@ class EmployeeCreationTest extends TestCase
         $this->assertDatabaseMissing('employees', ['nip' => '198001012006041001']);
     }
 
+    public function test_free_text_program_studi_is_not_used_by_normal_employee_crud(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload([
+            'prodi_pendidikan_terakhir' => 'Program Studi Bebas Dari Client',
+        ]));
+
+        $response->assertCreated();
+        $this->assertNull(Employee::query()->where('nip', '198001012006041001')->value('prodi_pendidikan_terakhir'));
+    }
+
     public function test_old_employees_store_endpoint_is_not_available(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

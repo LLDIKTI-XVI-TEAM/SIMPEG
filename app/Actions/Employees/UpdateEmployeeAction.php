@@ -34,7 +34,7 @@ class UpdateEmployeeAction
         return DB::transaction(function () use ($employee, $validated, $request) {
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
-            $validated = $this->normalizeEmployeeContract($validated);
+            $validated = $this->normalizeEmployeeContract($validated, $employee);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && ($oldValues['tanggal_akhir_kontrak'] ?? null) !== $validated['tanggal_akhir_kontrak'];
             $rankHistoryChanged = false;
@@ -306,7 +306,7 @@ class UpdateEmployeeAction
         });
     }
 
-    private function normalizeEmployeeContract(array $data): array
+    private function normalizeEmployeeContract(array $data, ?Employee $employee = null): array
     {
         $email = $data['email_pribadi'] ?? $data['email'] ?? null;
         if ($email !== null) {
@@ -330,11 +330,18 @@ class UpdateEmployeeAction
             $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $data['status_aktif'])->value('id');
         }
 
-        if (array_key_exists('program_studi_id', $data)) {
-            $data['prodi_pendidikan_terakhir'] = $data['program_studi_id']
-                ? RefProgramStudi::find($data['program_studi_id'])?->nama
-                : null;
+        if (! empty($data['program_studi_id'])) {
+            $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        } elseif (($data['clear_program_studi'] ?? false) === true) {
+            $data['program_studi_id'] = null;
+            $data['prodi_pendidikan_terakhir'] = null;
+        } elseif ($employee !== null) {
+            // Form edit selalu mengirim select kosong. Itu bukan intent untuk
+            // menghapus snapshot import yang belum memiliki relasi referensi.
+            unset($data['program_studi_id'], $data['prodi_pendidikan_terakhir']);
         }
+
+        unset($data['clear_program_studi']);
 
         return $data;
     }

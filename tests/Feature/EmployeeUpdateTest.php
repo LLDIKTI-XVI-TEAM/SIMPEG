@@ -292,6 +292,49 @@ class EmployeeUpdateTest extends TestCase
         $this->assertNull($employee->fresh()->program_studi_id);
     }
 
+    public function test_update_preserves_unreconciled_import_program_studi_snapshot(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'program_studi_id' => null,
+            'prodi_pendidikan_terakhir' => 'Program Studi Dari Import',
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Setelah Diperbarui',
+            'program_studi_id' => null,
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'program_studi_id' => null,
+            'prodi_pendidikan_terakhir' => 'Program Studi Dari Import',
+        ]);
+    }
+
+    public function test_update_requires_explicit_intent_to_clear_program_studi_snapshot(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Negara']);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+            'prodi_pendidikan_terakhir' => $programStudi->nama,
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'program_studi_id' => null,
+            'clear_program_studi' => true,
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'program_studi_id' => null,
+            'prodi_pendidikan_terakhir' => null,
+        ]);
+    }
+
     public function test_pppk_contract_dates_are_shown_saved_and_reset_active_contract_alerts(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

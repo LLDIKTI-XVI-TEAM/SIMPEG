@@ -2362,8 +2362,8 @@
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
                     <select x-model="editPendidikanForm.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                         <option value="">-- Pilih Program Studi --</option>
-                        @foreach($programStudiOptions as $programStudi)
-                            <option value="{{ $programStudi->id }}">{{ $programStudi->nama }}</option>
+                        @foreach($educationProgramStudiOptions as $programStudi)
+                            <option value="{{ $programStudi->id }}" :disabled="{{ $programStudi->is_active ? 'false' : 'editPendidikanForm.program_studi_id !== \''. $programStudi->id .'\'' }}">{{ $programStudi->nama }}{{ ! $programStudi->is_active ? ' (Nonaktif)' : '' }}</option>
                         @endforeach
                     </select>
                 </div>

@@ -56,6 +56,21 @@ class DataMasterProgramStudiTest extends TestCase
         $this->assertDatabaseHas('ref_program_studi', ['id' => $programStudi->id]);
     }
 
+    public function test_program_studi_name_is_normalized_and_unique_case_insensitively(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.store'), [
+            'nama' => '  Teknik   Informatika  ',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('ref_program_studi', ['nama' => 'Teknik Informatika']);
+
+        $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.store'), [
+            'nama' => 'teknik informatika',
+        ])->assertSessionHasErrors('nama');
+    }
+
     public function test_renaming_program_studi_syncs_education_and_employee_snapshots(): void
     {
         $user = User::factory()->superAdmin()->create();

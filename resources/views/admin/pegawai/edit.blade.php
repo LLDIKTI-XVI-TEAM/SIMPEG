@@ -618,6 +618,10 @@
                                 @endforeach
                             </select>
                             <p class="text-xs text-muted">Pilih dari Data Master Program Studi.</p>
+                            <label class="mt-2 flex items-center gap-2 text-xs text-muted">
+                                <input type="checkbox" name="clear_program_studi" value="1" @checked(old('clear_program_studi'))>
+                                Hapus relasi dan snapshot Program Studi secara eksplisit.
+                            </label>
                         </div>
 
 

@@ -76,6 +76,18 @@ class EducationHistoryTest extends TestCase
         $this->assertSame($programStudi->id, $employee->refresh()->program_studi_id);
     }
 
+    public function test_free_text_jurusan_is_not_used_by_normal_education_history_crud(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($user)->postJsonWithCsrf($this->endpoint($employee), $this->validPayload([
+            'jurusan' => 'Jurusan Bebas Dari Client',
+        ]));
+
+        $response->assertCreated()->assertJsonPath('history.jurusan', null);
+    }
+
     public function test_admin_cannot_create_education_history_with_inactive_program_studi(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -191,6 +203,22 @@ class EducationHistoryTest extends TestCase
 
         $response->assertOk()->assertJsonPath('history.jurusan', 'Jurusan Manual');
         $this->assertSame('Jurusan Manual', $history->fresh()->jurusan);
+    }
+
+    public function test_free_text_jurusan_cannot_overwrite_legacy_snapshot_on_update(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'jurusan' => 'Snapshot Legacy',
+        ]));
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $this->validPayload(['jurusan' => 'Teks Baru Dari Client']),
+        );
+
+        $response->assertOk()->assertJsonPath('history.jurusan', 'Snapshot Legacy');
     }
 
     public function test_admin_can_update_employee_education_history(): void
