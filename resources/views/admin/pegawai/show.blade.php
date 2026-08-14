@@ -44,6 +44,7 @@
 
     <div x-data="{
         activeTab: new URLSearchParams(window.location.search).get('tab') || 'profile',
+        tabOrder: ['profile', 'keluarga', 'kepangkatan', 'jabatan', 'kgb', 'disiplin', 'pendidikan', 'pengangkatan', 'docs'],
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
         kinerjaEndpoint: @js(route('pegawai.kinerja.update', $p->id)),
         isUpdatingKinerja: false,
@@ -400,6 +401,29 @@
                 return `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
             return dateString;
+        },
+
+        activateTab(tab) {
+            if (this.tabOrder.includes(tab)) {
+                this.activeTab = tab;
+            }
+        },
+        moveTabFocus(event, currentTab) {
+            const supportedKeys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+            if (!supportedKeys.includes(event.key)) return;
+
+            event.preventDefault();
+            const currentIndex = this.tabOrder.indexOf(currentTab);
+            let nextIndex = currentIndex;
+
+            if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % this.tabOrder.length;
+            if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + this.tabOrder.length) % this.tabOrder.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = this.tabOrder.length - 1;
+
+            const nextTab = this.tabOrder[nextIndex];
+            this.activateTab(nextTab);
+            this.$nextTick(() => this.$refs[`pegawai_tab_${nextTab}`]?.focus());
         },
 
         init() {
@@ -791,26 +815,28 @@
                     <span class="font-medium text-ink">Detail Pegawai</span>
                 </nav>
             </div>
-            <div class="flex items-center gap-3 shrink-0">
-                <a href="javascript:void(0)" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}'; }" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft shadow-sm">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+            <div class="flex flex-wrap items-center justify-end gap-2 sm:gap-3 shrink-0">
+                <x-ui.button type="button" variant="secondary" size="md" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ auth()->user()->role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai') }}'; }">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                     </svg>
                     Kembali
-                </a>
+                </x-ui.button>
                 @if(auth()->user()->role !== 'pimpinan')
-                <a href="{{ route('pegawai.edit', $p->id) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                <x-ui.button as="a" href="{{ route('pegawai.edit', $p->id) }}" wire:navigate variant="primary" size="md">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
                     Edit Pegawai
-                </a>
+                </x-ui.button>
                 @endif
                 @if($canDeactivateEmployee)
-                <button type="button" @click="showDeactivateModal = true"
-                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                <x-ui.button type="button" variant="danger-solid" size="md" @click="showDeactivateModal = true">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
                     Nonaktifkan
-                </button>
+                </x-ui.button>
                 @endif
             </div>
         </div>
@@ -863,10 +889,13 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-xl font-bold text-ink font-sans leading-tight">{{ $p->nama_dengan_gelar ?? $p->nama_lengkap }}</h2>
                         </div>
-                        @if($p->nama_dengan_gelar)
-                            <p class="text-xs text-muted font-sans mt-0.5">{{ $p->nama_lengkap }}</p>
-                        @endif
-                        <p class="text-xs text-muted">NIP. {{ $p->nip }}</p>
+                        <div class="flex flex-wrap items-center gap-2 text-xs text-muted font-sans mt-0.5">
+                            @if($p->nama_dengan_gelar)
+                                <span>{{ $p->nama_lengkap }}</span>
+                                <span>&middot;</span>
+                            @endif
+                            <span>NIP. {{ $p->nip }}</span>
+                        </div>
                         <div class="flex items-center gap-2 mt-1.5">
                             <x-ui.badge variant="primary" size="md" class="!font-bold">
                                 {{ $p->jenisPegawai->nama ?? '-' }}
@@ -887,22 +916,22 @@
             </div>
 
             {{-- TAB NAVIGATION --}}
-            <div class="border-b border-border flex gap-4 md:gap-6 overflow-x-auto pb-1 select-none" aria-label="Navigasi detail pegawai" aria-orientation="vertical">
-                <button @click="activeTab = 'profile'" :class="activeTab === 'profile' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Profil</button>
-                <button @click="activeTab = 'keluarga'" :class="activeTab === 'keluarga' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Keluarga</button>
-                <button @click="activeTab = 'kepangkatan'" :class="activeTab === 'kepangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Kepangkatan</button>
-                <button @click="activeTab = 'jabatan'" :class="activeTab === 'jabatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Jabatan</button>
-                <button @click="activeTab = 'kgb'" :class="activeTab === 'kgb' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">KGB</button>
-                <button @click="activeTab = 'disiplin'" :class="activeTab === 'disiplin' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Hukuman Disiplin</button>
-                <button @click="activeTab = 'pendidikan'" :class="activeTab === 'pendidikan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pendidikan</button>
-                <button @click="activeTab = 'pengangkatan'" :class="activeTab === 'pengangkatan' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Pengangkatan</button>
-                <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-b-2 border-primary text-primary font-bold pb-2' : 'text-muted hover:text-ink font-semibold pb-2'" class="text-xs md:text-sm transition-colors cursor-pointer focus:outline-none font-sans shrink-0">Dokumen SK</button>
-            </div>
+            <x-ui.tabs label="Navigasi detail pegawai" aria-orientation="horizontal">
+                <x-ui.tab active="activeTab === 'profile'" click="activateTab('profile')" id="pegawai-tab-profile" x-ref="pegawai_tab_profile" x-bind:tabindex="activeTab === 'profile' ? 0 : -1" aria-controls="pegawai-panel-profile" @keydown="moveTabFocus($event, 'profile')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Profil</x-ui.tab>
+                <x-ui.tab active="activeTab === 'keluarga'" click="activateTab('keluarga')" id="pegawai-tab-keluarga" x-ref="pegawai_tab_keluarga" x-bind:tabindex="activeTab === 'keluarga' ? 0 : -1" aria-controls="pegawai-panel-keluarga" @keydown="moveTabFocus($event, 'keluarga')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Keluarga</x-ui.tab>
+                <x-ui.tab active="activeTab === 'kepangkatan'" click="activateTab('kepangkatan')" id="pegawai-tab-kepangkatan" x-ref="pegawai_tab_kepangkatan" x-bind:tabindex="activeTab === 'kepangkatan' ? 0 : -1" aria-controls="pegawai-panel-kepangkatan" @keydown="moveTabFocus($event, 'kepangkatan')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Kepangkatan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'jabatan'" click="activateTab('jabatan')" id="pegawai-tab-jabatan" x-ref="pegawai_tab_jabatan" x-bind:tabindex="activeTab === 'jabatan' ? 0 : -1" aria-controls="pegawai-panel-jabatan" @keydown="moveTabFocus($event, 'jabatan')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Jabatan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'kgb'" click="activateTab('kgb')" id="pegawai-tab-kgb" x-ref="pegawai_tab_kgb" x-bind:tabindex="activeTab === 'kgb' ? 0 : -1" aria-controls="pegawai-panel-kgb" @keydown="moveTabFocus($event, 'kgb')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">KGB</x-ui.tab>
+                <x-ui.tab active="activeTab === 'disiplin'" click="activateTab('disiplin')" id="pegawai-tab-disiplin" x-ref="pegawai_tab_disiplin" x-bind:tabindex="activeTab === 'disiplin' ? 0 : -1" aria-controls="pegawai-panel-disiplin" @keydown="moveTabFocus($event, 'disiplin')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Hukuman Disiplin</x-ui.tab>
+                <x-ui.tab active="activeTab === 'pendidikan'" click="activateTab('pendidikan')" id="pegawai-tab-pendidikan" x-ref="pegawai_tab_pendidikan" x-bind:tabindex="activeTab === 'pendidikan' ? 0 : -1" aria-controls="pegawai-panel-pendidikan" @keydown="moveTabFocus($event, 'pendidikan')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Pendidikan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'pengangkatan'" click="activateTab('pengangkatan')" id="pegawai-tab-pengangkatan" x-ref="pegawai_tab_pengangkatan" x-bind:tabindex="activeTab === 'pengangkatan' ? 0 : -1" aria-controls="pegawai-panel-pengangkatan" @keydown="moveTabFocus($event, 'pengangkatan')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Pengangkatan</x-ui.tab>
+                <x-ui.tab active="activeTab === 'docs'" click="activateTab('docs')" id="pegawai-tab-docs" x-ref="pegawai_tab_docs" x-bind:tabindex="activeTab === 'docs' ? 0 : -1" aria-controls="pegawai-panel-docs" @keydown="moveTabFocus($event, 'docs')" class="focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2">Dokumen</x-ui.tab>
+            </x-ui.tabs>
 
             <p class="history-export-unavailable hidden">Ekspor riwayat tidak tersedia</p>
 
             {{-- TAB 1: PROFIL LENGKAP --}}
-            <div id="pimpinan-panel-info" aria-controls="pimpinan-panel-info" x-show="activeTab === 'profile'" class="space-y-6" x-transition>
+            <div id="pegawai-panel-profile" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-profile" x-show="activeTab === 'profile'" class="space-y-6" x-transition>
                 
                 {{-- Toggle Flag Kinerja & Kepala Bagian --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-soft/40 rounded-lg p-4 border border-border">
@@ -962,14 +991,18 @@
                             @endif
                         </div>
                         @if(auth()->user()->role !== 'pimpinan')
-                        <button
+                        <x-ui.button
                             type="button"
+                            variant="primary"
+                            size="sm"
                             @click="updateSatyalancanaEligibility()"
-                            :disabled="isUpdatingSatyalancana"
-                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-soft disabled:cursor-not-allowed disabled:opacity-50"
+                            x-bind:disabled="isUpdatingSatyalancana"
                         >
-                            Simpan Satyalancana
-                        </button>
+                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                            <span>Simpan Satyalancana</span>
+                        </x-ui.button>
                         @endif
                     </div>
 
@@ -994,7 +1027,7 @@
                     @if ($canAssignSupervisor)
                         <form id="assign-kepala-bagian-form" action="{{ route('pegawai.assign-atasan', $p->id) }}" method="POST" @submit="validateSupervisorSelection($event)" class="border-t border-border pt-4">
                             @csrf
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_13rem_auto] md:items-start">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div class="space-y-1">
                                     <label for="kepala_bagian_lookup" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
                                         Ubah Kepala Bagian
@@ -1063,18 +1096,32 @@
                                     @enderror
                                     <p x-show="supervisorSelectedName" class="text-xs text-muted">Dipilih: <span x-text="supervisorSelectedName" class="font-semibold text-ink"></span></p>
                                 </div>
+
                                 <x-form.input
                                     name="effective_date"
                                     type="date"
-                                    label="Tanggal Mulai Penugasan Kepala Bagian"
+                                    label="Tanggal Mulai Penugasan"
                                     :value="old('effective_date', now()->toDateString())"
                                     required
                                     help="Tanggal mulai berlakunya penugasan Kepala Bagian untuk pegawai ini."
                                 />
-                                <div class="flex flex-wrap gap-2 md:pt-6">
-                                    <x-ui.button type="submit" size="sm">Simpan</x-ui.button>
-                                    <x-ui.button type="button" variant="danger" size="sm" aria-label="Hapus penugasan Kepala Bagian dan simpan" @click="clearSupervisorAndSubmit()">Hapus Kepala Bagian lalu simpan</x-ui.button>
-                                </div>
+                            </div>
+
+                            <div class="mt-4 flex flex-wrap items-center justify-end gap-3">
+                                @if ($currentSupervisor)
+                                    <x-ui.button type="button" variant="danger" size="sm" aria-label="Hapus penugasan Kepala Bagian dan simpan" @click="clearSupervisorAndSubmit()">
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                        </svg>
+                                        Hapus Kepala Bagian lalu simpan
+                                    </x-ui.button>
+                                @endif
+                                <x-ui.button type="submit" variant="primary" size="sm">
+                                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                    </svg>
+                                    <span>Simpan</span>
+                                </x-ui.button>
                             </div>
                         </form>
                     @endif
@@ -1159,12 +1206,12 @@
                         <div class="flex items-center justify-between">
                             <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Status Kepegawaian</h3>
                             @if($p->statusHistories && $p->statusHistories->count() > 0)
-                            <button type="button" @click="showRiwayatStatus = true" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 shadow-sm cursor-pointer font-sans">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <x-ui.button type="button" variant="secondary" size="sm" @click="showRiwayatStatus = true">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Lihat Riwayat
-                            </button>
+                            </x-ui.button>
                             @endif
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -1257,19 +1304,19 @@
             </div>
 
             {{-- TAB 2: DATA KELUARGA --}}
-            <div x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-keluarga" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-keluarga" x-show="activeTab === 'keluarga'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Data Keluarga</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
                     </div>
                     @if(auth()->user()->role !== 'pimpinan')
-                            <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Keluarga
-                    </button>
+                            <x-ui.button type="button" variant="primary" size="sm" @click="openModal('keluarga', 'Tambah Anggota Keluarga')">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                Tambah Keluarga
+                            </x-ui.button>
                             @endif
                 </div>
 
@@ -1319,18 +1366,19 @@
                                     </td>
                                     @if(auth()->user()->role !== 'pimpinan')
                                             <td class="px-4 py-3 text-right">
-                                        <button
+                                        <x-ui.button
                                             type="button"
+                                            variant="danger"
+                                            size="xs"
                                             @click="deleteKeluarga(fam.id, index)"
-                                            :disabled="isDeletingKeluarga"
-                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            x-bind:disabled="isDeletingKeluarga"
                                             title="Hapus anggota keluarga ini"
                                         >
-                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                             </svg>
                                             Hapus
-                                        </button>
+                                        </x-ui.button>
                                     </td>
                                             @endif
                                 </tr>
@@ -1346,19 +1394,19 @@
             </div>
 
             {{-- TAB 3: RIWAYAT KEPANGKATAN --}}
-            <div x-show="activeTab === 'kepangkatan'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-kepangkatan" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-kepangkatan" x-show="activeTab === 'kepangkatan'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
                     </div>
                     @if($canCreateEmployeeHistory)
-                        <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button type="button" variant="primary" size="sm" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')">
+                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat Kepangkatan
-                        </button>
+                        </x-ui.button>
                     @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -1386,19 +1434,19 @@
             </div>
 
             {{-- TAB 4: RIWAYAT JABATAN --}}
-            <div x-show="activeTab === 'jabatan'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-jabatan" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-jabatan" x-show="activeTab === 'jabatan'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
                     </div>
                     @if($canCreateEmployeeHistory)
-                        <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button type="button" variant="primary" size="sm" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')">
+                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat Jabatan
-                        </button>
+                        </x-ui.button>
                     @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -1428,19 +1476,19 @@
             </div>
 
             {{-- TAB 5: RIWAYAT KGB --}}
-            <div x-show="activeTab === 'kgb'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-kgb" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-kgb" x-show="activeTab === 'kgb'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
                     </div>
                     @if($canCreateEmployeeHistory)
-                        <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button type="button" variant="primary" size="sm" @click="openModal('kgb', 'Tambah Riwayat KGB')">
+                            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat KGB
-                        </button>
+                        </x-ui.button>
                     @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -1468,19 +1516,19 @@
             </div>
 
             {{-- TAB 6: HUKUMAN DISIPLIN --}}
-            <div x-show="activeTab === 'disiplin'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-disiplin" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-disiplin" x-show="activeTab === 'disiplin'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian.</p>
                     </div>
                     @if(auth()->user()->role !== 'pimpinan')
-                            <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Hukuman
-                    </button>
+                            <x-ui.button type="button" variant="primary" size="sm" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                Tambah Hukuman
+                            </x-ui.button>
                             @endif
                 </div>
                 <div class="overflow-x-auto rounded-lg border border-border">
@@ -1520,19 +1568,19 @@
             </div>
 
             {{-- TAB 7: RIWAYAT PENDIDIKAN --}}
-            <div x-show="activeTab === 'pendidikan'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-pendidikan" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-pendidikan" x-show="activeTab === 'pendidikan'" class="space-y-4" style="display: none;" x-transition>
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Riwayat kualifikasi akademis tertinggi staf.</p>
                     </div>
                     @if(auth()->user()->role !== 'pimpinan')
-                            <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Pendidikan
-                    </button>
+                            <x-ui.button type="button" variant="primary" size="sm" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                Tambah Pendidikan
+                            </x-ui.button>
                             @endif
                 </div>
                 {{-- Loading skeleton --}}
@@ -1569,25 +1617,27 @@
                                     @if(auth()->user()->role !== 'pimpinan')
                                             <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
-                                            <button
+                                            <x-ui.button
                                                 type="button"
+                                                variant="link"
+                                                size="xs"
                                                 @click="openEditPendidikan(edu)"
-                                                :disabled="isDeletingPendidikan"
-                                                class="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                x-bind:disabled="isDeletingPendidikan"
                                                 title="Edit riwayat pendidikan"
-                                            >Edit</button>
-                                            <button
+                                            >Edit</x-ui.button>
+                                            <x-ui.button
                                                 type="button"
+                                                variant="danger"
+                                                size="xs"
                                                 @click="deletePendidikan(edu.id, index)"
-                                                :disabled="isDeletingPendidikan"
-                                                class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                x-bind:disabled="isDeletingPendidikan"
                                                 title="Hapus riwayat pendidikan"
                                             >
-                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
                                                 Hapus
-                                            </button>
+                                            </x-ui.button>
                                         </div>
                                     </td>
                                             @endif
@@ -1604,7 +1654,7 @@
             </div>
 
             {{-- TAB 8: DATA PENGANGKATAN --}}
-            <div x-show="activeTab === 'pengangkatan'" class="space-y-4" style="display: none;" x-transition>
+            <div id="pegawai-panel-pengangkatan" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-pengangkatan" x-show="activeTab === 'pengangkatan'" class="space-y-4" style="display: none;" x-transition>
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Data & SK Pengangkatan Pertama</h3>
                     <p class="text-xs text-muted font-sans mt-0.5">Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK.</p>
@@ -1644,20 +1694,19 @@
             </div>
 
             {{-- TAB 9: DOKUMEN & SK --}}
-            <div x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition>
+            <div id="pegawai-panel-docs" role="tabpanel" tabindex="0" aria-labelledby="pegawai-tab-docs" x-show="activeTab === 'docs'" style="display: none;" class="space-y-4" x-transition>
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Daftar Dokumen & Berkas Pegawai</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Seluruh berkas kepegawaian termasuk SK, ijazah, KTP/KK, dan dokumen lainnya.</p>
                     </div>
                     @can('update', $p)
-                    <button type="button" @click="showUploadBerkas = !showUploadBerkas"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10 font-sans">
+                    <x-ui.button type="button" variant="secondary" size="sm" @click="showUploadBerkas = !showUploadBerkas">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Unggah Berkas
-                    </button>
+                    </x-ui.button>
                     @endcan
                 </div>
 
@@ -1747,9 +1796,9 @@
                                 <span class="min-w-0 flex-1 truncate text-xs font-sans"
                                     :class="newBerkas.file ? 'text-ink' : 'text-muted'"
                                     x-text="newBerkas.file ? newBerkas.file.name : 'Belum ada file dipilih'"></span>
-                                <button x-show="newBerkas.file" type="button"
+                                <x-ui.button x-show="newBerkas.file" type="button" variant="danger" size="xs"
                                     @click="newBerkas.file = null; document.getElementById('berkas_upload_input').value = ''"
-                                    class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                >Hapus</x-ui.button>
                             </div>
                             <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG/DOC/DOCX, maks. 10 MB.</p>
                             <p x-show="uploadBerkasErrors.berkas" x-text="uploadBerkasErrors.berkas?.[0]"
@@ -1759,19 +1808,18 @@
 
                     {{-- Tombol aksi --}}
                     <div class="flex items-center gap-2 pt-1">
-                        <button type="button" @click="submitUploadBerkas()"
-                            :disabled="isUploadingBerkas"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60 font-sans">
+                        <x-ui.button type="button" variant="primary" size="sm" @click="submitUploadBerkas()"
+                            x-bind:disabled="isUploadingBerkas"
+                        >
                             <svg x-show="isUploadingBerkas" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
                             <span x-text="isUploadingBerkas ? 'Mengunggah...' : 'Unggah'"></span>
-                        </button>
-                        <button type="button" @click="showUploadBerkas = false; uploadBerkasError = ''; uploadBerkasErrors = {};"
-                            class="inline-flex items-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted transition hover:bg-soft font-sans">
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="muted" size="sm" @click="showUploadBerkas = false; uploadBerkasError = ''; uploadBerkasErrors = {};">
                             Batal
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
                 @endcan
@@ -1817,21 +1865,17 @@
                                     <td class="px-4 py-3 text-muted" x-text="doc.file_size"></td>
                                     <td class="px-4 py-3">
                                         <div class="flex items-center gap-1.5">
-                                            <a :href="doc.detail_url"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                                title="Lihat detail">
+                                            <x-ui.button as="a" size="icon" variant="secondary" x-bind:href="doc.detail_url" aria-label="Lihat detail dokumen" title="Lihat detail" class="!h-10 !w-10">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                                 </svg>
-                                            </a>
-                                            <a :href="doc.download_url"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                                title="Unduh">
+                                            </x-ui.button>
+                                            <x-ui.button as="a" size="icon" variant="secondary" x-bind:href="doc.download_url" aria-label="Unduh dokumen" title="Unduh" class="!h-10 !w-10">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                                 </svg>
-                                            </a>
+                                            </x-ui.button>
                                         </div>
                                     </td>
                                 </tr>
@@ -1844,7 +1888,7 @@
         </div>
 
         {{-- MODAL DYNAMIC FORM --}}
-        <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
+        <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition role="dialog" aria-modal="true" aria-labelledby="pegawai-history-modal-title" @keydown.escape.window="showModal = false">
             <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-ink/60 transition-opacity" @click="showModal = false"></div>
                 
@@ -1853,12 +1897,12 @@
                 
                 <div class="relative z-10 inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
                     <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
-                        <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
-                        <button @click="showModal = false" class="text-muted hover:text-ink cursor-pointer">
+                        <h3 id="pegawai-history-modal-title" class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
+                        <x-ui.button type="button" variant="ghost" size="icon" @click="showModal = false" aria-label="Tutup modal" class="!h-10 !w-10">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                        </button>
+                        </x-ui.button>
                     </div>
 
                     {{-- Modal Error --}}
@@ -1986,16 +2030,16 @@
                                         Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
                                     </label>
                                     <div class="flex items-center gap-2">
-                                        <label for="file_sk_pangkat" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                        <x-ui.button as="label" for="file_sk_pangkat" variant="secondary" size="sm">
                                             Pilih File
-                                        </label>
+                                        </x-ui.button>
                                         <input type="file" id="file_sk_pangkat" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
                                             @change="newPangkat.file_sk = $event.target.files[0] || null">
                                         <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newPangkat.file_sk ? 'text-ink' : 'text-muted'"
                                             x-text="newPangkat.file_sk ? newPangkat.file_sk.name : 'Belum ada file dipilih'"></span>
-                                        <button x-show="newPangkat.file_sk" type="button"
+                                        <x-ui.button x-show="newPangkat.file_sk" type="button" variant="danger" size="xs"
                                             @click="newPangkat.file_sk = null; document.getElementById('file_sk_pangkat').value = ''"
-                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                        >Hapus</x-ui.button>
                                     </div>
                                     <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
@@ -2062,16 +2106,16 @@
                                         Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
                                     </label>
                                     <div class="flex items-center gap-2">
-                                        <label for="file_sk_jabatan" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                        <x-ui.button as="label" for="file_sk_jabatan" variant="secondary" size="sm">
                                             Pilih File
-                                        </label>
+                                        </x-ui.button>
                                         <input type="file" id="file_sk_jabatan" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
                                             @change="newJabatan.file_sk = $event.target.files[0] || null">
                                         <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newJabatan.file_sk ? 'text-ink' : 'text-muted'"
                                             x-text="newJabatan.file_sk ? newJabatan.file_sk.name : 'Belum ada file dipilih'"></span>
-                                        <button x-show="newJabatan.file_sk" type="button"
+                                        <x-ui.button x-show="newJabatan.file_sk" type="button" variant="danger" size="xs"
                                             @click="newJabatan.file_sk = null; document.getElementById('file_sk_jabatan').value = ''"
-                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                        >Hapus</x-ui.button>
                                     </div>
                                     <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
@@ -2102,16 +2146,16 @@
                                         Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
                                     </label>
                                     <div class="flex items-center gap-2">
-                                        <label for="file_sk_kgb" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                        <x-ui.button as="label" for="file_sk_kgb" variant="secondary" size="sm">
                                             Pilih File
-                                        </label>
+                                        </x-ui.button>
                                         <input type="file" id="file_sk_kgb" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
                                             @change="newKgb.file_sk = $event.target.files[0] || null">
                                         <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newKgb.file_sk ? 'text-ink' : 'text-muted'"
                                             x-text="newKgb.file_sk ? newKgb.file_sk.name : 'Belum ada file dipilih'"></span>
-                                        <button x-show="newKgb.file_sk" type="button"
+                                        <x-ui.button x-show="newKgb.file_sk" type="button" variant="danger" size="xs"
                                             @click="newKgb.file_sk = null; document.getElementById('file_sk_kgb').value = ''"
-                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                                        >Hapus</x-ui.button>
                                     </div>
                                     <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
@@ -2148,21 +2192,13 @@
                                     </label>
 
                                     {{-- Tab toggle: Dari Arsip | Unggah Baru --}}
-                                    <div class="flex gap-0.5 rounded-lg border border-border bg-soft p-0.5 w-fit">
-                                        <button type="button"
-                                            @click="disiplinFileMode = 'arsip'; newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
-                                            :class="disiplinFileMode === 'arsip' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
-                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
-                                        >Dari Arsip</button>
-                                        <button type="button"
-                                            @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''; newDisiplin.no_sk = ''; newDisiplin.tanggal_sk = ''"
-                                            :class="disiplinFileMode === 'baru' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
-                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
-                                        >Unggah Baru</button>
-                                    </div>
+                                    <x-ui.tabs variant="pills" label="Sumber berkas SK">
+                                        <x-ui.tab variant="pills" active="disiplinFileMode === 'arsip'" click="disiplinFileMode = 'arsip'; newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''" id="disiplin-file-tab-arsip" aria-controls="disiplin-file-panel-arsip" class="focus:ring-2 focus:ring-primary/20">Dari Arsip</x-ui.tab>
+                                        <x-ui.tab variant="pills" active="disiplinFileMode === 'baru'" click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''; newDisiplin.no_sk = ''; newDisiplin.tanggal_sk = ''" id="disiplin-file-tab-baru" aria-controls="disiplin-file-panel-baru" class="focus:ring-2 focus:ring-primary/20">Unggah Baru</x-ui.tab>
+                                    </x-ui.tabs>
 
                                     {{-- Panel: Dari Arsip --}}
-                                    <div x-show="disiplinFileMode === 'arsip'" class="space-y-1">
+                                    <div id="disiplin-file-panel-arsip" role="tabpanel" aria-labelledby="disiplin-file-tab-arsip" x-show="disiplinFileMode === 'arsip'" class="space-y-1">
                                         <div x-show="loadingArsip" class="text-xs text-muted font-sans py-1">Memuat daftar arsip...</div>
                                         <template x-if="!loadingArsip">
                                             <div class="space-y-1">
@@ -2191,14 +2227,14 @@
                                     </div>
 
                                     {{-- Panel: Unggah Baru --}}
-                                    <div x-show="disiplinFileMode === 'baru'" class="space-y-1">
+                                    <div id="disiplin-file-panel-baru" role="tabpanel" aria-labelledby="disiplin-file-tab-baru" x-show="disiplinFileMode === 'baru'" class="space-y-1">
                                         <div class="flex items-center gap-2">
-                                            <label for="file_sk_disiplin" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                                            <x-ui.button as="label" for="file_sk_disiplin" variant="secondary" size="sm">
                                                 <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                                                 </svg>
                                                 Pilih File
-                                            </label>
+                                            </x-ui.button>
                                             <input
                                                 type="file"
                                                 id="file_sk_disiplin"
@@ -2211,12 +2247,13 @@
                                                 :class="newDisiplin.file_sk ? 'text-ink' : 'text-muted'"
                                                 x-text="newDisiplin.file_sk ? newDisiplin.file_sk.name : 'Belum ada file dipilih'"
                                             ></span>
-                                            <button
+                                            <x-ui.button
                                                 x-show="newDisiplin.file_sk"
                                                 type="button"
+                                                variant="danger"
+                                                size="xs"
                                                 @click="newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
-                                                class="shrink-0 text-xs text-danger hover:underline font-sans"
-                                            >Hapus</button>
+                                            >Hapus</x-ui.button>
                                         </div>
                                         <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG, maks. 10 MB. File akan masuk ke Arsip Dokumen otomatis.</p>
                                     </div>
@@ -2269,22 +2306,25 @@
                         </template>
 
                         <div class="border-t border-border pt-6 flex justify-end gap-3 mt-6">
-                            <button 
+                            <x-ui.button
                                 type="button" 
+                                variant="muted"
+                                size="md"
                                 @click="showModal = false" 
                                 x-bind:disabled="isSubmitting"
-                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                                 </svg>
                                 Batal
-                            </button>
+                            </x-ui.button>
                             
-                            <button 
+                            <x-ui.button
                                 type="submit" 
+                                variant="primary"
+                                size="md"
                                 x-bind:disabled="isSubmitting"
-                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                class="min-w-[130px]"
                             >
                                 <span class="flex items-center" x-show="!isSubmitting">
                                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -2299,7 +2339,7 @@
                                     </svg>
                                     Menyimpan...
                                 </span>
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
                 </div>
@@ -2319,6 +2359,9 @@
         x-transition:leave-end="opacity-0"
         class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
         style="display:none;"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-pendidikan-modal-title"
         @keydown.escape.window="showEditPendidikan = false"
     >
         <div
@@ -2327,12 +2370,12 @@
         >
             {{-- Header --}}
             <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-                <h3 class="text-sm font-bold text-ink font-sans">Edit Riwayat Pendidikan</h3>
-                <button type="button" @click="showEditPendidikan = false" class="text-muted hover:text-ink transition cursor-pointer">
+                <h3 id="edit-pendidikan-modal-title" class="text-sm font-bold text-ink font-sans">Edit Riwayat Pendidikan</h3>
+                <x-ui.button type="button" variant="ghost" size="icon" @click="showEditPendidikan = false" aria-label="Tutup modal" class="!h-10 !w-10">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                     </svg>
-                </button>
+                </x-ui.button>
             </div>
 
             {{-- Body --}}
@@ -2373,12 +2416,10 @@
 
                 {{-- Footer --}}
                 <div class="flex justify-end gap-3 pt-2 border-t border-border mt-4">
-                    <button type="button" @click="showEditPendidikan = false" :disabled="isUpdatingPendidikan"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
+                    <x-ui.button type="button" variant="muted" size="md" @click="showEditPendidikan = false" x-bind:disabled="isUpdatingPendidikan">
                         Batal
-                    </button>
-                    <button type="submit" :disabled="isUpdatingPendidikan"
-                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[120px] disabled:opacity-50">
+                    </x-ui.button>
+                    <x-ui.button type="submit" variant="primary" size="md" x-bind:disabled="isUpdatingPendidikan" class="min-w-[120px]">
                         <span x-show="!isUpdatingPendidikan">Simpan Perubahan</span>
                         <span x-show="isUpdatingPendidikan" class="flex items-center gap-2">
                             <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -2387,7 +2428,7 @@
                             </svg>
                             Menyimpan...
                         </span>
-                    </button>
+                    </x-ui.button>
                 </div>
             </form>
         </div>
@@ -2399,6 +2440,9 @@
         x-transition.opacity
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         style="display: none;"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="status-history-modal-title"
         @keydown.escape.window="showRiwayatStatus = false"
     >
         <div
@@ -2407,18 +2451,18 @@
         >
             {{-- Header --}}
             <div class="flex items-center justify-between border-b border-border bg-soft/50 px-6 py-4">
-                <h3 class="text-base font-bold text-ink font-sans">Riwayat Perubahan Status Kepegawaian</h3>
-                <button type="button" @click="showRiwayatStatus = false" class="text-muted hover:text-ink transition cursor-pointer">
+                <h3 id="status-history-modal-title" class="text-base font-bold text-ink font-sans">Riwayat Perubahan Status Kepegawaian</h3>
+                <x-ui.button type="button" variant="ghost" size="icon" @click="showRiwayatStatus = false" aria-label="Tutup riwayat status" class="!h-10 !w-10">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                </button>
+                </x-ui.button>
             </div>
 
             {{-- Content: Grid 2 Kolom dengan Scroll --}}
             <div class="px-6 py-5">
                 @if($p->statusHistories && $p->statusHistories->count() > 0)
-                <div class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
+                <div class="grid grid-cols-1 gap-4 max-h-[60vh] overflow-y-auto pr-2 sm:grid-cols-2">
                     @foreach($p->statusHistories->sortByDesc('tanggal_efektif') as $history)
                     <div class="rounded-lg border {{ $history->is_latest ? 'border-primary bg-primary/5' : 'border-border bg-soft/30' }} p-4">
                         <div class="space-y-2">
@@ -2466,10 +2510,9 @@
 
             {{-- Footer --}}
             <div class="flex justify-end border-t border-border bg-soft/50 px-6 py-4">
-                <button type="button" @click="showRiwayatStatus = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer">
+                <x-ui.button type="button" variant="muted" size="md" @click="showRiwayatStatus = false">
                     Tutup
-                </button>
+                </x-ui.button>
             </div>
         </div>
     </div>
@@ -2482,15 +2525,14 @@
                 Data tidak dihapus dan bisa diaktifkan kembali.
             </p>
             <div class="flex justify-end gap-3 border-t border-border pt-4">
-                <button type="button" @click="showDeactivateModal = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
+                <x-ui.button type="button" variant="muted" size="md" @click="showDeactivateModal = false">
                     Batal
-                </button>
+                </x-ui.button>
                 <form method="POST" action="{{ route('pegawai.destroy', $p->id) }}">
                     @csrf
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
+                    <x-ui.button type="submit" variant="danger-solid" size="md">
                         Ya, Nonaktifkan
-                    </button>
+                    </x-ui.button>
                 </form>
             </div>
         </div>

@@ -41,7 +41,6 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
-use App\Http\Controllers\Admin\StatusPegawaiController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
@@ -111,13 +110,10 @@ if (app()->environment(['local', 'testing'])) {
 Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/super-admin/status-pegawai', [StatusPegawaiController::class, 'index'])
-        ->middleware(['role:super_admin'])
-        ->name('super-admin.status-pegawai.index');
-
-    Route::post('/super-admin/status-pegawai', [StatusPegawaiController::class, 'store'])
-        ->middleware(['role:super_admin'])
-        ->name('super-admin.status-pegawai.store');
+    // Halaman Status Pegawai telah dipindahkan ke aksi per-baris di Data Pegawai.
+    // Redirect menjaga bookmark lama tetap membawa pengguna ke titik kerja baru.
+    Route::redirect('/super-admin/status-pegawai', '/pegawai')
+        ->middleware(['role:super_admin']);
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
         ->middleware('role:super_admin,admin_kepegawaian,pimpinan')
@@ -366,6 +362,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/pegawai', [PegawaiController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.store');
+    Route::post('/pegawai/status', [PegawaiController::class, 'changeStatus'])
+        ->middleware(['role:super_admin'])
+        ->name('pegawai.status.update');
     Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
