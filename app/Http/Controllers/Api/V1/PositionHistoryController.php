@@ -15,11 +15,10 @@ class PositionHistoryController extends Controller
     public function index(
         Employee $employee,
         ListPositionHistoriesAction $action,
-        EmployeeHistoryPayload $payload,
     ): JsonResponse {
         return response()->json([
             'employee_id' => $employee->id,
-            'histories' => $action->execute($employee)->map($payload->position(...)),
+            'histories' => $action->execute($employee),
         ]);
     }
 
@@ -33,7 +32,7 @@ class PositionHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat jabatan berhasil ditambahkan.',
-            'history' => $payload->position($history),
+            'history' => $payload->position($history, $employee),
         ], 201);
     }
 }

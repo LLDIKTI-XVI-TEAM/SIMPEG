@@ -35,7 +35,7 @@ class EducationHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat pendidikan berhasil ditambahkan.',
-            'history' => $this->payload->response($history),
+            'history' => $this->payload->response($history, $employee),
         ], 201);
     }
 
@@ -49,7 +49,7 @@ class EducationHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat pendidikan berhasil diperbarui.',
-            'history' => $this->payload->response($history),
+            'history' => $this->payload->response($history, $employee),
         ]);
     }
 

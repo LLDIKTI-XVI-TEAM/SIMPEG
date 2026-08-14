@@ -4,12 +4,16 @@ namespace App\Actions\Employees;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 class ShowEmployeeDocumentStatusAction
 {
+    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+
     /**
      * Menyusun rincian status SK setiap riwayat pegawai berdasarkan file aktual.
      *
@@ -39,10 +43,17 @@ class ShowEmployeeDocumentStatusAction
 
         $disk = Storage::disk(Document::STORAGE_DISK);
         $records = collect();
+        $this->attachments->primeDocumentReferences(collect()
+            ->concat($employee->rankHistories->pluck('file_sk'))
+            ->concat($employee->positionHistories->pluck('file_sk'))
+            ->concat($employee->salaryHistories->pluck('file_sk'))
+            ->concat($employee->appointments->pluck('file_sk')));
 
         foreach ($employee->rankHistories as $history) {
             $records->push($this->record(
-                $disk,
+                $employee,
+                $history,
+                'rank',
                 'Pangkat',
                 $history->golongan?->nama ?? $history->golongan?->kode ?? 'Riwayat Pangkat',
                 'TMT Pangkat: '.$history->tmt_pangkat?->format('d/m/Y'),
@@ -54,7 +65,9 @@ class ShowEmployeeDocumentStatusAction
 
         foreach ($employee->positionHistories as $history) {
             $records->push($this->record(
-                $disk,
+                $employee,
+                $history,
+                'position',
                 'Jabatan',
                 $history->nama_jabatan,
                 'TMT Jabatan: '.$history->tmt_jabatan?->format('d/m/Y'),
@@ -66,7 +79,9 @@ class ShowEmployeeDocumentStatusAction
 
         foreach ($employee->salaryHistories as $history) {
             $records->push($this->record(
-                $disk,
+                $employee,
+                $history,
+                'salary',
                 'KGB',
                 'Gaji Pokok: Rp '.number_format((float) $history->gaji_pokok, 0, ',', '.'),
                 'TMT KGB: '.$history->tmt_kgb?->format('d/m/Y'),
@@ -78,7 +93,9 @@ class ShowEmployeeDocumentStatusAction
 
         foreach ($employee->appointments as $history) {
             $records->push($this->record(
-                $disk,
+                $employee,
+                $history,
+                'appointment',
                 'Pengangkatan',
                 $history->jenis_pengangkatan,
                 'TMT Pengangkatan: '.$history->tmt_pengangkatan?->format('d/m/Y'),
@@ -137,7 +154,7 @@ class ShowEmployeeDocumentStatusAction
             'tanggal' => $document->tanggal_dokumen?->format('d/m/Y') ?: '-',
             'keterangan' => $document->keterangan ?: '-',
             'file_path' => $document->file_path,
-            'file_url' => $fileTersedia ? asset('storage/'.$document->file_path) : null,
+            'file_url' => $fileTersedia ? route('dokumen.download', $document) : null,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : 'File tidak ditemukan',
         ];
@@ -170,7 +187,9 @@ class ShowEmployeeDocumentStatusAction
      * @return array{jenis: string, judul: string, detail: string, nomor_sk: string, tanggal_sk: string, file_path: string|null, file_url: string|null, file_tersedia: bool, status_label: string}
      */
     private function record(
-        Filesystem $disk,
+        Employee $employee,
+        Model $history,
+        string $historyType,
         string $jenis,
         ?string $judul,
         string $detail,
@@ -178,7 +197,13 @@ class ShowEmployeeDocumentStatusAction
         ?string $tanggalSk,
         ?string $filePath,
     ): array {
-        $fileTersedia = filled($filePath) && $disk->exists($filePath);
+        $fileUrl = $this->attachments->downloadUrl(
+            $employee,
+            $historyType,
+            $history,
+            'pegawai.history-attachments.download',
+        );
+        $fileTersedia = $fileUrl !== null;
 
         return [
             'jenis' => $jenis,
@@ -187,7 +212,7 @@ class ShowEmployeeDocumentStatusAction
             'nomor_sk' => $nomorSk ?: '-',
             'tanggal_sk' => $tanggalSk ?: '-',
             'file_path' => $filePath,
-            'file_url' => $fileTersedia ? asset('storage/'.$filePath) : null,
+            'file_url' => $fileUrl,
             'file_tersedia' => $fileTersedia,
             'status_label' => $fileTersedia ? 'File tersedia' : (blank($filePath) ? 'File belum diunggah' : 'File tidak ditemukan'),
         ];

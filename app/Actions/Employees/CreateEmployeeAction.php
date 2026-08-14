@@ -37,7 +37,7 @@ class CreateEmployeeAction
             return DB::transaction(function () use ($data, $request, &$uploadedFiles): Employee {
                 if ($request->hasFile('foto')) {
                     $data['foto'] = $this->files->storePhoto($request->file('foto'));
-                    $uploadedFiles[] = $data['foto'];
+                    $uploadedFiles[] = ['public', $data['foto']];
                 }
 
                 $employee = Employee::create($data);
@@ -58,8 +58,8 @@ class CreateEmployeeAction
 
                     if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                         $file = $request->file('file_sk_pangkat');
-                        $pangkatData['file_sk'] = $file->store('ranks/sk', 'public');
-                        $uploadedFiles[] = $pangkatData['file_sk'];
+                        $pangkatData['file_sk'] = $this->files->storeEmployeeDocument($file, 'ranks/sk');
+                        $uploadedFiles[] = [Document::STORAGE_DISK, $pangkatData['file_sk']];
 
                         $golonganLabel = isset($pangkatData['golongan_id'])
                             ? (RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
@@ -110,8 +110,8 @@ class CreateEmployeeAction
 
                     if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                         $file = $request->file('file_sk_jabatan');
-                        $jabatanData['file_sk'] = $file->store('positions/sk', 'public');
-                        $uploadedFiles[] = $jabatanData['file_sk'];
+                        $jabatanData['file_sk'] = $this->files->storeEmployeeDocument($file, 'positions/sk');
+                        $uploadedFiles[] = [Document::STORAGE_DISK, $jabatanData['file_sk']];
 
                         Document::create([
                             'employee_id' => $employee->id,
@@ -146,8 +146,8 @@ class CreateEmployeeAction
 
                     if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                         $file = $request->file('file_sk_kgb');
-                        $kgbData['file_sk'] = $file->store('salaries/sk', 'public');
-                        $uploadedFiles[] = $kgbData['file_sk'];
+                        $kgbData['file_sk'] = $this->files->storeEmployeeDocument($file, 'salaries/sk');
+                        $uploadedFiles[] = [Document::STORAGE_DISK, $kgbData['file_sk']];
 
                         Document::create([
                             'employee_id' => $employee->id,
@@ -175,8 +175,8 @@ class CreateEmployeeAction
 
                     if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
                         $file = $request->file('file_sk_pengangkatan');
-                        $appointmentData['file_sk'] = $file->store('appointments/sk', 'public');
-                        $uploadedFiles[] = $appointmentData['file_sk'];
+                        $appointmentData['file_sk'] = $this->files->storeEmployeeDocument($file, 'appointments/sk');
+                        $uploadedFiles[] = [Document::STORAGE_DISK, $appointmentData['file_sk']];
 
                         Document::create([
                             'employee_id' => $employee->id,
@@ -227,7 +227,7 @@ class CreateEmployeeAction
                     };
 
                     $filePath = $this->files->storeBerkasLainnya($request->file('file_berkas_lainnya'), $employee->id);
-                    $uploadedFiles[] = $filePath;
+                    $uploadedFiles[] = [Document::STORAGE_DISK, $filePath];
 
                     Document::create([
                         'employee_id' => $employee->id,
@@ -262,8 +262,8 @@ class CreateEmployeeAction
                 return $employee;
             });
         } catch (\Throwable $e) {
-            foreach ($uploadedFiles as $file) {
-                Storage::disk('public')->delete($file);
+            foreach ($uploadedFiles as [$disk, $file]) {
+                Storage::disk($disk)->delete($file);
             }
             throw $e;
         }
