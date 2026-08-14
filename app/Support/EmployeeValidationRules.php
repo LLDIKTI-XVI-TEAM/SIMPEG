@@ -71,7 +71,20 @@ class EmployeeValidationRules
             'alamat' => ['nullable', 'string'],
             'no_hp' => ['nullable', 'string', 'max:20'],
             'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
-            'email_pribadi' => ['nullable', 'email', 'max:255', 'unique:employees,email_pribadi'],
+            'email_pribadi' => [
+                'nullable',
+                'email',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    // Identitas email tetap dicadangkan ketika pegawai dinonaktifkan agar restore aman.
+                    if (Employee::withTrashed()
+                        ->whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
+                        ->exists()
+                    ) {
+                        $fail('Email sudah terdaftar pada pegawai lain.');
+                    }
+                },
+            ],
             'no_telepon_rumah' => ['nullable', 'string', 'max:20'],
         ];
     }
@@ -99,7 +112,16 @@ class EmployeeValidationRules
             'nullable',
             'email',
             'max:255',
-            Rule::unique('employees', 'email_pribadi')->ignore($employee->id),
+            function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
+                // Pegawai nonaktif tetap memiliki email kanonisnya; hanya email milik record ini yang dikecualikan.
+                if (Employee::withTrashed()
+                    ->whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
+                    ->where('id', '!=', $employee->id)
+                    ->exists()
+                ) {
+                    $fail('Email sudah terdaftar pada pegawai lain.');
+                }
+            },
         ];
 
         $rules['nik'] = [
@@ -124,22 +146,24 @@ class EmployeeValidationRules
     }
 
     /**
-     * Relaxed rules for import from Excel/CSV.
-     * Only fields available in the Excel are validated; the rest are nullable.
+     * Aturan validasi untuk data utama hasil pemetaan Excel/CSV.
      *
      * - nama_dengan_gelar : wajib diisi, diambil dari kolom 'Nama Pegawai' (termasuk gelar).
      * - nama_lengkap      : opsional, diambil dari kolom 'Person' (nama tanpa gelar).
      *                       Diisi nullable agar file yang tidak memiliki kolom Person
      *                       tetap dapat di-import tanpa error.
+     *
+     * Pengecekan unik dilakukan setelah deteksi duplikasi antarbaris agar prioritas
+     * error email/duplikasi dan skip NIP database tetap konsisten.
      */
     public static function import(): array
     {
         return [
             'nama_dengan_gelar' => ['required', 'string', 'max:255'],
             'nama_lengkap' => ['nullable', 'string', 'max:255'],
-            'nip' => ['required', 'string', 'size:18', 'unique:employees,nip'],
-            'email_pribadi' => ['required', 'email', 'max:255', 'unique:employees,email_pribadi'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:employees,email'],
+            'nip' => ['required', 'string', 'size:18'],
+            'email_pribadi' => ['required', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
             // Tanggal lahir wajib pada import karena menjadi dasar kalkulasi BUP/pensiun.
             'tanggal_lahir' => ['required', 'date', 'before:today'],
             'jenis_pegawai' => ['required', 'in:PNS,PPPK,CPNS'],

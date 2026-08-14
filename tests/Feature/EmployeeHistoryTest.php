@@ -103,6 +103,29 @@ class EmployeeHistoryTest extends TestCase
         ]);
     }
 
+    public function test_rank_history_response_preserves_asia_makassar_calendar_dates(): void
+    {
+        config(['app.timezone' => 'Asia/Makassar']);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+
+        $response = $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
+                'golongan_id' => $golongan->id,
+                'tmt_pangkat' => '2026-09-22',
+                'no_sk' => 'SK-RANK-DATE-ONLY',
+                'tanggal_sk' => '2026-09-22',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('history.tanggal_sk', '2026-09-22')
+            ->assertJsonPath('history.tmt_pangkat', '2026-09-22');
+        $this->assertStringNotContainsString('2026-09-21T16:00:00', $response->getContent());
+        $this->assertStringNotContainsString('2026-09-22T00:00:00', $response->getContent());
+    }
+
     public function test_backdated_rank_history_does_not_replace_current_latest_snapshot(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -465,6 +488,36 @@ class EmployeeHistoryTest extends TestCase
         ]);
     }
 
+    public function test_position_history_response_preserves_asia_makassar_calendar_dates(): void
+    {
+        config(['app.timezone' => 'Asia/Makassar']);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis Date-only'],
+            ['jenis_jabatan_id' => $jenisJabatan->id, 'is_active' => true],
+        );
+        $unitKerja = RefUnitKerja::firstOrFail();
+
+        $response = $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
+                'jabatan_id' => $jabatan->id,
+                'jenis_jabatan_id' => $jenisJabatan->id,
+                'unit_kerja_id' => $unitKerja->id,
+                'tmt_jabatan' => '2026-09-22',
+                'no_sk' => 'SK-POS-DATE-ONLY',
+                'tanggal_sk' => '2026-09-22',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('history.tanggal_sk', '2026-09-22')
+            ->assertJsonPath('history.tmt_jabatan', '2026-09-22');
+        $this->assertStringNotContainsString('2026-09-21T16:00:00', $response->getContent());
+        $this->assertStringNotContainsString('2026-09-22T00:00:00', $response->getContent());
+    }
+
     public function test_backdated_position_history_does_not_replace_current_latest_snapshot(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -577,6 +630,28 @@ class EmployeeHistoryTest extends TestCase
             'event' => 'CREATE',
             'auditable_type' => 'SalaryHistory',
         ]);
+    }
+
+    public function test_kgb_history_response_preserves_asia_makassar_calendar_dates(): void
+    {
+        config(['app.timezone' => 'Asia/Makassar']);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($user)
+            ->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kgb", [
+                'tmt_kgb' => '2026-09-22',
+                'gaji_pokok' => 4500000,
+                'no_sk' => 'SK-KGB-DATE-ONLY',
+                'tanggal_sk' => '2026-09-22',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('history.tanggal_sk', '2026-09-22')
+            ->assertJsonPath('history.tmt_kgb', '2026-09-22');
+        $this->assertStringNotContainsString('2026-09-21T16:00:00', $response->getContent());
+        $this->assertStringNotContainsString('2026-09-22T00:00:00', $response->getContent());
     }
 
     public function test_backdated_kgb_history_does_not_replace_current_latest_date(): void

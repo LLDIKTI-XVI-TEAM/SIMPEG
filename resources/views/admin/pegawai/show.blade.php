@@ -35,6 +35,8 @@
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
             && auth()->user()->hasPermission('employees.update');
+        $canDeactivateEmployee = auth()->check()
+            && auth()->user()->hasPermission('employees.deactivate');
 
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
@@ -49,6 +51,7 @@
         satyalancanaNote: @js($p->satyalancana_note ?? ''),
         satyalancanaEndpoint: @js(route('pegawai.satyalancana.update', $p->id)),
         isUpdatingSatyalancana: false,
+        showDeactivateModal: false,
         supervisorLookupEndpoint: @js(route('pegawai.supervisor-lookup', $p->id)),
         supervisorQuery: @js($selectedSupervisorName ?? ''),
         supervisorSelectedId: @js($selectedSupervisorId ?? ''),
@@ -75,10 +78,10 @@
         keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'nik' => auth()->user()->role === 'pimpinan' ? null : $f->nik, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
-        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk, 'tmt' => $r->tmt_pangkat])->toJson() }},
-        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk, 'tmt' => $j->tmt_jabatan])->toJson() }},
-        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk, 'tmt' => $s->tmt_kgb])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk ? \Carbon\Carbon::parse($d->tanggal_sk)->format('d-m-Y') : '-', 'masa' => ($d->tanggal_mulai ? \Carbon\Carbon::parse($d->tanggal_mulai)->format('d-m-Y') : '-') . ' s/d ' . ($d->tanggal_berakhir ? \Carbon\Carbon::parse($d->tanggal_berakhir)->format('d-m-Y') : 'Sekarang'), 'is_active' => $d->is_active])->toJson() }},
+        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d')])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d')])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d')])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active])->toJson() }},
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-'])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
@@ -679,14 +682,14 @@
                     
                     if (this.modalType === 'disiplin') {
                         const r   = result.record;
-                        const fmt = (d) => d ? d.split('-').reverse().join('-') : '-';
                         this.disiplinList.unshift({
                             id:        r.id,
                             jenis:     r.jenis_hukuman,
                             alasan:    r.deskripsi,
                             no_sk:     r.no_sk,
-                            tgl_sk:    fmt(r.tanggal_sk),
-                            masa:      fmt(r.tanggal_mulai) + ' s/d ' + (r.tanggal_berakhir ? fmt(r.tanggal_berakhir) : 'Sekarang'),
+                            tgl_sk:    r.tanggal_sk,
+                            tgl_mulai: r.tanggal_mulai,
+                            tgl_akhir: r.tanggal_berakhir,
                             is_active: r.is_active,
                         });
                         this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
@@ -802,6 +805,12 @@
                     </svg>
                     Edit Pegawai
                 </a>
+                @endif
+                @if($canDeactivateEmployee)
+                <button type="button" @click="showDeactivateModal = true"
+                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                    Nonaktifkan
+                </button>
                 @endif
             </div>
         </div>
@@ -976,6 +985,10 @@
                                 <span class="text-[9px] font-bold text-muted uppercase tracking-wider font-sans block">Kepala Bagian/Supervisor Aktif</span>
                                 <p class="text-xs font-bold text-ink font-sans">{{ $currentSupervisor?->supervisor?->nama_lengkap ?? '-' }}</p>
                                 <p class="text-xs text-muted">NIP. {{ $currentSupervisor?->supervisor?->nip ?? '-' }} ({{ $currentSupervisorPosition?->nama_jabatan ?? '-' }})</p>
+                                <p class="mt-1 text-xs text-muted">
+                                    <span class="font-semibold text-ink">Mulai Penugasan:</span>
+                                    {{ $currentSupervisor?->tanggal_mulai?->format('d-m-Y') ?? '-' }}
+                                </p>
                             </div>
                     </div>
                     @if ($canAssignSupervisor)
@@ -1053,10 +1066,10 @@
                                 <x-form.input
                                     name="effective_date"
                                     type="date"
-                                    label="Tanggal Efektif"
+                                    label="Tanggal Mulai Penugasan Kepala Bagian"
                                     :value="old('effective_date', now()->toDateString())"
                                     required
-                                    help="Tanggal mulai penugasan."
+                                    help="Tanggal mulai berlakunya penugasan Kepala Bagian untuk pegawai ini."
                                 />
                                 <div class="flex flex-wrap gap-2 md:pt-6">
                                     <x-ui.button type="submit" size="sm">Simpan</x-ui.button>
@@ -1160,8 +1173,8 @@
                                 <p class="text-ink font-sans font-bold">{{ $p->statusPegawai->nama ?? $p->status_aktif ?? '-' }}</p>
                             </div>
                             <div class="space-y-0.5">
-                                <span class="font-semibold text-muted font-sans">Tanggal Efektif</span>
-                                <p class="text-ink font-sans">{{ $p->status_tanggal ? \Carbon\Carbon::parse($p->status_tanggal)->format('d-m-Y') : '-' }}</p>
+                                <span class="font-semibold text-muted font-sans">Tanggal Efektif Status Kepegawaian</span>
+                                <p class="text-ink font-sans">{{ $statusEffectiveDate?->format('d-m-Y') ?? '-' }}</p>
                             </div>
                             @if($p->status_keterangan)
                             <div class="space-y-0.5 sm:col-span-2">
@@ -1445,8 +1458,8 @@
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="k.gaji"></td>
                                     <td class="px-4 py-3" x-text="k.no_sk"></td>
-                                    <td class="px-4 py-3" x-text="k.tgl_sk"></td>
-                                    <td class="px-4 py-3" x-text="k.tmt"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(k.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(k.tmt)"></td>
                                 </tr>
                             </template>
                         </tbody>
@@ -1492,8 +1505,8 @@
                                     </td>
                                     <td class="px-4 py-3" x-text="d.alasan"></td>
                                     <td class="px-4 py-3" x-text="d.no_sk"></td>
-                                    <td class="px-4 py-3" x-text="d.tgl_sk"></td>
-                                    <td class="px-4 py-3" x-text="d.masa"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(d.tgl_sk)"></td>
+                                    <td class="px-4 py-3" x-text="formatDate(d.tgl_mulai) + ' s/d ' + (d.tgl_akhir ? formatDate(d.tgl_akhir) : 'Sekarang')"></td>
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
@@ -2461,6 +2474,28 @@
         </div>
     </div>
 
+    @if($canDeactivateEmployee)
+    <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
+        <div class="space-y-4">
+            <p class="text-sm text-muted font-sans">
+                Apakah Anda yakin ingin menonaktifkan pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong>?
+                Data tidak dihapus dan bisa diaktifkan kembali.
+            </p>
+            <div class="flex justify-end gap-3 border-t border-border pt-4">
+                <button type="button" @click="showDeactivateModal = false"
+                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
+                    Batal
+                </button>
+                <form method="POST" action="{{ route('pegawai.destroy', $p->id) }}">
+                    @csrf
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
+                        Ya, Nonaktifkan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </x-ui.modal>
+    @endif
 </div>{{-- /x-data utama --}}
 
 </div>

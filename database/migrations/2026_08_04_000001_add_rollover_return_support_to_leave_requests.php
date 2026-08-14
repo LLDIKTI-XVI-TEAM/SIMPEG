@@ -159,6 +159,10 @@ return new class extends Migration
     /** Rollback hanya mencabut pasangan policy yang dibuat migration ini. */
     private function removeNotificationPolicies(): void
     {
+        if (! Schema::hasTable('ref_notification_channels')) {
+            return;
+        }
+
         $channelIds = $this->requiredChannelIds();
 
         DB::table('notification_event_channels')

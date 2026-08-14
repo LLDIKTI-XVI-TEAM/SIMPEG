@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $jenis_pegawai_id
  * @property string|null $status_aktif
  * @property string|null $status_pegawai_id
+ * @property Carbon|null $status_tanggal
  * @property string|null $kepala_bagian_id
  * @property string|null $kelas_jabatan
  * @property string|null $kelas_jabatan_terakhir
@@ -44,6 +45,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $no_kk
  * @property string|null $nik_hash
  * @property string|null $foto_public_path
+ * @property-read string $nama Accessor for nama_lengkap
  * @property-read RefJenisPegawai|null $jenisPegawai
  * @property-read User|null $user
  * @property-read Employee|null $kepalaBagian
@@ -248,6 +250,12 @@ class Employee extends Model
         return $this->hasMany(LeaveBalance::class);
     }
 
+    /** @return HasMany<EmployeeMilestone, $this> */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(EmployeeMilestone::class);
+    }
+
     /** @return HasMany<EwsAlert, $this> */
     public function ewsAlerts(): HasMany
     {
@@ -343,6 +351,13 @@ class Employee extends Model
                 'email' => $value,
                 'email_pribadi' => $value,
             ],
+        );
+    }
+
+    protected function nama(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($value, array $attributes) => $attributes['nama_lengkap'] ?? $value,
         );
     }
 

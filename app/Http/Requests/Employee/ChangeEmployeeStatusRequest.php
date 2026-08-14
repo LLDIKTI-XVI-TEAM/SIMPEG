@@ -30,7 +30,7 @@ class ChangeEmployeeStatusRequest extends FormRequest
         return [
             'pegawai_id' => 'Pegawai',
             'status_pegawai_id' => 'Status Baru',
-            'tanggal' => 'Tanggal Efektif',
+            'tanggal' => 'Tanggal Efektif Status Kepegawaian',
             'keterangan' => 'Keterangan',
             'berkas' => 'Berkas Pendukung',
         ];

@@ -14,7 +14,9 @@ use App\Actions\Employees\ShowMyProfileAction;
 use App\Actions\Employees\UpdateEmployeeAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
+use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\ListEmployeesRequest;
+use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Models\Employee;
@@ -178,7 +180,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function destroy(Employee $employee, Request $request, DeactivateEmployeeAction $action): JsonResponse
+    public function destroy(Employee $employee, DeactivateEmployeeRequest $request, DeactivateEmployeeAction $action): JsonResponse
     {
         $action->execute($employee, $request);
 
@@ -187,7 +189,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function restore(string $employee, Request $request, RestoreEmployeeAction $action): JsonResponse
+    public function restore(string $employee, RestoreEmployeeRequest $request, RestoreEmployeeAction $action): JsonResponse
     {
         $restored = $action->execute(Employee::onlyTrashed()->findOrFail($employee), $request);
 
