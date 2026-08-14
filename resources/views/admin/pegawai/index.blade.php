@@ -3,6 +3,9 @@
         $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
         $isReadOnly = $isReadOnly ?? false;
+        $openStatusModal = $openStatusModal ?? false;
+        $statusFormEmployee = $statusFormEmployee ?? null;
+        $canChangeStatus = $canChangeStatus ?? false;
     @endphp
 
     <div x-data="{
