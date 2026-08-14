@@ -81,6 +81,28 @@ class EmployeeHistoryAttachmentService
     }
 
     /**
+     * Mengembalikan path dokumen hanya bila metadata pemilik dan kategorinya tidak ambigu.
+     *
+     * @param  list<string>  $allowedCategories
+     */
+    public function availableDocumentPath(
+        Employee $employee,
+        Document $document,
+        array $allowedCategories,
+    ): ?string {
+        if (! hash_equals((string) $employee->id, (string) $document->employee_id)
+            || ! in_array($document->jenis_dokumen, $allowedCategories, true)) {
+            return null;
+        }
+
+        return $this->availableEmployeePath(
+            $employee,
+            $document->file_path,
+            [$document->jenis_dokumen],
+        );
+    }
+
+    /**
      * Menyelesaikan SK status langsung atau fallback metadata legacy dengan aturan scope yang sama.
      */
     public function availableStatusPath(Employee $employee, EmployeeStatusHistory $history): ?string
@@ -89,7 +111,7 @@ class EmployeeHistoryAttachmentService
             return null;
         }
 
-        if ($history->file_sk !== null) {
+        if (is_string($history->file_sk) && $history->file_sk !== '') {
             return $this->availableEmployeePath(
                 $employee,
                 $history->file_sk,

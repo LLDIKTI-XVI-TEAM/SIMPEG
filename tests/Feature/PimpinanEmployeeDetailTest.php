@@ -130,6 +130,43 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertSee('showDocumentStatusModal', false);
     }
 
+    public function test_daftar_pimpinan_tetap_read_only_saat_permission_mutasi_mengalami_drift(): void
+    {
+        $role = Role::where('name', 'pimpinan')->firstOrFail();
+        $permissionIds = Permission::query()
+            ->whereIn('name', [
+                'employees.create',
+                'employees.update',
+                'employees.deactivate',
+                'employees.restore',
+            ])
+            ->pluck('id');
+        $role->permissions()->syncWithoutDetaching($permissionIds);
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.index'))
+            ->assertOk()
+            ->assertDontSee('aria-label="Tampilkan Pegawai Non-Aktif"', false)
+            ->assertDontSee('deletePegawai(p.id, p.nama_lengkap)', false)
+            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertDontSee('showDeleteModal', false)
+            ->assertDontSee('showRestoreModal', false)
+            ->assertDontSee(route('data-nonaktif'), false);
+    }
+
+    public function test_daftar_admin_dengan_permission_mutasi_tetap_menampilkan_kontrol_lifecycle_pegawai(): void
+    {
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSee('aria-label="Tampilkan Pegawai Non-Aktif"', false)
+            ->assertSee('deletePegawai(p.id, p.nama_lengkap)', false)
+            ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertSee('showDeleteModal', false)
+            ->assertSee('showRestoreModal', false)
+            ->assertSee(route('data-nonaktif'), false);
+    }
+
     public function test_daftar_pimpinan_hanya_menjalankan_satu_query_untuk_setiap_koleksi_opsi_filter(): void
     {
         Employee::factory()->create([
@@ -1247,6 +1284,61 @@ class PimpinanEmployeeDetailTest extends TestCase
         $response->assertOk()
             ->assertDownload(Str::slug($employee->nama_lengkap).'-'.Str::slug($document->nama_dokumen).'.pdf');
         Storage::disk('public')->assertMissing($document->file_path);
+    }
+
+    public function test_pimpinan_fail_closed_saat_path_dokumen_memiliki_metadata_lintas_pegawai_atau_kategori(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Target Metadata Ambigu']);
+        $otherEmployee = Employee::factory()->create();
+        $crossOwner = $this->createStoredDocument(
+            $employee,
+            'metadata-lintas-pegawai.pdf',
+            'lainnya',
+            'Dokumen Lintas Pegawai',
+        );
+        Document::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_dokumen' => $crossOwner->jenis_dokumen,
+            'nama_dokumen' => 'Metadata Milik Pegawai Lain',
+            'file_path' => $crossOwner->file_path,
+        ]);
+
+        $crossCategory = $this->createStoredDocument(
+            $employee,
+            'metadata-lintas-kategori.pdf',
+            'lainnya',
+            'Dokumen Lintas Kategori',
+        );
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'Metadata Kategori Sensitif',
+            'file_path' => $crossCategory->file_path,
+        ]);
+
+        $pimpinan = User::factory()->pimpinan()->create();
+        $detailResponse = $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee));
+
+        $detailResponse->assertOk()
+            ->assertSee($crossOwner->nama_dokumen)
+            ->assertSee($crossCategory->nama_dokumen)
+            ->assertDontSee($this->pimpinanDocumentUrl($employee, $crossOwner), false)
+            ->assertDontSee($this->pimpinanDocumentUrl($employee, $crossCategory), false);
+
+        $this->actingAs($pimpinan)
+            ->get($this->pimpinanDocumentUrl($employee, $crossOwner))
+            ->assertNotFound();
+        $this->actingAs($pimpinan)
+            ->get($this->pimpinanDocumentUrl($employee, $crossCategory))
+            ->assertNotFound();
+
+        // Unduhan generik Admin tetap mengikuti scope operasionalnya dan tidak diubah oleh aturan Pimpinan.
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('dokumen.download', $crossOwner))
+            ->assertOk()
+            ->assertDownload();
     }
 
     public function test_pimpinan_hanya_melihat_dan_mengunduh_kategori_dokumen_yang_tidak_sensitif(): void

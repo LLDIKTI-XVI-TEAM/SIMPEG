@@ -14,7 +14,6 @@ use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 class PreparePimpinanEmployeeDetailAction
 {
@@ -171,7 +170,7 @@ class PreparePimpinanEmployeeDetailAction
             ...$employee->disciplineRecords->pluck('file_sk'),
             ...$employee->educationHistories->pluck('file_ijazah'),
             ...$employee->statusHistories->pluck('file_sk'),
-            ...$employee->documents->where('jenis_dokumen', 'sk_status_pegawai')->pluck('file_path'),
+            ...$employee->documents->pluck('file_path'),
             $employee->appointment?->file_sk,
             $employee->status_berkas_path,
         ]));
@@ -215,7 +214,11 @@ class PreparePimpinanEmployeeDetailAction
         });
 
         $employee->documents->each(function (Document $document) use ($employee): void {
-            $fileAvailable = $this->pathAvailable($document->file_path);
+            $fileAvailable = $this->attachments->availableDocumentPath(
+                $employee,
+                $document,
+                DocumentCategory::visibleToPimpinanKeys(),
+            ) !== null;
 
             $document->setAttribute(
                 'pimpinan_download_url',
@@ -262,12 +265,5 @@ class PreparePimpinanEmployeeDetailAction
             $history,
             'pimpinan.pegawai.history-attachments.download',
         );
-    }
-
-    private function pathAvailable(mixed $path): bool
-    {
-        return is_string($path)
-            && $path !== ''
-            && Storage::disk(Document::STORAGE_DISK)->exists($path);
     }
 }

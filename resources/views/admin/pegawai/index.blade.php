@@ -566,24 +566,26 @@
             emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" checkAllShow="!filters.show_nonaktif" filterClass="lg:grid-cols-6">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
-                <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
-                    <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
-                        aria-label="Tampilkan Pegawai Non-Aktif"
-                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
-                    Tampilkan Pegawai Non-Aktif
-                </label>
-                @if (auth()->user()->hasPermission('employees.restore'))
-                    {{-- Tautan hanya muncul pada mode nonaktif agar halaman kelola nonaktif tidak
-                         perlu ditemukan lewat URL manual. --}}
-                    <a x-show="filters.show_nonaktif" href="{{ route('data-nonaktif') }}" wire:navigate
-                        class="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 text-xs font-semibold text-primary transition hover:bg-soft">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                        </svg>
-                        Kelola Pegawai Non-Aktif
-                    </a>
+                @if (! $isReadOnly)
+                    <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
+                        <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
+                            aria-label="Tampilkan Pegawai Non-Aktif"
+                            class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
+                        Tampilkan Pegawai Non-Aktif
+                    </label>
+                    @if (auth()->user()->hasPermission('employees.restore'))
+                        {{-- Tautan hanya muncul pada mode nonaktif agar halaman kelola nonaktif tidak
+                             perlu ditemukan lewat URL manual. --}}
+                        <a x-show="filters.show_nonaktif" href="{{ route('data-nonaktif') }}" wire:navigate
+                            class="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 text-xs font-semibold text-primary transition hover:bg-soft">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                            </svg>
+                            Kelola Pegawai Non-Aktif
+                        </a>
+                    @endif
                 @endif
                 {{-- Filter Golongan --}}
                 <div>
@@ -801,7 +803,7 @@
                                 </x-ui.tooltip>
                                 @endif
 
-                                @if(auth()->user()->hasPermission('employees.deactivate'))
+                                @if (! $isReadOnly && auth()->user()->hasPermission('employees.deactivate'))
                                     {{-- Nonaktifkan → masuk Backup sesuai permission soft delete --}}
                                     <x-ui.tooltip text="Nonaktifkan" position="top-end">
                                         <button x-show="!filters.show_nonaktif" type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
@@ -819,7 +821,7 @@
 
                             {{-- Mode nonaktif hanya menampilkan pemulihan; aksi khusus pegawai aktif
                                  seperti detail, edit, dan nonaktifkan tidak berlaku untuk record terhapus. --}}
-                            @if (auth()->user()->hasPermission('employees.restore'))
+                            @if (! $isReadOnly && auth()->user()->hasPermission('employees.restore'))
                                 <div x-show="filters.show_nonaktif" class="flex items-center justify-start gap-1.5">
                                     <x-ui.tooltip text="Aktifkan Kembali" position="top-end">
                                         <button type="button" @click="restorePegawai(p.id, p.nama_lengkap)"

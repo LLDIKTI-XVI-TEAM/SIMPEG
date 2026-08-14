@@ -102,7 +102,12 @@ class PimpinanEmployeeController extends Controller
         string $document,
         PrepareDocumentDownloadAction $action,
     ) {
-        $download = $action->execute($document, $employee->id, DocumentCategory::visibleToPimpinanKeys());
+        $download = $action->execute(
+            $document,
+            $employee->id,
+            DocumentCategory::visibleToPimpinanKeys(),
+            rejectAmbiguousMetadata: true,
+        );
 
         return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
             'Cache-Control' => 'private, no-store, max-age=0',

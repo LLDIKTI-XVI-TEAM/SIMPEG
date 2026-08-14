@@ -106,6 +106,49 @@ class EmployeeHistoryAttachmentDownloadTest extends TestCase
             ->assertDownload();
     }
 
+    public function test_status_legacy_dengan_file_sk_kosong_tetap_menyediakan_unduhan_admin_dan_pimpinan(): void
+    {
+        $employee = Employee::factory()->create();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Kosong',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-KOSONG',
+            'file_sk' => '',
+            'is_latest' => true,
+        ]);
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Legacy Kosong',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-KOSONG',
+            'file_path' => 'pegawai/status-legacy-kosong.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($document->file_path, 'status legacy privat');
+
+        $adminDownloadUrl = $this->url($employee, 'status', $history->id);
+        $pimpinanDownloadUrl = route('pimpinan.pegawai.status-attachments.download', [
+            'employee' => $employee,
+            'history' => $history,
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', ['id' => $employee->id]))
+            ->assertOk()
+            ->assertSee($adminDownloadUrl, false);
+        $this->get($adminDownloadUrl)
+            ->assertOk()
+            ->assertDownload();
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($pimpinanDownloadUrl, false);
+        $this->get($pimpinanDownloadUrl)
+            ->assertOk()
+            ->assertDownload();
+    }
+
     public function test_attachment_status_legacy_menolak_dokumen_lintas_pegawai_dan_file_privat_yang_hilang(): void
     {
         $employee = Employee::factory()->create();
