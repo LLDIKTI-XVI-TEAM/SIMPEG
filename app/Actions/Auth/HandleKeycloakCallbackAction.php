@@ -138,7 +138,9 @@ class HandleKeycloakCallbackAction
         // Sync email Keycloak yang sudah diverifikasi ke kolom email_pribadi pegawai,
         // agar email yang dipakai SSO selalu konsisten dengan data kepegawaian.
         if ($verifiedEmail && $user->employee_id) {
-            $employee = Employee::find($user->employee_id);
+            // Pegawai nonaktif tetap pemilik email_pribadi-nya; temukan juga record yang dihapus
+            // agar tidak menyinkronkan email ke pegawai lain saat index unik masih mencadangkannya.
+            $employee = Employee::withTrashed()->find($user->employee_id);
 
             if ($employee
                 && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail
@@ -174,7 +176,9 @@ class HandleKeycloakCallbackAction
             return Employee::where(function ($query) use ($matchedEmail): void {
                 $query
                     ->whereRaw('lower(email_pribadi) = ?', [$matchedEmail])
-                    ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
+                    // Kolom email lama tanpa index unik: hanya cocokkan pegawai aktif;
+                    // pegawai nonaktif hanya memegang email_pribadi kanonisnya.
+                    ->orWhere(fn ($query) => $query->withTrashed()->whereRaw('lower(email) = ?', [$matchedEmail]));
             })->limit(2)->get();
         }
 
@@ -183,7 +187,7 @@ class HandleKeycloakCallbackAction
 
     private function emailIsOwnedByAnotherEmployee(Employee $employee, string $email): bool
     {
-        return Employee::query()
+        return Employee::withTrashed()
             ->whereKeyNot($employee->id)
             ->where(function ($query) use ($email): void {
                 $query

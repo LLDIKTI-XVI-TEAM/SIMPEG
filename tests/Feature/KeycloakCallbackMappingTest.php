@@ -593,6 +593,68 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
+    /** Sync tidak boleh menimpa email yang dicadangkan pegawai nonaktif; login harus tetap berhasil. */
+    public function test_login_does_not_crash_when_keycloak_email_belongs_to_trashed_employee(): void
+    {
+        $trashedOwner = Employee::factory()->create(['email_pribadi' => 'dinas@example.com']);
+        $trashedOwner->delete();
+
+        $employee = Employee::factory()->create(['email_pribadi' => 'aktif@example.com']);
+        User::factory()->create([
+            'email' => 'aktif@example.com',
+            'keycloak_id' => 'kc-trashed-owner',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-trashed-owner',
+            'nickname' => 'aktif',
+            'name' => 'Aktif',
+            'email' => 'dinas@example.com',
+            'raw' => ['email' => 'dinas@example.com', 'email_verified' => true, 'preferred_username' => 'aktif'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        // Email tetap di tangan pegawai nonaktif; user login tanpa exception.
+        $this->assertDatabaseHas('employees', [
+            'id' => $trashedOwner->id,
+            'email_pribadi' => 'dinas@example.com',
+        ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'aktif@example.com',
+        ]);
+    }
+
+    /** User lama milik pegawai yang dinonaktifkan tetap sync email-nya ke record trashed tersebut. */
+    public function test_existing_user_mapped_to_trashed_employee_still_syncs_email(): void
+    {
+        $trashedEmployee = Employee::factory()->create(['email_pribadi' => 'lama@example.com']);
+        $trashedEmployee->delete();
+
+        User::factory()->create([
+            'email' => 'lama@example.com',
+            'keycloak_id' => 'kc-trashed-sync',
+            'employee_id' => $trashedEmployee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-trashed-sync',
+            'nickname' => 'trashed',
+            'name' => 'Trashed',
+            'email' => 'baru@example.com',
+            'raw' => ['email' => 'baru@example.com', 'email_verified' => true, 'preferred_username' => 'trashed'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $trashedEmployee->id,
+            'email_pribadi' => 'baru@example.com',
+        ]);
+    }
+
     /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
