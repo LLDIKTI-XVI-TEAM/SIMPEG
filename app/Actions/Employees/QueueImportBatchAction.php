@@ -2,9 +2,11 @@
 
 namespace App\Actions\Employees;
 
+use App\Exceptions\Import\ImportSchemaNotReadyException;
 use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\Import\ImportBatchJobPublisher;
+use App\Services\Import\ImportBatchSchemaReadiness;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,7 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class QueueImportBatchAction
 {
-    public function __construct(private readonly ImportBatchJobPublisher $publisher) {}
+    public function __construct(
+        private readonly ImportBatchJobPublisher $publisher,
+        private readonly ImportBatchSchemaReadiness $schemaReadiness,
+    ) {}
 
     /**
      * Mengklaim batch secara atomik sebelum dispatch agar request ganda tidak membuat job ganda.
@@ -53,6 +58,15 @@ class QueueImportBatchAction
                 throw ValidationException::withMessages([
                     'message' => ['Data belum divalidasi. Jalankan validasi terlebih dahulu.'],
                 ]);
+            }
+
+            // Schema yang belum dimigrasikan membuat insert claim gagal di tengah transaksi dan
+            // membocorkan pesan SQL ke pengguna. Berhenti sebelum payload pegawai dibentuk agar
+            // tidak ada data sensitif yang disiapkan untuk database yang belum siap menerimanya.
+            $missingColumns = $this->schemaReadiness->missingColumns();
+
+            if ($missingColumns !== []) {
+                throw new ImportSchemaNotReadyException($missingColumns);
             }
 
             $originalBatch = $batch;
