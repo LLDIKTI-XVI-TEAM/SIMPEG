@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\PositionHistory;
@@ -16,11 +17,14 @@ use App\Models\User;
 use App\Services\EmployeeHistoryService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Http\Middleware\TrimStrings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -296,6 +300,101 @@ class EmployeeHistoryTest extends TestCase
         $response->assertJsonPath('histories.2.golongan.kode', 'III/a');
     }
 
+    public function test_list_riwayat_mengembalikan_url_unduh_terlindungi_dengan_lookup_metadata_terbatas(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $unitKerja = RefUnitKerja::firstOrFail();
+        $metadataQueries = [];
+        $activeType = null;
+
+        DB::listen(function (QueryExecuted $query) use (&$activeType, &$metadataQueries): void {
+            $sql = mb_strtolower($query->sql);
+
+            if ($activeType !== null && str_contains($sql, 'from "documents"') && str_contains($sql, '"file_path" in')) {
+                $metadataQueries[$activeType]++;
+            }
+        });
+
+        foreach ([
+            'rank' => ['uri' => "api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", 'category' => 'sk_pangkat'],
+            'position' => ['uri' => "api/v1/pegawai/{$employee->id}/riwayat-jabatan", 'category' => 'sk_jabatan'],
+            'salary' => ['uri' => "api/v1/pegawai/{$employee->id}/riwayat-kgb", 'category' => 'sk_kgb'],
+        ] as $type => $endpoint) {
+            $createHistory = function (string $path, string $suffix) use ($employee, $golongan, $jenisJabatan, $unitKerja, $type): RankHistory|PositionHistory|SalaryHistory {
+                return match ($type) {
+                    'rank' => RankHistory::create([
+                        'employee_id' => $employee->id,
+                        'golongan_id' => $golongan->id,
+                        'tmt_pangkat' => '2026-08-'.$suffix,
+                        'file_sk' => $path,
+                    ]),
+                    'position' => PositionHistory::create([
+                        'employee_id' => $employee->id,
+                        'nama_jabatan' => 'Jabatan '.$suffix,
+                        'jenis_jabatan_id' => $jenisJabatan->id,
+                        'unit_kerja_id' => $unitKerja->id,
+                        'tmt_jabatan' => '2026-08-'.$suffix,
+                        'file_sk' => $path,
+                    ]),
+                    'salary' => SalaryHistory::create([
+                        'employee_id' => $employee->id,
+                        'gaji_pokok' => 5000000,
+                        'tmt_kgb' => '2026-08-'.$suffix,
+                        'file_sk' => $path,
+                    ]),
+                };
+            };
+            $validPath = "histories/{$type}-valid.pdf";
+            $missingPath = "histories/{$type}-missing.pdf";
+            $conflictingPath = "histories/{$type}-conflicting.pdf";
+            $validHistory = $createHistory($validPath, '03');
+            $missingHistory = $createHistory($missingPath, '02');
+            $conflictingHistory = $createHistory($conflictingPath, '01');
+
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => $endpoint['category'],
+                'nama_dokumen' => 'SK valid '.$type,
+                'file_path' => $validPath,
+            ]);
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => $endpoint['category'],
+                'nama_dokumen' => 'SK hilang '.$type,
+                'file_path' => $missingPath,
+            ]);
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => 'lainnya',
+                'nama_dokumen' => 'SK konflik '.$type,
+                'file_path' => $conflictingPath,
+            ]);
+            Storage::disk(Document::STORAGE_DISK)->put($validPath, 'SK valid '.$type);
+            Storage::disk(Document::STORAGE_DISK)->put($conflictingPath, 'SK konflik '.$type);
+
+            $activeType = $type;
+            $metadataQueries[$type] = 0;
+            $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+                ->getJson($endpoint['uri'])
+                ->assertOk();
+            $histories = collect($response->json('histories'))->keyBy('id');
+
+            $this->assertSame(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => $type,
+                'history' => $validHistory,
+            ]), $histories->get($validHistory->id)['download_url']);
+            $this->assertNull($histories->get($missingHistory->id)['download_url']);
+            $this->assertNull($histories->get($conflictingHistory->id)['download_url']);
+        }
+
+        $this->assertSame(['rank' => 1, 'position' => 1, 'salary' => 1], $metadataQueries);
+    }
+
     public function test_unauthenticated_request_cannot_list_rank_histories(): void
     {
         $employee = Employee::factory()->create();
@@ -385,6 +484,52 @@ class EmployeeHistoryTest extends TestCase
             ...$this->validRankHistoryPayload(),
             'file_sk' => 'sk/rank-aman.pdf',
         ])->assertCreated();
+    }
+
+    public function test_create_history_dengan_upload_mengembalikan_url_unduh_terlindungi(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $jenisJabatan = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis URL Unduh'],
+            ['jenis_jabatan_id' => $jenisJabatan->id, 'is_active' => true],
+        );
+        $unitKerja = RefUnitKerja::firstOrFail();
+
+        $responses = [
+            'rank' => $this->actingAs($user)->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kepangkatan", [
+                ...$this->validRankHistoryPayload(),
+                'file_sk' => UploadedFile::fake()->create('sk-pangkat.pdf', 10, 'application/pdf'),
+            ]),
+            'position' => $this->actingAs($user)->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-jabatan", [
+                'jabatan_id' => $jabatan->id,
+                'jenis_jabatan_id' => $jenisJabatan->id,
+                'unit_kerja_id' => $unitKerja->id,
+                'tmt_jabatan' => '2026-03-01',
+                'no_sk' => 'SK-POS-URL',
+                'tanggal_sk' => '2026-03-10',
+                'file_sk' => UploadedFile::fake()->create('sk-jabatan.pdf', 10, 'application/pdf'),
+            ]),
+            'salary' => $this->actingAs($user)->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/riwayat-kgb", [
+                'tmt_kgb' => '2026-04-01',
+                'gaji_pokok' => 4500000,
+                'no_sk' => 'SK-KGB-URL',
+                'tanggal_sk' => '2026-04-10',
+                'file_sk' => UploadedFile::fake()->create('sk-kgb.pdf', 10, 'application/pdf'),
+            ]),
+        ];
+
+        foreach ($responses as $type => $response) {
+            $response->assertCreated();
+            $historyId = $response->json('history.id');
+            $response->assertJsonPath('history.download_url', route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => $type,
+                'history' => $historyId,
+            ]));
+        }
     }
 
     public function test_unauthenticated_request_cannot_create_rank_history(): void
