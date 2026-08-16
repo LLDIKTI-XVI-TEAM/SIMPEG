@@ -828,8 +828,9 @@
                                 @endif
 
                                 @if ($canChangeStatus)
-                                    {{-- Ubah status hanya tersedia untuk Super Admin; backend
-                                         menegakkan batas yang sama melalui FormRequest. --}}
+                                    {{-- Ubah status tersedia bagi pengelola pegawai yang memiliki
+                                         permission employees.update; backend menegakkan batas
+                                         yang sama melalui middleware route dan FormRequest. --}}
                                     <x-ui.tooltip text="Ubah Status" position="top">
                                         <button type="button" data-testid="change-status-trigger" @click="openStatusModal(p)"
                                             :aria-label="'Ubah status pegawai ' + p.nama_lengkap"

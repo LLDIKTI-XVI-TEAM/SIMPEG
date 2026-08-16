@@ -6,7 +6,9 @@ use App\Actions\Employees\ChangeEmployeeStatusAction;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
+use App\Models\Permission;
 use App\Models\RefStatusPegawai;
+use App\Models\Role;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -281,6 +283,30 @@ class ChangeEmployeeStatusTest extends TestCase
         $user = User::factory()->pimpinan()->create();
         $employee = Employee::factory()->create();
         $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.status.update'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_admin_kepegawaian_without_employees_update_permission_cannot_change_employee_status(): void
+    {
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.update')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertDontSee('data-testid="change-status-trigger"', false);
 
         $this->actingAs($user)
             ->postWithCsrf(route('pegawai.status.update'), [
