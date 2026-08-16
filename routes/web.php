@@ -43,6 +43,7 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
@@ -622,6 +623,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard/Pengaturan', function () {
         return redirect()->route('pengaturan');
     });
+
+    // =========================================================================
+    // SWITCH & REVERT ROLE (US-1.6)
+    // =========================================================================
+    Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
+        ->name('switch-role');
+
+    Route::post('/revert-role', [SwitchRoleController::class, 'revertRole'])
+        ->name('revert-role');
 
     Route::get('/notifications', [NotificationController::class, 'index'])
         ->middleware('permission:notifications.read')

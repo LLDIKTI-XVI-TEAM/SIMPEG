@@ -46,6 +46,7 @@ class RbacSeeder extends Seeder
             'audit_logs.read' => ['module' => 'audit_logs', 'description' => 'Melihat audit log sistem'],
             'notifications.read' => ['module' => 'notifications', 'description' => 'Melihat notifikasi milik sendiri'],
             'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],
+            'users.switch_role' => ['module' => 'users', 'description' => 'Melakukan simulasi beralih ke role yang lebih rendah untuk demo/testing/support'],
             // Permission cuti menjadi gerbang kasar route/menu; otorisasi inti per pengajuan tetap berbasis approver terkonfigurasi.
             'cuti.create' => ['module' => 'cuti', 'description' => 'Mengajukan permohonan cuti'],
             'cuti.read_own' => ['module' => 'cuti', 'description' => 'Melihat pengajuan cuti milik sendiri'],
