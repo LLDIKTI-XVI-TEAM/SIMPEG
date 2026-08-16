@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\DisciplineRecord;
-use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EwsConfig;
 use App\Models\PositionHistory;
@@ -17,6 +16,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeHistoryService
 {
@@ -236,14 +236,48 @@ class EmployeeHistoryService
      */
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
+        $document = null;
+        if (! empty($data['dokumen_id'])) {
+            // Arsip yang dipakai ulang wajib tetap menjadi SK disiplin milik pegawai ini.
+            $document = $employee->documents()
+                ->whereKey($data['dokumen_id'])
+                ->where('jenis_dokumen', 'sk_hukuman_disiplin')
+                ->first();
+            if ($document === null) {
+                throw ValidationException::withMessages([
+                    'dokumen_id' => 'Dokumen harus berupa SK Hukuman Disiplin milik pegawai yang sedang diproses.',
+                ]);
+            }
+
+            if (empty($data['file_sk'])) {
+                $data['file_sk'] = $document->file_path;
+            }
+        }
+
+        if (($data['file_sk'] ?? null) instanceof UploadedFile && $document !== null) {
+            throw ValidationException::withMessages([
+                'file_sk' => 'Unggahan baru tidak dapat digabung dengan pilihan dokumen arsip.',
+            ]);
+        }
+
+        if (is_string($data['file_sk'] ?? null)) {
+            $path = $data['file_sk'];
+            // Path string hanya kompatibilitas arsip internal; kepemilikan, kategori, dan path
+            // wajib cocok agar pemanggil service tidak dapat melewati validasi HTTP.
+            $pathDocument = $employee->documents()
+                ->where('jenis_dokumen', 'sk_hukuman_disiplin')
+                ->where('file_path', $path)
+                ->first();
+            if ($pathDocument === null || ($document !== null && ! hash_equals($document->file_path, $path))) {
+                throw ValidationException::withMessages([
+                    'file_sk' => 'Path file harus merujuk SK Hukuman Disiplin milik pegawai yang sedang diproses.',
+                ]);
+            }
+        }
+
         // Proses upload file SK terlebih dahulu (jika ada file baru)
         [$data, $uploadedSkPath] = $this->storeSkUploadWithPath($data);
 
-        // Jika user memilih dari arsip dokumen, gunakan file_path dokumen sebagai file_sk
-        if (empty($data['file_sk']) && ! empty($data['dokumen_id'])) {
-            $doc = Document::find($data['dokumen_id']);
-            $data['file_sk'] = $doc?->file_path;
-        }
         unset($data['dokumen_id']);
 
         // Hanya file yang baru diunggah yang boleh dihapus saat rollback; file dari
@@ -332,7 +366,7 @@ class EmployeeHistoryService
         try {
             return DB::transaction($callback);
         } catch (\Throwable $exception) {
-            $this->files->deletePublicFile($uploadedSkPath);
+            $this->files->deleteEmployeeDocumentFile($uploadedSkPath);
 
             throw $exception;
         }

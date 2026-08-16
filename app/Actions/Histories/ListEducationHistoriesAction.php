@@ -18,12 +18,15 @@ class ListEducationHistoriesAction
      */
     public function execute(Employee $employee): Collection
     {
-        return $employee->educationHistories()
-            ->with(['jenjang', 'programStudi'])
+        $histories = $employee->educationHistories()
             ->orderByDesc('tahun_lulus')
             ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (EducationHistory $h): array => $this->payload->response($h))
+            ->get();
+        $histories->loadMissing(['jenjang', 'programStudi']);
+        $this->payload->primeAttachmentReferences($histories->pluck('file_ijazah'));
+
+        return $histories
+            ->map(fn (EducationHistory $h): array => $this->payload->response($h, $employee))
             ->values();
     }
 }

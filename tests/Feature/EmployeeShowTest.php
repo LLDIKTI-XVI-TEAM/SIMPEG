@@ -24,6 +24,7 @@ use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -34,6 +35,8 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -76,6 +79,29 @@ class EmployeeShowTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('employee.id', $employee->id);
+    }
+
+    public function test_detail_admin_fallback_ke_profil_saat_query_tab_legacy_atau_tidak_valid(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        foreach (['info', 'tab-tidak-valid'] as $invalidTab) {
+            $this->actingAs($admin)
+                ->get(route('pegawai.show', $employee).'?tab='.$invalidTab)
+                ->assertOk()
+                ->assertSee("activeTab: 'profile'", false);
+        }
+    }
+
+    public function test_detail_admin_mempertahankan_query_tab_yang_valid(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee).'?tab=keluarga')
+            ->assertOk()
+            ->assertSee("activeTab: 'keluarga'", false);
     }
 
     public function test_employee_detail_page_prioritizes_manual_retirement_date_and_falls_back_to_bup(): void
@@ -134,6 +160,54 @@ class EmployeeShowTest extends TestCase
             ->assertSee('15-06-2035', false)
             ->assertDontSee('01-04-2024', false)
             ->assertDontSee('01-01-2022', false);
+    }
+
+    public function test_detail_admin_tidak_memakai_riwayat_non_latest_sebagai_snapshot_pekerjaan(): void
+    {
+        $employee = $this->employeeWithReferences([
+            'pangkat_terakhir' => 'Pangkat Snapshot Marker',
+            'golongan_terakhir' => 'GOL-SNAPSHOT',
+            'jabatan_terakhir' => 'Jabatan Snapshot Marker',
+        ]);
+        $historicalRank = RefGolongan::create([
+            'kode' => 'HIST/Z',
+            'nama' => 'Pangkat Historis Nonlatest Marker',
+            'urutan' => 999,
+        ]);
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $historicalRank->id,
+            'tmt_pangkat' => '2099-01-01',
+            'no_sk' => 'SK-HIST-RANK-NONLATEST',
+            'tanggal_sk' => '2098-12-01',
+            'is_latest' => false,
+        ]);
+        PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Jabatan Historis Nonlatest Marker',
+            'jenis_jabatan_id' => RefJenisJabatan::where('nama', 'Struktural')->firstOrFail()->id,
+            'unit_kerja_id' => RefUnitKerja::where('nama', 'Kepala Bagian Umum')->firstOrFail()->id,
+            'tmt_jabatan' => '2099-01-01',
+            'no_sk' => 'SK-HIST-POSITION-NONLATEST',
+            'tanggal_sk' => '2098-12-01',
+            'is_latest' => false,
+        ]);
+
+        $html = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $profileStart = strpos($html, 'data-employee-detail-panel="profile"');
+        $familyStart = strpos($html, 'data-employee-detail-panel="keluarga"', $profileStart ?: 0);
+        $this->assertNotFalse($profileStart);
+        $this->assertNotFalse($familyStart);
+        $profileHtml = substr($html, $profileStart, $familyStart - $profileStart);
+
+        $this->assertStringContainsString('Pangkat Snapshot Marker', $profileHtml);
+        $this->assertStringContainsString('GOL-SNAPSHOT', $profileHtml);
+        $this->assertStringContainsString('Jabatan Snapshot Marker', $profileHtml);
+        $this->assertStringNotContainsString('Pangkat Historis Nonlatest Marker', $profileHtml);
+        $this->assertStringNotContainsString('Jabatan Historis Nonlatest Marker', $profileHtml);
     }
 
     public function test_detail_page_menampilkan_kontrol_kepala_bagian_hanya_bila_role_dan_permission_memenuhi_syarat(): void
@@ -265,6 +339,116 @@ class EmployeeShowTest extends TestCase
             ], false);
     }
 
+    public function test_detail_admin_merender_riwayat_status_dengan_urutan_deterministik(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        // Urutan insert sengaja kebalikan dari aturan tampilan agar query, bukan urutan fisik DB, yang menentukan hasil.
+        $this->createStatusHistory($employee, 'Status Tie Rendah Admin', false, '2026-06-01', '2026-06-10 08:00:00', '10000000-0000-4000-8000-000000000002');
+        $this->createStatusHistory($employee, 'Status Tie Tinggi Admin', false, '2026-06-01', '2026-06-10 08:00:00', '10000000-0000-4000-8000-000000000003');
+        $this->createStatusHistory($employee, 'Status Dibuat Terbaru Admin', false, '2026-06-01', '2026-06-10 09:00:00', '10000000-0000-4000-8000-000000000001');
+        $this->createStatusHistory($employee, 'Status Tanggal Terbaru Admin', false, '2026-08-01', '2026-06-10 07:00:00', '10000000-0000-4000-8000-000000000004');
+        $this->createStatusHistory($employee, 'Status Flag Latest Admin', true, '2025-01-01', '2026-06-10 06:00:00', '10000000-0000-4000-8000-000000000005');
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSeeInOrder([
+                'Status Flag Latest Admin',
+                'Status Tanggal Terbaru Admin',
+                'Status Dibuat Terbaru Admin',
+                'Status Tie Rendah Admin',
+                'Status Tie Tinggi Admin',
+            ], false);
+    }
+
+    public function test_detail_admin_merender_dan_mengunduh_dokumen_status_legacy_milik_pegawai(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Dengan Dokumen',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-ADMIN',
+            'is_latest' => true,
+        ]);
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Legacy',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-ADMIN',
+            'file_path' => 'pegawai/status-legacy-admin.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($document->file_path, 'status legacy privat');
+        $url = route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status',
+            'history' => $history,
+        ]);
+        $admin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($url, false)
+            ->assertDontSee($document->file_path, false)
+            ->assertDontSee('/storage/', false);
+
+        $this->actingAs($admin)
+            ->get($url)
+            ->assertOk()
+            ->assertDownload();
+    }
+
+    public function test_detail_admin_memilih_kandidat_dokumen_status_legacy_tersedia_pertama_secara_konsisten(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $history = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status Legacy Duplikat',
+            'tanggal_efektif' => '2026-08-01',
+            'nomor_berkas' => 'SK-STATUS-LEGACY-DUPLIKAT',
+            'is_latest' => true,
+        ]);
+        $missingDocument = new Document;
+        $missingDocument->id = '30000000-0000-4000-8000-000000000001';
+        $missingDocument->forceFill([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Lama Hilang',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-DUPLIKAT',
+            'file_path' => 'pegawai/status-legacy-hilang.pdf',
+        ])->save();
+        $availableDocument = new Document;
+        $availableDocument->id = '30000000-0000-4000-8000-000000000002';
+        $availableDocument->forceFill([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_status_pegawai',
+            'nama_dokumen' => 'SK Status Lama Tersedia',
+            'nomor_dokumen' => 'SK-STATUS-LEGACY-DUPLIKAT',
+            'file_path' => 'pegawai/status-legacy-tersedia.pdf',
+        ])->save();
+        Storage::disk(Document::STORAGE_DISK)->put($availableDocument->file_path, 'status legacy tersedia');
+        $url = route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status',
+            'history' => $history,
+        ]);
+        $admin = User::factory()->superAdmin()->create();
+
+        $this->actingAs($admin)
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($url, false);
+
+        $this->actingAs($admin)
+            ->get($url)
+            ->assertOk()
+            ->assertDownload();
+    }
+
     public function test_detail_page_tidak_mengarang_tanggal_status_tanpa_sumber_resmi(): void
     {
         $employee = $this->employeeWithReferences([
@@ -372,6 +556,46 @@ class EmployeeShowTest extends TestCase
             ->assertSee('x-text="formatDate(j.tmt)"', false);
     }
 
+    public function test_detail_page_formats_kgb_history_dates_in_table(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('x-text="formatDate(k.tgl_sk)"', false)
+            ->assertSee('x-text="formatDate(k.tmt)"', false);
+    }
+
+    public function test_detail_page_mempertahankan_tanggal_kalender_kgb_pada_payload_awal_dan_baris_baru(): void
+    {
+        $employee = $this->employeeWithReferences();
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 5000000,
+            'no_sk' => 'SK-KGB-KALENDER',
+            'tanggal_sk' => '2026-01-10',
+            'tmt_kgb' => '2026-01-15',
+            'is_latest' => true,
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk();
+
+        $payload = $this->extractAlpineList($response->getContent(), 'kgbList', 'disiplinList');
+        $row = collect($payload)->firstWhere('no_sk', 'SK-KGB-KALENDER');
+        $this->assertIsArray($row);
+        // Payload awal harus mempertahankan date-only DB tanpa konversi UTC yang menggeser hari.
+        $this->assertSame('2026-01-10', $row['tgl_sk']);
+        $this->assertSame('2026-01-15', $row['tmt']);
+
+        $response
+            // Baris hasil create tetap memakai tanggal date-only dari input/API yang sama.
+            ->assertSee('tgl_sk: this.newKgb.tanggal_sk,', false)
+            ->assertSee('tmt: this.newKgb.tmt_kgb', false);
+    }
+
     public function test_detail_page_serializes_official_history_dates_without_timezone_shift(): void
     {
         config(['app.timezone' => 'Asia/Makassar']);
@@ -458,6 +682,202 @@ class EmployeeShowTest extends TestCase
             ->assertOk()
             ->assertSee("pendidikan_v2_{$employee->id}", false)
             ->assertDontSee("pendidikan_{$employee->id}", false);
+    }
+
+    public function test_detail_page_disciplines_use_normalized_dates_and_protected_download_url(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $record = DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'Pelanggaran tanggal kalender',
+            'tanggal_mulai' => '2026-09-22',
+            'tanggal_berakhir' => '2026-10-22',
+            'no_sk' => 'SK-DISIPLIN-DATE-ONLY',
+            'tanggal_sk' => '2026-09-22',
+            'file_sk' => 'sk/disiplin-date-only.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($record->file_sk, 'sk disiplin privat');
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('x-text="formatDate(d.tgl_sk)"', false)
+            ->assertSee('x-text="formatDate(d.tgl_mulai) + \' s/d \' + (d.tgl_akhir ? formatDate(d.tgl_akhir) : \'Sekarang\')"', false)
+            ->assertSee('download_url: r.download_url', false);
+
+        $payload = $this->extractAlpineList($response->getContent(), 'disiplinList', 'pendidikanList');
+        $row = collect($payload)->firstWhere('no_sk', 'SK-DISIPLIN-DATE-ONLY');
+        $this->assertIsArray($row);
+        $this->assertSame('2026-09-22', $row['tgl_sk']);
+        $this->assertSame('2026-09-22', $row['tgl_mulai']);
+        $this->assertSame('2026-10-22', $row['tgl_akhir']);
+        $this->assertSame(route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'discipline',
+            'history' => $record,
+        ]), $row['download_url']);
+    }
+
+    public function test_detail_page_preserves_education_download_url_after_metadata_update(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $content = $this->actingAs($admin)
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $updateHandler = Str::between(
+            $content,
+            'async submitEditPendidikan() {',
+            'async deletePendidikan(id, index) {',
+        );
+
+        $this->assertStringContainsString('download_url: h.download_url', $updateHandler);
+    }
+
+    public function test_detail_page_payload_program_studi_mempertahankan_url_unduh_privat(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Publik Detail']);
+        $history = EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => RefJenjangPendidikan::where('nama', 'D4 / S1')->firstOrFail()->id,
+            'program_studi_id' => $programStudi->id,
+            'nama_institusi' => 'Universitas Detail',
+            'tahun_lulus' => 2024,
+            'no_ijazah' => 'IJAZAH-PRODI-DOWNLOAD',
+            'file_ijazah' => 'ijazah/program-studi-detail.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($history->file_ijazah, 'ijazah privat');
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $row = collect($this->extractAlpineList($content, 'pendidikanList', 'pendidikanLoading'))
+            ->firstWhere('no_ijazah', 'IJAZAH-PRODI-DOWNLOAD');
+
+        $this->assertIsArray($row);
+        $this->assertSame($programStudi->id, $row['program_studi_id']);
+        $this->assertSame($programStudi->nama, $row['prodi']);
+        $this->assertSame(route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'education',
+            'history' => $history,
+        ]), $row['download_url']);
+    }
+
+    public function test_detail_admin_tidak_merender_tautan_attachment_yang_file_privatnya_hilang(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $rank = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/a')->firstOrFail()->id,
+            'tmt_pangkat' => '2026-01-01',
+            'file_sk' => 'sk/admin-rank-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $position = PositionHistory::create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Jabatan File Hilang',
+            'tmt_jabatan' => '2026-01-01',
+            'file_sk' => 'sk/admin-position-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $salary = SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'gaji_pokok' => 4500000,
+            'tmt_kgb' => '2026-01-01',
+            'file_sk' => 'sk/admin-salary-hilang.pdf',
+            'is_latest' => true,
+        ]);
+        $discipline = DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'File tidak tersedia',
+            'tanggal_mulai' => '2026-01-01',
+            'no_sk' => 'SK-DIS-HILANG',
+            'tanggal_sk' => '2025-12-31',
+            'file_sk' => 'sk/admin-discipline-hilang.pdf',
+        ]);
+        $status = EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Status File Hilang',
+            'tanggal_efektif' => '2026-01-01',
+            'file_sk' => 'sk/admin-status-hilang.pdf',
+            'is_latest' => true,
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk();
+        $content = $response->getContent();
+
+        $rankRow = collect($this->extractAlpineList($content, 'pangkatList', 'jabatanList'))->firstWhere('no_sk', $rank->no_sk);
+        $positionRow = collect($this->extractAlpineList($content, 'jabatanList', 'kgbList'))->firstWhere('no_sk', $position->no_sk);
+        $salaryRow = collect($this->extractAlpineList($content, 'kgbList', 'disiplinList'))->firstWhere('no_sk', $salary->no_sk);
+        $disciplineRow = collect($this->extractAlpineList($content, 'disiplinList', 'pendidikanList'))->firstWhere('no_sk', $discipline->no_sk);
+
+        $this->assertNull($rankRow['download_url']);
+        $this->assertNull($positionRow['download_url']);
+        $this->assertNull($salaryRow['download_url']);
+        $this->assertNull($disciplineRow['download_url']);
+        $response->assertDontSee(route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status',
+            'history' => $status,
+        ]), false);
+    }
+
+    public function test_detail_admin_tidak_merender_tautan_snapshot_status_yang_file_privatnya_hilang(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences([
+            'status_berkas_path' => 'sk/admin-status-snapshot-hilang.pdf',
+            'status_nomor_berkas' => 'SK-SNAPSHOT-HILANG',
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertDontSee(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => 'status-snapshot',
+                'history' => $employee,
+            ]), false);
+    }
+
+    public function test_detail_admin_memakai_snapshot_status_saat_semua_riwayat_tidak_memiliki_lampiran(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences([
+            'status_berkas_path' => 'sk/admin-status-snapshot-fallback.pdf',
+            'status_nomor_berkas' => 'SK-SNAPSHOT-FALLBACK',
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_nama' => 'Aktif tanpa lampiran',
+            'tanggal_efektif' => '2026-08-01',
+            'is_latest' => true,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($employee->status_berkas_path, 'snapshot status privat');
+        $url = route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'status-snapshot',
+            'history' => $employee,
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee('Aktif tanpa lampiran')
+            ->assertSee('SK-SNAPSHOT-FALLBACK')
+            ->assertSee($url, false);
     }
 
     public function test_detail_page_provides_optional_sk_upload_controls_for_each_history_modal(): void
@@ -599,6 +1019,42 @@ class EmployeeShowTest extends TestCase
             'jenis_pegawai_id' => RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
             'email' => fake()->unique()->safeEmail(),
         ], $attributes));
+    }
+
+    private function createStatusHistory(
+        Employee $employee,
+        string $name,
+        bool $isLatest,
+        string $effectiveDate,
+        string $createdAt,
+        string $id,
+    ): EmployeeStatusHistory {
+        $history = new EmployeeStatusHistory;
+        $history->id = $id;
+        $history->forceFill([
+            'employee_id' => $employee->id,
+            'status_nama' => $name,
+            'tanggal_efektif' => $effectiveDate,
+            'is_latest' => $isLatest,
+            'created_at' => Carbon::parse($createdAt),
+            'updated_at' => Carbon::parse($createdAt),
+        ])->save();
+
+        return $history;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function extractAlpineList(string $html, string $listName, string $nextListName): array
+    {
+        $startMarker = $listName.': ';
+        $endMarker = "\n        ".$nextListName.': ';
+        $start = strpos($html, $startMarker);
+        $this->assertNotFalse($start);
+        $end = strpos($html, $endMarker, $start);
+        $this->assertNotFalse($end);
+        $json = rtrim(trim(substr($html, $start + strlen($startMarker), $end - $start - strlen($startMarker))), ',');
+
+        return json_decode(html_entity_decode($json, ENT_QUOTES | ENT_HTML5), true, flags: JSON_THROW_ON_ERROR);
     }
 
     private function seedEmployeeDetail(Employee $employee, Employee $supervisor): void

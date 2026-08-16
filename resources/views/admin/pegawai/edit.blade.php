@@ -6,8 +6,6 @@
             ->filter(fn($appointment) => strcasecmp((string) $appointment->jenis_pengangkatan, 'PPPK') === 0)
             ->sortByDesc('tmt_pengangkatan')
             ->first();
-        $golonganRefOptions = $golonganRefOptions ?? \App\Models\RefGolongan::orderBy('kode')->get();
-        $eselonOptions = $eselonOptions ?? \App\Models\RefEselon::orderBy('nama')->get();
     @endphp
 
     <div class="mx-auto max-w-7xl space-y-6">
@@ -55,28 +53,25 @@
             fotoPreview: {{ json_encode($fotoUrl) }},
 
             // File uploads state
-            skPangkatName: {{ json_encode($p->latestRank() && $p->latestRank()->file_sk ? basename($p->latestRank()->file_sk) : "") }},
+            skPangkatName: {{ json_encode($latestRank?->admin_attachment_download_url ? basename($latestRank->file_sk) : "") }},
             skPangkatSize: '',
             skPangkatError: '',
             skPangkatMode: 'upload', // 'upload' | 'arsip'
             selectedArsipPangkatId: '',
             arsipPangkatList: {{ json_encode($arsipPangkat) }},
-
-            skJabatanName: {{ json_encode($p->latestPosition() && $p->latestPosition()->file_sk ? basename($p->latestPosition()->file_sk) : "") }},
+            skJabatanName: {{ json_encode($latestPosition?->admin_attachment_download_url ? basename($latestPosition->file_sk) : "") }},
             skJabatanSize: '',
             skJabatanError: '',
             skJabatanMode: 'upload',
             selectedArsipJabatanId: '',
             arsipJabatanList: {{ json_encode($arsipJabatan) }},
-
-            skKgbName: {{ json_encode($p->latestSalary() && $p->latestSalary()->file_sk ? basename($p->latestSalary()->file_sk) : "") }},
+            skKgbName: {{ json_encode($latestSalary?->admin_attachment_download_url ? basename($latestSalary->file_sk) : "") }},
             skKgbSize: '',
             skKgbError: '',
             skKgbMode: 'upload',
             selectedArsipKgbId: '',
             arsipKgbList: {{ json_encode($arsipKgb) }},
-
-            skPengangkatanName: {{ json_encode($p->appointment && $p->appointment->file_sk ? basename($p->appointment->file_sk) : "") }},
+            skPengangkatanName: {{ json_encode($p->appointment?->admin_attachment_download_url ? basename($p->appointment->file_sk) : "") }},
             skPengangkatanSize: '',
             skPengangkatanError: '',
             skPengangkatanMode: 'upload',
@@ -859,8 +854,6 @@
 
                     {{-- SUB-TAB A: PANGKAT --}}
                     <div x-show="subTab === 'pangkat'" class="space-y-6" x-transition>
-                        @php $latestRank = $p->latestRank(); @endphp
-
                         <div class="mb-4 border-b border-border pb-4">
                             <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-sans">
                                 <p class="text-xs font-bold text-primary uppercase tracking-wider">Tambah Riwayat
@@ -976,9 +969,9 @@
                                                     x-text="'(' + skPangkatSize + ')'"></span>
                                             </div>
                                         </template>
-                                        @if($latestRank && $latestRank->file_sk)
+                                        @if($latestRank?->admin_attachment_download_url)
                                             <div class="mt-2 text-xs text-muted" x-show="!skPangkatSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestRank->file_sk) }}"
+                                                Berkas saat ini: <a href="{{ $latestRank->admin_attachment_download_url }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($latestRank->file_sk) }}</a>
                                             </div>
@@ -1023,8 +1016,6 @@
 
                     {{-- SUB-TAB B: JABATAN --}}
                     <div x-show="subTab === 'jabatan'" class="space-y-6" x-transition>
-                        @php $latestPosition = $p->latestPosition(); @endphp
-
                         <div class="mb-4 border-b border-border pb-4">
                             <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-sans">
                                 <p class="text-xs font-bold text-primary uppercase tracking-wider">Tambah Riwayat
@@ -1213,10 +1204,10 @@
                                                     x-text="'(' + skJabatanSize + ')'"></span>
                                             </div>
                                         </template>
-                                        @if($latestPosition && $latestPosition->file_sk)
+                                        @if($latestPosition?->admin_attachment_download_url)
                                             <div class="mt-2 text-xs text-muted" x-show="!skJabatanSize">
                                                 Berkas saat ini: <a
-                                                    href="{{ asset('storage/' . $latestPosition->file_sk) }}"
+                                                    href="{{ $latestPosition->admin_attachment_download_url }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($latestPosition->file_sk) }}</a>
                                             </div>
@@ -1256,8 +1247,6 @@
 
                     {{-- SUB-TAB C: KGB --}}
                     <div x-show="subTab === 'kgb'" class="space-y-6" x-transition>
-                        @php $latestSalary = $p->latestSalary(); @endphp
-
                         <div class="mb-4 border-b border-border pb-4">
                             <div class="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 font-sans">
                                 <p class="text-xs font-bold text-primary uppercase tracking-wider">Tambah Riwayat KGB
@@ -1362,9 +1351,9 @@
                                                     x-text="'(' + skKgbSize + ')'"></span>
                                             </div>
                                         </template>
-                                        @if($latestSalary && $latestSalary->file_sk)
+                                        @if($latestSalary?->admin_attachment_download_url)
                                             <div class="mt-2 text-xs text-muted" x-show="!skKgbSize">
-                                                Berkas saat ini: <a href="{{ asset('storage/' . $latestSalary->file_sk) }}"
+                                                Berkas saat ini: <a href="{{ $latestSalary->admin_attachment_download_url }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($latestSalary->file_sk) }}</a>
                                             </div>
@@ -1533,10 +1522,10 @@
                                                     x-text="'(' + skPengangkatanSize + ')'"></span>
                                             </div>
                                         </template>
-                                        @if($p->appointment && $p->appointment->file_sk)
+                                        @if($p->appointment?->admin_attachment_download_url)
                                             <div class="mt-2 text-xs text-muted" x-show="!skPengangkatanSize">
                                                 Berkas saat ini: <a
-                                                    href="{{ asset('storage/' . $p->appointment->file_sk) }}"
+                                                    href="{{ $p->appointment->admin_attachment_download_url }}"
                                                     target="_blank"
                                                     class="text-primary hover:underline font-semibold">{{ basename($p->appointment->file_sk) }}</a>
                                             </div>

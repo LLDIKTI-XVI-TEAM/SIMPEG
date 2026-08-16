@@ -49,6 +49,18 @@ class EmployeeImportMappingUiTest extends TestCase
         $this->assertStringContainsString('errorSourceHeaders,', $componentScript);
         $response->assertSee('item.errorSourceHeaders?.includes(header)', false);
         $response->assertSee("'Baris validasi ' + item.row + ', ' + header", false);
+        $this->assertStringContainsString('validationStatusLabel(status)', $componentScript);
+        $this->assertStringContainsString('Sudah ada — akan dilewati', $componentScript);
+        $response->assertSee('Terlewat (sudah ada)', false);
+        // Keterangan baris terlewat mengutamakan alasan dari server; fallback
+        // hanya untuk respons lama yang tidak membawa alasan.
+        $this->assertStringContainsString("return item.error || 'NIP sudah terdaftar di database. Baris ini tidak akan diimpor.';", $componentScript);
+        $response->assertSee('validation-description-', false);
+        $this->assertStringContainsString("r.status === 'error'", $componentScript);
+        $response->assertSee("item.status !== 'error'", false);
+        $response->assertSee('validRows === 0 || hasEdits || isExecuting', false);
+        $response->assertSee('Validasi ulang perubahan sebelum mengimpor.', false);
+        $response->assertDontSee("item.status === 'error' || item.status === 'skip'", false);
         $response->assertSee('dusk="mapping-required-warning"', false);
         $this->assertStringContainsString('hasDuplicateMapping', $componentScript);
         $response->assertSee('Selesaikan konflik dan field wajib pada panel pemetaan.', false);

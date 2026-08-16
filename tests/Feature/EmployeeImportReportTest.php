@@ -122,7 +122,7 @@ class EmployeeImportReportTest extends TestCase
     }
 
     /**
-     * Tiga baris: valid, NIP duplikat database (error unique), dan tanggal lahir tidak valid (error).
+     * Tiga baris: valid, NIP yang sudah terdaftar (skip), dan tanggal lahir tidak valid (error).
      */
     private function mixedCsv(): string
     {

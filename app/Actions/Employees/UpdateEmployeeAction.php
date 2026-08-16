@@ -31,7 +31,9 @@ class UpdateEmployeeAction
      */
     public function execute(Employee $employee, array $validated, Request $request): Employee
     {
-        return DB::transaction(function () use ($employee, $validated, $request) {
+        $storedEmployeeDocumentPaths = [];
+
+        $transaction = function () use ($employee, $validated, $request, &$storedEmployeeDocumentPaths) {
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated, $employee);
@@ -71,9 +73,8 @@ class UpdateEmployeeAction
 
                 if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                     $file = $request->file('file_sk_pangkat');
-                    $filename = $file->hashName();
-                    $file->move(storage_path('app/public/ranks/sk'), $filename);
-                    $pangkatData['file_sk'] = 'ranks/sk/'.$filename;
+                    $pangkatData['file_sk'] = $this->files->storeEmployeeDocument($file, 'ranks/sk');
+                    $storedEmployeeDocumentPaths[] = $pangkatData['file_sk'];
 
                     $golonganLabel = isset($pangkatData['golongan_id'])
                         ? (RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
@@ -131,9 +132,8 @@ class UpdateEmployeeAction
 
                 if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                     $file = $request->file('file_sk_jabatan');
-                    $filename = $file->hashName();
-                    $file->move(storage_path('app/public/positions/sk'), $filename);
-                    $jabatanData['file_sk'] = 'positions/sk/'.$filename;
+                    $jabatanData['file_sk'] = $this->files->storeEmployeeDocument($file, 'positions/sk');
+                    $storedEmployeeDocumentPaths[] = $jabatanData['file_sk'];
 
                     Document::create([
                         'employee_id' => $employee->id,
@@ -176,9 +176,8 @@ class UpdateEmployeeAction
 
                 if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                     $file = $request->file('file_sk_kgb');
-                    $filename = $file->hashName();
-                    $file->move(storage_path('app/public/salaries/sk'), $filename);
-                    $kgbData['file_sk'] = 'salaries/sk/'.$filename;
+                    $kgbData['file_sk'] = $this->files->storeEmployeeDocument($file, 'salaries/sk');
+                    $storedEmployeeDocumentPaths[] = $kgbData['file_sk'];
 
                     Document::create([
                         'employee_id' => $employee->id,
@@ -231,9 +230,8 @@ class UpdateEmployeeAction
 
                 if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
                     $file = $request->file('file_sk_pengangkatan');
-                    $filename = $file->hashName();
-                    $file->move(storage_path('app/public/appointments/sk'), $filename);
-                    $appointmentData['file_sk'] = 'appointments/sk/'.$filename;
+                    $appointmentData['file_sk'] = $this->files->storeEmployeeDocument($file, 'appointments/sk');
+                    $storedEmployeeDocumentPaths[] = $appointmentData['file_sk'];
 
                     Document::create([
                         'employee_id' => $employee->id,
@@ -322,7 +320,18 @@ class UpdateEmployeeAction
             AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->toArray(), $request);
 
             return $employee;
-        });
+        };
+
+        try {
+            return DB::transaction($transaction);
+        } catch (\Throwable $exception) {
+            // Storage tidak ikut rollback transaksi DB; hanya file baru dari request ini yang dikompensasi.
+            foreach (array_unique($storedEmployeeDocumentPaths) as $path) {
+                $this->files->deleteEmployeeDocumentFile($path);
+            }
+
+            throw $exception;
+        }
     }
 
     /**
