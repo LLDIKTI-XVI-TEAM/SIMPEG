@@ -6,7 +6,9 @@ use App\Actions\Employees\ChangeEmployeeStatusAction;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
+use App\Models\Permission;
 use App\Models\RefStatusPegawai;
+use App\Models\Role;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -43,7 +45,7 @@ class ChangeEmployeeStatusTest extends TestCase
         ]);
         $mutasi = RefStatusPegawai::where('nama', 'Mutasi')->firstOrFail();
 
-        $response = $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $response = $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $mutasi->id,
             'tanggal' => '2026-08-01',
@@ -52,6 +54,7 @@ class ChangeEmployeeStatusTest extends TestCase
 
         $response->assertRedirect();
         $response->assertSessionHas('success');
+        $response->assertSessionHas('employee_data_changed', true);
 
         $employee->refresh();
         $this->assertSame($mutasi->id, $employee->status_pegawai_id);
@@ -94,7 +97,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
         $pensiun = RefStatusPegawai::where('nama', 'Pensiun')->firstOrFail();
 
-        $response = $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $response = $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pensiun->id,
             'tanggal' => '2026-08-01',
@@ -157,7 +160,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $mutasi = RefStatusPegawai::where('nama', 'Mutasi')->firstOrFail();
         $pensiun = RefStatusPegawai::where('nama', 'Pensiun')->firstOrFail();
 
-        $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $mutasi->id,
             'tanggal' => '2026-08-01',
@@ -171,7 +174,7 @@ class ChangeEmployeeStatusTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->assertExists($oldFilePath);
         $this->assertSame(1, Document::where('employee_id', $employee->id)->count());
 
-        $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pensiun->id,
             'tanggal' => '2026-09-01',
@@ -200,7 +203,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $mutasi = RefStatusPegawai::where('nama', 'Mutasi')->firstOrFail();
         $pensiun = RefStatusPegawai::where('nama', 'Pensiun')->firstOrFail();
 
-        $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $mutasi->id,
             'tanggal' => '2026-08-01',
@@ -212,7 +215,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $oldFilePath = $employee->status_berkas_path;
         $this->assertNotNull($oldFilePath);
 
-        $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pensiun->id,
             'tanggal' => '2026-09-01',
@@ -240,7 +243,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
         $pemberhentian = RefStatusPegawai::where('nama', 'Pemberhentian Sementara')->firstOrFail();
 
-        $response = $this->actingAs($admin)->postWithCsrf(route('super-admin.status-pegawai.store'), [
+        $response = $this->actingAs($admin)->postWithCsrf(route('pegawai.status.update'), [
             'pegawai_id' => $employee->id,
             'status_pegawai_id' => $pemberhentian->id,
             'tanggal' => '2026-08-01',
@@ -254,21 +257,95 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->assertSame('Pemberhentian Sementara', $employee->refresh()->status_aktif);
     }
 
-    public function test_admin_kepegawaian_cannot_access_status_pegawai_page(): void
+    public function test_admin_kepegawaian_can_change_employee_status(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
 
         $this->actingAs($user)
-            ->get(route('super-admin.status-pegawai.index'))
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSee('data-testid="change-status-trigger"', false);
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.status.update'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+    }
+
+    public function test_pimpinan_cannot_change_employee_status(): void
+    {
+        $user = User::factory()->pimpinan()->create();
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.status.update'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
             ->assertForbidden();
     }
 
-    public function test_status_page_uses_unambiguous_effective_date_label(): void
+    public function test_admin_kepegawaian_without_employees_update_permission_cannot_change_employee_status(): void
+    {
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.update')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertDontSee('data-testid="change-status-trigger"', false);
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.status.update'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_legacy_status_pegawai_post_route_still_accepts_submission(): void
+    {
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('super-admin.status-pegawai.store'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+    }
+
+    public function test_status_form_is_rendered_in_employee_table_and_old_page_redirects(): void
     {
         $this->actingAs(User::factory()->superAdmin()->create())
-            ->get(route('super-admin.status-pegawai.index'))
+            ->get(route('data-pegawai'))
             ->assertOk()
-            ->assertSee('Tanggal Efektif Status Kepegawaian', false);
+            ->assertSee('data-testid="change-status-trigger"', false)
+            ->assertSee('Ubah Status Pegawai', false)
+            ->assertSee('Tanggal Efektif Status Kepegawaian', false)
+            ->assertSee(route('pegawai.status.update'), false)
+            ->assertDontSee('super-admin.status-pegawai.index', false);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get('/super-admin/status-pegawai')
+            ->assertRedirect(route('data-pegawai'));
     }
 
     private function postWithCsrf(string $uri, array $data): TestResponse

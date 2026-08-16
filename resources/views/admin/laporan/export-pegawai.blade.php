@@ -383,27 +383,27 @@
             </div>
 
             {{-- Footer: Paginasi --}}
-            <div class="flex flex-col gap-4 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-muted font-sans">Tampilkan</span>
-                        <select x-model.number="perPage" @change="currentPage = 1" aria-label="Jumlah data pratinjau per halaman" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
-                            <option value="10">10</option>
-                            <option value="25">25</option>
-                            <option value="50">50</option>
-                        </select>
-                        <span class="text-sm text-muted font-sans">data per halaman</span>
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                <div class="flex items-center gap-3 text-sm text-muted">
+                    <span class="whitespace-nowrap font-sans">Tampilkan</span>
+                    <select x-model.number="perPage" @change="currentPage = 1" aria-label="Jumlah data pratinjau per halaman" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span class="hidden sm:inline font-sans">data</span>
+
+                    {{-- Meta Info --}}
+                    <div class="hidden md:block ml-2 border-l border-border pl-4 font-sans" x-show="exportRows.length > 0">
+                        Menampilkan
+                        <span class="font-medium text-ink" x-text="exportRows.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span>
+                        – <span class="font-medium text-ink" x-text="Math.min(currentPage * perPage, exportRows.length)"></span>
+                        dari <span class="font-medium text-ink" x-text="exportRows.length"></span>
                     </div>
                 </div>
-                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <p class="text-sm text-muted font-sans">
-                        Menampilkan
-                        <span class="font-medium" x-text="exportRows.length === 0 ? 0 : (currentPage - 1) * perPage + 1"></span>–<span class="font-medium" x-text="Math.min(currentPage * perPage, exportRows.length)"></span>
-                        dari <span class="font-medium" x-text="exportRows.length"></span> data
-                    </p>
-                    <div class="flex items-center gap-1.5">
-                        <x-ui.pagination current="currentPage" total="totalPages" />
-                    </div>
+
+                <div class="flex items-center gap-1.5">
+                    <x-ui.pagination current="currentPage" total="totalPages" />
                 </div>
             </div>
         </x-ui.card>
