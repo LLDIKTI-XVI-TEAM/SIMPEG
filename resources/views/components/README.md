@@ -71,56 +71,71 @@ Komponen tombol standar dan anchor link dengan dukungan variasi visual, ukuran, 
 <x-ui.button as="a" href="{{ route('pegawai.index') }}" variant="secondary" size="lg" :full-width="true">
     Kembali ke Daftar
 </x-ui.button>
-
-{{-- Tombol Aksi Destruktif --}}
-<x-ui.button type="button" variant="danger" size="sm">
-    Hapus
-</x-ui.button>
 ```
 
 ---
 
 ### 📦 `x-ui.card`
-Kontainer permukaan putih ber-border untuk mengelompokkan konten administratif.
+Kontainer permukaan putih ber-border untuk mengelompokkan konten administratif dengan header/footer opsional.
 
 **Props**:
-- `padding`: `none`, `sm`, `md` (default), `lg`.
-- `shadow`: `none`, `sm` (default), `md`.
+- `as`: (string) Tag HTML pembungkus: `'div'` (default), `'section'`, `'article'`, `'form'`, `'a'`.
+- `variant`: `'default'` (default), `'soft'`, `'interactive'` (hover translate & shadow).
+- `padding`: `'none'`, `'sm'` (p-4), `'md'` (p-5, default), `'lg'` (p-6).
+- `shadow`: (bool, default: `true`) Menambahkan bayangan `shadow-md shadow-slate-200/50`.
+
+**Slots**:
+- `$header`: (opsional) Area atas dengan pembatas garis bawah (`border-b`).
+- `$slot`: Konten utama card.
+- `$footer`: (opsional) Area bawah dengan pembatas garis atas (`border-t`).
 
 **Contoh Penggunaan**:
 ```blade
-<x-ui.card padding="lg" class="space-y-4">
-    <h3 class="text-lg font-semibold text-ink">Informasi Pegawai</h3>
-    <p class="text-sm text-muted">Konten informasi detail pegawai...</p>
+<x-ui.card padding="lg" variant="default" :shadow="true">
+    <x-slot:header>
+        <h3 class="text-sm font-bold text-ink">Informasi Pegawai</h3>
+    </x-slot:header>
+
+    <p class="text-sm text-muted">Konten detail informasi pegawai...</p>
+
+    <x-slot:footer>
+        <div class="flex justify-end gap-2">
+            <x-ui.button variant="secondary" size="sm">Tutup</x-ui.button>
+        </div>
+    </x-slot:footer>
 </x-ui.card>
 ```
 
 ---
 
 ### 🏷️ `x-ui.badge`
-Badge status untuk menampilkan status pegawai, progres cuti, atau tingkatan EWS.
+Badge status untuk menampilkan status pegawai, progres cuti, atau tingkat urgensi EWS.
 
 **Props**:
-- `variant`: `primary`, `secondary`, `success`, `warning`, `danger`, `info`, `muted` (default).
-- `size`: `sm`, `md` (default).
-- `dot`: (bool) Menampilkan titik indikator warna.
+- `variant`: `'muted'` (default), `'primary'`, `'success'`, `'danger'`, `'warning'`, `'orange'`, `'info'`, `'ink'`, `'none'`.
+- `size`: `'xs'` (text-[9px]), `'sm'` (text-[10px], default), `'md'` (text-xs).
+- `dot`: (bool, default: `false`) Menampilkan titik indikator warna.
+- `pill`: (bool, default: `false`) Menjadikan rounded-full (default: rounded-md).
+- `uppercase`: (bool, default: `false`) Menjadikan teks kapital ber-tracking.
 
 **Contoh Penggunaan**:
 ```blade
 <x-ui.badge variant="success" :dot="true">Aktif</x-ui.badge>
-<x-ui.badge variant="warning">Menunggu Persetujuan</x-ui.badge>
+<x-ui.badge variant="warning" :pill="true">Menunggu Persetujuan</x-ui.badge>
 <x-ui.badge variant="danger">Non-Aktif</x-ui.badge>
 ```
 
 ---
 
 ### ⚠️ `x-ui.alert`
-Kotak notifikasi dan peringatan kontekstual.
+Kotak notifikasi dan peringatan kontekstual dengan icon semantik.
 
 **Props**:
-- `variant`: `info` (default), `success`, `warning`, `danger`.
+- `variant`: `'info'` (default), `'success'`, `'danger'`, `'warning'`.
 - `title`: (string|null) Judul tebal di awal alert.
-- `dismissible`: (bool) Tombol tutup alert (default: false).
+- `size`: `'sm'`, `'md'` (default), `'lg'`.
+- `dismissible`: (bool, default: `false`) Menampilkan tombol tutup.
+- `dismissAction`: (string|null) Ekspresi Alpine.js saat tombol tutup diklik.
 
 **Contoh Penggunaan**:
 ```blade
@@ -136,15 +151,21 @@ Kotak notifikasi dan peringatan kontekstual.
 ---
 
 ### 📊 `x-ui.stat-card`
-Card statistik metrik untuk dashboard dan halaman profil ringkas.
+Card statistik metrik untuk dashboard dan rekapitulasi data.
 
 **Props**:
-- `label`: (string) Judul metrik.
-- `value`: (string|int) Angka nilai metrik.
-- `unit`: (string|null) Satuan metrik (misal: "Hari", "Pegawai").
+- `label`: (string|null) Judul metrik.
+- `value`: (string|int|null) Nilai metrik.
+- `valueBinding`: (string|null) Ekspresi Alpine.js `x-text` untuk nilai reaktif.
+- `unit`: (string|null) Satuan nilai (misal: "Hari", "Pegawai").
 - `description`: (string|null) Teks penjelas di bawah nilai.
-- `variant`: `primary`, `secondary`, `success`, `warning`, `danger`, `info`.
-- `size`: `sm`, `md`, `lg`.
+- `variant`: `'primary'` (default), `'success'`, `'warning'`, `'danger'`, `'orange'`, `'info'`, `'muted'`.
+- `size`: `'sm'`, `'md'` (default), `'lg'`.
+- `padding`: `'none'`, `'sm'`, `'md'` (default), `'lg'`.
+- `surface`: `'default'` (default), `'soft'`.
+- `center`: (bool, default: `false`) Rata tengah teks dan icon.
+- `accent`: (bool, default: `false`) Garis aksen di bagian bawah card.
+- `shadow`: (bool, default: `true`).
 
 **Contoh Penggunaan**:
 ```blade
@@ -163,7 +184,7 @@ Card statistik metrik untuk dashboard dan halaman profil ringkas.
 Navigasi jejak remah halaman.
 
 **Props**:
-- `items`: (array) Daftar asosiatif `[['label' => '...', 'url' => '...'], ...]`.
+- `items`: (array) Daftar item navigasi `[['label' => '...', 'url' => '...'], ...]`.
 
 **Contoh Penggunaan**:
 ```blade
@@ -180,13 +201,15 @@ Navigasi jejak remah halaman.
 Modal konfirmasi aksi berbahaya (soft delete, reset, mutasi status) dengan pengiriman form HTTP bermetode `POST`/`DELETE` ber-CSRF.
 
 **Props**:
-- `id`: (string) Identifier dialog.
+- `id`: (string) Identifier modal dialog.
 - `title`: (string) Judul konfirmasi.
 - `message`: (string) Pesan penjelasan dampak aksi.
-- `confirm-text`: (string) Teks tombol konfirmasi (misal: "Hapus", "Nonaktifkan").
-- `variant`: `danger`, `warning`, `primary`.
+- `confirm-text`: (string, default: `'Ya, Lanjutkan'`) Teks tombol konfirmasi.
+- `cancel-text`: (string, default: `'Batal'`) Teks tombol batal.
+- `variant`: `'danger'`, `'warning'`, `'primary'`.
 - `action`: (string) URL endpoint tujuan submit.
-- `method`: `POST`, `DELETE`, `PUT`.
+- `method`: `'POST'`, `'DELETE'`, `'PUT'`, `'PATCH'`.
+- `size`: `'md'`, `'sm'`, `'lg'`.
 
 **Contoh Penggunaan**:
 ```blade
@@ -203,6 +226,49 @@ Modal konfirmasi aksi berbahaya (soft delete, reset, mutasi status) dengan pengi
         <x-ui.button variant="danger" size="xs">Nonaktifkan</x-ui.button>
     </x-slot:trigger>
 </x-ui.confirm-dialog>
+```
+
+---
+
+### 🪟 `x-ui.modal`
+Modal dialog serbaguna berbasis Alpine.js dengan transisi halus dan penanganan aksesibilitas ARIA dialog.
+
+**Props**:
+- `show`: (string|null) Nama variabel boolean state Alpine.js (misal: `'showModal'`).
+- `title`: (string|null) Judul modal pada header.
+- `maxWidth`: `'sm'`, `'md'` (default), `'lg'`, `'xl'`, `'2xl'`, `'3xl'`, `'4xl'`.
+- `closeAction`: (string|null) Ekspresi Alpine.js saat modal ditutup (misal: `'showModal = false'`).
+- `bodyClass`: (string, default: `'p-6'`).
+
+**Contoh Penggunaan**:
+```blade
+<x-ui.modal show="openModal" title="Tambah Data Riwayat" maxWidth="lg" closeAction="openModal = false">
+    <form class="space-y-4">
+        <x-form.input name="nomor_sk" label="Nomor SK" required />
+    </form>
+    
+    <x-slot:footer>
+        <div class="flex justify-end gap-2">
+            <x-ui.button variant="secondary" size="sm" @click="openModal = false">Batal</x-ui.button>
+            <x-ui.button variant="primary" size="sm" type="submit">Simpan</x-ui.button>
+        </div>
+    </x-slot:footer>
+</x-ui.modal>
+```
+
+---
+
+### 🎚️ `x-ui.toggle`
+Sakelar toggle boolean (switch) berbasis CSS peer-checked.
+
+**Props**:
+- `name`: (string|null) Nama field form.
+- `id`: (string|null) Identifier elemen (default: otomatis).
+- `disabled`: (bool, default: `false`).
+
+**Contoh Penggunaan**:
+```blade
+<x-ui.toggle name="is_active" :checked="true" />
 ```
 
 ---
@@ -269,8 +335,8 @@ Input teks multibaris untuk keterangan/alasan.
 />
 ```
 
-### 5. `x-form.checkbox` & `x-form.toggle`
-Input boolean pilihan atau sakelar status.
+### 5. `x-form.checkbox`
+Input kotak centang pilihan boolean.
 ```blade
 <x-form.checkbox 
     name="is_active" 
@@ -279,18 +345,39 @@ Input boolean pilihan atau sakelar status.
 />
 ```
 
+### 6. `x-form.file-upload`
+Area upload berkas/dokumen pendukung.
+```blade
+<x-form.file-upload 
+    name="file_sk" 
+    label="Dokumen SK (PDF/Gambar)" 
+    accept=".pdf,.jpg,.jpeg,.png" 
+    required 
+/>
+```
+
 ---
 
 ## 🔒 5. Session Management & Keamanan Autentikasi
 
-### Kebijakan Session Timeout:
-1. **`SIMPEG_SESSION_IDLE_TIMEOUT=30`**:
-   - Sesuai spesifikasi **US-1.3**, batas waktu idle di browser ditetapkan sebesar **30 menit**.
-   - Jika tidak ada aktivitas pengguna selama 30 menit, aplikasi menampilkan dialog peringatan idle dan mengarahkan pengguna kembali ke halaman login.
-   - Sesi idle yang terputus dicatat secara otomatis ke dalam `audit_logs` dengan event `LOGOUT` atau `TIMEOUT`.
-2. **`SESSION_LIFETIME=120`**:
-   - Nilai session lifetime server-side diatur lebih besar (120 menit) sebagai batas pengaman (*fail-safe lifetime*) agar sesi backend tidak hangus mendahului timer idle client-side.
+### Mekanisme Session Timeout (Server-Side Enforced):
+Sistem SIMPEG menerapkan penegakan *idle timeout* berbasis request di sisi server melalui middleware `App\Http\Middleware\SessionTimeoutMessage`:
 
-### Keamanan Route Logout:
-- **Wajib HTTP `POST`**: Seluruh aksi logout dari sistem wajib menggunakan metode `POST` dengan token `@csrf` valid untuk mencegah serangan CSRF via prefetching atau tautan GET.
-- **Route `GET /logout` Dilarang**: Route GET untuk logout telah dihapus secara permanen dari `routes/web.php` untuk mematuhi standar OWASP dan release gate SIMPEG.
+1. **`SIMPEG_SESSION_IDLE_TIMEOUT=30`**:
+   - Sesuai spesifikasi **US-1.3** dan keputusan kanonis **K-US-03**, batas waktu tidak aktif (*idle*) ditetapkan sebesar **30 menit** berdasarkan selisih waktu `now() - last_activity_at`.
+   - Evaluasi timeout terjadi pada **request HTTP berikutnya yang masuk ke aplikasi**.
+   - Ketika idle time melebihi 30 menit:
+     1. Middleware mencatat riwayat audit dengan event resmi **`SESSION_TIMEOUT`** lengkap dengan identitas pengguna (`user_id` dan `user_name`).
+     2. Memanggil `Auth::logout()` dan `session()->invalidate()`.
+     3. Meregenerasi token CSRF (`session()->regenerateToken()`).
+     4. Menyimpan pesan flash `simpeg_session_timeout_message` ("*Sesi Anda telah berakhir. Silakan login kembali.*").
+     5. Me-redirect request HTML ke `route('login')`, atau mengembalikan respons JSON `401 Unauthorized` untuk request AJAX/API.
+   - **Pengecualian Polling Background**: Request polling notifikasi periodik (`api.v1.notifikasi.index` dan `api.v1.notifikasi.jumlah-belum-dibaca`) sengaja tidak memperbarui `last_activity_at` agar browser yang ditinggalkan terbuka tidak membuat sesi hidup selamanya.
+
+2. **`SESSION_LIFETIME=120`**:
+   - Waktu kedaluwarsa sesi native Laravel (`config/session.php`) dikonfigurasi sebesar **120 menit**.
+   - Pengaturan ini sengaja dibuat lebih besar daripada idle timeout aplikasi (30 menit) sebagai **jaring pengaman (*safety net*)** agar payload sesi dan data user tidak terhapus oleh garbage collection PHP sebelum middleware sempat memeriksa timeout dan mencatat event audit `SESSION_TIMEOUT` dengan identitas pengguna yang valid.
+
+### Keamanan Rute Logout:
+- **Wajib HTTP `POST`**: Seluruh aksi logout dari sistem wajib menggunakan metode `POST /logout` dengan token `@csrf` valid untuk mencegah serangan Cross-Site Request Forgery (CSRF).
+- **Rute `GET /logout` Dihapus**: Rute GET untuk logout telah dihapus secara permanen dari `routes/web.php` untuk mematuhi standar keamanan OWASP dan release gate SIMPEG.
