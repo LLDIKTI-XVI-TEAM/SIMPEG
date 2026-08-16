@@ -141,6 +141,18 @@
         skList: {{ $riwayatSk->map($mapDokumenRow)->toJson() }},
         berkasList: {{ $riwayatBerkas->map($mapDokumenRow)->toJson() }},
 
+        // Arsip terpusat menyimpan hasil fetch di sessionStorage tanpa TTL; setelah
+        // mutasi dari tab ini cache-nya wajib dibuang agar navigasi kembali tidak
+        // menampilkan data lama.
+        invalidateDokumenCache() {
+            const toDelete = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('dokumen_')) toDelete.push(key);
+            }
+            toDelete.forEach(k => sessionStorage.removeItem(k));
+        },
+
         // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen & SK
         showUploadBerkas: false,
         isUploadingBerkas: false,
@@ -222,6 +234,7 @@
                     const json = await res.json();
                     // Tambahkan dokumen baru ke daftar secara reaktif (tanpa reload)
                     this.berkasList.unshift(json.document);
+                    this.invalidateDokumenCache();
                     this.showUploadBerkas = false;
                     this.newBerkas = { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null };
                     const fileInput = document.getElementById('berkas_upload_input');
@@ -296,7 +309,7 @@
                 });
 
                 if (res.ok) {
-                    const json = await res.json();
+                    this.invalidateDokumenCache();
                     this.showUploadSkForm = false;
                     // Riwayat/dokumen paling relevan dimuat ulang agar tabel, status
                     // kelengkapan, dan tab riwayat lain sinkron dengan data baru.
@@ -399,6 +412,7 @@
                 if (res.ok) {
                     // Perbaikan menyentuh riwayat kanonis dan status kelengkapan;
                     // muat ulang agar seluruh tabel dan badge sinkron.
+                    this.invalidateDokumenCache();
                     window.location.reload();
                 } else if (res.status === 422) {
                     const json = await res.json();
@@ -453,6 +467,7 @@
                     const json = await res.json();
                     const index = this.berkasList.findIndex(item => item.id === this.editBerkasId);
                     if (index !== -1) this.berkasList.splice(index, 1, json.document);
+                    this.invalidateDokumenCache();
                     this.showEditBerkasModal = false;
                     this.toast = { show: true, message: 'Dokumen berhasil diperbarui.', type: 'success' };
                     setTimeout(() => { this.toast.show = false; }, 3500);
@@ -508,6 +523,7 @@
 
                 if (res.ok) {
                     this.berkasList = this.berkasList.filter(item => item.id !== this.deleteBerkasId);
+                    this.invalidateDokumenCache();
                     this.showDeleteBerkasModal = false;
                     this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
                     setTimeout(() => { this.toast.show = false; }, 3500);

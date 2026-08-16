@@ -6,6 +6,7 @@ use App\Actions\Documents\StoreBerkasSkAction;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
@@ -181,5 +182,49 @@ class StoreBerkasSkActionTest extends TestCase
     private function fakeSk(): UploadedFile
     {
         return UploadedFile::fake()->create('sk.pdf', 120, 'application/pdf');
+    }
+
+    public function test_replace_pengangkatan_mempertahankan_file_lama_yang_direferensikan_riwayat_lain(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $oldPath = 'sk/pengangkatan-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'SK lama');
+
+        $employee->appointments()->create([
+            'jenis_pengangkatan' => 'CPNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK/ANGKAT/LAMA',
+            'tanggal_sk' => '2019-12-01',
+            'file_sk' => $oldPath,
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pengangkatan',
+            'nama_dokumen' => 'SK Pengangkatan Lama',
+            'file_path' => $oldPath,
+        ]);
+        // Path lama ternyata juga dipakai riwayat pangkat (data legacy).
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::firstOrCreate(['kode' => 'III/a'], ['nama' => 'Penata Muda', 'urutan' => 1, 'is_active' => true])->id,
+            'tmt_pangkat' => '2021-01-01',
+            'no_sk' => 'SK/PANGKAT/2021',
+            'tanggal_sk' => '2020-12-01',
+            'file_sk' => $oldPath,
+            'is_latest' => true,
+        ]);
+
+        $action = app(StoreBerkasSkAction::class);
+        $action->execute($employee, [
+            'kategori_dokumen' => 'sk_pengangkatan',
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2022-01-01',
+            'no_sk' => 'SK/ANGKAT/BARU',
+            'tanggal_sk' => '2021-12-01',
+            'file_sk' => UploadedFile::fake()->create('sk-baru.pdf', 80, 'application/pdf'),
+        ], request());
+
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
     }
 }

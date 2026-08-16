@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Document;
 use App\Models\Employee;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Menilai kelengkapan dokumen SK pegawai berdasarkan riwayat kanonis, arsip
@@ -153,7 +155,9 @@ class EmployeeDocumentStatusService
                 $state = 'perlu_perbaikan';
                 $statusLabel = blank($canonical['file_path'] ?? null)
                     ? 'Berkas belum diunggah'
-                    : 'File tidak ditemukan di storage';
+                    : ($this->physicalFileExists($canonical['file_path'])
+                        ? 'File tidak dapat diakses (konflik metadata)'
+                        : 'File tidak ditemukan di storage');
                 $perluPerbaikanCount++;
             }
 
@@ -236,6 +240,15 @@ class EmployeeDocumentStatusService
             self::ATTACHMENT_TYPES[$requiredSkKey],
             $candidate['history'],
         );
+    }
+
+    /**
+     * Membedakan label penyebab kerusakan: file fisik ada tetapi ditolak scoped
+     * validator berarti konflik metadata, bukan file hilang dari storage.
+     */
+    private function physicalFileExists(string $filePath): bool
+    {
+        return Storage::disk(Document::STORAGE_DISK)->exists($filePath);
     }
 
     /**

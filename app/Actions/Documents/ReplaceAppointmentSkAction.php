@@ -4,9 +4,14 @@ namespace App\Actions\Documents;
 
 use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
+use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
+use App\Models\PositionHistory;
+use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
+use App\Models\SalaryHistory;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\Employees\TmtCalculatorService;
@@ -36,7 +41,7 @@ class ReplaceAppointmentSkAction
         $newPath = $this->files->storeSk($file);
 
         try {
-            return DB::transaction(function () use ($employee, $data, $newPath, $request): Document {
+            [$document, $oldFilePath] = DB::transaction(function () use ($employee, $data, $newPath, $request): array {
                 $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
 
                 $appointment = $employee->appointments()
@@ -82,7 +87,7 @@ class ReplaceAppointmentSkAction
                     );
                 }
 
-                $document = $this->replaceDocument($employee, $appointment, $oldFilePath, $newPath);
+                [$document] = $this->replaceDocument($employee, $appointment, $oldFilePath, $newPath);
 
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
                     strtoupper((string) $appointment->jenis_pengangkatan),
@@ -93,8 +98,17 @@ class ReplaceAppointmentSkAction
 
                 $this->tmtCalculator->syncForEmployee($employee);
 
-                return $document;
+                return [$document, $oldFilePath];
             });
+
+            // Penghapusan file lama hanya boleh terjadi setelah transaksi ter-commit:
+            // bila commit/sync gagal, database tetap menunjuk ke file lama yang utuh
+            // dan blok catch cukup membersihkan file baru yang tidak terpakai.
+            if (filled($oldFilePath) && $oldFilePath !== $newPath && ! $this->fileIsStillReferenced($oldFilePath)) {
+                Storage::disk(Document::STORAGE_DISK)->delete($oldFilePath);
+            }
+
+            return $document;
         } catch (\Throwable $exception) {
             Storage::disk(Document::STORAGE_DISK)->delete($newPath);
 
@@ -102,12 +116,15 @@ class ReplaceAppointmentSkAction
         }
     }
 
+    /**
+     * @return array{0: Document, 1: string|null}
+     */
     private function replaceDocument(
         Employee $employee,
         Appointment $appointment,
         ?string $oldFilePath,
         string $newPath,
-    ): Document {
+    ): array {
         $document = null;
 
         if (filled($oldFilePath)) {
@@ -138,7 +155,7 @@ class ReplaceAppointmentSkAction
             $document = $employee->documents()->create($payload);
             AuditService::logOrFail('CREATE', 'Document', $document->id, null, $this->auditPayload($document));
 
-            return $document;
+            return [$document, $oldFilePath];
         }
 
         $oldValues = $this->auditPayload($document);
@@ -151,16 +168,22 @@ class ReplaceAppointmentSkAction
             $this->auditPayload($document->fresh()),
         );
 
-        if ($oldFilePath && $oldFilePath !== $newPath && ! $this->fileIsStillReferenced($oldFilePath)) {
-            Storage::disk(Document::STORAGE_DISK)->delete($oldFilePath);
-        }
-
-        return $document;
+        return [$document, $oldFilePath];
     }
 
+    /**
+     * Referensi file dicek lengkap (setara UpdateDocumentAction) sebelum file lama
+     * boleh dihapus: path yang sama dapat dipakai riwayat/disiplin/status pegawai.
+     */
     private function fileIsStillReferenced(string $filePath): bool
     {
         return Document::query()->where('file_path', $filePath)->exists()
+            || Employee::query()->where('status_berkas_path', $filePath)->exists()
+            || EmployeeStatusHistory::query()->where('file_sk', $filePath)->exists()
+            || RankHistory::query()->where('file_sk', $filePath)->exists()
+            || PositionHistory::query()->where('file_sk', $filePath)->exists()
+            || SalaryHistory::query()->where('file_sk', $filePath)->exists()
+            || DisciplineRecord::query()->where('file_sk', $filePath)->exists()
             || Appointment::query()->where('file_sk', $filePath)->exists();
     }
 }

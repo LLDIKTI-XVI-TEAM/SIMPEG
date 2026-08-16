@@ -144,16 +144,23 @@ class StoreDocumentAction
 
     private function syncAppointment(Employee $employee, ?string $noSk, mixed $tanggalSk, string $fileSk): void
     {
-        $appointment = $employee->appointment;
+        // Pengangkatan aktif diambil dari yang paling mutakhir agar metadata arsip
+        // tidak menempel pada appointment lama.
+        $appointment = $employee->appointments()
+            ->orderByDesc('tmt_pengangkatan')
+            ->orderByDesc('created_at')
+            ->first();
+
         if ($appointment && ! $appointment->file_sk) {
             $appointment->update(['file_sk' => $fileSk, 'no_sk' => $noSk ?? $appointment->no_sk, 'tanggal_sk' => $tanggalSk ?? $appointment->tanggal_sk]);
         }
 
-        // Sync jenis_pegawai_id jika ada nomor dokumen mengindikasikan jenis pengangkatan
-        // (ini hanya bisa dilakukan ketika category = sk_pengangkatan dan ada appointment)
+        // Sinkron jenis_pegawai_id dari jenis pengangkatan terbaru TIDAK boleh
+        // bergantung pada backfill berkas: unggahan arsip sk_pengangkatan tetap
+        // memperbaiki data lama/impor yang jenis pegawainya belum konsisten.
         if ($appointment && $appointment->jenis_pengangkatan) {
             $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [strtoupper($appointment->jenis_pengangkatan)])->first();
-            if ($jenisPegawai) {
+            if ($jenisPegawai && $jenisPegawai->id !== $employee->jenis_pegawai_id) {
                 $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
             }
         }

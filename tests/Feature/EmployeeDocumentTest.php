@@ -855,4 +855,34 @@ class EmployeeDocumentTest extends TestCase
         $this->assertDatabaseMissing('documents', ['id' => $document->id]);
         Storage::disk(Document::STORAGE_DISK)->assertMissing($filePath);
     }
+
+    public function test_uploading_sk_pengangkatan_archive_without_repair_still_syncs_jenis_pegawai(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
+        // Jenis pegawai tidak konsisten dengan appointment (mis. data lama/impor).
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
+        $employee->appointments()->create([
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK/ANGKAT/2020',
+            'tanggal_sk' => '2019-12-15',
+            'file_sk' => "{$employee->id}/sk_pengangkatan/valid.pdf",
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put("{$employee->id}/sk_pengangkatan/valid.pdf", 'SK lama valid');
+
+        // Unggahan arsip: appointment sudah punya file valid sehingga tidak ada repair.
+        $this->actingAs($user)
+            ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
+                'nama_dokumen' => 'SK Pengangkatan Arsip',
+                'kategori_dokumen' => 'sk_pengangkatan',
+                'pegawai_id' => $employee->id,
+                'berkas' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 10, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated();
+
+        $this->assertSame($pns->id, $employee->refresh()->jenis_pegawai_id);
+    }
 }
