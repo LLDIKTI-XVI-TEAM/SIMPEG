@@ -49,6 +49,8 @@ class AdminKepegawaianAccessTest extends TestCase
             'laporan.pegawai',
             'cuti.laporan',
             'audit-log',
+            // Data Backup terbuka bagi role ini karena memegang employees.restore.
+            'data-backup',
         ] as $allowedRoute) {
             $response->assertSee('href="'.route($allowedRoute).'"', false);
         }

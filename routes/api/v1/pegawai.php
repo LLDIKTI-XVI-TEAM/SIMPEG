@@ -46,8 +46,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->name('inactive');
 
+        // Gate API Data Backup harus sama dengan halaman webnya; sebelumnya hanya super_admin
+        // sehingga search/pagination/refresh oleh Admin Kepegawaian berakhir 403 meski restore diizinkan.
         Route::get('/backup', [EmployeeController::class, 'backup'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore', 'role:super_admin'])
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore', 'role:super_admin,admin_kepegawaian'])
             ->name('backup');
 
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
