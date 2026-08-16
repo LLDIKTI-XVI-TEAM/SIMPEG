@@ -684,6 +684,22 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee("pendidikan_{$employee->id}", false);
     }
 
+    public function test_education_summary_is_bound_to_alpine_state_after_mutations(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('pendidikanSummary:', $content);
+        $this->assertStringContainsString('applyEducationSummary(summary)', $content);
+        $this->assertStringContainsString('x-text="pendidikanSummary.pendidikan_terakhir ?? \'-\'"', $content);
+        $this->assertStringContainsString('x-text="pendidikanSummary.program_studi ?? \'-\'"', $content);
+        $this->assertSame(3, substr_count($content, 'this.applyEducationSummary(result.education_summary);'));
+    }
+
     public function test_education_forms_exclude_inactive_choices_except_the_reference_stored_on_an_existing_history(): void
     {
         $activeProgramStudi = RefProgramStudi::create(['nama' => 'Program Studi Aktif Untuk Riwayat Baru']);

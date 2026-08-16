@@ -67,7 +67,9 @@ class EducationHistoryTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('history.program_studi_id', $programStudi->id)
-            ->assertJsonPath('history.program_studi', 'Administrasi Publik');
+            ->assertJsonPath('history.program_studi', 'Administrasi Publik')
+            ->assertJsonPath('education_summary.pendidikan_terakhir', 'D4 / S1')
+            ->assertJsonPath('education_summary.program_studi', 'Administrasi Publik');
         $this->assertDatabaseHas('education_histories', [
             'employee_id' => $employee->id,
             'program_studi_id' => $programStudi->id,
@@ -174,9 +176,12 @@ class EducationHistoryTest extends TestCase
         );
 
         $response->assertOk()
+            ->assertJsonStructure(['education_summary' => ['pendidikan_terakhir', 'program_studi']])
             ->assertJsonPath('history.program_studi_id', null)
             ->assertJsonPath('history.program_studi', null)
-            ->assertJsonPath('history.jurusan', null);
+            ->assertJsonPath('history.jurusan', null)
+            ->assertJsonPath('education_summary.pendidikan_terakhir', 'D4 / S1')
+            ->assertJsonPath('education_summary.program_studi', null);
         $this->assertDatabaseHas('education_histories', [
             'id' => $history->id,
             'program_studi_id' => null,
@@ -232,7 +237,8 @@ class EducationHistoryTest extends TestCase
             $this->validPayload(['nama_institusi' => 'Universitas Diperbarui']),
         );
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonStructure(['education_summary' => ['pendidikan_terakhir', 'program_studi']]);
         $response->assertJsonPath('history.nama_institusi', 'Universitas Diperbarui');
         $this->assertDatabaseHas('education_histories', [
             'id' => $history->id,
@@ -249,7 +255,10 @@ class EducationHistoryTest extends TestCase
         $response = $this->actingAs($user)
             ->deleteJsonWithCsrf($this->endpoint($employee)."/{$history->id}");
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonStructure(['education_summary' => ['pendidikan_terakhir', 'program_studi']]);
+        $response->assertJsonPath('education_summary.pendidikan_terakhir', null);
+        $response->assertJsonPath('education_summary.program_studi', null);
         $this->assertDatabaseMissing('education_histories', ['id' => $history->id]);
     }
 

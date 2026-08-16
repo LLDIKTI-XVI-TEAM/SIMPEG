@@ -52,4 +52,19 @@ class EducationHistoryPayload
                 ),
         ];
     }
+
+    /**
+     * Memproyeksikan ringkasan pendidikan terbaru setelah observer menyinkronkan pegawai.
+     *
+     * @return array{pendidikan_terakhir: string|null, program_studi: string|null}
+     */
+    public function educationSummary(Employee $employee): array
+    {
+        $employee->refresh()->load('programStudi');
+
+        return [
+            'pendidikan_terakhir' => $employee->pendidikan_terakhir,
+            'program_studi' => $employee->programStudi?->nama ?? $employee->prodi_pendidikan_terakhir,
+        ];
+    }
 }

@@ -118,6 +118,27 @@ class DataMasterProgramStudiTest extends TestCase
         ]);
     }
 
+    public function test_renaming_program_studi_syncs_soft_deleted_employee_snapshot(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Nama Lama Pegawai Nonaktif']);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+            'prodi_pendidikan_terakhir' => 'Nama Lama Pegawai Nonaktif',
+        ]);
+        $employee->delete();
+
+        $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.update', $programStudi), [
+            'nama' => 'Nama Baru Pegawai Nonaktif',
+        ])->assertRedirect();
+
+        $trashedEmployee = Employee::withTrashed()->findOrFail($employee->id);
+        $this->assertSame('Nama Baru Pegawai Nonaktif', $trashedEmployee->prodi_pendidikan_terakhir);
+
+        $trashedEmployee->restore();
+        $this->assertSame('Nama Baru Pegawai Nonaktif', $trashedEmployee->fresh()->prodi_pendidikan_terakhir);
+    }
+
     private function postWithCsrf(string $uri, array $data): TestResponse
     {
         return $this->withSession(['_token' => 'test-token'])

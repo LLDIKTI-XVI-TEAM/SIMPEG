@@ -77,6 +77,10 @@
         keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'nik' => $f->nik, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
+        pendidikanSummary: @js([
+            'pendidikan_terakhir' => $p->pendidikan_terakhir,
+            'program_studi' => $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir,
+        ]),
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'download_url' => $r->admin_attachment_download_url])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'download_url' => $j->admin_attachment_download_url])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'download_url' => $s->admin_attachment_download_url])->toJson() }},
@@ -509,12 +513,22 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const json = await res.json();
                 this.pendidikanList = json.histories ?? [];
+                this.applyEducationSummary(json.education_summary);
                 sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
             } catch (e) {
                 console.error('Gagal memuat riwayat pendidikan:', e);
             } finally {
                 this.pendidikanLoading = false;
             }
+        },
+
+        applyEducationSummary(summary) {
+            if (!summary) return;
+
+            this.pendidikanSummary = {
+                pendidikan_terakhir: summary.pendidikan_terakhir ?? null,
+                program_studi: summary.program_studi ?? null,
+            };
         },
 
         openEditPendidikan(edu) {
@@ -568,6 +582,7 @@
                     };
                 }
                 sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.applyEducationSummary(result.education_summary);
                 this.showEditPendidikan = false;
                 this.editingPendidikan = null;
                 this.toast = { show: true, message: 'Riwayat pendidikan berhasil diperbarui.', type: 'success' };
@@ -591,13 +606,14 @@
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                 });
+                const result = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
+                    this.toast = { show: true, message: result.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
                     return;
                 }
                 this.pendidikanList.splice(index, 1);
                 sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.applyEducationSummary(result.education_summary);
                 this.toast = { show: true, message: 'Riwayat pendidikan berhasil dihapus.', type: 'success' };
                 setTimeout(() => this.toast.show = false, 3000);
             } catch (e) {
@@ -759,6 +775,7 @@
                         });
                         // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
                         sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                        this.applyEducationSummary(result.education_summary);
                         this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
                     }
                     
@@ -1289,11 +1306,11 @@
                 <div class="grid gap-3 rounded-lg border border-border bg-soft/30 p-4 sm:grid-cols-2">
                     <div>
                         <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Pendidikan Terakhir</p>
-                        <p class="mt-1 text-sm font-semibold text-ink">{{ $p->pendidikan_terakhir ?? '-' }}</p>
+                        <p class="mt-1 text-sm font-semibold text-ink" x-text="pendidikanSummary.pendidikan_terakhir ?? '-'">{{ $p->pendidikan_terakhir ?? '-' }}</p>
                     </div>
                     <div>
                         <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Program Studi</p>
-                        <p class="mt-1 text-sm font-semibold text-ink">{{ $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir ?? '-' }}</p>
+                        <p class="mt-1 text-sm font-semibold text-ink" x-text="pendidikanSummary.program_studi ?? '-'">{{ $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir ?? '-' }}</p>
                     </div>
                 </div>
                 {{-- Loading skeleton --}}

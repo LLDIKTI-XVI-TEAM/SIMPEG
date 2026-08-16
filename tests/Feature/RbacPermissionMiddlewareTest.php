@@ -95,6 +95,31 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
     }
 
+    public function test_permission_data_migration_rollback_preserves_preexisting_permission_and_mappings(): void
+    {
+        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
+        $superAdmin = Role::where('name', 'super_admin')->firstOrFail();
+        $adminKepegawaian = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $adminKepegawaian->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $migration = require database_path('migrations/2026_08_17_000002_add_reference_tables_manage_permission.php');
+        $migration->up();
+        $migration->down();
+
+        $this->assertDatabaseHas('permissions', [
+            'id' => $permission->id,
+            'name' => 'reference_tables.manage',
+        ]);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $superAdmin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $adminKepegawaian->id,
+            'permission_id' => $permission->id,
+        ]);
+    }
+
     public function test_permission_middleware_allows_user_with_permission(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

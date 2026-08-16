@@ -61,21 +61,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::transaction(function (): void {
-            $permissionId = DB::table('permissions')
-                ->where('name', 'reference_tables.manage')
-                ->value('id');
-
-            if ($permissionId === null) {
-                return;
-            }
-
-            DB::table('role_permissions')
-                ->where('permission_id', $permissionId)
-                ->delete();
-            DB::table('permissions')
-                ->where('id', $permissionId)
-                ->delete();
-        });
+        // Data permission dapat sudah ada atau telah diubah operator sebelum migrasi ini.
+        // Tanpa catatan kepemilikan, rollback tidak boleh mencabut permission maupun pemetaan role.
     }
 };
