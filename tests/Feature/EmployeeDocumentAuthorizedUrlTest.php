@@ -107,14 +107,13 @@ class EmployeeDocumentAuthorizedUrlTest extends TestCase
         $employee = Employee::factory()->create(['jenis_pegawai_id' => $pns->id]);
 
         $this->actingAs($user)
-            ->from('/dashboard/dokumen')
-            ->post('/dashboard/dokumen/upload', [
+            ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
                 'nama_dokumen' => 'SK Pangkat Privat',
                 'kategori_dokumen' => 'sk_pangkat',
                 'pegawai_id' => $employee->id,
                 'berkas' => UploadedFile::fake()->create('sk-pangkat.pdf', 10, 'application/pdf'),
-            ])
-            ->assertRedirect('/dashboard/dokumen');
+            ], ['Accept' => 'application/json'])
+            ->assertCreated();
 
         $document = Document::query()
             ->where('employee_id', $employee->id)

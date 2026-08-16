@@ -9,7 +9,7 @@
             'disiplin' => 'Hukuman Disiplin',
             'pendidikan' => 'Pendidikan',
             'pengangkatan' => 'Pengangkatan',
-            'docs' => 'Dokumen SK',
+            'docs' => 'Dokumen & SK',
         ];
     @endphp
 

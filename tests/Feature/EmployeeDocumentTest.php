@@ -97,14 +97,14 @@ class EmployeeDocumentTest extends TestCase
             ->assertOk()
             ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan');
 
-        $this->post('/dashboard/dokumen/upload', [
+        $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'SK Pangkat Arsip',
             'nomor_dokumen' => 'NOMOR-FORM-ULANG',
             'tanggal_terbit' => '2020-01-01',
             'kategori_dokumen' => 'sk_pangkat',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('sk-pangkat-arsip.pdf', 100, 'application/pdf'),
-        ])->assertRedirect('/dashboard/dokumen');
+        ])->assertCreated();
 
         $document = Document::query()
             ->where('employee_id', $employee->id)
@@ -156,14 +156,14 @@ class EmployeeDocumentTest extends TestCase
         }
 
         $this->actingAs($user)
-            ->post('/dashboard/dokumen/upload', [
+            ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
                 'nama_dokumen' => 'SK Pangkat Backfill',
                 'nomor_dokumen' => 'SK-BACKFILL-001',
                 'tanggal_terbit' => '2025-12-20',
                 'kategori_dokumen' => 'sk_pangkat',
                 'pegawai_id' => $employee->id,
                 'berkas' => UploadedFile::fake()->create('sk-pangkat-backfill.pdf', 100, 'application/pdf'),
-            ])->assertRedirect('/dashboard/dokumen');
+            ])->assertCreated();
 
         $document = Document::query()
             ->where('employee_id', $employee->id)
@@ -199,40 +199,49 @@ class EmployeeDocumentTest extends TestCase
             'jenis_pengangkatan' => 'PNS',
             'tmt_pengangkatan' => '2020-01-01',
             'no_sk' => 'SK-APPOINTMENT-001',
+            'tanggal_sk' => '2019-12-20',
             'file_sk' => $filePath,
         ]);
 
-        // Sinkronisasi jenis pegawai tidak boleh terikat pada perbaikan berkas:
-        // unggahan SK Pengangkatan tetap memperbaiki jenis pegawai yang stale
-        // meskipun berkas pengangkatan sudah valid.
+        // Sinkronisasi jenis pegawai tidak boleh terikat pada keadaan berkas:
+        // penggantian SK Pengangkatan tetap memperbaiki jenis pegawai yang stale
+        // meskipun berkas pengangkatan sebelumnya sudah valid.
         $this->actingAs($user)
-            ->post('/dashboard/dokumen/upload', [
-                'nama_dokumen' => 'SK Pengangkatan Tambahan',
+            ->postJson("/api/v1/pegawai/{$employee->id}/berkas-sk", [
                 'kategori_dokumen' => 'sk_pengangkatan',
-                'pegawai_id' => $employee->id,
-                'berkas' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 100, 'application/pdf'),
-            ])->assertRedirect('/dashboard/dokumen');
+                'jenis_pengangkatan' => 'PNS',
+                'tmt_pengangkatan' => '2020-01-01',
+                'no_sk' => 'SK-APPOINTMENT-BARU',
+                'tanggal_sk' => '2025-12-20',
+                'file_sk' => UploadedFile::fake()->create('sk-pengangkatan-baru.pdf', 100, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated();
 
         $this->assertSame($pns->id, $employee->refresh()->jenis_pegawai_id);
-        $this->assertSame($filePath, $employee->appointment()->first()->file_sk);
+        $appointment = $employee->appointment()->first();
+        $this->assertSame('SK-APPOINTMENT-BARU', $appointment->no_sk);
+        $this->assertNotSame($filePath, $appointment->file_sk);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($appointment->file_sk);
     }
 
     public function test_upload_modal_resets_autofill_metadata_on_close_and_cancel(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
 
-        // Regression bleed metadata antar pegawai: semua jalur tutup/batal modal
-        // harus memanggil helper terpusat yang mengosongkan nilai autofill,
-        // bukan hanya me-reset flag-nya tanpa membersihkan input.
+        // Regression bleed metadata: modal berkas SK pada profil pegawai harus
+        // memulai dari form bersih setiap dibuka, membersihkan nilai autofill
+        // saat kategori berganti, dan membatalkan request yang masih berjalan
+        // saat modal ditutup.
         $this->actingAs($user)
-            ->get(route('dokumen'))
+            ->get("/pegawai/{$employee->id}")
             ->assertOk()
-            ->assertSee('resetUploadMetadata()', false)
-            ->assertSee('@click="if (!isUploading) { showUploadModal = false; resetUploadMetadata(); }"', false)
-            ->assertSee('@keydown.escape.window="if (!isUploading) { showUploadModal = false; resetUploadMetadata(); }"', false)
-            ->assertSee('@click="showUploadModal = false; resetUploadMetadata()"', false)
-            ->assertSee('this.resetUploadMetadata();', false)
-            ->assertDontSee('uploadNomorFromAutofill = false; uploadTanggalFromAutofill = false;', false);
+            ->assertSee("this.skFileForm = { kategori_dokumen: kategori, nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null };", false)
+            ->assertSee('this.skNomorFromAutofill = false;', false)
+            ->assertSee('this.skTanggalFromAutofill = false;', false)
+            ->assertSee("if (this.skNomorFromAutofill)   { this.skFileForm.nomor_dokumen = ''; this.skNomorFromAutofill = false; }", false)
+            ->assertSee("if (this.skTanggalFromAutofill) { this.skFileForm.tanggal_terbit = ''; this.skTanggalFromAutofill = false; }", false)
+            ->assertSee('if (this.skFileController) { this.skFileController.abort(); this.skFileController = null; }', false);
     }
 
     public function test_position_history_creation_syncs_to_documents_table(): void
@@ -461,17 +470,17 @@ class EmployeeDocumentTest extends TestCase
         $this->actingAs($user);
         $file = UploadedFile::fake()->create('ijazah.pdf', 100, 'application/pdf');
 
-        $response = $this->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
             'tanggal_terbit' => '2026-01-01',
             'kategori_dokumen' => 'ijazah',
             'pegawai_id' => $employee->id,
             'berkas' => $file,
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHas('success');
+        $response->assertCreated();
+        $response->assertJsonPath('document.nama_dokumen', 'Ijazah Master Tester');
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -612,14 +621,14 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($user);
-        $response = $this->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Dokumen Tanpa Nomor',
             'kategori_dokumen' => 'lainnya',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertCreated();
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -637,15 +646,15 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Script Berbahaya',
             'kategori_dokumen' => 'lainnya',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('script.sh', 5, 'text/x-shellscript'),
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHasErrors('berkas');
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
@@ -660,15 +669,15 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Dokumen Terlalu Besar',
             'kategori_dokumen' => 'lainnya',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('terlalu-besar.pdf', 10241, 'application/pdf'),
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHasErrors('berkas');
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Dokumen Terlalu Besar',
