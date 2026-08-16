@@ -291,8 +291,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-nonaktif');
 
+    // Gate halaman Data Backup disamakan dengan aksi restore agar Admin Kepegawaian
+    // yang memegang employees.restore tidak berakhir 403 saat membuka halaman ini.
     Route::get('/pegawai/data-backup', [PegawaiController::class, 'backup'])
-        ->middleware(['role:super_admin'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-backup');
 
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])

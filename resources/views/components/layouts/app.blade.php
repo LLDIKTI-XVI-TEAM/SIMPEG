@@ -77,7 +77,6 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
-                    'data-backup',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -141,7 +140,11 @@
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
-                        ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus'],
+                        // Route Data Backup mensyaratkan permission employees.restore, sehingga
+                        // menunya hanya ditampilkan bila permission itu benar-benar dimiliki.
+                        auth()->user()?->hasPermission('employees.restore')
+                            ? ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus']
+                            : null,
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ])
