@@ -8,7 +8,8 @@ class ToggleProgramStudiRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'super_admin';
+        // Permission menjadi sumber otorisasi agar backend tetap fail-closed saat role berubah.
+        return (bool) $this->user()?->hasPermission('reference_tables.manage');
     }
 
     public function rules(): array

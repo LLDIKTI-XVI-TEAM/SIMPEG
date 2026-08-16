@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\Permission;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,6 +43,18 @@ class DataMasterProgramStudiTest extends TestCase
         $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.toggle', $programStudi), [])
             ->assertRedirect();
         $this->assertFalse($programStudi->refresh()->is_active);
+    }
+
+    public function test_program_studi_mutation_requires_reference_table_permission(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $role = Role::where('name', 'super_admin')->firstOrFail();
+        $permissionId = Permission::where('name', 'reference_tables.manage')->value('id');
+        $role->permissions()->detach($permissionId);
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.program-studi.store'), ['nama' => 'Teknik Informatika'])
+            ->assertForbidden();
     }
 
     public function test_program_studi_used_by_employee_cannot_be_deleted(): void

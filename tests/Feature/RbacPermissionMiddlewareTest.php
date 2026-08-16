@@ -51,14 +51,27 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        // 21 permission dasar + 16 permission modul cuti setelah hak hapus disiplin dihilangkan.
-        $this->assertSame(37, Permission::count());
+        // 24 permission non-cuti + 13 permission modul cuti + 1 permission data referensi.
+        $this->assertSame(38, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
         );
         $this->assertTrue(Permission::where('name', 'employees.deactivate')->exists());
         $this->assertTrue(Permission::where('name', 'employees.restore')->exists());
+    }
+
+    public function test_reference_table_permission_only_belongs_to_super_admin(): void
+    {
+        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
+
+        $this->assertSame('reference_tables', $permission->module);
+        $this->assertSame('Mengelola data referensi SIMPEG', $permission->description);
+        $this->assertTrue(Role::where('name', 'super_admin')->firstOrFail()->permissions()->whereKey($permission->id)->exists());
+
+        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $roleName) {
+            $this->assertFalse(Role::where('name', $roleName)->firstOrFail()->permissions()->whereKey($permission->id)->exists());
+        }
     }
 
     public function test_permission_middleware_allows_user_with_permission(): void
