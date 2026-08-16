@@ -77,7 +77,6 @@
                     'data-master',
                     'hari-libur',
                     'ews.config',
-                    'super-admin.status-pegawai.index',
                 ],
                 'pimpinan' => [
                     'audit-log',
@@ -86,7 +85,6 @@
                     'rbac',
                     'data-backup',
                     'ews.config',
-                    'super-admin.status-pegawai.index',
                 ],
                 'kepala_bagian' => [
                     'data-pegawai',
@@ -106,7 +104,6 @@
                     'cuti.rekap',
                     'ews',
                     'ews.config',
-                    'super-admin.status-pegawai.index',
                 ],
 
                 'pegawai' => [
@@ -126,7 +123,6 @@
                     'hari-libur',
                     'pengaturan',
                     'audit-log',
-                    'super-admin.status-pegawai.index',
                 ],
             ];
 
@@ -143,7 +139,6 @@
                     'group' => 'Kepegawaian',
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        ['label' => 'Status Pegawai', 'route' => 'super-admin.status-pegawai.index', 'icon' => 'users'],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         // Route Data Backup mensyaratkan permission employees.restore, sehingga
                         // menunya hanya ditampilkan bila permission itu benar-benar dimiliki.
@@ -323,6 +318,8 @@
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
                             @elseif($menu['icon'] === 'users')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+                            @elseif($menu['icon'] === 'identification')
+                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-3.75 6c0-1.035.84-1.875 1.875-1.875h.008c1.035 0 1.875.84 1.875 1.875v.375H6.75v-.375Z" /></svg>
                             @elseif($menu['icon'] === 'arrow-up-tray')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
                             @elseif($menu['icon'] === 'calendar')
