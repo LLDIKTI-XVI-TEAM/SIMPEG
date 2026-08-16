@@ -18,22 +18,30 @@
         </p>
     </div>
 
-    <div class="mt-4">
-        <a
-            href="{{ route('logout.get') }}"
-            id="retry-login-btn"
-            class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
-        >
-            Coba Login Kembali
-        </a>
-        
+    <div class="mt-4 space-y-3">
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <x-ui.button
+                type="submit"
+                id="retry-login-btn"
+                variant="primary"
+                size="lg"
+                :full-width="true"
+            >
+                Coba Login Kembali
+            </x-ui.button>
+        </form>
+
         @if(app()->environment('local'))
-        <a
+        <x-ui.button
+            as="a"
             href="{{ route('dev-login') }}"
-            class="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-secondary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
+            variant="secondary"
+            size="lg"
+            :full-width="true"
         >
             Gunakan Demo Login (Lokal)
-        </a>
+        </x-ui.button>
         @endif
     </div>
 

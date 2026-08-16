@@ -67,7 +67,6 @@ Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->nam
 Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
-Route::get('/logout', [KeycloakAuthController::class, 'logout'])->name('logout.get');
 Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
     ->middleware('throttle:60,1')
     ->name('cuti.verify');
