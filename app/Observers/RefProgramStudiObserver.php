@@ -14,6 +14,7 @@ class RefProgramStudiObserver
             return;
         }
 
+        // Sinkronkan snapshot agar ekspor dan tampilan legacy tidak menyajikan nama lama.
         EducationHistory::where('program_studi_id', $programStudi->id)
             ->update(['jurusan' => $programStudi->nama]);
         Employee::where('program_studi_id', $programStudi->id)

@@ -27,7 +27,7 @@ class RefProgramStudi extends Model
         return ['is_active' => 'boolean'];
     }
 
-    /** Keep the stored value and validation input on one canonical form. */
+    /** Samakan nilai tersimpan dan input validasi dalam bentuk kanonis. */
     public function setNamaAttribute(string $value): void
     {
         $this->attributes['nama'] = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
