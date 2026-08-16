@@ -227,7 +227,11 @@
             <p class="text-sm font-semibold text-ink font-sans">Data Backup Pegawai</p>
             <p class="text-xs text-muted font-sans mt-0.5">
                 Pegawai yang dinonaktifkan disimpan di sini dan <span class="font-semibold text-primary">tidak akan dihapus otomatis</span>.
-                Data dapat dipulihkan kapan saja. Pilih satu atau lebih untuk dipulihkan sekaligus.
+                @if ($canBulkRestore)
+                    Data dapat dipulihkan kapan saja. Pilih satu atau lebih untuk dipulihkan sekaligus.
+                @else
+                    Data dapat dipulihkan kapan saja, satu per satu sesuai permission Anda.
+                @endif
             </p>
         </div>
     </div>

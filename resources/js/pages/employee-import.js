@@ -192,6 +192,40 @@ const registerEmployeeImport = () => {
             const start = (this.valPage - 1) * this.valPerPage;
             return this.filteredValidations.slice(start, start + this.valPerPage);
         },
+        validationStatusLabel(status) {
+            return {
+                valid: 'Siap diimpor',
+                skip: 'Sudah ada — akan dilewati',
+                error: 'Error',
+            }[status] || status;
+        },
+        validationFilterLabel(filter) {
+            return {
+                all: 'Semua',
+                valid: 'Valid (siap impor)',
+                skip: 'Terlewat (sudah ada)',
+                error: 'Error (bermasalah)',
+            }[filter] || filter;
+        },
+        validationStatusDescription(item) {
+            if (item.status === 'skip') {
+                // Alasan dari server diutamakan agar wording keterangan baris
+                // terlewat tetap satu sumber dengan backend dan laporan import;
+                // fallback hanya untuk respons lama yang tidak membawa alasan.
+                return item.error || 'NIP sudah terdaftar di database. Baris ini tidak akan diimpor.';
+            }
+
+            return item.error || 'Siap impor';
+        },
+        validationCellHook(prefix, row, header) {
+            const normalizedHeader = String(header)
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, '') || 'kolom';
+
+            return `${prefix}-${row}-${normalizedHeader}`;
+        },
 
         // Track edits
         hasEdits: false,
@@ -450,7 +484,11 @@ const registerEmployeeImport = () => {
                             }
                         }
                     }
-                    const errorSourceHeaders = this.sourceHeadersForErrors(errorCols);
+                    // Respons skip membawa alasan dari server, tetapi bukan error
+                    // yang perlu disorot atau diperbaiki Admin.
+                    const errorSourceHeaders = r.status === 'error'
+                        ? this.sourceHeadersForErrors(errorCols)
+                        : [];
 
                     return {
                         row: r.row,
@@ -489,7 +527,7 @@ const registerEmployeeImport = () => {
 
         // Step 3 → 4 → 5: Execute import
         async executeImport() {
-            if (!this.batchId) return;
+            if (!this.batchId || this.validRows === 0 || this.hasEdits || this.isExecuting) return;
 
             this.isExecuting = true;
             this.apiError = '';

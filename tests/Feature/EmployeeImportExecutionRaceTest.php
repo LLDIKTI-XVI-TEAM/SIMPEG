@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Actions\Employees\DownloadImportReportAction;
 use App\Actions\Employees\ExecuteImportBatchAction;
 use App\Actions\Employees\QueueImportBatchAction;
+use App\Actions\Employees\SaveImportMappingAction;
 use App\Actions\Employees\UploadImportBatchAction;
 use App\Actions\Employees\ValidateImportBatchAction;
 use App\Jobs\ImportEmployeeBatchJob;
@@ -33,6 +34,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class EmployeeImportExecutionRaceTest extends TestCase
@@ -893,6 +895,71 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $validatedData = $firstResult['validated_data'];
         $this->assertIsArray($validatedData);
         $this->assertSame('budi@example.com', $validatedData['email_pribadi']);
+    }
+
+    /** Validasi dan claim antrean wajib memakai lock lifecycle yang sama agar snapshot eksekusi tidak kedaluwarsa. */
+    public function test_validation_and_queue_share_the_same_batch_lifecycle_lock(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->validCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        $lock = Cache::lock('import_batch:lifecycle:'.$batchId, 60);
+        $this->assertTrue($lock->get());
+
+        try {
+            try {
+                app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+                $this->fail('Validasi seharusnya ditolak saat lifecycle batch sedang dikunci.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(
+                    ['Batch import sedang diproses oleh permintaan lain. Silakan coba kembali.'],
+                    $exception->errors()['message'] ?? [],
+                );
+            }
+
+            $this->assertNull(Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['validation']);
+
+            try {
+                app(SaveImportMappingAction::class)->execute(
+                    $batchId,
+                    Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId)['mapping'],
+                    $user,
+                );
+                $this->fail('Penyimpanan mapping seharusnya ditolak saat lifecycle batch sedang dikunci.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(
+                    ['Batch import sedang diproses oleh permintaan lain. Silakan coba kembali.'],
+                    $exception->errors()['message'] ?? [],
+                );
+            }
+        } finally {
+            $lock->release();
+        }
+
+        app(ValidateImportBatchAction::class)->execute($batchId, null, $user);
+        Queue::fake();
+        $lock = Cache::lock('import_batch:lifecycle:'.$batchId, 60);
+        $this->assertTrue($lock->get());
+
+        try {
+            try {
+                app(QueueImportBatchAction::class)->execute($batchId, $user);
+                $this->fail('Claim antrean seharusnya ditolak saat lifecycle batch sedang dikunci.');
+            } catch (ValidationException $exception) {
+                $this->assertSame(
+                    ['Batch import sedang diproses oleh permintaan lain. Silakan coba kembali.'],
+                    $exception->errors()['message'] ?? [],
+                );
+            }
+
+            $this->assertDatabaseMissing('import_batches', ['id' => $batchId]);
+        } finally {
+            $lock->release();
+        }
     }
 
     /** Redelivery completed memulihkan file/cache dan hanya membuat satu notifikasi. */

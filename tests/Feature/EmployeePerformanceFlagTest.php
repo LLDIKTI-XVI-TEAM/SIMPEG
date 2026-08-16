@@ -51,6 +51,22 @@ class EmployeePerformanceFlagTest extends TestCase
             ->assertSee('Flag ini menggantikan penilaian SKP yang belum tersedia di Fase 1. Akan digantikan oleh modul Penilaian Kinerja di fase selanjutnya.');
     }
 
+    public function test_admin_detail_binds_read_only_eligibility_cards_to_reactive_state(): void
+    {
+        $employee = Employee::factory()->create([
+            'is_kinerja_baik' => true,
+            'is_satyalancana_eligible' => true,
+            'satyalancana_note' => 'Catatan awal',
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee("x-text=\"kinerjaBaik ? 'Kinerja Baik' : 'Kinerja Tidak Baik'\"", false)
+            ->assertSee("x-text=\"satyalancanaEligible ? 'Layak' : 'Tidak Layak'\"", false)
+            ->assertSee("x-text=\"satyalancanaNote || 'Tidak ada catatan manual.'\"", false);
+    }
+
     public function test_admin_kepegawaian_can_update_performance_flag(): void
     {
         $employee = Employee::factory()->create(['is_kinerja_baik' => false]);

@@ -97,6 +97,7 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
+                    'data-nonaktif',
                     'data-backup',
                     'data-master',
                     'laporan',

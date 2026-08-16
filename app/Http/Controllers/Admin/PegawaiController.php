@@ -7,6 +7,7 @@ use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ExportEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
+use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
@@ -94,6 +95,7 @@ class PegawaiController extends Controller
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
             'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', 'all')),
             'status_aktif' => trim((string) $request->query('status_aktif', '')),
+            'show_nonaktif' => $request->boolean('show_nonaktif'),
         ];
 
         // Backward-compatible query params from the pagination branch.
@@ -216,11 +218,51 @@ class PegawaiController extends Controller
         return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai', 'golonganRefOptions', 'eselonOptions'));
     }
 
+    public function inactive(Request $request, ListInactiveEmployeesAction $action)
+    {
+        $unitKerjaOptions = RefUnitKerja::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $jenisPegawaiOptions = RefJenisPegawai::query()
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
+        $golonganOptions = Employee::query()
+            ->whereNotNull('golongan_terakhir')
+            ->distinct()
+            ->orderBy('golongan_terakhir')
+            ->pluck('golongan_terakhir')
+            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($golonganOptions->isEmpty()) {
+            $golonganOptions = collect(['II', 'III', 'IV']);
+        }
+
+        $filters = [
+            'search' => trim((string) $request->query('search', '')),
+            'golongan' => trim((string) $request->query('golongan', '')),
+            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
+            'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
+        ];
+
+        $employees = $action->execute($filters);
+
+        return view('admin.pegawai.nonaktif', compact(
+            'employees',
+            'filters',
+            'unitKerjaOptions',
+            'jenisPegawaiOptions',
+            'golonganOptions'
+        ));
+    }
+
     /**
-     * Halaman Data Backup — satu-satunya halaman pemulihan pegawai soft delete.
-     * Data tidak akan dihapus permanen secara otomatis.
-     * Dapat diakses Super Admin dan Admin Kepegawaian karena keduanya memegang
-     * permission employees.restore; pemulihan massal tetap terbatas pada Super Admin.
+     * Halaman Data Backup — daftar terpusat pegawai yang dinonaktifkan (soft deleted).
+     * Data tidak akan dihapus permanen secara otomatis. Dapat diakses Super Admin dan
+     * Admin Kepegawaian karena keduanya memegang permission employees.restore;
+     * pemulihan massal tetap terbatas pada Super Admin.
      */
     public function backup(Request $request)
     {
@@ -424,7 +466,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }
@@ -516,7 +558,7 @@ class PegawaiController extends Controller
         });
 
         return back()
-            ->with('success', $count.' pegawai berhasil dinonaktifkan.')
+            ->with('success', $count.' pegawai berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }
@@ -528,10 +570,11 @@ class PegawaiController extends Controller
 
         $action->execute($employee, $request);
 
-        // Data Backup kini memakai gate yang sama dengan aksi restore, yaitu role
-        // super_admin/admin_kepegawaian beserta permission employees.restore, sehingga
-        // pemulihan oleh Admin Kepegawaian tidak lagi berakhir pada 403.
-        return redirect()->route('data-backup')
+        // Tujuan redirect dibatasi ke daftar nonaktif karena halaman itu memakai gate yang sama
+        // dengan aksi restore, yaitu role super_admin/admin_kepegawaian beserta permission
+        // employees.restore. Mengarahkan ke halaman khusus Super Admin akan membuat pemulihan
+        // oleh Admin Kepegawaian berakhir pada 403 walaupun mutasinya sudah berhasil.
+        return redirect()->route('data-nonaktif')
             ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
