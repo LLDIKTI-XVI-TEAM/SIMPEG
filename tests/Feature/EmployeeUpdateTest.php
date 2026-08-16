@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Appointment;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\PositionHistory;
@@ -24,6 +25,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Mockery\Expectation;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -491,6 +493,45 @@ class EmployeeUpdateTest extends TestCase
         $employee->refresh();
         $this->assertSame('2030-01-02', $employee->tanggal_kenaikan_pangkat_berikutnya?->format('Y-m-d'));
         $this->assertSame('2028-03-02', $employee->tanggal_kgb_berikutnya?->format('Y-m-d'));
+    }
+
+    public function test_update_employee_menghapus_upload_sk_baru_ketika_transaksi_gagal(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $oldPath = 'ranks/sk/file-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'file lama yang masih direferensikan');
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Nama Sebelum Gagal']);
+        $golongan = RefGolongan::firstOrFail();
+
+        $this->mock(TmtCalculatorService::class, function (MockInterface $mock): void {
+            /** @var Expectation $expectation */
+            $expectation = $mock->shouldReceive('syncForEmployee');
+            $expectation->once()
+                ->andThrow(new \RuntimeException('paksa rollback setelah upload'));
+        });
+
+        $payload = $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Seharusnya Rollback',
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-ROLLBACK-001',
+            'pangkat_tanggal_sk' => '2026-01-01',
+            'pangkat_tmt_pangkat' => '2026-01-02',
+            'file_sk_pangkat' => UploadedFile::fake()->create('sk-rollback.pdf', 100, 'application/pdf'),
+        ]);
+
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->withSession(['_token' => 'test-token'])
+            ->post('/pegawai/'.$employee->id, $payload, ['X-CSRF-TOKEN' => 'test-token']);
+
+        $response->assertRedirect()->assertSessionHas('error', 'Gagal memperbarui pegawai: paksa rollback setelah upload');
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'nama_lengkap' => 'Nama Sebelum Gagal',
+        ]);
+        $this->assertDatabaseMissing('rank_histories', ['no_sk' => 'SK-ROLLBACK-001']);
+        $this->assertDatabaseMissing('documents', ['nomor_dokumen' => 'SK-ROLLBACK-001']);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
+        $this->assertSame([$oldPath], Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     public function test_unrelated_employee_update_does_not_sync_or_change_derived_snapshots(): void

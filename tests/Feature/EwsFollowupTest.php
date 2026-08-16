@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EmployeeStatusHistory;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\Permission;
@@ -258,7 +260,8 @@ class EwsFollowupTest extends TestCase
 
     public function test_pension_approval_uploads_sk_sets_employee_to_pensiun_and_stops_reminders(): void
     {
-
+        Storage::fake(Document::STORAGE_DISK);
+        Storage::fake('public');
         $user = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
         $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
@@ -295,6 +298,33 @@ class EwsFollowupTest extends TestCase
             'jenis_dokumen' => 'sk_pensiun',
             'nomor_dokumen' => 'SK-PENSIUN-EWS-001',
         ]);
+        $history = EmployeeStatusHistory::query()
+            ->where('employee_id', $employee->id)
+            ->where('status_nama', 'Pensiun')
+            ->firstOrFail();
+        $document = Document::query()
+            ->where('employee_id', $employee->id)
+            ->where('jenis_dokumen', 'sk_pensiun')
+            ->firstOrFail();
+        $this->assertSame($document->file_path, $history->file_sk);
+        $this->assertSame($document->file_path, $employee->fresh()->status_berkas_path);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => 'status',
+                'history' => $history,
+            ]))
+            ->assertOk()
+            ->assertDownload();
+        $this->actingAs($user)
+            ->get(route('pegawai.history-attachments.download', [
+                'employee' => $employee,
+                'type' => 'status-snapshot',
+                'history' => $employee,
+            ]))
+            ->assertOk()
+            ->assertDownload();
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->refresh()->followup_status);
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $otherStage->refresh()->followup_status);
         $this->assertTrue(SimpegNotification::whereIn('ews_alert_id', [$alert->id, $otherStage->id])->where('is_read', true)->exists());

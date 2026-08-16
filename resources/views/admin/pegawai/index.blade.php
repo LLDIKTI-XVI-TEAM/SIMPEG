@@ -6,6 +6,7 @@
     @endphp
 
     <div x-data="{
+    @if (! $isReadOnly)
     // ===== State Modal Riwayat =====
     showRiwayatModal: false,
     riwayatType: '',
@@ -37,15 +38,18 @@
     documentStatus: { status_kelengkapan: 'kosong', is_lengkap: false, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
+    @endif
 
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
     isLoading: false,
     perPage: {{ $perPage }},
+    @if (! $isReadOnly)
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
     editedEmployeeData: @js(session('edited_employee_data', null)),
+    @endif
     sort: '{{ $sort }}',
     direction: '{{ $direction }}',
     employeeShowUrlPrefix: @js($employeeShowUrlPrefix),
@@ -81,10 +85,12 @@
         this.clearCacheByPrefixes(['pegawai_']);
     },
 
+    @if (! $isReadOnly)
     clearEmployeeLifecycleCache() {
         // Perubahan status aktif/nonaktif memengaruhi daftar pegawai dan Data Backup.
         this.clearCacheByPrefixes(['pegawai_', 'backup_']);
     },
+    @endif
 
     async fetchPage(page) {
         const cKey = this.cacheKey + `_p${page}`;
@@ -94,11 +100,13 @@
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
+                @if (! $isReadOnly)
                 // Pilihan baris tidak boleh terbawa antar halaman atau antar mode filter.
                 this.$nextTick(() => {
                     document.querySelectorAll('.row-check').forEach(c => c.checked = false);
                     updateBulkBar();
                 });
+                @endif
                 return;
             } catch (e) {
                 sessionStorage.removeItem(cKey);
@@ -135,11 +143,13 @@
             sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
             this.pegawaiRows = rows;
             this.meta = meta;
+            @if (! $isReadOnly)
             // Reset semua checkbox saat data baru dimuat
             this.$nextTick(() => {
                 document.querySelectorAll('.row-check').forEach(c => c.checked = false);
                 updateBulkBar();
             });
+            @endif
         } catch (e) {
             console.error('Gagal fetch data pegawai:', e);
         } finally {
@@ -151,6 +161,7 @@
         this.fetchPage(1);
     },
 
+    @if (! $isReadOnly)
     /**
      * Nonaktifkan dan pulihkan memindahkan pegawai antar daftar sehingga jumlah data di server
      * berubah. Halaman dimuat ulang agar jumlah baris, penomoran, dan rentang data tidak
@@ -165,6 +176,7 @@
             await this.fetchPage(lastPage);
         }
     },
+    @endif
 
     setSort(column) {
         if (this.sort === column) {
@@ -181,7 +193,7 @@
         this.fetchPage(1);
     },
 
-
+    @if (! $isReadOnly)
     deletePegawai(id, name) {
         this.deletePegawaiId = id;
         this.deletePegawaiName = name || '';
@@ -390,7 +402,10 @@
         }
     },
 
+    @endif
+
     init() {
+        @if (! $isReadOnly)
         if (this.dataChanged) {
             if (this.editedEmployeeId && this.editedEmployeeData) {
                 // Perbarui cache secara sinkron tanpa loading delay untuk pengalaman instant save
@@ -405,6 +420,7 @@
             }
             return;
         }
+        @endif
         
         // ── Cek sessionStorage terlebih dahulu ──
         // Jika data ada → tampilkan langsung tanpa loading, tanpa skeleton
@@ -550,24 +566,26 @@
             emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" checkAllShow="!filters.show_nonaktif" filterClass="lg:grid-cols-6">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
-                <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
-                    <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
-                        aria-label="Tampilkan Pegawai Non-Aktif"
-                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
-                    Tampilkan Pegawai Non-Aktif
-                </label>
-                @if (auth()->user()->hasPermission('employees.restore'))
-                    {{-- Tautan hanya muncul pada mode nonaktif agar halaman kelola nonaktif tidak
-                         perlu ditemukan lewat URL manual. --}}
-                    <a x-show="filters.show_nonaktif" href="{{ route('data-nonaktif') }}" wire:navigate
-                        class="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 text-xs font-semibold text-primary transition hover:bg-soft">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                        </svg>
-                        Kelola Pegawai Non-Aktif
-                    </a>
+                @if (! $isReadOnly)
+                    <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
+                        <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
+                            aria-label="Tampilkan Pegawai Non-Aktif"
+                            class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
+                        Tampilkan Pegawai Non-Aktif
+                    </label>
+                    @if (auth()->user()->hasPermission('employees.restore'))
+                        {{-- Tautan hanya muncul pada mode nonaktif agar halaman kelola nonaktif tidak
+                             perlu ditemukan lewat URL manual. --}}
+                        <a x-show="filters.show_nonaktif" href="{{ route('data-nonaktif') }}" wire:navigate
+                            class="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 text-xs font-semibold text-primary transition hover:bg-soft">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                            </svg>
+                            Kelola Pegawai Non-Aktif
+                        </a>
+                    @endif
                 @endif
                 {{-- Filter Golongan --}}
                 <div>
@@ -700,6 +718,29 @@
 
                         {{-- Dokumen --}}
                         <td class="px-4 py-3">
+                            @if ($isReadOnly)
+                            <span x-show="!filters.show_nonaktif"
+                                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+                                :class="{
+                                'bg-success/10 text-success': p.is_lengkap === 'lengkap',
+                                'bg-warning/10 text-warning': p.is_lengkap === 'tidak_lengkap',
+                                'bg-primary/10 text-primary': p.is_lengkap === 'tersedia',
+                                'bg-muted/20 text-muted': p.is_lengkap === 'kosong',
+                            }" title="Status kelengkapan dokumen">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="{
+                                    'bg-success': p.is_lengkap === 'lengkap',
+                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
+                                    'bg-primary': p.is_lengkap === 'tersedia',
+                                    'bg-muted': p.is_lengkap === 'kosong',
+                                }"></span>
+                                <span x-text="
+                                    p.is_lengkap === 'lengkap'       ? 'Lengkap' :
+                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
+                                                                       'Belum Ada'
+                                "></span>
+                            </span>
+                            @else
                             <button x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 :class="{
@@ -725,6 +766,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
                                 </svg>
                             </button>
+                            @endif
                         </td>
 
                         {{-- Aksi --}}
@@ -761,7 +803,7 @@
                                 </x-ui.tooltip>
                                 @endif
 
-                                @if(auth()->user()->hasPermission('employees.deactivate'))
+                                @if (! $isReadOnly && auth()->user()->hasPermission('employees.deactivate'))
                                     {{-- Nonaktifkan → masuk Backup sesuai permission soft delete --}}
                                     <x-ui.tooltip text="Nonaktifkan" position="top-end">
                                         <button x-show="!filters.show_nonaktif" type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
@@ -779,7 +821,7 @@
 
                             {{-- Mode nonaktif hanya menampilkan pemulihan; aksi khusus pegawai aktif
                                  seperti detail, edit, dan nonaktifkan tidak berlaku untuk record terhapus. --}}
-                            @if (auth()->user()->hasPermission('employees.restore'))
+                            @if (! $isReadOnly && auth()->user()->hasPermission('employees.restore'))
                                 <div x-show="filters.show_nonaktif" class="flex items-center justify-start gap-1.5">
                                     <x-ui.tooltip text="Aktifkan Kembali" position="top-end">
                                         <button type="button" @click="restorePegawai(p.id, p.nama_lengkap)"
@@ -840,6 +882,7 @@
         </div>
         @endif
 
+        @if (! $isReadOnly)
         {{-- ============================================================ --}}
         {{-- MODAL RINCIAN STATUS DOKUMEN --}}
         {{-- ============================================================ --}}
@@ -1329,9 +1372,11 @@
                 </button>
             </div>
         </x-ui.modal>
+        @endif
 
     </div>{{-- end x-data --}}
 
+    @if (! $isReadOnly)
     <script>
         function updateBulkBar() {
             // Baris yang dinonaktifkan (mode daftar nonaktif) tidak boleh ikut dihitung sebagai
@@ -1341,6 +1386,8 @@
             const bar = document.getElementById('bulk-bar');
             const count = document.getElementById('selected-count');
             const checkAll = document.getElementById('check-all');
+
+            if (!bar || !count || !checkAll) return;
 
             // Bulk bar visibility
             if (checked.length > 0) {
@@ -1474,5 +1521,6 @@
             });
         });
     </script>
+    @endif
 
 </div>

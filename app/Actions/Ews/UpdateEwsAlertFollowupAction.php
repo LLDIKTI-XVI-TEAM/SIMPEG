@@ -71,7 +71,7 @@ class UpdateEwsAlertFollowupAction
             // tidak menghapusnya, sehingga kompensasi manual diperlukan agar tidak
             // ada orphan file tanpa riwayat/dokumen yang merujuknya.
             foreach (array_filter($storedSkPaths) as $storedSkPath) {
-                $this->files->deletePublicFile($storedSkPath);
+                $this->files->deleteEmployeeDocumentFile($storedSkPath);
             }
 
             throw $exception;

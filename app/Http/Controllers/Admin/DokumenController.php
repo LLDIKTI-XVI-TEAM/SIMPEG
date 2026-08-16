@@ -50,7 +50,10 @@ class DokumenController extends Controller
     {
         $download = $action->execute($id);
 
-        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename']);
+        return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
+            'Cache-Control' => 'private, no-store, max-age=0',
+            'Pragma' => 'no-cache',
+        ]);
     }
 
     /**
