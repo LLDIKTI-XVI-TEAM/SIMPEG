@@ -91,7 +91,10 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredData()"', false)
             ->assertSee('x-show="!filters.show_nonaktif" onclick="exportFilteredDataPdf()"', false)
             ->assertSee('x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"', false)
-            ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false)
+            ->assertSee('aria-label="\'Nonaktifkan pegawai \' + p.nama_lengkap"', false)
+            ->assertSeeText('riwayat, dan dokumen tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang')
+            ->assertSeeText('permission pemulihan')
+            ->assertDontSee('Pemulihan dilakukan oleh <strong>Super Admin</strong>', false)
             ->assertDontSee('30 hari', false)
             ->assertDontSee('dihapus permanen otomatis', false);
     }
@@ -106,7 +109,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertOk()
             ->assertSee('Nonaktifkan', false)
             ->assertSee('Apakah Anda yakin ingin menonaktifkan pegawai', false)
-            ->assertSee('Data tidak dihapus dan bisa diaktifkan kembali.', false);
+            ->assertSee('Data tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang memiliki permission pemulihan.', false);
     }
 
     public function test_tombol_nonaktifkan_tidak_tampil_tanpa_permission(): void
@@ -282,7 +285,26 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
     }
 
-    public function test_web_restore_redirects_admin_kepegawaian_to_an_accessible_page(): void
+    public function test_deactivation_modals_describe_backup_without_automatic_purge(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSeeText('Nonaktifkan Pegawai')
+            ->assertSeeText('akan dinonaktifkan dan dipindahkan dari daftar pegawai aktif ke')
+            ->assertSeeText('Pegawai terpilih akan dinonaktifkan')
+            ->assertSeeText('dapat dipulihkan kembali oleh pengguna yang memiliki')
+            ->assertSeeText('permission pemulihan')
+            ->assertDontSee('Pemulihan dilakukan oleh <strong>Super Admin</strong>', false)
+            ->assertSeeText('Data tidak dihapus permanen secara otomatis.')
+            ->assertDontSeeText('Data tidak dihapus dan bisa diaktifkan kembali.')
+            ->assertDontSeeText('30 hari')
+            ->assertDontSeeText('dihapus permanen otomatis');
+    }
+
+    public function test_web_restore_redirects_and_writes_restore_audit(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Web Restore']);
@@ -361,6 +383,8 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSee('x-show="filters.show_nonaktif"', false)
             ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
             ->assertSee("'Aktifkan kembali pegawai ' + p.nama_lengkap", false)
+            ->assertSee('show="showRestoreModal"', false)
+            ->assertSee('confirmRestorePegawai()', false)
             ->assertSee('/api/v1/pegawai/${this.restorePegawaiId}/restore', false)
             // Halaman kelola nonaktif tetap dapat dicapai tanpa mengetik URL manual.
             ->assertSee(route('data-nonaktif'), false);

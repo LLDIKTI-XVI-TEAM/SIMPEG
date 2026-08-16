@@ -459,7 +459,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }
@@ -551,7 +551,7 @@ class PegawaiController extends Controller
         });
 
         return back()
-            ->with('success', $count.' pegawai berhasil dinonaktifkan.')
+            ->with('success', $count.' pegawai berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }
