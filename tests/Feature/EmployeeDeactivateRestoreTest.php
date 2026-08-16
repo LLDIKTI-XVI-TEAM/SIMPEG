@@ -191,6 +191,113 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif Filter']);
     }
 
+    public function test_api_backup_hanya_terbuka_untuk_role_dengan_permission_restore(): void
+    {
+        $trashed = Employee::factory()->create(['nama_lengkap' => 'Pegawai Backup RBAC']);
+        $trashed->delete();
+
+        // Gate API Data Backup harus sama dengan halaman webnya. Sebelumnya API hanya
+        // super_admin sehingga search/pagination/refresh oleh Admin Kepegawaian berakhir 403
+        // walaupun restore satu pegawai diizinkan.
+        $this->actingAs(User::factory()->superAdmin()->create());
+        $this->getJson('/api/v1/pegawai/backup')->assertOk();
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create());
+        $this->getJson('/api/v1/pegawai/backup')->assertOk();
+
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $role->permissions()->detach(Permission::where('name', 'employees.restore')->value('id'));
+        $this->getJson('/api/v1/pegawai/backup')->assertForbidden();
+
+        $this->actingAs(User::factory()->pegawai()->create());
+        $this->getJson('/api/v1/pegawai/backup')->assertForbidden();
+    }
+
+    public function test_api_backup_search_hanya_mencari_soft_deleted_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Pegawai aktif bernama serupa tidak boleh ikut hasil search daftar backup.
+        Employee::factory()->create(['nama_lengkap' => 'Andi Aktif Backup']);
+        $trashed = Employee::factory()->create(['nama_lengkap' => 'Andi Nonaktif Backup']);
+        $trashed->delete();
+        $other = Employee::factory()->create(['nama_lengkap' => 'Budi Nonaktif Backup']);
+        $other->delete();
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai/backup?search=Andi%20Nonaktif')
+            ->assertOk()
+            ->assertJsonPath('employees.total', 1)
+            ->assertJsonPath('employees.data.0.nama_lengkap', 'Andi Nonaktif Backup')
+            ->assertJsonMissing(['nama_lengkap' => 'Andi Aktif Backup'])
+            ->assertJsonMissing(['nama_lengkap' => 'Budi Nonaktif Backup']);
+    }
+
+    public function test_api_backup_pagination_dan_dataset_hanya_soft_deleted(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        for ($i = 1; $i <= 3; $i++) {
+            $employee = Employee::factory()->create(['nama_lengkap' => "Pegawai Backup Halaman {$i}"]);
+            $employee->delete();
+        }
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif Pagination']);
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai/backup?page=2&per_page=2')
+            ->assertOk()
+            ->assertJsonPath('employees.current_page', 2)
+            ->assertJsonPath('employees.last_page', 2)
+            ->assertJsonPath('employees.per_page', 2)
+            ->assertJsonPath('employees.total', 3)
+            ->assertJsonCount(1, 'employees.data')
+            ->assertJsonMissing(['nama_lengkap' => 'Pegawai Aktif Pagination']);
+    }
+
+    public function test_admin_kepegawaian_restore_lalu_refresh_backup_tanpa_error(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Restore Refresh']);
+        $employee->delete();
+
+        $this->actingAs($user);
+
+        // Bug lama: restore berhasil tetapi refresh daftar backup 403 karena gate API hanya
+        // super_admin, sehingga UI dapat menampilkan pesan gagal padahal database sudah berubah.
+        $this->getJson('/api/v1/pegawai/backup')
+            ->assertOk()
+            ->assertJsonFragment(['nama_lengkap' => 'Pegawai Restore Refresh']);
+
+        $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/restore")->assertOk();
+
+        $this->getJson('/api/v1/pegawai/backup')
+            ->assertOk()
+            ->assertJsonMissing(['nama_lengkap' => 'Pegawai Restore Refresh'])
+            ->assertJsonPath('employees.total', 0);
+    }
+
+    public function test_halaman_backup_menyembunyikan_kontrol_pulihkan_massal_dari_admin_kepegawaian(): void
+    {
+        $trashed = Employee::factory()->create(['nama_lengkap' => 'Pegawai Bulk UI']);
+        $trashed->delete();
+
+        // Bulk restore tetap Super Admin only pada route, sehingga UI tidak boleh
+        // menjanjikan aksi massal kepada role yang pasti ditolak backend.
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-backup'))
+            ->assertOk()
+            ->assertDontSeeText('Pilih satu atau lebih untuk dipulihkan sekaligus.')
+            ->assertSeeText('satu per satu sesuai permission Anda')
+            ->assertDontSeeText('Pulihkan Pilihan')
+            ->assertDontSee('type="checkbox" class="backup-check', false);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('data-backup'))
+            ->assertOk()
+            ->assertSeeText('Pilih satu atau lebih untuk dipulihkan sekaligus.')
+            ->assertSee('type="checkbox" class="backup-check', false);
+    }
+
     public function test_nonaktif_filter_returns_trashed_employees_of_every_lifecycle_status(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -331,7 +438,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
     }
 
-    public function test_web_restore_does_not_redirect_admin_kepegawaian_to_super_admin_page(): void
+    public function test_web_restore_redirect_tetap_dapat_diakses_admin_kepegawaian(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
@@ -339,12 +446,15 @@ class EmployeeDeactivateRestoreTest extends TestCase
 
         $this->actingAs($user);
 
-        // Menegaskan halaman tujuan lama memang tertutup bagi Admin Kepegawaian, sehingga
-        // redirect ke sana akan mengubah restore yang berhasil menjadi dead-end 403.
-        $this->get(route('data-backup'))->assertForbidden();
+        // Gate Data Backup kini sama dengan aksi restore, sehingga Admin Kepegawaian
+        // tidak lagi berakhir 403 saat membuka halaman pengelolaan pegawai nonaktif itu.
+        $this->get(route('data-backup'))->assertOk();
 
-        $this->postWithCsrf(route('pegawai.restore', $employee->id))
-            ->assertRedirect(route('data-nonaktif'));
+        $response = $this->postWithCsrf(route('pegawai.restore', $employee->id));
+        $response->assertRedirect(route('data-nonaktif'));
+
+        // Redirect wajib diikuti karena assert 302 saja tidak membuktikan tujuannya dapat diakses.
+        $this->followRedirects($response)->assertOk();
     }
 
     public function test_web_restore_still_works_for_super_admin(): void
