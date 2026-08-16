@@ -255,7 +255,7 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->assertSame('Pemberhentian Sementara', $employee->refresh()->status_aktif);
     }
 
-    public function test_admin_kepegawaian_cannot_change_employee_status(): void
+    public function test_admin_kepegawaian_can_change_employee_status(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
@@ -264,7 +264,23 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->actingAs($user)
             ->get(route('data-pegawai'))
             ->assertOk()
-            ->assertDontSee('data-testid="change-status-trigger"', false);
+            ->assertSee('data-testid="change-status-trigger"', false);
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('pegawai.status.update'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+    }
+
+    public function test_pimpinan_cannot_change_employee_status(): void
+    {
+        $user = User::factory()->pimpinan()->create();
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
 
         $this->actingAs($user)
             ->postWithCsrf(route('pegawai.status.update'), [
@@ -273,6 +289,21 @@ class ChangeEmployeeStatusTest extends TestCase
                 'tanggal' => '2026-08-01',
             ])
             ->assertForbidden();
+    }
+
+    public function test_legacy_status_pegawai_post_route_still_accepts_submission(): void
+    {
+        $employee = Employee::factory()->create();
+        $status = RefStatusPegawai::query()->where('is_active', true)->firstOrFail();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('super-admin.status-pegawai.store'), [
+                'pegawai_id' => $employee->id,
+                'status_pegawai_id' => $status->id,
+                'tanggal' => '2026-08-01',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
     }
 
     public function test_status_form_is_rendered_in_employee_table_and_old_page_redirects(): void

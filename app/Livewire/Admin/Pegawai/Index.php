@@ -136,9 +136,10 @@ class Index extends Component
             'per_page' => $perPage,
         ];
 
-        // Perubahan status tetap merupakan kewenangan Super Admin. Form ditampilkan
-        // di konteks baris pegawai agar operator tidak perlu berpindah halaman.
-        $canChangeStatus = $request->user()?->role === 'super_admin';
+        // Kewenangan perubahan status mengikuti permission employees.update (Admin
+        // Kepegawaian dan Super Admin). Form ditampilkan di konteks baris pegawai
+        // agar operator tidak perlu berpindah halaman.
+        $canChangeStatus = $request->user()?->can('employees.update') ?? false;
         $statusChangeOptions = $canChangeStatus
             ? RefStatusPegawai::query()->where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama'])
             : collect();

@@ -112,9 +112,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Halaman Status Pegawai telah dipindahkan ke aksi per-baris di Data Pegawai.
-    // Redirect menjaga bookmark lama tetap membawa pengguna ke titik kerja baru.
+    // Redirect menjaga bookmark lama tetap membuka titik kerja baru; nama route lama
+    // dipertahankan agar caller lama (helper, test, integrasi) tidak memicu RouteNotFoundException.
     Route::redirect('/super-admin/status-pegawai', '/pegawai')
-        ->middleware(['role:super_admin']);
+        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->name('super-admin.status-pegawai.index');
+    Route::post('/super-admin/status-pegawai', [PegawaiController::class, 'changeStatus'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('super-admin.status-pegawai.store');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
         ->middleware('role:super_admin,admin_kepegawaian,pimpinan')
@@ -364,7 +369,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.store');
     Route::post('/pegawai/status', [PegawaiController::class, 'changeStatus'])
-        ->middleware(['role:super_admin'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.status.update');
     Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
