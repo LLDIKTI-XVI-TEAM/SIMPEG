@@ -472,7 +472,7 @@
                                             'text-danger font-semibold': item.status === 'error',
                                             'text-primary': item.status === 'skip',
                                             'text-success': item.status === 'valid'
-                                        }" class="text-xs font-sans" x-text="validationStatusDescription(item)"></span>
+                                        }" x-bind:dusk="'validation-description-' + item.row" class="text-xs font-sans" x-text="validationStatusDescription(item)"></span>
                                     </x-ui.table-td>
                                 </x-ui.table-row>
                             </template>

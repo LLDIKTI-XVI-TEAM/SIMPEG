@@ -209,7 +209,10 @@ const registerEmployeeImport = () => {
         },
         validationStatusDescription(item) {
             if (item.status === 'skip') {
-                return 'NIP sudah terdaftar di database. Baris ini tidak akan diimpor.';
+                // Alasan dari server diutamakan agar wording keterangan baris
+                // terlewat tetap satu sumber dengan backend dan laporan import;
+                // fallback hanya untuk respons lama yang tidak membawa alasan.
+                return item.error || 'NIP sudah terdaftar di database. Baris ini tidak akan diimpor.';
             }
 
             return item.error || 'Siap impor';

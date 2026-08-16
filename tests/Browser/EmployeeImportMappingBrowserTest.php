@@ -147,20 +147,22 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
                     { row: 2, data: { NIP: '123456789012345678', 'Email Pegawai': 'existing@example.test' } },
                     { row: 3, data: { NIP: '123456789012345679', 'Email Pegawai': 'duplicate@example.test' } },
                     { row: 4, data: { NIP: '123456789012345680', 'Email Pegawai': 'email-used@example.test' } },
+                    { row: 5, data: { NIP: '123456789012345681', 'Email Pegawai': 'legacy@example.test' } },
                 ];
                 window.fetch = (url, options = {}) => {
                     const path = new URL(url, window.location.origin).pathname;
                     const response = path.endsWith('/mapping')
                         ? { mapping: component.columnMapping, warnings: { unmatched_columns: [], missing_required: [] } }
                         : {
-                            total_rows: 3,
+                            total_rows: 4,
                             valid_count: 0,
-                            skip_count: 1,
+                            skip_count: 2,
                             error_count: 2,
                             results: [
                                 { row: 2, status: 'skip', errors: { NIP: ['NIP sudah terdaftar di database.'] } },
                                 { row: 3, status: 'error', errors: { NIP: ['NIP ganda dalam file.'] } },
                                 { row: 4, status: 'error', errors: { 'Email Pegawai': ['Email sudah terdaftar.'] } },
+                                { row: 5, status: 'skip', errors: {} },
                             ],
                         };
 
@@ -171,8 +173,7 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
 
             $browser->waitForText('Sudah ada — akan dilewati')
                 ->assertSee('Terlewat (sudah ada)')
-                ->assertSee('NIP sudah terdaftar di database. Baris ini tidak akan diimpor.')
-                ->assertSeeIn('@validation-skip-count', '1')
+                ->assertSeeIn('@validation-skip-count', '2')
                 ->assertPresent('@validation-value-2-nip')
                 ->assertMissing('@validation-input-2-nip')
                 ->assertPresent('@validation-input-3-nip')
@@ -180,6 +181,8 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
 
             $statusPresentation = $browser->script(<<<'JS'
                 return {
+                    row2Description: document.querySelector('[dusk="validation-description-2"]')?.textContent?.trim() ?? '',
+                    row5Description: document.querySelector('[dusk="validation-description-5"]')?.textContent?.trim() ?? '',
                     skipRowIsDanger: document.querySelector('[dusk="validation-row-2"]')?.classList.contains('bg-danger/[0.03]') ?? true,
                     skipInputIsDanger: document.querySelector('[dusk="validation-input-2-nip"]')?.classList.contains('border-danger/50') ?? false,
                     duplicateNipIsDanger: document.querySelector('[dusk="validation-input-3-nip"]')?.classList.contains('border-danger/50') ?? false,
@@ -188,6 +191,10 @@ class EmployeeImportMappingBrowserTest extends DuskTestCase
             JS)[0];
 
             $this->assertSame([
+                // Baris 2 membawa alasan dari server sehingga teks server yang tampil.
+                'row2Description' => 'NIP sudah terdaftar di database.',
+                // Baris 5 tanpa alasan dari server sehingga keterangan fallback tampil.
+                'row5Description' => 'NIP sudah terdaftar di database. Baris ini tidak akan diimpor.',
                 'skipRowIsDanger' => false,
                 'skipInputIsDanger' => false,
                 'duplicateNipIsDanger' => true,
