@@ -11,7 +11,7 @@ class ChangeEmployeeStatusRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user !== null && $user->role === 'super_admin';
+        return $user !== null && $user->can('employees.update');
     }
 
     public function rules(): array

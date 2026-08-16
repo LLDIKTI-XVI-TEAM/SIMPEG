@@ -209,7 +209,7 @@
                 Refresh
             </button>
             <a href="{{ route('data-pegawai') }}"
-                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans">
+                class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm font-sans">
                 <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                 </svg>
@@ -219,11 +219,8 @@
     </div>
 
     {{-- INFO BANNER --}}
-    <div class="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
-        <svg class="mt-0.5 w-5 h-5 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-        </svg>
-        <div class="flex-1 min-w-0">
+    <div class="mb-6 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
+        <div class="min-w-0">
             <p class="text-sm font-semibold text-ink font-sans">Data Backup Pegawai</p>
             <p class="text-xs text-muted font-sans mt-0.5">
                 Pegawai yang dinonaktifkan disimpan di sini dan <span class="font-semibold text-primary">tidak akan dihapus otomatis</span>.
@@ -314,15 +311,18 @@
 
                     {{-- Aksi --}}
                     <td class="px-4 py-3.5 text-right">
-                        <button type="button"
-                            @click="openSingleRestore(p.id, p.nama_lengkap)"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-success/40 bg-surface px-3 py-1.5 text-xs font-semibold text-success transition hover:bg-success/10 hover:border-success shadow-sm font-sans"
-                            :aria-label="'Pulihkan ' + p.nama_lengkap">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                            </svg>
-                            Pulihkan
-                        </button>
+                        <div class="flex items-center justify-end">
+                            <x-ui.tooltip text="Pulihkan" position="top-end">
+                                <button type="button"
+                                    @click="openSingleRestore(p.id, p.nama_lengkap)"
+                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-success/40 bg-surface text-success transition hover:bg-success/10 shadow-sm"
+                                    :aria-label="'Pulihkan ' + p.nama_lengkap">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                    </svg>
+                                </button>
+                            </x-ui.tooltip>
+                        </div>
                     </td>
 
                 </tr>

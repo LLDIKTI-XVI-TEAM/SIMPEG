@@ -2145,7 +2145,7 @@
                         </template>
 
                         <div class="border-t border-border pt-6 flex justify-end gap-3 mt-6">
-                            <button 
+                            <button
                                 type="button" 
                                 @click="showModal = false" 
                                 x-bind:disabled="isSubmitting"
@@ -2157,7 +2157,7 @@
                                 Batal
                             </button>
                             
-                            <button 
+                            <button
                                 type="submit" 
                                 x-bind:disabled="isSubmitting"
                                 class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed"
