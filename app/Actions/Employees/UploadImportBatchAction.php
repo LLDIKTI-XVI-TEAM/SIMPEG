@@ -16,6 +16,11 @@ class UploadImportBatchAction
 {
     public const CACHE_PREFIX = 'import_batch:';
 
+    public const LIFECYCLE_LOCK_PREFIX = 'import_batch:lifecycle:';
+
+    /** Lock lifecycle lebih panjang dari batas request import agar claim tidak membaca validasi parsial. */
+    public const LIFECYCLE_LOCK_SECONDS = 300;
+
     public const CACHE_TTL_MINUTES = 30;
 
     public const STORAGE_DIR = 'imports';
@@ -31,8 +36,7 @@ class UploadImportBatchAction
     public function __construct(private readonly CsvEmployeeReader $reader) {}
 
     /**
-     * Upload and parse the import file, cache the raw rows, and return batch metadata.
-     *
+     * Mengunggah dan membaca file import, menyimpan baris mentah di cache, lalu mengembalikan metadata batch.
      *
      * @throws ValidationException
      */
@@ -96,8 +100,7 @@ class UploadImportBatchAction
     }
 
     /**
-     * Detect the type of template based on CSV headers.
-     *
+     * Menentukan tipe template berdasarkan header CSV.
      *
      * @throws ValidationException
      */

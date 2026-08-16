@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\ChangeEmployeeStatusAction;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
@@ -87,6 +88,8 @@ class ChangeEmployeeStatusTest extends TestCase
 
     public function test_change_status_with_attachment_creates_single_document(): void
     {
+        Storage::fake('employee_documents');
+        Storage::fake('public');
         $admin = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
         $pensiun = RefStatusPegawai::where('nama', 'Pensiun')->firstOrFail();
@@ -111,6 +114,40 @@ class ChangeEmployeeStatusTest extends TestCase
         $this->assertSame('sk_status_pegawai', $document->jenis_dokumen);
         $this->assertSame($employee->status_berkas_path, $document->file_path);
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        Storage::disk('public')->assertMissing($document->file_path);
+    }
+
+    public function test_change_status_membersihkan_file_privat_ketika_transaksi_gagal(): void
+    {
+        Storage::fake('employee_documents');
+        Storage::fake('public');
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $pensiun = RefStatusPegawai::where('nama', 'Pensiun')->firstOrFail();
+
+        Document::creating(function (): void {
+            throw new \RuntimeException('Paksa rollback setelah file tersimpan.');
+        });
+
+        try {
+            app(ChangeEmployeeStatusAction::class)->execute(
+                $employee,
+                [
+                    'status_pegawai_id' => $pensiun->id,
+                    'tanggal' => '2026-08-01',
+                    'keterangan' => 'Rollback marker',
+                ],
+                request(),
+                UploadedFile::fake()->create('sk-pensiun.pdf', 200, 'application/pdf'),
+            );
+            $this->fail('Transaksi seharusnya gagal.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Paksa rollback setelah file tersimpan.', $exception->getMessage());
+        }
+
+        $this->assertSame([], Storage::disk('employee_documents')->allFiles());
+        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertDatabaseCount('documents', 0);
+        $this->assertDatabaseCount('employee_status_histories', 0);
     }
 
     public function test_second_change_with_new_attachment_creates_second_document_and_preserves_old_file(): void

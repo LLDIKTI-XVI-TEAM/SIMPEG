@@ -29,8 +29,7 @@ class ExecuteImportBatchAction
     public function __construct(private readonly TmtCalculatorService $tmtCalculator) {}
 
     /**
-     * Execute the validated batch.
-     *
+     * Menjalankan snapshot batch tervalidasi dengan checkpoint per baris yang tahan retry.
      *
      * @throws ValidationException
      */

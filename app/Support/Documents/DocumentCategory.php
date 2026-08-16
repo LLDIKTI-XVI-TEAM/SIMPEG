@@ -4,6 +4,8 @@ namespace App\Support\Documents;
 
 class DocumentCategory
 {
+    private const PIMPINAN_HIDDEN = ['ktp_kk'];
+
     public const LABELS = [
         'sk_pengangkatan' => 'SK Pengangkatan',
         'sk_pangkat' => 'SK Kenaikan Pangkat',
@@ -42,6 +44,16 @@ class DocumentCategory
     public static function editableKeys(): array
     {
         return array_keys(self::editableLabels());
+    }
+
+    /**
+     * Kategori yang aman ditampilkan kepada Pimpinan; KTP/KK ditahan karena memuat NIK dan nomor KK.
+     *
+     * @return list<string>
+     */
+    public static function visibleToPimpinanKeys(): array
+    {
+        return array_values(array_diff(self::keys(), self::PIMPINAN_HIDDEN));
     }
 
     public static function label(?string $category): string
