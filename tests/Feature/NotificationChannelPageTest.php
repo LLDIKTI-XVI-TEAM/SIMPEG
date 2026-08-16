@@ -24,7 +24,7 @@ class NotificationChannelPageTest extends TestCase
         $this->seedRbac();
     }
 
-    public function test_super_admin_melihat_halaman_dan_seluruh_23_event_dari_katalog(): void
+    public function test_super_admin_melihat_halaman_dan_seluruh_event_dari_katalog(): void
     {
         $admin = User::factory()->superAdmin()->create();
         $catalog = app(NotificationEventCatalog::class);
@@ -39,11 +39,16 @@ class NotificationChannelPageTest extends TestCase
             $response
                 ->assertSee($event['label'])
                 ->assertSee('data-event-key="'.$eventKey.'"', false);
+
+            $this->assertSame(
+                1,
+                substr_count($response->getContent(), 'data-event-key="'.$eventKey.'"'),
+                "Event {$eventKey} harus dirender tepat satu kali.",
+            );
         }
 
         $response->assertSee('data-event-key="cuti.ditangguhkan_tugas_dinas"', false);
         $response->assertSee('data-event-key="cuti.dikembalikan_karena_rollover"', false);
-        $this->assertSame(23, substr_count($response->getContent(), 'data-event-key="'));
     }
 
     public function test_role_selain_super_admin_ditolak_dari_halaman(): void

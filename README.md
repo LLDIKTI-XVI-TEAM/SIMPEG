@@ -87,7 +87,8 @@ podman compose exec app php artisan key:generate
 # Jalankan database migration
 podman compose exec app php artisan migrate
 
-# Buat symbolic link storage
+# Buat symbolic link hanya untuk aset yang memang bersifat publik
+# (bukan untuk dokumen pegawai)
 podman compose exec app php artisan storage:link
 ```
 
@@ -107,6 +108,108 @@ Buka browser dan akses:
 ```
 http://localhost:8000
 ```
+
+---
+
+## Update Aplikasi (Menarik Perubahan Baru)
+
+Instalasi yang sudah berjalan tidak otomatis menyesuaikan schema database ketika kode baru
+ditarik. Migration **tidak** dijalankan pada startup container dan **tidak** dijalankan dari
+request HTTP, karena migration paralel dari beberapa container web/worker berisiko saling
+berebut (race condition) dan mengubah schema di luar kendali rilis.
+
+Jalankan langkah berikut **berurutan** setiap kali menarik perubahan yang memuat migration baru:
+
+```bash
+# 1. Ambil kode terbaru
+git pull
+
+# 2. Hentikan worker agar tidak ada job yang berjalan di atas schema lama
+podman compose stop queue scheduler
+
+# 3. Perbarui dependency bila composer.lock / package-lock.json berubah
+podman compose exec app composer install
+# Build asset dijalankan di host karena Node.js tidak tersedia di container app
+npm ci && npm run build
+
+# 4. Jalankan migration satu kali dari container app
+podman compose exec app php artisan migrate
+
+# 5. Bersihkan cache konfigurasi/route hasil build lama
+podman compose exec app php artisan optimize:clear
+
+# 6. Jalankan ulang aplikasi dan worker dengan kode + schema yang sudah sinkron
+podman compose up -d
+podman compose restart queue scheduler
+
+# 7. Verifikasi tidak ada migration yang tertinggal
+podman compose exec app php artisan migrate:status
+podman compose exec app php artisan about --only=environment
+```
+
+Catatan penting:
+
+- Langkah 4 harus selesai **sebelum** worker versi baru menerima job. Worker yang berjalan di
+  atas schema lama akan gagal menyimpan state batch dan job berpotensi berakhir di `failed_jobs`.
+- Pada instalasi dengan lebih dari satu container app/worker, jalankan `migrate` dari **satu**
+  container saja.
+- Untuk lingkungan yang melayani pengguna, aktifkan mode maintenance sebelum langkah 2 dan
+  matikan setelah langkah 6:
+
+  ```bash
+  podman compose exec app php artisan down
+  podman compose exec app php artisan up
+  ```
+
+- Jangan memakai `migrate:fresh`, `migrate:refresh`, atau `migrate:reset` pada database yang
+  sudah memuat data nyata; ketiganya menghapus data.
+
+> Prosedur rilis produksi kanonis (siapa yang menjalankan, jendela maintenance, dan strategi
+> rollback) belum ditetapkan dalam dokumen proyek. Sampai keputusan tersebut ada, prosedur di
+> atas menjadi acuan update manual dan tidak boleh diganti dengan auto-migration pada startup
+> container tanpa persetujuan eksplisit.
+
+---
+
+## Runbook Cutover Dokumen ke Storage Privat
+
+Dokumen pegawai sengaja disimpan di storage privat dan diunduh melalui akses backend yang berotorisasi. Arah ini mengutamakan standar keamanan saat ini, meskipun PRD versi lama masih mencantumkan path `storage/app/public` untuk dokumen. Jangan mengalihkan dokumen pegawai kembali ke disk `public` atau mengeksposnya melalui `storage:link`, karena hal tersebut membuka kembali risiko bypass authorization melalui symlink.
+
+Jalankan urutan berikut sebagai **release gate sebelum aplikasi diaktifkan**. Proyek belum aktif, sehingga runbook ini adalah gerbang pra-aktivasi dan bukan klaim bahwa data produksi sudah dimigrasikan.
+
+1. Jadwalkan downtime, pastikan backup database dan storage dokumen lama sudah tersedia sesuai prosedur infrastruktur LLDIKTI, lalu aktifkan maintenance mode:
+
+   ```bash
+   podman compose exec app php artisan down
+   ```
+
+2. Jalankan dry-run tanpa flag. Lanjutkan hanya bila ringkasannya menunjukkan `hilang=0` dan `konflik=0`. Jika `yatim` lebih dari nol, periksa setiap path yang dilaporkan dan pastikan semuanya memang dokumen pegawai legacy tanpa referensi database; file tersebut akan dipindahkan ke karantina privat saat mode eksekusi:
+
+   ```bash
+   podman compose exec app php artisan documents:migrate-to-private-storage
+   ```
+
+   Perbaiki setiap path yang berstatus `hilang` atau `konflik`. Dry-run juga gagal saat menemukan `yatim` agar file publik tanpa referensi tidak terlewat sebagai hasil bersih.
+
+3. Setelah kondisi `hilang` dan `konflik` bersih serta setiap `yatim` sudah ditinjau, lakukan cutover dengan satu-satunya flag eksekusi yang tersedia:
+
+   ```bash
+   podman compose exec app php artisan documents:migrate-to-private-storage --execute
+   ```
+
+4. Jalankan dry-run kembali untuk verifikasi. Pastikan `siap=0`, `hilang=0`, `konflik=0`, dan `yatim=0`; baris yang sudah privat akan dihitung sebagai `sudah_privat`, sedangkan orphan yang berhasil diamankan tercatat sebagai `dikarantina` pada langkah eksekusi.
+
+   ```bash
+   podman compose exec app php artisan documents:migrate-to-private-storage
+   ```
+
+5. Aktifkan aplikasi hanya setelah verifikasi lulus:
+
+   ```bash
+   podman compose exec app php artisan up
+   ```
+
+Tidak ada fallback ke disk publik pada proses ini. Jika verifikasi gagal, tetap pertahankan maintenance mode dan selesaikan penyebabnya sebelum aktivasi.
 
 ---
 
@@ -363,6 +466,24 @@ podman compose logs db
 ```
 
 Tunggu beberapa detik setelah `podman compose up` agar PostgreSQL selesai inisialisasi.
+
+### Import pegawai menolak dengan pesan "Database aplikasi belum siap"
+
+Endpoint eksekusi import memeriksa kolom wajib tabel `import_batches` sebelum batch diklaim.
+Bila ada kolom yang belum tersedia, endpoint menolak dengan HTTP 503 dan tidak membuat batch,
+job, maupun data pegawai. Penyebab paling umum adalah migration yang belum dijalankan setelah
+menarik kode baru.
+
+Periksa dan jalankan migration yang tertinggal:
+
+```bash
+podman compose exec app php artisan migrate:status
+podman compose exec app php artisan migrate
+podman compose restart queue
+```
+
+Daftar kolom yang hilang dicatat pada `storage/logs/laravel.log` dengan konteks
+`import.pegawai.schema_readiness`.
 
 ---
 

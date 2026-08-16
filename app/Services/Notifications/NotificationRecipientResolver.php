@@ -11,7 +11,10 @@ class NotificationRecipientResolver
     /** @var Collection<int, Employee>|null */
     private ?Collection $adminRecipientsCache = null;
 
-    public function __construct(private readonly NotificationChannelResolver $channels) {}
+    public function __construct(
+        private readonly NotificationChannelResolver $channels,
+        private readonly NotificationEventCatalog $catalog,
+    ) {}
 
     /**
      * Mengembalikan penerima tambahan untuk EWS lintas role; cuti tetap memakai penerima in-app utama.
@@ -55,6 +58,12 @@ class NotificationRecipientResolver
      */
     public function emailEnabled(string $type, ?array $data = null): bool
     {
+        // Katalog domain menjadi batas utama agar kebijakan DB yang stale tidak
+        // mengaktifkan adapter email untuk event yang hanya mendukung in-app.
+        if (! $this->catalog->supportsChannel($type, 'email')) {
+            return false;
+        }
+
         if ($type === 'ews.kenaikan_pangkat' && ($data['is_eligible'] ?? null) === false) {
             return false;
         }

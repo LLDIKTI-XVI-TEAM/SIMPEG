@@ -23,7 +23,6 @@ class DisciplineRecordPayload
             'tanggal_berakhir',
             'no_sk',
             'tanggal_sk',
-            'file_sk',
             'is_active',
             'created_at',
         ]);

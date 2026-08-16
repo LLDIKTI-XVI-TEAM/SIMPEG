@@ -13,7 +13,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 /**
  * Satu-satunya jalur untuk mengubah status kepegawaian (Status Pegawai).
@@ -37,69 +36,72 @@ class ChangeEmployeeStatusAction
     {
         $status = RefStatusPegawai::findOrFail($data['status_pegawai_id']);
 
-        $employee = DB::transaction(function () use ($employee, $status, $data, $request, $berkas): Employee {
-            $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
-            $oldValues = $employee->getRawOriginal();
+        $storedFilePath = null;
 
-            // Mark semua history record lama sebagai not latest
-            EmployeeStatusHistory::where('employee_id', $employee->id)
-                ->where('is_latest', true)
-                ->update(['is_latest' => false]);
+        try {
+            $employee = DB::transaction(function () use ($employee, $status, $data, $request, $berkas, &$storedFilePath): Employee {
+                $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
+                $oldValues = $employee->getRawOriginal();
 
-            $filePath = null;
-            $nomorBerkas = null;
+                // Mark semua history record lama sebagai not latest
+                EmployeeStatusHistory::where('employee_id', $employee->id)
+                    ->where('is_latest', true)
+                    ->update(['is_latest' => false]);
 
-            if ($berkas !== null) {
-                // Store file dengan naming pattern: {employee_id}/sk_status_pegawai/{employee_id}_sk_status_pegawai_{uuid}.{ext}
-                $extension = $berkas->getClientOriginalExtension();
-                $filename = $employee->id.'_sk_status_pegawai_'.Str::uuid().'.'.$extension;
-                $filePath = $berkas->storeAs(
-                    $employee->id.'/sk_status_pegawai',
-                    $filename,
-                    'public'
-                );
-                $nomorBerkas = $this->generateNomorBerkas($status);
+                $filePath = null;
+                $nomorBerkas = null;
 
-                // Create Document record agar muncul di Arsip Dokumen
-                Document::create([
+                if ($berkas !== null) {
+                    $filePath = $this->files->storeEmployeeDocument($berkas, $employee->id.'/sk_status_pegawai');
+                    $storedFilePath = $filePath;
+                    $nomorBerkas = $this->generateNomorBerkas($status);
+
+                    // Create Document record agar muncul di Arsip Dokumen
+                    Document::create([
+                        'employee_id' => $employee->id,
+                        'jenis_dokumen' => 'sk_status_pegawai',
+                        'nama_dokumen' => 'SK Perubahan Status — '.$status->nama,
+                        'nomor_dokumen' => $nomorBerkas,
+                        'tanggal_dokumen' => $data['tanggal'],
+                        'file_path' => $filePath,
+                        'keterangan' => $data['deskripsi'] ?? null,
+                    ]);
+                }
+
+                // Create new history record dengan is_latest = true
+                EmployeeStatusHistory::create([
                     'employee_id' => $employee->id,
-                    'jenis_dokumen' => 'sk_status_pegawai',
-                    'nama_dokumen' => 'SK Perubahan Status — '.$status->nama,
-                    'nomor_dokumen' => $nomorBerkas,
-                    'tanggal_dokumen' => $data['tanggal'],
-                    'file_path' => $filePath,
-                    'keterangan' => $data['deskripsi'] ?? null,
+                    'status_pegawai_id' => $status->id,
+                    'status_nama' => $status->nama,
+                    'keterangan' => $data['keterangan'] ?? null,
+                    'tanggal_efektif' => $data['tanggal'],
+                    'nomor_berkas' => $nomorBerkas,
+                    'file_sk' => $filePath,
+                    'changed_by_user_id' => auth()->id(),
+                    'is_latest' => true,
                 ]);
-            }
 
-            // Create new history record dengan is_latest = true
-            EmployeeStatusHistory::create([
-                'employee_id' => $employee->id,
-                'status_pegawai_id' => $status->id,
-                'status_nama' => $status->nama,
-                'keterangan' => $data['keterangan'] ?? null,
-                'tanggal_efektif' => $data['tanggal'],
-                'nomor_berkas' => $nomorBerkas,
-                'file_sk' => $filePath,
-                'changed_by_user_id' => auth()->id(),
-                'is_latest' => true,
-            ]);
+                // Sync employee snapshot fields untuk backward compatibility
+                $employee->update([
+                    'status_pegawai_id' => $status->id,
+                    'status_aktif' => $status->nama,
+                    'status_keterangan' => $data['keterangan'] ?? null,
+                    'status_tanggal' => $data['tanggal'],
+                    'status_berkas_path' => $filePath,
+                    'status_nomor_berkas' => $nomorBerkas,
+                ]);
 
-            // Sync employee snapshot fields untuk backward compatibility
-            $employee->update([
-                'status_pegawai_id' => $status->id,
-                'status_aktif' => $status->nama,
-                'status_keterangan' => $data['keterangan'] ?? null,
-                'status_tanggal' => $data['tanggal'],
-                'status_berkas_path' => $filePath,
-                'status_nomor_berkas' => $nomorBerkas,
-            ]);
+                $employee->refresh();
+                AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->getAttributes(), $request);
 
-            $employee->refresh();
-            AuditService::log('UPDATE', 'Employee', $employee->id, $oldValues, $employee->getAttributes(), $request);
+                return $employee;
+            });
+        } catch (\Throwable $exception) {
+            // File storage berada di luar transaksi database dan wajib dikompensasi ketika persistence gagal.
+            $this->files->deleteEmployeeDocumentFile($storedFilePath);
 
-            return $employee;
-        });
+            throw $exception;
+        }
 
         // Notifikasi bersifat fire-and-forget setelah transaksi berhasil, agar kegagalan
         // pengiriman notifikasi tidak membatalkan perubahan status yang sudah tersimpan.

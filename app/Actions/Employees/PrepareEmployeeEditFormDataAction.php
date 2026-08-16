@@ -12,9 +12,13 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
+use Illuminate\Database\Eloquent\Model;
 
 class PrepareEmployeeEditFormDataAction
 {
+    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+
     /**
      * Prepare data needed for the employee edit form.
      *
@@ -44,6 +48,23 @@ class PrepareEmployeeEditFormDataAction
         $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
+        $latestRank = $p->rankHistories->firstWhere('is_latest', true);
+        $latestPosition = $p->positionHistories->firstWhere('is_latest', true);
+        $latestSalary = $p->salaryHistories->firstWhere('is_latest', true);
+
+        $histories = collect([
+            'rank' => $latestRank,
+            'position' => $latestPosition,
+            'salary' => $latestSalary,
+            'appointment' => $p->appointment,
+        ])->filter();
+        $this->attachments->primeDocumentReferences($histories->pluck('file_sk'));
+        $histories->each(function (Model $history, string $type) use ($p): void {
+            $history->setAttribute(
+                'admin_attachment_download_url',
+                $this->attachments->downloadUrl($p, $type, $history, 'pegawai.history-attachments.download'),
+            );
+        });
 
         // Dokumen arsip per kategori untuk fitur "Pilih dari Arsip"
         $arsipPangkat = $p->documents()
@@ -109,6 +130,9 @@ class PrepareEmployeeEditFormDataAction
             'statusPegawai',
             'golonganRefOptions',
             'eselonOptions',
+            'latestRank',
+            'latestPosition',
+            'latestSalary',
             'arsipPangkat',
             'arsipJabatan',
             'arsipKgb',

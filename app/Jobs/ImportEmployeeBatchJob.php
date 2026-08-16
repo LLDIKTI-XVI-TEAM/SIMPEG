@@ -41,7 +41,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
     protected ?string $deliveryInstanceId = null;
 
     /**
-     * Create a new job instance.
+     * Membuat job import dengan token kepemilikan dan identitas delivery yang stabil.
      */
     public function __construct(
         protected string $batchId,
@@ -56,7 +56,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
     }
 
     /**
-     * Execute the job.
+     * Menjalankan batch lalu memulihkan notifikasi completion secara idempoten.
      */
     public function handle(ExecuteImportBatchAction $action, NotificationService $notificationService): void
     {
@@ -89,7 +89,7 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
     }
 
     /**
-     * Handle job failure – update cache status and notify user.
+     * Menangani kegagalan job tanpa menimpa batch yang sudah selesai atau diambil worker lain.
      */
     public function failed(\Throwable $exception): void
     {
