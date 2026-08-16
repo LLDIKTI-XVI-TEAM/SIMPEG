@@ -684,6 +684,44 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee("pendidikan_{$employee->id}", false);
     }
 
+    public function test_education_forms_exclude_inactive_choices_except_the_reference_stored_on_an_existing_history(): void
+    {
+        $activeProgramStudi = RefProgramStudi::create(['nama' => 'Program Studi Aktif Untuk Riwayat Baru']);
+        $inactiveProgramStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Nonaktif Yang Sedang Dipakai',
+            'is_active' => false,
+        ]);
+        $employee = $this->employeeWithReferences([
+            'program_studi_id' => $inactiveProgramStudi->id,
+            'prodi_pendidikan_terakhir' => $inactiveProgramStudi->nama,
+        ]);
+        EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => RefJenjangPendidikan::where('nama', 'D4 / S1')->firstOrFail()->id,
+            'program_studi_id' => $inactiveProgramStudi->id,
+            'nama_institusi' => 'Universitas Riwayat Lama',
+            'jurusan' => $inactiveProgramStudi->nama,
+            'tahun_lulus' => 2020,
+        ]);
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $createOptions = Str::of($content)
+            ->after('<select x-model="newPendidikan.program_studi_id"')
+            ->before('</select>')
+            ->toString();
+        $editOptions = Str::of($content)
+            ->after('<select x-model="editPendidikanForm.program_studi_id"')
+            ->before('</select>')
+            ->toString();
+
+        $this->assertStringContainsString($activeProgramStudi->nama, $createOptions);
+        $this->assertStringNotContainsString($inactiveProgramStudi->nama, $createOptions);
+        $this->assertStringContainsString($inactiveProgramStudi->nama.' (Nonaktif)', $editOptions);
+    }
+
     public function test_detail_page_disciplines_use_normalized_dates_and_protected_download_url(): void
     {
         Storage::fake(Document::STORAGE_DISK);

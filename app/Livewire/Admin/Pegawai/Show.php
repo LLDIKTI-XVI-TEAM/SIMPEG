@@ -65,10 +65,6 @@ class Show extends Component
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
         $programStudiOptions = RefProgramStudi::query()
             ->where('is_active', true)
-            ->when(
-                $p->program_studi_id,
-                fn ($query) => $query->orWhere('id', $p->program_studi_id),
-            )
             ->orderBy('nama')
             ->get();
         $educationProgramStudiOptions = RefProgramStudi::query()
