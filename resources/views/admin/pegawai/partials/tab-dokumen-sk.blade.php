@@ -82,7 +82,7 @@
                             class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
                     </div>
                     <p class="text-[10px] text-muted italic font-sans">PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
-                    <p x-show="skUploadErrors.berkas" x-text="skUploadErrors.berkas?.[0]" class="text-xs text-danger font-sans"></p>
+                    <p x-show="skUploadErrors.file_sk" x-text="skUploadErrors.file_sk?.[0]" class="text-xs text-danger font-sans"></p>
                 </div>
             </div>
 

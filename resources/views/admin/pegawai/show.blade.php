@@ -269,7 +269,7 @@
             fd.append('kategori_dokumen', this.newSk.kategori_dokumen);
             fd.append('no_sk', this.newSk.no_sk);
             fd.append('tanggal_sk', this.newSk.tanggal_sk);
-            fd.append('berkas', this.newSk.file_sk);
+            fd.append('file_sk', this.newSk.file_sk);
 
             if (this.newSk.kategori_dokumen === 'sk_pangkat') {
                 fd.append('golongan_id', this.newSk.golongan_id);
