@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\AssignSupervisorAction;
+use App\Actions\Employees\ChangeEmployeeStatusAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ExportEmployeeAction;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\BulkDeactivateEmployeesRequest;
 use App\Http\Requests\Employee\BulkRestoreEmployeesRequest;
+use App\Http\Requests\Employee\ChangeEmployeeStatusRequest;
 use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
@@ -47,6 +49,32 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
+    /**
+     * Mengubah status dari modal pada tabel Data Pegawai. Seluruh perubahan
+     * tetap melalui action domain agar riwayat, dokumen, audit, dan notifikasi
+     * memiliki perilaku yang sama dengan alur sebelumnya.
+     */
+    public function changeStatus(ChangeEmployeeStatusRequest $request, ChangeEmployeeStatusAction $action)
+    {
+        $validated = $request->validated();
+        $employee = Employee::findOrFail($validated['pegawai_id']);
+
+        try {
+            $action->execute($employee, $validated, $request, $request->file('berkas'));
+
+            return redirect()->route('data-pegawai')
+                ->with('success', 'Status pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                // Daftar dimuat dari sessionStorage; flag ini memaksanya meminta
+                // baris terbaru sehingga status pada tabel tidak tertinggal.
+                ->with('employee_data_changed', true);
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->except('berkas'))
+                ->with('error', 'Gagal memperbarui status pegawai: '.$e->getMessage())
+                ->with('open_status_modal', true);
+        }
+    }
+
     public function index(Request $request, ListEmployeesAction $listAction)
     {
         $perPage = (int) $request->query('per_page', 10);

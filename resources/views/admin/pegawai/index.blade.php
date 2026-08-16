@@ -3,6 +3,9 @@
         $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
         $isReadOnly = $isReadOnly ?? false;
+        $openStatusModal = $openStatusModal ?? false;
+        $statusFormEmployee = $statusFormEmployee ?? null;
+        $canChangeStatus = $canChangeStatus ?? false;
     @endphp
 
     <div x-data="{
@@ -40,6 +43,14 @@
     documentStatusError: '',
     @endif
 
+    // ===== Modal Ubah Status Pegawai =====
+    showStatusModal: @js($openStatusModal),
+    statusEmployee: @js($statusFormEmployee ? [
+        'id' => $statusFormEmployee->id,
+        'nama_lengkap' => $statusFormEmployee->nama_lengkap,
+        'nip' => $statusFormEmployee->nip,
+    ] : null),
+
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
@@ -65,6 +76,19 @@
 
     detailUrl(employee) {
         return `${this.employeeShowUrlPrefix}/${employee.id}`;
+    },
+
+    openStatusModal(employee) {
+        this.statusEmployee = {
+            id: employee.id,
+            nama_lengkap: employee.nama_lengkap,
+            nip: employee.nip,
+        };
+        this.showStatusModal = true;
+    },
+
+    closeStatusModal() {
+        this.showStatusModal = false;
     },
 
     get cacheKey() {
@@ -803,6 +827,21 @@
                                 </x-ui.tooltip>
                                 @endif
 
+                                @if ($canChangeStatus)
+                                    {{-- Ubah status tersedia bagi pengelola pegawai yang memiliki
+                                         permission employees.update; backend menegakkan batas
+                                         yang sama melalui middleware route dan FormRequest. --}}
+                                    <x-ui.tooltip text="Ubah Status" position="top">
+                                        <button type="button" data-testid="change-status-trigger" @click="openStatusModal(p)"
+                                            :aria-label="'Ubah status pegawai ' + p.nama_lengkap"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-3.75 6c0-1.035.84-1.875 1.875-1.875h.008c1.035 0 1.875.84 1.875 1.875v.375H6.75v-.375Z" />
+                                            </svg>
+                                        </button>
+                                    </x-ui.tooltip>
+                                @endif
+
                                 @if (! $isReadOnly && auth()->user()->hasPermission('employees.deactivate'))
                                     {{-- Nonaktifkan → masuk Backup (berdasarkan permission) --}}
                                     <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
@@ -1375,6 +1414,103 @@
             </div>
         </x-ui.modal>
         @endif
+
+    @if ($canChangeStatus)
+        <x-ui.modal
+            show="showStatusModal"
+            title="Ubah Status Pegawai"
+            titleId="change-status-modal-title"
+            descriptionId="change-status-modal-description"
+            maxWidth="2xl"
+            closeAction="closeStatusModal()"
+        >
+            <p id="change-status-modal-description" class="mb-5 text-sm text-muted">
+                Perubahan dicatat sebagai riwayat, dapat disertai berkas SK, dan akan memberi notifikasi kepada pegawai.
+            </p>
+
+            <form id="change-status-form" action="{{ route('pegawai.status.update') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+                @csrf
+                <input type="hidden" name="pegawai_id" :value="statusEmployee?.id ?? ''">
+
+                <div class="rounded-lg border border-border bg-soft px-4 py-3">
+                    <p class="text-xs font-semibold text-muted">Pegawai</p>
+                    <p class="mt-1 text-sm font-semibold text-ink" x-text="statusEmployee ? statusEmployee.nama_lengkap : 'Pegawai tidak ditemukan'"></p>
+                    <p class="mt-0.5 text-xs text-muted" x-text="statusEmployee?.nip ? 'NIP. ' + statusEmployee.nip : ''"></p>
+                </div>
+                @error('pegawai_id')
+                    <p class="text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+
+                <div class="grid gap-5 md:grid-cols-2">
+                    <div>
+                        <label for="status_pegawai_id" class="mb-1.5 block text-sm font-semibold text-ink">Status Baru <span class="text-danger">*</span></label>
+                        <select name="status_pegawai_id" id="status_pegawai_id" required aria-describedby="status_pegawai_id-error"
+                            class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 @error('status_pegawai_id') border-danger @enderror">
+                            <option value="">-- Pilih Status --</option>
+                            @foreach($statusChangeOptions as $status)
+                                <option value="{{ $status->id }}" @selected(old('status_pegawai_id') === $status->id)>{{ $status->nama }}</option>
+                            @endforeach
+                        </select>
+                        @error('status_pegawai_id')
+                            <p id="status_pegawai_id-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="tanggal" class="mb-1.5 block text-sm font-semibold text-ink">Tanggal Efektif Status Kepegawaian <span class="text-danger">*</span></label>
+                        <input type="date" name="tanggal" id="tanggal" value="{{ old('tanggal') }}" required aria-describedby="tanggal-error"
+                            class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 @error('tanggal') border-danger @enderror">
+                        @error('tanggal')
+                            <p id="tanggal-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="nomor_berkas" class="mb-1.5 block text-sm font-semibold text-ink">Nomor Berkas (Otomatis)</label>
+                        <input type="text" id="nomor_berkas" value="SK-STATUS-{{ date('Ymd') }}-XXX" disabled
+                            class="block w-full cursor-not-allowed rounded-lg border border-border bg-soft px-3 py-2 text-sm text-muted">
+                        <p class="mt-1 text-xs text-muted">Nomor berkas dibuat otomatis hanya jika Anda melampirkan berkas pendukung.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="keterangan" class="mb-1.5 block text-sm font-semibold text-ink">Keterangan <span class="font-normal text-muted">(Opsional)</span></label>
+                    <textarea name="keterangan" id="keterangan" rows="3" placeholder="Masukkan catatan atau keterangan perubahan status..." aria-describedby="keterangan-error"
+                        class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 @error('keterangan') border-danger @enderror">{{ old('keterangan') }}</textarea>
+                    @error('keterangan')
+                        <p id="keterangan-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="berkas" class="mb-1.5 block text-sm font-semibold text-ink">Upload Berkas SK Pendukung <span class="font-normal text-muted">(Opsional)</span></label>
+                    <input type="file" name="berkas" id="berkas" accept=".pdf,.jpg,.jpeg,.png" aria-describedby="berkas-help berkas-error"
+                        class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-primary-hover @error('berkas') border-danger @enderror">
+                    <p id="berkas-help" class="mt-1 text-xs text-muted">PDF, JPG, atau PNG; maksimal 10 MB. Berkas akan tersimpan pada arsip dokumen pegawai.</p>
+                    @error('berkas')
+                        <p id="berkas-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+            </form>
+
+            <x-slot:footer>
+                <div class="flex items-center justify-end gap-3">
+                    <x-ui.button type="button" variant="muted" @click="closeStatusModal()">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                        <span>Batal</span>
+                    </x-ui.button>
+                    <x-ui.button type="submit" variant="primary" form="change-status-form">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                        <span>Simpan Status</span>
+                    </x-ui.button>
+                </div>
+            </x-slot:footer>
+        </x-ui.modal>
+    @endif
 
     </div>{{-- end x-data --}}
 

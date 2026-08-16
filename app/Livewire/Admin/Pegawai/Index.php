@@ -12,6 +12,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -135,6 +136,27 @@ class Index extends Component
             'per_page' => $perPage,
         ];
 
+        // Kewenangan perubahan status mengikuti permission employees.update (Admin
+        // Kepegawaian dan Super Admin). Form ditampilkan di konteks baris pegawai
+        // agar operator tidak perlu berpindah halaman.
+        $canChangeStatus = $request->user()?->can('employees.update') ?? false;
+        $statusChangeOptions = $canChangeStatus
+            ? RefStatusPegawai::query()->where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get(['id', 'nama'])
+            : collect();
+
+        $statusFormEmployee = null;
+        $oldEmployeeId = old('pegawai_id');
+        if (is_string($oldEmployeeId) && Str::isUuid($oldEmployeeId)) {
+            $statusFormEmployee = Employee::query()
+                ->select(['id', 'nama_lengkap', 'nip'])
+                ->find($oldEmployeeId);
+        }
+
+        $statusFormErrors = ['pegawai_id', 'status_pegawai_id', 'tanggal', 'keterangan', 'berkas'];
+        $statusErrorBag = $request->session()->get('errors');
+        $openStatusModal = session('open_status_modal', false)
+            || ($statusErrorBag !== null && $statusErrorBag->hasAny($statusFormErrors));
+
         return view('admin.pegawai.index', compact(
             'perPage',
             'sort',
@@ -149,7 +171,11 @@ class Index extends Component
             'golonganRefOptions',
             'jabatanOptions',
             'jenisJabatanOptions',
-            'eselonOptions'
+            'eselonOptions',
+            'canChangeStatus',
+            'statusChangeOptions',
+            'statusFormEmployee',
+            'openStatusModal'
         ));
     }
 }

@@ -36,13 +36,13 @@
     ];
 
     $isDisabled = filter_var($disabled, FILTER_VALIDATE_BOOL);
-    $tag = ($as === 'a' || $href) ? 'a' : 'button';
+    $tag = $as ?: ($href ? 'a' : 'button');
     $classes = [
-        'inline-flex items-center justify-center font-semibold font-sans transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
+        'inline-flex cursor-pointer items-center justify-center font-semibold font-sans transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
         $sizes[(string) $size] ?? $sizes['md'],
         $variants[(string) $variant] ?? $variants['primary'],
         'w-full' => filter_var($fullWidth, FILTER_VALIDATE_BOOL),
-        'pointer-events-none opacity-50' => $tag === 'a' && $isDisabled,
+        'pointer-events-none opacity-50' => in_array($tag, ['a', 'label'], true) && $isDisabled,
     ];
 
     $title = $attributes->get('title');
@@ -59,6 +59,13 @@
             >
                 {{ $slot }}
             </a>
+        @elseif ($tag === 'label')
+            <label
+                @if ($isDisabled) aria-disabled="true" @endif
+                {{ $attributes->except('title')->class($classes) }}
+            >
+                {{ $slot }}
+            </label>
         @else
             <button
                 type="{{ $type }}"
@@ -78,6 +85,13 @@
         >
             {{ $slot }}
         </a>
+    @elseif ($tag === 'label')
+        <label
+            @if ($isDisabled) aria-disabled="true" @endif
+            {{ $attributes->class($classes) }}
+        >
+            {{ $slot }}
+        </label>
     @else
         <button
             type="{{ $type }}"
