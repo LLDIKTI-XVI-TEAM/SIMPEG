@@ -104,14 +104,14 @@ class EmployeeDocumentTest extends TestCase
             ->assertOk()
             ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan');
 
-        $this->post('/dashboard/dokumen/upload', [
+        $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'SK Pangkat Perbaikan',
             'nomor_dokumen' => 'NOMOR-YANG-TIDAK-BOLEH-DIPAKAI',
             'tanggal_terbit' => '2020-01-01',
             'kategori_dokumen' => 'sk_pangkat',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('sk-pangkat-perbaikan.pdf', 100, 'application/pdf'),
-        ])->assertRedirect('/dashboard/dokumen');
+        ])->assertCreated();
 
         $document = Document::query()
             ->where('employee_id', $employee->id)
@@ -355,17 +355,17 @@ class EmployeeDocumentTest extends TestCase
         $this->actingAs($user);
         $file = UploadedFile::fake()->create('ijazah.pdf', 100, 'application/pdf');
 
-        $response = $this->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
             'tanggal_terbit' => '2026-01-01',
             'kategori_dokumen' => 'ijazah',
             'pegawai_id' => $employee->id,
             'berkas' => $file,
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHas('success');
+        $response->assertCreated();
+        $response->assertJsonPath('document.nama_dokumen', 'Ijazah Master Tester');
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -506,14 +506,14 @@ class EmployeeDocumentTest extends TestCase
         $employee = $this->createPnsEmployee();
 
         $this->actingAs($user);
-        $response = $this->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Dokumen Tanpa Nomor',
             'kategori_dokumen' => 'lainnya',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertCreated();
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -531,15 +531,15 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Script Berbahaya',
             'kategori_dokumen' => 'lainnya',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('script.sh', 5, 'text/x-shellscript'),
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHasErrors('berkas');
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
@@ -554,15 +554,15 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
             'nama_dokumen' => 'Dokumen Terlalu Besar',
             'kategori_dokumen' => 'lainnya',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('terlalu-besar.pdf', 10241, 'application/pdf'),
-        ]);
+        ], ['Accept' => 'application/json']);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHasErrors('berkas');
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Dokumen Terlalu Besar',

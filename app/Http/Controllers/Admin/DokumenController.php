@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Actions\Documents\DeleteDocumentAction;
 use App\Actions\Documents\ListDocumentsPageAction;
 use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Documents\ShowDocumentPageAction;
-use App\Actions\Documents\StoreDocumentAction;
-use App\Actions\Documents\UpdateDocumentAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Documents\StoreDocumentRequest;
-use App\Http\Requests\Documents\UpdateDocumentRequest;
 use App\Models\Document;
 use Illuminate\Support\Facades\Storage;
 
+/**
+ * Arsip dokumen terpusat bersifat baca-saja (keputusan produk K-MTG-04):
+ * seluruh aksi unggah/edit/hapus dilakukan dari tab Dokumen & SK pada
+ * halaman detail pegawai melalui API pegawai.
+ */
 class DokumenController extends Controller
 {
     public function index(ListDocumentsPageAction $action)
@@ -26,24 +26,14 @@ class DokumenController extends Controller
         return view('admin.dokumen.show', $action->execute($id));
     }
 
-    public function store(StoreDocumentRequest $request, StoreDocumentAction $action)
+    public function store()
     {
-        $document = $action->execute($request->validated(), $request->file('berkas'));
-
-        return redirect()->route('dokumen')
-            ->with('success', 'Dokumen "'.$document->nama_dokumen.'" berhasil diunggah.')
-            ->with('document_data_changed', true);
+        abort(403, 'Arsip dokumen bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari halaman detail pegawai pada bagian Dokumen & SK.');
     }
 
-    public function update(string $id, UpdateDocumentRequest $request, UpdateDocumentAction $action)
+    public function update(string $id)
     {
-        $document = Document::findOrFail($id);
-
-        $document = $action->execute($document, $request->validated(), $request->file('berkas'));
-
-        return redirect()->route('dokumen')
-            ->with('success', 'Dokumen "'.$document->nama_dokumen.'" berhasil diperbarui.')
-            ->with('document_data_changed', true);
+        abort(403, 'Arsip dokumen bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari halaman detail pegawai pada bagian Dokumen & SK.');
     }
 
     public function download(string $id, PrepareDocumentDownloadAction $action)
@@ -56,34 +46,13 @@ class DokumenController extends Controller
         ]);
     }
 
-    /**
-     * Cek dampak penghapusan dokumen (data riwayat yang terhubung).
-     * Diakses via AJAX sebelum konfirmasi hapus.
-     */
-    public function checkImpact(string $id, DeleteDocumentAction $action)
+    public function checkImpact(string $id)
     {
-        $document = Document::findOrFail($id);
-        $result = $action->checkImpact($document);
-
-        return response()->json([
-            'nomor_dokumen' => $document->nomor_dokumen,
-            'nama_dokumen' => $document->nama_dokumen,
-            ...$result,
-        ]);
+        abort(403, 'Arsip dokumen bersifat baca-saja. Penghapusan berkas dilakukan dari halaman detail pegawai pada bagian Dokumen & SK.');
     }
 
-    /**
-     * Hapus dokumen yang tidak digunakan oleh data riwayat pegawai.
-     * Hanya Super Admin.
-     */
-    public function destroy(string $id, DeleteDocumentAction $action)
+    public function destroy(string $id)
     {
-        $document = Document::findOrFail($id);
-
-        $action->execute($document);
-
-        return redirect()->route('dokumen')
-            ->with('success', 'Dokumen berhasil dihapus.')
-            ->with('document_data_changed', true);
+        abort(403, 'Arsip dokumen bersifat baca-saja. Penghapusan berkas dilakukan dari halaman detail pegawai pada bagian Dokumen & SK.');
     }
 }

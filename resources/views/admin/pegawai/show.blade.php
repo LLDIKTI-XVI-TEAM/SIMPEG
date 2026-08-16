@@ -1,8 +1,7 @@
 <div>
 
     @php
-        $allDocuments   = collect($p->documents ?? []);
-        $riwayatDokumen = $allDocuments;
+        $allDocuments = collect($p->documents ?? []);
 
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
@@ -13,6 +12,46 @@
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
 
+        // Tab Dokumen & SK menjadi satu-satunya tempat aksi kelola dokumen; arsip
+        // terpusat hanya baca-saja (K-MTG-04).
+        $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
+        $canDeleteBerkas = \App\Support\Documents\DocumentAuthorization::canDelete(auth()->user());
+
+        // Berkas SK kanonis per kategori: riwayat is_latest lebih dulu, lalu TMT terbaru.
+        $canonicalSkFiles = [
+            'sk_pangkat' => $p->rankHistories->sortByDesc('tmt_pangkat')->sortByDesc('is_latest')->first()?->file_sk,
+            'sk_jabatan' => $p->positionHistories->sortByDesc('tmt_jabatan')->sortByDesc('is_latest')->first()?->file_sk,
+            'sk_kgb' => $p->salaryHistories->sortByDesc('tmt_kgb')->sortByDesc('is_latest')->first()?->file_sk,
+            'sk_pengangkatan' => $p->appointments->sortByDesc('tmt_pengangkatan')->first()?->file_sk,
+        ];
+
+        $mapDokumenRow = function ($d) use ($canonicalSkFiles) {
+            return [
+                'id'             => $d->id,
+                'nama_dokumen'   => $d->nama_dokumen,
+                'jenis_dokumen'  => $d->jenis_dokumen,
+                'kategori_label' => \App\Support\Documents\DocumentCategory::label($d->jenis_dokumen),
+                'nomor_dokumen'  => $d->nomor_dokumen,
+                'tanggal_dokumen'=> $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('d-m-Y') : null,
+                'file_size'      => $d->fileSizeLabel(),
+                'file_path'      => $d->file_path,
+                'file_tersedia'  => $d->fileExists(),
+                'keterangan'     => $d->keterangan,
+                'is_latest'      => filled($d->file_path)
+                    && in_array($d->file_path, array_filter($canonicalSkFiles), true),
+                'is_deletable'   => \App\Support\Documents\DocumentCategory::isDeletable($d->jenis_dokumen),
+                'detail_url'     => route('dokumen.show', $d->id),
+                'download_url'   => route('dokumen.download', $d->id),
+            ];
+        };
+
+        $riwayatSk = $allDocuments
+            ->filter(fn ($d) => \App\Support\Documents\DocumentCategory::isProtectedSk($d->jenis_dokumen))
+            ->values();
+        $riwayatBerkas = $allDocuments
+            ->filter(fn ($d) => ! \App\Support\Documents\DocumentCategory::isProtectedSk($d->jenis_dokumen))
+            ->values();
+
         $detailTabs = [
             'profile' => 'Profil',
             'keluarga' => 'Keluarga',
@@ -22,7 +61,7 @@
             'disiplin' => 'Hukuman Disiplin',
             'pendidikan' => 'Pendidikan',
             'pengangkatan' => 'Pengangkatan',
-            'docs' => 'Dokumen SK',
+            'docs' => 'Dokumen & SK',
         ];
         $requestedDetailTab = request()->query('tab');
 
@@ -98,25 +137,59 @@
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
         newPendidikan: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
 
-        // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen SK
+        // ===== Tab Dokumen & SK =====
+        skList: {{ $riwayatSk->map($mapDokumenRow)->toJson() }},
+        berkasList: {{ $riwayatBerkas->map($mapDokumenRow)->toJson() }},
+
+        // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen & SK
         showUploadBerkas: false,
         isUploadingBerkas: false,
         uploadBerkasError: '',
         uploadBerkasErrors: {},
         newBerkas: { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null },
-        dokumenList: {{ $riwayatDokumen->map(fn($d) => [
-            'id'             => $d->id,
-            'nama_dokumen'   => $d->nama_dokumen,
-            'jenis_dokumen'  => $d->jenis_dokumen,
-            'kategori_label' => \App\Support\Documents\DocumentCategory::label($d->jenis_dokumen),
-            'nomor_dokumen'  => $d->nomor_dokumen,
-            'tanggal_dokumen'=> $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('d-m-Y') : null,
-            'file_size'      => $d->fileSizeLabel(),
-            'file_path'      => $d->file_path,
-            'keterangan'     => $d->keterangan,
-            'detail_url'     => route('dokumen.show', $d->id),
-            'download_url'   => route('dokumen.download', $d->id),
-        ])->toJson() }},
+
+        // Tambah riwayat SK baru (pangkat/jabatan/KGB append; pengangkatan replace)
+        showUploadSkForm: false,
+        isUploadingSk: false,
+        skUploadError: '',
+        skUploadErrors: {},
+        newSk: { kategori_dokumen: 'sk_pangkat', no_sk: '', tanggal_sk: '', file_sk: null, golongan_id: '', tmt_pangkat: '', jabatan_id: '', jenis_jabatan_id: '', unit_kerja_id: '', kelas_jabatan: '', tmt_jabatan: '', gaji_pokok: '', tmt_kgb: '', jenis_pengangkatan: 'CPNS', tmt_pengangkatan: '' },
+
+        // Unggah arsip / perbaiki berkas SK yang rusak
+        showSkFileModal: false,
+        isUploadingSkFile: false,
+        skFileError: '',
+        skFileErrors: {},
+        skFileHint: '',
+        skMetadataLoading: false,
+        skNomorFromAutofill: false,
+        skTanggalFromAutofill: false,
+        skFileController: null,
+        skFileForm: { kategori_dokumen: 'sk_pangkat', nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null },
+
+        // Edit metadata berkas lainnya
+        showEditBerkasModal: false,
+        isUpdatingBerkas: false,
+        editBerkasError: '',
+        editBerkasErrors: {},
+        editBerkasId: '',
+        editBerkasForm: { kategori_dokumen: 'lainnya', nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null },
+
+        // Hapus berkas lainnya (2-step dengan check-impact)
+        showDeleteBerkasModal: false,
+        deleteBerkasId: '',
+        deleteBerkasName: '',
+        deleteBerkasStep: 'confirm',
+        deleteBerkasLoading: false,
+        deleteBerkasHasBlocked: false,
+        deleteBerkasBlockedImpacts: {},
+        isDeletingBerkas: false,
+
+        get skUploadHint() {
+            return this.newSk.kategori_dokumen === 'sk_pengangkatan'
+                ? 'SK Pengangkatan akan menggantikan data pengangkatan aktif beserta berkasnya.'
+                : 'SK ditambahkan sebagai riwayat baru (append-only); riwayat lama tetap tersimpan.';
+        },
 
         async submitUploadBerkas() {
             if (!this.newBerkas.file) {
@@ -148,7 +221,7 @@
                 if (res.ok) {
                     const json = await res.json();
                     // Tambahkan dokumen baru ke daftar secara reaktif (tanpa reload)
-                    this.dokumenList.unshift(json.document);
+                    this.berkasList.unshift(json.document);
                     this.showUploadBerkas = false;
                     this.newBerkas = { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null };
                     const fileInput = document.getElementById('berkas_upload_input');
@@ -166,6 +239,288 @@
                 this.uploadBerkasError = 'Gagal mengunggah berkas. Periksa koneksi internet Anda.';
             } finally {
                 this.isUploadingBerkas = false;
+            }
+        },
+
+        // ===== Tambah riwayat SK baru dari tab Dokumen & SK =====
+        resetSkTypeFields() {
+            this.newSk.golongan_id = '';
+            this.newSk.tmt_pangkat = '';
+            this.newSk.jabatan_id = '';
+            this.newSk.jenis_jabatan_id = '';
+            this.newSk.unit_kerja_id = '';
+            this.newSk.kelas_jabatan = '';
+            this.newSk.tmt_jabatan = '';
+            this.newSk.gaji_pokok = '';
+            this.newSk.tmt_kgb = '';
+            this.newSk.jenis_pengangkatan = 'CPNS';
+            this.newSk.tmt_pengangkatan = '';
+        },
+        async submitUploadSk() {
+            if (!this.newSk.file_sk) {
+                this.skUploadError = 'Berkas SK wajib dipilih.';
+                return;
+            }
+            this.isUploadingSk = true;
+            this.skUploadError = '';
+            this.skUploadErrors = {};
+
+            const fd = new FormData();
+            fd.append('kategori_dokumen', this.newSk.kategori_dokumen);
+            fd.append('no_sk', this.newSk.no_sk);
+            fd.append('tanggal_sk', this.newSk.tanggal_sk);
+            fd.append('berkas', this.newSk.file_sk);
+
+            if (this.newSk.kategori_dokumen === 'sk_pangkat') {
+                fd.append('golongan_id', this.newSk.golongan_id);
+                fd.append('tmt_pangkat', this.newSk.tmt_pangkat);
+            } else if (this.newSk.kategori_dokumen === 'sk_jabatan') {
+                fd.append('jabatan_id', this.newSk.jabatan_id);
+                if (this.newSk.jenis_jabatan_id) fd.append('jenis_jabatan_id', this.newSk.jenis_jabatan_id);
+                if (this.newSk.unit_kerja_id) fd.append('unit_kerja_id', this.newSk.unit_kerja_id);
+                if (this.newSk.kelas_jabatan) fd.append('kelas_jabatan', this.newSk.kelas_jabatan);
+                fd.append('tmt_jabatan', this.newSk.tmt_jabatan);
+            } else if (this.newSk.kategori_dokumen === 'sk_kgb') {
+                fd.append('gaji_pokok', this.newSk.gaji_pokok);
+                fd.append('tmt_kgb', this.newSk.tmt_kgb);
+            } else if (this.newSk.kategori_dokumen === 'sk_pengangkatan') {
+                fd.append('jenis_pengangkatan', this.newSk.jenis_pengangkatan);
+                fd.append('tmt_pengangkatan', this.newSk.tmt_pengangkatan);
+            }
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-sk`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: fd,
+                });
+
+                if (res.ok) {
+                    const json = await res.json();
+                    this.showUploadSkForm = false;
+                    // Riwayat/dokumen paling relevan dimuat ulang agar tabel, status
+                    // kelengkapan, dan tab riwayat lain sinkron dengan data baru.
+                    window.location.reload();
+                } else if (res.status === 422) {
+                    const json = await res.json();
+                    this.skUploadErrors = json.errors ?? {};
+                    this.skUploadError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
+                } else {
+                    this.skUploadError = 'Gagal menyimpan SK. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.skUploadError = 'Gagal menyimpan SK. Periksa koneksi internet Anda.';
+            } finally {
+                this.isUploadingSk = false;
+            }
+        },
+
+        // ===== Unggah arsip / perbaiki berkas SK =====
+        openSkFileModal(kategori = 'sk_pangkat') {
+            this.skFileForm = { kategori_dokumen: kategori, nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null };
+            this.skFileError = '';
+            this.skFileErrors = {};
+            this.skFileHint = '';
+            this.skNomorFromAutofill = false;
+            this.skTanggalFromAutofill = false;
+            this.showSkFileModal = true;
+            this.$nextTick(() => this.prefillSkFileMetadata());
+        },
+        async prefillSkFileMetadata() {
+            const category = this.skFileForm.kategori_dokumen;
+            this.skFileHint = '';
+
+            if (this.skNomorFromAutofill)   { this.skFileForm.nomor_dokumen = ''; this.skNomorFromAutofill = false; }
+            if (this.skTanggalFromAutofill) { this.skFileForm.tanggal_terbit = ''; this.skTanggalFromAutofill = false; }
+
+            if (!['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan', 'sk_kgb'].includes(category)) {
+                if (this.skFileController) { this.skFileController.abort(); this.skFileController = null; }
+                return;
+            }
+
+            // Batalkan request sebelumnya agar respons lama tidak menulis ke form
+            // ketika pengguna berganti kategori pada koneksi lambat.
+            if (this.skFileController) this.skFileController.abort();
+            const controller = new AbortController();
+            this.skFileController = controller;
+            const snapshotCategory = category;
+
+            this.skMetadataLoading = true;
+            try {
+                const response = await fetch('/api/v1/pegawai/{{ $p->id }}/status-dokumen', {
+                    cache: 'no-store',
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('Metadata SK tidak dapat dimuat.');
+
+                const data = await response.json();
+                if (this.skFileForm.kategori_dokumen !== snapshotCategory) return;
+
+                const sk = data.document_status?.required_sks?.find(item => item.jenis === snapshotCategory);
+                if (!sk || sk.status !== 'perlu_perbaikan') return;
+
+                if (sk.nomor_sk)   { this.skFileForm.nomor_dokumen = sk.nomor_sk;   this.skNomorFromAutofill = true; }
+                if (sk.tanggal_sk) { this.skFileForm.tanggal_terbit = sk.tanggal_sk; this.skTanggalFromAutofill = true; }
+                this.skFileHint = 'Nomor dan tanggal SK diambil dari riwayat yang perlu diperbaiki dan tidak dapat diubah.';
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                this.skFileHint = error.message || 'Metadata SK tidak dapat dimuat.';
+            } finally {
+                this.skMetadataLoading = false;
+                if (this.skFileController === controller) this.skFileController = null;
+            }
+        },
+        async submitSkFile() {
+            if (!this.skFileForm.file) {
+                this.skFileError = 'Berkas wajib dipilih.';
+                return;
+            }
+            this.isUploadingSkFile = true;
+            this.skFileError = '';
+            this.skFileErrors = {};
+
+            const fd = new FormData();
+            fd.append('pegawai_id', '{{ $p->id }}');
+            fd.append('kategori_dokumen', this.skFileForm.kategori_dokumen);
+            fd.append('nama_dokumen', this.skFileForm.nama_dokumen || ('Berkas ' + this.skFileForm.kategori_dokumen.replace('_', ' ').toUpperCase()));
+            fd.append('nomor_dokumen', this.skFileForm.nomor_dokumen);
+            fd.append('tanggal_terbit', this.skFileForm.tanggal_terbit);
+            fd.append('deskripsi', this.skFileForm.deskripsi);
+            fd.append('berkas', this.skFileForm.file);
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: fd,
+                });
+
+                if (res.ok) {
+                    // Perbaikan menyentuh riwayat kanonis dan status kelengkapan;
+                    // muat ulang agar seluruh tabel dan badge sinkron.
+                    window.location.reload();
+                } else if (res.status === 422) {
+                    const json = await res.json();
+                    this.skFileErrors = json.errors ?? {};
+                    this.skFileError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
+                } else {
+                    this.skFileError = 'Gagal menyimpan berkas. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.skFileError = 'Gagal menyimpan berkas. Periksa koneksi internet Anda.';
+            } finally {
+                this.isUploadingSkFile = false;
+            }
+        },
+
+        // ===== Edit metadata berkas lainnya =====
+        openEditBerkas(doc) {
+            this.editBerkasId = doc.id;
+            this.editBerkasForm = {
+                kategori_dokumen: doc.jenis_dokumen,
+                nama_dokumen: doc.nama_dokumen ?? '',
+                nomor_dokumen: doc.nomor_dokumen ?? '',
+                tanggal_terbit: doc.tanggal_dokumen ? doc.tanggal_dokumen.split('-').reverse().join('-') : '',
+                deskripsi: doc.keterangan ?? '',
+                file: null,
+            };
+            this.editBerkasError = '';
+            this.editBerkasErrors = {};
+            this.showEditBerkasModal = true;
+        },
+        async submitEditBerkas() {
+            this.isUpdatingBerkas = true;
+            this.editBerkasError = '';
+            this.editBerkasErrors = {};
+
+            const fd = new FormData();
+            fd.append('kategori_dokumen', this.editBerkasForm.kategori_dokumen);
+            fd.append('nama_dokumen', this.editBerkasForm.nama_dokumen);
+            fd.append('nomor_dokumen', this.editBerkasForm.nomor_dokumen);
+            fd.append('tanggal_terbit', this.editBerkasForm.tanggal_terbit);
+            fd.append('deskripsi', this.editBerkasForm.deskripsi);
+            if (this.editBerkasForm.file) fd.append('berkas', this.editBerkasForm.file);
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.editBerkasId}`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: fd,
+                });
+
+                if (res.ok) {
+                    const json = await res.json();
+                    const index = this.berkasList.findIndex(item => item.id === this.editBerkasId);
+                    if (index !== -1) this.berkasList.splice(index, 1, json.document);
+                    this.showEditBerkasModal = false;
+                    this.toast = { show: true, message: 'Dokumen berhasil diperbarui.', type: 'success' };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                } else if (res.status === 422) {
+                    const json = await res.json();
+                    this.editBerkasErrors = json.errors ?? {};
+                    this.editBerkasError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
+                } else {
+                    this.editBerkasError = 'Gagal memperbarui dokumen. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.editBerkasError = 'Gagal memperbarui dokumen. Periksa koneksi internet Anda.';
+            } finally {
+                this.isUpdatingBerkas = false;
+            }
+        },
+
+        // ===== Hapus berkas lainnya (check-impact → konfirmasi) =====
+        openDeleteBerkas(doc) {
+            this.deleteBerkasId = doc.id;
+            this.deleteBerkasName = doc.nama_dokumen;
+            this.deleteBerkasStep = 'confirm';
+            this.deleteBerkasHasBlocked = false;
+            this.deleteBerkasBlockedImpacts = {};
+            this.showDeleteBerkasModal = true;
+        },
+        async checkDeleteBerkasImpact() {
+            this.deleteBerkasLoading = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.deleteBerkasId}/check-impact`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!res.ok) throw new Error('Gagal memeriksa dampak penghapusan.');
+                const json = await res.json();
+                this.deleteBerkasHasBlocked = Boolean(json.has_blocked);
+                this.deleteBerkasBlockedImpacts = json.blocked_impacts ?? {};
+                this.deleteBerkasStep = 'impact';
+            } catch (e) {
+                this.deleteBerkasStep = 'impact';
+                this.deleteBerkasHasBlocked = true;
+                this.deleteBerkasBlockedImpacts = { Error: [{ id: '', label: e.message }] };
+            } finally {
+                this.deleteBerkasLoading = false;
+            }
+        },
+        async submitDeleteBerkas() {
+            this.isDeletingBerkas = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.deleteBerkasId}`, {
+                    method: 'DELETE',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                });
+
+                if (res.ok) {
+                    this.berkasList = this.berkasList.filter(item => item.id !== this.deleteBerkasId);
+                    this.showDeleteBerkasModal = false;
+                    this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                } else {
+                    const json = await res.json().catch(() => null);
+                    this.toast = { show: true, message: json?.message ?? 'Gagal menghapus berkas.', type: 'error' };
+                    setTimeout(() => { this.toast.show = false; }, 5000);
+                }
+            } catch (e) {
+                this.toast = { show: true, message: 'Gagal menghapus berkas. Periksa koneksi internet Anda.', type: 'error' };
+                setTimeout(() => { this.toast.show = false; }, 5000);
+            } finally {
+                this.isDeletingBerkas = false;
             }
         },
         async updateKinerjaBaik(value) {
@@ -1359,190 +1714,7 @@
 
             {{-- TAB 9: DOKUMEN & SK --}}
             <x-pegawai.detail.panel tab="docs" id-prefix="admin">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Daftar Dokumen & Berkas Pegawai</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Seluruh berkas kepegawaian termasuk SK, ijazah, KTP/KK, dan dokumen lainnya.</p>
-                    </div>
-                    @can('update', $p)
-                    <button type="button" @click="showUploadBerkas = !showUploadBerkas"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10 font-sans">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Unggah Berkas
-                    </button>
-                    @endcan
-                </div>
-
-                {{-- Panel Upload Berkas Lainnya --}}
-                @can('update', $p)
-                <div x-show="showUploadBerkas" x-transition class="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
-                    <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unggah Berkas Baru</h4>
-
-                    {{-- Error global --}}
-                    <p x-show="uploadBerkasError" x-text="uploadBerkasError"
-                       class="text-xs text-danger font-semibold font-sans"></p>
-
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {{-- Nama Dokumen --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                Nama Dokumen <span class="text-danger">*</span>
-                            </label>
-                            <input type="text" x-model="newBerkas.nama_dokumen"
-                                placeholder="Misal: KTP An. Budi Santoso"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <p x-show="uploadBerkasErrors.nama_dokumen" x-text="uploadBerkasErrors.nama_dokumen?.[0]"
-                               class="text-xs text-danger font-sans"></p>
-                        </div>
-
-                        {{-- Kategori --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                Kategori <span class="text-danger">*</span>
-                            </label>
-                            <div class="relative">
-                                <select x-model="newBerkas.kategori_dokumen"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                                    <option value="ktp_kk">KTP & KK</option>
-                                    <option value="ijazah">Ijazah</option>
-                                    <option value="lainnya">Lainnya</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <p x-show="uploadBerkasErrors.kategori_dokumen" x-text="uploadBerkasErrors.kategori_dokumen?.[0]"
-                               class="text-xs text-danger font-sans"></p>
-                        </div>
-
-                        {{-- Nomor Dokumen --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Dokumen</label>
-                            <input type="text" x-model="newBerkas.nomor_dokumen"
-                                placeholder="Opsional"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        </div>
-
-                        {{-- Tanggal Terbit --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Terbit</label>
-                            <input type="date" x-model="newBerkas.tanggal_terbit"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                        </div>
-
-                        {{-- Keterangan --}}
-                        <div class="space-y-1 sm:col-span-2">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Keterangan</label>
-                            <input type="text" x-model="newBerkas.keterangan"
-                                placeholder="Keterangan opsional"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        </div>
-
-                        {{-- File Upload --}}
-                        <div class="space-y-1 sm:col-span-2">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                File Berkas <span class="text-danger">*</span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <label for="berkas_upload_input"
-                                    class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10 font-sans">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                    </svg>
-                                    Pilih File
-                                </label>
-                                <input type="file" id="berkas_upload_input" class="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                    @change="newBerkas.file = $event.target.files[0] || null">
-                                <span class="min-w-0 flex-1 truncate text-xs font-sans"
-                                    :class="newBerkas.file ? 'text-ink' : 'text-muted'"
-                                    x-text="newBerkas.file ? newBerkas.file.name : 'Belum ada file dipilih'"></span>
-                                <button x-show="newBerkas.file" type="button"
-                                    @click="newBerkas.file = null; document.getElementById('berkas_upload_input').value = ''"
-                                    class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
-                            </div>
-                            <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG/DOC/DOCX, maks. 10 MB.</p>
-                            <p x-show="uploadBerkasErrors.berkas" x-text="uploadBerkasErrors.berkas?.[0]"
-                               class="text-xs text-danger font-sans"></p>
-                        </div>
-                    </div>
-
-                    {{-- Tombol aksi --}}
-                    <div class="flex items-center gap-2 pt-1">
-                        <button type="button" @click="submitUploadBerkas()"
-                            :disabled="isUploadingBerkas"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60 font-sans">
-                            <svg x-show="isUploadingBerkas" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                            <span x-text="isUploadingBerkas ? 'Mengunggah...' : 'Unggah'"></span>
-                        </button>
-                        <button type="button" @click="showUploadBerkas = false; uploadBerkasError = ''; uploadBerkasErrors = {};"
-                            class="inline-flex items-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted transition hover:bg-soft font-sans">
-                            Batal
-                        </button>
-                    </div>
-                </div>
-                @endcan
-
-                {{-- Tabel Dokumen (Alpine reactive) --}}
-                <x-pegawai.detail.table
-                    name="docs"
-                    :headings="['Nama Dokumen', 'Kategori', 'Nomor Dokumen', 'Tanggal Terbit', 'Ukuran']"
-                    :show-actions="true"
-                >
-                            <template x-if="dokumenList.length === 0">
-                                <tr>
-                                    <td colspan="6" class="px-4 py-6 text-center text-muted font-sans">
-                                        Belum ada dokumen atau berkas yang diunggah untuk pegawai ini.
-                                    </td>
-                                </tr>
-                            </template>
-                            <template x-for="doc in dokumenList" :key="doc.id">
-                                <tr class="transition-colors hover:bg-soft/30">
-                                    <td class="px-4 py-3 max-w-xs">
-                                        <div class="flex items-start gap-2.5">
-                                            <div class="flex h-8 w-6 shrink-0 items-center justify-center rounded border border-border bg-soft p-0.5 shadow-sm">
-                                                <span class="text-[5px] font-bold text-primary uppercase"
-                                                    x-text="(doc.file_path || '').split('.').pop()?.substring(0, 4) || 'file'"></span>
-                                            </div>
-                                            <div class="min-w-0">
-                                                <p class="font-bold font-sans truncate" x-text="doc.nama_dokumen"></p>
-                                                <p x-show="doc.keterangan" class="text-[10px] text-muted truncate" x-text="doc.keterangan"></p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-muted font-sans" x-text="doc.kategori_label"></td>
-                                    <td class="px-4 py-3 text-muted font-mono" x-text="doc.nomor_dokumen || '-'"></td>
-                                    <td class="px-4 py-3 text-muted" x-text="doc.tanggal_dokumen || '-'"></td>
-                                    <td class="px-4 py-3 text-muted" x-text="doc.file_size"></td>
-                                    <td class="px-4 py-3">
-                                        <div class="flex items-center gap-1.5">
-                                            <a :href="doc.detail_url"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                                title="Lihat detail">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                                </svg>
-                                            </a>
-                                            <a :href="doc.download_url"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                                title="Unduh">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                                </svg>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                </x-pegawai.detail.table>
+                @include('admin.pegawai.partials.tab-dokumen-sk')
             </x-pegawai.detail.panel>
 
         </x-pegawai.detail.shell>
@@ -1888,7 +2060,7 @@
                                                 </x-form.select>
                                                 <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
                                                     Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
-                                                    <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
+                                                    <button type="button" @click="selectTab('docs')" class="text-primary underline cursor-pointer">Unggah dari bagian Dokumen &amp; SK</button>.
                                                 </p>
                                             </div>
                                         </template>

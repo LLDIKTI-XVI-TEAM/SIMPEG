@@ -56,6 +56,62 @@ class DocumentCategory
         return array_values(array_diff(self::keys(), self::PIMPINAN_HIDDEN));
     }
 
+    /**
+     * SK yang hanya boleh ditambah sebagai riwayat baru. File lama tetap arsip.
+     *
+     * @return list<string>
+     */
+    public static function appendOnlySkKeys(): array
+    {
+        return ['sk_pangkat', 'sk_jabatan', 'sk_kgb'];
+    }
+
+    /**
+     * SK yang mengganti data pengangkatan dan satu dokumen aktif.
+     *
+     * @return list<string>
+     */
+    public static function replaceSkKeys(): array
+    {
+        return ['sk_pengangkatan'];
+    }
+
+    /**
+     * Kategori yang boleh diunggah dari section Dokumen SK di detail pegawai.
+     *
+     * @return list<string>
+     */
+    public static function tabSkKeys(): array
+    {
+        return [...self::appendOnlySkKeys(), ...self::replaceSkKeys()];
+    }
+
+    /**
+     * Berkas non-SK yang boleh diunggah/dihapus dari section Berkas Lainnya.
+     *
+     * @return list<string>
+     */
+    public static function otherUploadKeys(): array
+    {
+        return ['ijazah', 'ktp_kk', 'lainnya'];
+    }
+
+    public static function isDeletable(?string $category): bool
+    {
+        return in_array($category, self::otherUploadKeys(), true);
+    }
+
+    public static function isProtectedSk(?string $category): bool
+    {
+        return in_array($category, [
+            ...self::tabSkKeys(),
+            'sk_hukuman_disiplin',
+            'sk_mutasi',
+            'sk_pensiun',
+            'sk_status_pegawai',
+        ], true);
+    }
+
     public static function label(?string $category): string
     {
         return self::LABELS[$category] ?? 'Lainnya';
