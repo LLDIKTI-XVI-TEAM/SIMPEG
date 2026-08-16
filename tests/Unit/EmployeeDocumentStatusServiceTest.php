@@ -25,7 +25,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
     {
         parent::setUp();
         Storage::fake(Document::STORAGE_DISK);
-        $this->service = new EmployeeDocumentStatusService;
+        $this->service = app(EmployeeDocumentStatusService::class);
         $this->pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
     }
 

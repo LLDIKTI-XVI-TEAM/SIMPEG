@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,6 +14,10 @@ use Illuminate\Support\Facades\Storage;
  */
 class EmployeeDocumentStatusService
 {
+    public function __construct(
+        private readonly EmployeeHistoryAttachmentService $attachments,
+    ) {}
+
     /** @var array<string, string> */
     private const REQUIRED_SK = [
         'sk_pengangkatan' => 'SK Pengangkatan',
@@ -78,6 +84,19 @@ class EmployeeDocumentStatusService
             ];
         }
 
+        // Validasi konflik metadata (path diklaim Document pegawai/kategori lain)
+        // memakai cache referensi yang di-prime sekali — tanpa query per kandidat.
+        // Pegawai tanpa berkas sama sekali tetap bebas query.
+        $candidatePaths = collect($sources)
+            ->flatten(1)
+            ->filter(fn (array $candidate): bool => filled($candidate['file_path'] ?? null))
+            ->pluck('file_path')
+            ->unique()
+            ->values();
+        if ($candidatePaths->isNotEmpty()) {
+            $this->attachments->primeDocumentReferences($candidatePaths);
+        }
+
         $disk = Storage::disk(Document::STORAGE_DISK);
         $requiredSks = [];
         $tersediaCount = 0;
@@ -94,11 +113,11 @@ class EmployeeDocumentStatusService
             $canonical = $candidates->first();
             $canonicalBroken = $canonical !== null
                 && $canonical['source'] === 'Riwayat Pegawai'
-                && (blank($canonical['file_path']) || ! $disk->exists($canonical['file_path']));
+                && ! $this->candidatePathUsable($employee, $key, $canonical, $disk);
 
             $available = $canonicalBroken
                 ? null
-                : $candidates->first(fn (array $candidate): bool => filled($candidate['file_path']) && $disk->exists($candidate['file_path']));
+                : $candidates->first(fn (array $candidate): bool => $this->candidatePathUsable($employee, $key, $candidate, $disk));
 
             if ($available !== null) {
                 $state = 'tersedia';
@@ -112,7 +131,7 @@ class EmployeeDocumentStatusService
                 $state = 'perlu_perbaikan';
                 $statusLabel = blank($canonical['file_path'] ?? null)
                     ? 'Berkas belum diunggah'
-                    : 'File tidak ditemukan di storage';
+                    : ($disk->exists($canonical['file_path']) ? 'File tidak dapat diakses (konflik metadata)' : 'File tidak ditemukan di storage');
                 $perluPerbaikanCount++;
             }
 
@@ -173,6 +192,30 @@ class EmployeeDocumentStatusService
             'type' => self::ATTACHMENT_TYPES[$requiredSkKey],
             'history' => $candidate['history'],
         ]);
+    }
+
+    /**
+     * Kandidat hanya dianggap tersedia bila file fisik ada DAN metadata referensinya
+     * tidak diklaim Document milik pegawai/kategori lain (fail-closed, selaras dengan
+     * EmployeeHistoryAttachmentService::availablePath pada endpoint unduh).
+     *
+     * @param  array<string, mixed>  $candidate
+     */
+    private function candidatePathUsable(Employee $employee, string $requiredSkKey, array $candidate, Filesystem $disk): bool
+    {
+        if (blank($candidate['file_path'] ?? null) || ! $disk->exists($candidate['file_path'])) {
+            return false;
+        }
+
+        if (array_key_exists('document', $candidate)) {
+            return $this->attachments->availableDocumentPath($employee, $candidate['document'], [$requiredSkKey]) !== null;
+        }
+
+        return $this->attachments->availablePath(
+            $employee,
+            self::ATTACHMENT_TYPES[$requiredSkKey],
+            $candidate['history'],
+        ) !== null;
     }
 
     /**

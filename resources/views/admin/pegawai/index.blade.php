@@ -747,21 +747,24 @@
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
                                 :class="{
                                 'bg-success/10 text-success': p.is_lengkap === 'lengkap',
-                                'bg-warning/10 text-warning': p.is_lengkap === 'tidak_lengkap',
-                                'bg-primary/10 text-primary': p.is_lengkap === 'tersedia',
-                                'bg-muted/20 text-muted': p.is_lengkap === 'kosong',
+                                'bg-primary/10 text-primary': p.is_lengkap === 'tidak_wajib',
+                                'bg-warning/10 text-warning': p.is_lengkap === 'belum_lengkap',
+                                'bg-danger/10 text-danger':   p.is_lengkap === 'perlu_perbaikan',
+                                'bg-muted/20 text-muted':     p.is_lengkap === 'belum_ada' || !p.is_lengkap,
                             }" title="Status kelengkapan dokumen">
                                 <span class="h-1.5 w-1.5 rounded-full" :class="{
                                     'bg-success': p.is_lengkap === 'lengkap',
-                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
-                                    'bg-primary': p.is_lengkap === 'tersedia',
-                                    'bg-muted': p.is_lengkap === 'kosong',
+                                    'bg-primary': p.is_lengkap === 'tidak_wajib',
+                                    'bg-warning': p.is_lengkap === 'belum_lengkap',
+                                    'bg-danger':  p.is_lengkap === 'perlu_perbaikan',
+                                    'bg-muted':   p.is_lengkap === 'belum_ada' || !p.is_lengkap,
                                 }"></span>
                                 <span x-text="
-                                    p.is_lengkap === 'lengkap'       ? 'Lengkap' :
-                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
-                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
-                                                                       'Belum Ada'
+                                    p.is_lengkap === 'lengkap'         ? 'Lengkap' :
+                                    p.is_lengkap === 'tidak_wajib'     ? 'Tidak Wajib' :
+                                    p.is_lengkap === 'belum_lengkap'   ? 'Belum Lengkap' :
+                                    p.is_lengkap === 'perlu_perbaikan' ? 'Perlu Perbaikan' :
+                                                                        'Belum Ada'
                                 "></span>
                             </span>
                             @else

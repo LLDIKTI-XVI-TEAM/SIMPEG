@@ -61,6 +61,13 @@ class StoreDocumentAction
                     $this->syncHistory($repairHistory, $document);
                 }
 
+                // Sinkron jenis pegawai tidak boleh bergantung pada syarat repair:
+                // unggahan arsip sk_pengangkatan tetap memperbaiki data lama/impor
+                // yang jenis_pegawai_id-nya belum konsisten dengan appointment.
+                if ($category === 'sk_pengangkatan') {
+                    $this->syncAppointmentJenisPegawai($employee);
+                }
+
                 $this->syncEmployeeStatus($employee, $category);
 
                 // Payload audit dibatasi pada metadata arsip. Isi berkas tidak pernah masuk audit,
@@ -130,11 +137,26 @@ class StoreDocumentAction
             $history->only(['file_sk', 'no_sk', 'tanggal_sk'])
         );
 
-        if ($history instanceof Appointment && $history->jenis_pengangkatan) {
-            $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [strtoupper($history->jenis_pengangkatan)])->first();
-            if ($jenisPegawai) {
-                $history->employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
-            }
+    }
+
+    /**
+     * Selaraskan jenis_pegawai_id dengan jenis pengangkatan terbaru, termasuk saat
+     * unggahan sk_pengangkatan tidak memicu perbaikan berkas (arsip biasa).
+     */
+    private function syncAppointmentJenisPegawai(Employee $employee): void
+    {
+        $appointment = $employee->appointments()
+            ->orderByDesc('tmt_pengangkatan')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($appointment === null || ! $appointment->jenis_pengangkatan) {
+            return;
+        }
+
+        $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [strtoupper($appointment->jenis_pengangkatan)])->first();
+        if ($jenisPegawai && $jenisPegawai->id !== $employee->jenis_pegawai_id) {
+            $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
         }
     }
 

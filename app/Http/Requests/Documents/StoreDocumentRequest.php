@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Documents;
 
+use App\Support\Documents\DocumentAuthorization;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -11,6 +12,10 @@ class StoreDocumentRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        if (DocumentAuthorization::allowsLocalApiBypass()) {
+            return true;
+        }
+
         $user = $this->user();
 
         return $user !== null
