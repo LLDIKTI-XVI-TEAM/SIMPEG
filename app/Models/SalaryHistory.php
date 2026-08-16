@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\HasSkDocument;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $tmt_kgb
  * @property Carbon|null $tanggal_sk
  */
-class SalaryHistory extends Model
+class SalaryHistory extends Model implements HasSkDocument
 {
     use HasUuid;
 

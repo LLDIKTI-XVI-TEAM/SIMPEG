@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Contracts\HasSkDocument;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,10 +11,11 @@ use Illuminate\Support\Carbon;
 /**
  * @property string|null $jenis_pengangkatan
  * @property string|null $no_sk
+ * @property string|null $file_sk
  * @property Carbon|null $tmt_pengangkatan
  * @property Carbon|null $tanggal_sk
  */
-class Appointment extends Model
+class Appointment extends Model implements HasSkDocument
 {
     use HasUuid;
 

@@ -27,12 +27,19 @@ class EmployeeIndexTest extends TestCase
 
     private const PEGAWAI_ENDPOINT = '/api/v1/pegawai';
 
+    private RefJenisPegawai $pns;
+
     protected function setUp(): void
     {
         parent::setUp();
-
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
+        $this->pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+    }
+
+    private function createPnsEmployee(array $attributes = []): Employee
+    {
+        return Employee::factory()->create(array_merge(['jenis_pegawai_id' => $this->pns->id], $attributes));
     }
 
     public function test_guest_cannot_list_employees(): void
@@ -189,16 +196,43 @@ class EmployeeIndexTest extends TestCase
     {
 
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create(['profil_status' => 'belum_lengkap']);
+        $employee = $this->createPnsEmployee(['profil_status' => 'belum_lengkap']);
 
-        $this->assertEmployeeDocumentCompleteness($user, $employee, 'kosong');
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'belum_ada');
     }
 
-    public function test_document_completeness_requires_file_for_the_existing_rank_history_only(): void
+    public function test_non_pns_document_completeness_is_not_required(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
+
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_wajib');
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.status_kelengkapan', 'tidak_wajib')
+            ->assertJsonPath('document_status.total_wajib', 0);
+    }
+
+    public function test_employee_index_renders_not_required_document_status_ui(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSee("p.is_lengkap === 'tidak_wajib'", false)
+            ->assertSee('Tidak Wajib', false)
+            ->assertSee("documentStatus.status_kelengkapan === 'tidak_wajib'", false)
+            ->assertSee('Dokumen SK wajib tidak berlaku untuk jenis pegawai ini.', false);
+    }
+
+    public function test_document_completeness_is_belum_lengkap_when_only_rank_sk_is_valid(): void
     {
 
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create(['profil_status' => 'lengkap']);
+        $employee = $this->createPnsEmployee(['profil_status' => 'lengkap']);
         $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
         $filePath = 'ranks/sk/'.$employee->id.'.pdf';
 
@@ -213,17 +247,56 @@ class EmployeeIndexTest extends TestCase
         ]);
 
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pangkat');
-        $this->assertEmployeeDocumentCompleteness($user, $employee, 'lengkap');
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'belum_lengkap');
 
         Storage::disk(Document::STORAGE_DISK)->delete($filePath);
-        $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'perlu_perbaikan');
     }
 
-    public function test_document_completeness_is_tersedia_when_only_other_documents_with_files_exist(): void
+    public function test_document_completeness_uses_canonical_rank_and_salary_histories(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->createPnsEmployee();
+
+        $rankFile = 'ranks/sk/'.$employee->id.'-lama.pdf';
+        $salaryFile = 'salaries/sk/'.$employee->id.'-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($rankFile, 'SK pangkat lama');
+        Storage::disk(Document::STORAGE_DISK)->put($salaryFile, 'SK KGB lama');
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_pangkat' => '2022-01-01',
+            'file_sk' => $rankFile,
+            'is_latest' => false,
+        ]);
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_pangkat' => '2024-01-01',
+            'file_sk' => null,
+            'is_latest' => true,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2022-01-01',
+            'file_sk' => $salaryFile,
+            'is_latest' => false,
+        ]);
+        SalaryHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2024-01-01',
+            'file_sk' => null,
+            'is_latest' => true,
+        ]);
+
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'perlu_perbaikan');
+    }
+
+    public function test_document_completeness_is_belum_ada_when_only_other_documents_with_files_exist(): void
     {
 
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create(['profil_status' => 'belum_lengkap']);
+        $employee = $this->createPnsEmployee(['profil_status' => 'belum_lengkap']);
 
         // Tidak ada riwayat SK (rankHistories, positionHistories, salaryHistories, appointments)
         // Tapi ada berkas lainnya (mis. KTP) yang filenya tersedia di storage
@@ -237,14 +310,42 @@ class EmployeeIndexTest extends TestCase
             'file_path' => $filePath,
         ]);
 
-        $this->assertEmployeeDocumentCompleteness($user, $employee, 'tersedia');
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'belum_ada');
+    }
+
+    public function test_document_completeness_is_belum_lengkap_when_only_three_required_sks_are_valid(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->createPnsEmployee();
+
+        foreach (['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan'] as $category) {
+            $path = "{$employee->id}/{$category}.pdf";
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'SK tersedia');
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => $category,
+                'nama_dokumen' => $category,
+                'file_path' => $path,
+            ]);
+        }
+
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'belum_lengkap');
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.tersedia_count', 3)
+            ->assertJsonPath('document_status.total_wajib', 4)
+            ->assertJsonPath('document_status.required_sks.3.jenis', 'sk_kgb')
+            ->assertJsonPath('document_status.required_sks.3.status', 'belum_ada');
     }
 
     public function test_document_completeness_requires_storage_files_for_every_existing_history_type(): void
     {
         Storage::fake(Document::STORAGE_DISK);
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
         $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
         $positionType = RefJenisJabatan::where('nama', 'Struktural')->firstOrFail();
         $unit = RefUnitKerja::firstOrFail();
@@ -303,13 +404,13 @@ class EmployeeIndexTest extends TestCase
 
         foreach ($paths as $type => $path) {
             $disk->delete($path);
-            $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
+            $this->assertEmployeeDocumentCompleteness($user, $employee, 'perlu_perbaikan');
 
             $newPath = str_replace('.pdf', '_new.pdf', $path);
             $disk->put($newPath, 'SK tersedia');
 
             $records[$type]->update(['file_sk' => null]);
-            $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_lengkap');
+            $this->assertEmployeeDocumentCompleteness($user, $employee, 'perlu_perbaikan');
             $records[$type]->update(['file_sk' => $newPath]);
             $paths[$type] = $newPath;
         }
@@ -321,7 +422,7 @@ class EmployeeIndexTest extends TestCase
     {
         Storage::fake(Document::STORAGE_DISK);
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
         $rank = RefGolongan::where('kode', 'III/a')->firstOrFail();
         $filePath = 'ranks/sk/'.$employee->id.'.pdf';
 
@@ -354,8 +455,11 @@ class EmployeeIndexTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('employee.id', $employee->id)
-            ->assertJsonPath('document_status.status_kelengkapan', 'lengkap')
-            ->assertJsonPath('document_status.is_lengkap', true)
+            ->assertJsonPath('document_status.status_kelengkapan', 'belum_lengkap')
+            ->assertJsonPath('document_status.is_lengkap', false)
+            ->assertJsonPath('document_status.tersedia_count', 1)
+            ->assertJsonPath('document_status.total_wajib', 4)
+            ->assertJsonPath('document_status.required_sks.0.status', 'belum_ada')
             ->assertJsonPath('document_status.total_riwayat', 1)
             ->assertJsonPath('document_status.file_tersedia', 1)
             ->assertJsonPath('document_status.records.0.jenis', 'Pangkat')
@@ -396,8 +500,11 @@ class EmployeeIndexTest extends TestCase
         $this->actingAs($user)
             ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
             ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'tidak_lengkap')
+            ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan')
             ->assertJsonPath('document_status.is_lengkap', false)
+            ->assertJsonPath('document_status.required_sks.1.jenis', 'sk_pangkat')
+            ->assertJsonPath('document_status.required_sks.1.status', 'perlu_perbaikan')
+            ->assertJsonPath('document_status.required_sks.1.status_label', 'File tidak ditemukan di storage')
             ->assertJsonPath('document_status.file_tersedia', 0)
             ->assertJsonPath('document_status.records.0.status_label', 'File tidak ditemukan');
     }
@@ -430,7 +537,6 @@ class EmployeeIndexTest extends TestCase
         $this->actingAs($user)
             ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
             ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'tidak_lengkap')
             ->assertJsonPath('document_status.file_tersedia', 0)
             ->assertJsonPath('document_status.records.0.file_tersedia', false)
             ->assertJsonPath('document_status.records.0.file_url', null);
@@ -444,12 +550,63 @@ class EmployeeIndexTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_table_row_uses_required_sk_archives_for_document_status(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->createPnsEmployee();
+
+        foreach (['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan', 'sk_kgb'] as $jenis) {
+            $path = "archives/{$employee->id}/{$jenis}.pdf";
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'SK tersedia');
+            Document::create([
+                'employee_id' => $employee->id,
+                'jenis_dokumen' => $jenis,
+                'nama_dokumen' => $jenis,
+                'file_path' => $path,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/table-row")
+            ->assertOk()
+            ->assertJsonPath('employee.is_lengkap', 'lengkap');
+    }
+
+    public function test_document_status_endpoint_prioritizes_is_latest_over_later_tmt(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->createPnsEmployee();
+        $newerFile = "ranks/sk/{$employee->id}-newer.pdf";
+        Storage::disk(Document::STORAGE_DISK)->put($newerFile, 'SK lebih baru');
+
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_pangkat' => '2022-01-01',
+            'file_sk' => null,
+            'is_latest' => true,
+        ]);
+        RankHistory::create([
+            'employee_id' => $employee->id,
+            'tmt_pangkat' => '2024-01-01',
+            'file_sk' => $newerFile,
+            'is_latest' => false,
+        ]);
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.required_sks.1.jenis', 'sk_pangkat')
+            ->assertJsonPath('document_status.required_sks.1.status', 'perlu_perbaikan');
+    }
+
     private function assertEmployeeDocumentCompleteness(User $user, Employee $employee, string $expected): void
     {
-        $this->actingAs($user)
-            ->getJson(self::PEGAWAI_ENDPOINT.'?search='.urlencode($employee->nip))
-            ->assertOk()
-            ->assertJsonCount(1, 'employees.data')
-            ->assertJsonPath('employees.data.0.is_lengkap', $expected);
+        $response = $this->actingAs($user)
+            ->getJson(self::PEGAWAI_ENDPOINT.'?search='.urlencode($employee->nip));
+
+        $response->assertOk()->assertJsonCount(1, 'employees.data');
+        $response->assertJsonPath('employees.data.0.is_lengkap', $expected);
     }
 }

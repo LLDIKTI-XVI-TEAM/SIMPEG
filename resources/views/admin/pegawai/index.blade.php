@@ -35,7 +35,7 @@
     // ===== State Modal Rincian Dokumen =====
     showDocumentStatusModal: false,
     documentStatusEmployee: null,
-    documentStatus: { status_kelengkapan: 'kosong', is_lengkap: false, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
+    documentStatus: { status_kelengkapan: 'belum_ada', is_lengkap: false, total_wajib: 0, tersedia_count: 0, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
     @endif
@@ -202,7 +202,7 @@
 
     async openDocumentStatus(employee) {
         this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
-        this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_lengkap: employee.is_lengkap === 'lengkap', total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
+        this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_lengkap: employee.is_lengkap === 'lengkap' || employee.is_lengkap === 'tidak_wajib', total_wajib: 0, tersedia_count: 0, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
         this.documentStatusError = '';
         this.showDocumentStatusModal = true;
         this.isLoadingDocumentStatus = true;
@@ -745,21 +745,24 @@
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 :class="{
                                 'bg-success/10 text-success hover:bg-success/15': p.is_lengkap === 'lengkap',
-                                'bg-warning/10 text-warning hover:bg-warning/15': p.is_lengkap === 'tidak_lengkap',
-                                'bg-primary/10 text-primary hover:bg-primary/15': p.is_lengkap === 'tersedia',
-                                'bg-muted/20 text-muted hover:bg-muted/30':       p.is_lengkap === 'kosong',
+                                'bg-primary/10 text-primary hover:bg-primary/15': p.is_lengkap === 'tidak_wajib',
+                                'bg-warning/10 text-warning hover:bg-warning/15': p.is_lengkap === 'belum_lengkap',
+                                'bg-danger/10 text-danger hover:bg-danger/15':    p.is_lengkap === 'perlu_perbaikan',
+                                'bg-muted/20 text-muted hover:bg-muted/30':       p.is_lengkap === 'belum_ada',
                             }" title="Klik untuk melihat rincian status dokumen">
                                 <span class="h-1.5 w-1.5 rounded-full" :class="{
                                     'bg-success': p.is_lengkap === 'lengkap',
-                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
-                                    'bg-primary': p.is_lengkap === 'tersedia',
-                                    'bg-muted':   p.is_lengkap === 'kosong',
+                                    'bg-primary': p.is_lengkap === 'tidak_wajib',
+                                    'bg-warning': p.is_lengkap === 'belum_lengkap',
+                                    'bg-danger':  p.is_lengkap === 'perlu_perbaikan',
+                                    'bg-muted':   p.is_lengkap === 'belum_ada',
                                 }"></span>
                                 <span x-text="
                                     p.is_lengkap === 'lengkap'       ? 'Lengkap' :
-                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
-                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
-                                                                       'Belum Ada'
+                                    p.is_lengkap === 'tidak_wajib'   ? 'Tidak Wajib' :
+                                    p.is_lengkap === 'belum_lengkap' ? 'Belum Lengkap' :
+                                    p.is_lengkap === 'perlu_perbaikan' ? 'Perlu Perbaikan' :
+                                                                         'Belum Ada'
                                 "></span>
                                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                     stroke-width="2">
@@ -898,21 +901,24 @@
                     <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
                         :class="{
                         'bg-success/10 text-success': documentStatus.status_kelengkapan === 'lengkap',
-                        'bg-warning/10 text-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
-                        'bg-primary/10 text-primary': documentStatus.status_kelengkapan === 'tersedia',
-                        'bg-muted/20 text-muted':     documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                        'bg-primary/10 text-primary': documentStatus.status_kelengkapan === 'tidak_wajib',
+                        'bg-warning/10 text-warning': documentStatus.status_kelengkapan === 'belum_lengkap',
+                        'bg-danger/10 text-danger':   documentStatus.status_kelengkapan === 'perlu_perbaikan',
+                        'bg-muted/20 text-muted':     documentStatus.status_kelengkapan === 'belum_ada' || !documentStatus.status_kelengkapan,
                     }">
                         <span class="h-1.5 w-1.5 rounded-full" :class="{
                             'bg-success': documentStatus.status_kelengkapan === 'lengkap',
-                            'bg-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
-                            'bg-primary': documentStatus.status_kelengkapan === 'tersedia',
-                            'bg-muted':   documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                            'bg-primary': documentStatus.status_kelengkapan === 'tidak_wajib',
+                            'bg-warning': documentStatus.status_kelengkapan === 'belum_lengkap',
+                            'bg-danger':  documentStatus.status_kelengkapan === 'perlu_perbaikan',
+                            'bg-muted':   documentStatus.status_kelengkapan === 'belum_ada' || !documentStatus.status_kelengkapan,
                         }"></span>
                         <span x-text="
                             documentStatus.status_kelengkapan === 'lengkap'       ? 'Lengkap' :
-                            documentStatus.status_kelengkapan === 'tidak_lengkap' ? 'Tidak Lengkap' :
-                            documentStatus.status_kelengkapan === 'tersedia'      ? 'Tersedia' :
-                                                                                    'Belum Ada'
+                            documentStatus.status_kelengkapan === 'tidak_wajib'   ? 'Tidak Wajib' :
+                            documentStatus.status_kelengkapan === 'belum_lengkap' ? 'Belum Lengkap' :
+                            documentStatus.status_kelengkapan === 'perlu_perbaikan' ? 'Perlu Perbaikan' :
+                                                                                      'Belum Ada'
                         "></span>
                     </span>
                 </div>
@@ -933,12 +939,53 @@
                         x-text="documentStatusError"></div>
                 </template>
 
-                <template
-                    x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_riwayat === 0 && documentStatus.total_dokumen === 0">
-                    <div class="rounded-lg border border-border bg-soft/40 p-5 text-center">
-                        <p class="text-sm font-semibold text-ink">Belum ada dokumen pegawai</p>
-                        <p class="mt-1 text-xs text-muted">Arsip dokumen dan riwayat yang memiliki file akan tampil di
-                            sini.</p>
+                <template x-if="!isLoadingDocumentStatus && !documentStatusError">
+                    <div class="space-y-3">
+                        <template x-if="documentStatus.status_kelengkapan === 'tidak_wajib'">
+                            <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
+                                Dokumen SK wajib tidak berlaku untuk jenis pegawai ini.
+                            </div>
+                        </template>
+                        <div x-show="documentStatus.status_kelengkapan !== 'tidak_wajib'" class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-bold text-ink">Kelengkapan 4 SK Wajib</p>
+                                <p class="text-xs text-muted"
+                                    x-text="`${documentStatus.tersedia_count} dari ${documentStatus.total_wajib} SK tersedia dan valid.`">
+                                </p>
+                            </div>
+                        </div>
+                        <div x-show="documentStatus.status_kelengkapan !== 'tidak_wajib'" class="grid gap-2 sm:grid-cols-2">
+                            <template x-for="sk in documentStatus.required_sks" :key="sk.jenis">
+                                <div class="rounded-lg border p-3" :class="{
+                                    'border-success/30 bg-success/5': sk.status === 'tersedia',
+                                    'border-danger/30 bg-danger/5': sk.status === 'perlu_perbaikan',
+                                    'border-border bg-soft/40': sk.status === 'belum_ada',
+                                }">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-semibold text-ink" x-text="sk.label"></p>
+                                            <p class="mt-0.5 text-xs" :class="{
+                                                'text-success': sk.status === 'tersedia',
+                                                'text-danger': sk.status === 'perlu_perbaikan',
+                                                'text-muted': sk.status === 'belum_ada',
+                                            }" x-text="sk.status_label"></p>
+                                        </div>
+                                        <span class="h-2 w-2 shrink-0 rounded-full" :class="{
+                                            'bg-success': sk.status === 'tersedia',
+                                            'bg-danger': sk.status === 'perlu_perbaikan',
+                                            'bg-muted': sk.status === 'belum_ada',
+                                        }"></span>
+                                    </div>
+                                    <a x-show="sk.status === 'tersedia'" :href="sk.file_url" target="_blank" rel="noopener"
+                                        class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                                        Buka file
+                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H19.5m0 0v6m0-6L10.5 15m-3 3h-3a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 4.5 3h12A1.5 1.5 0 0 1 18 4.5v3" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </template>
+                        </div>
                     </div>
                 </template>
 

@@ -33,6 +33,76 @@
         searchTimer: null,
         fetchError: null,
         dataChanged: @js(session('document_data_changed', false)),
+        selectedUploadEmployeeId: '',
+        uploadMetadataLoading: false,
+        uploadMetadataHint: '',
+        uploadNomorFromAutofill: false,
+        uploadTanggalFromAutofill: false,
+
+        uploadMetadataController: null,
+
+        async prefillUploadSkMetadata() {
+            const category = this.$refs.uploadCategory?.value;
+            this.uploadMetadataHint = '';
+
+            // Kosongkan nilai yang berasal dari autofill sebelumnya agar tidak tertinggal (bleed)
+            // ketika beralih dari satu konteks valid ke konteks valid lainnya.
+            if (this.uploadNomorFromAutofill)  { this.$refs.uploadNomorDokumen.value  = ''; this.uploadNomorFromAutofill  = false; }
+            if (this.uploadTanggalFromAutofill) { this.$refs.uploadTanggalDokumen.value = ''; this.uploadTanggalFromAutofill = false; }
+
+            if (!this.selectedUploadEmployeeId || !['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan', 'sk_kgb'].includes(category)) {
+                // Batalkan request lama yang mungkin sedang berjalan untuk pegawai/kategori sebelumnya.
+                if (this.uploadMetadataController) { this.uploadMetadataController.abort(); this.uploadMetadataController = null; }
+                return;
+            }
+
+            // Batalkan request sebelumnya (jika ada) sebelum memulai yang baru.
+            // Ini mencegah respons lama menulis nilai ke input saat pengguna sudah
+            // mengganti pilihan pegawai atau kategori pada koneksi lambat.
+            if (this.uploadMetadataController) this.uploadMetadataController.abort();
+            const controller = new AbortController();
+            this.uploadMetadataController = controller;
+
+            // Snapshot konteks saat ini. Digunakan untuk validasi setelah await
+            // selesai — jika pengguna sempat mengganti pilihan di sela-sela request,
+            // respons ini dianggap kedaluwarsa dan tidak ditulis ke input.
+            const snapshotEmployeeId = this.selectedUploadEmployeeId;
+            const snapshotCategory   = category;
+
+            this.uploadMetadataLoading = true;
+            this.uploadMetadataHint = '';
+            try {
+                const response = await fetch('/api/v1/pegawai/' + snapshotEmployeeId + '/status-dokumen', {
+                    cache: 'no-store',
+                    signal: controller.signal,
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (!response.ok) throw new Error('Metadata SK tidak dapat dimuat.');
+
+                const data = await response.json();
+
+                // Validasi token: pastikan pegawai dan kategori yang dipilih saat ini
+                // masih sama dengan saat request dikirim. Jika berbeda, buang respons ini.
+                const currentCategory = this.$refs.uploadCategory?.value;
+                if (snapshotEmployeeId !== this.selectedUploadEmployeeId || snapshotCategory !== currentCategory) return;
+
+                const sk = data.document_status?.required_sks?.find(item => item.jenis === snapshotCategory);
+                if (!sk || sk.status !== 'perlu_perbaikan') return;
+
+                if (sk.nomor_sk)   { this.$refs.uploadNomorDokumen.value  = sk.nomor_sk;   this.uploadNomorFromAutofill  = true; }
+                if (sk.tanggal_sk) { this.$refs.uploadTanggalDokumen.value = sk.tanggal_sk; this.uploadTanggalFromAutofill = true; }
+                this.uploadMetadataHint = 'Nomor dan tanggal SK diambil dari riwayat yang perlu diperbaiki.';
+            } catch (error) {
+                // AbortError bukan error sesungguhnya — request sengaja dibatalkan.
+                if (error.name === 'AbortError') return;
+                this.uploadMetadataHint = error.message || 'Metadata SK tidak dapat dimuat.';
+            } finally {
+                this.uploadMetadataLoading = false;
+                // Bersihkan referensi controller hanya jika ini masih controller aktif.
+                if (this.uploadMetadataController === controller) this.uploadMetadataController = null;
+            }
+        },
+
 
         get cacheKey() {
             const f = this.filters;
@@ -153,7 +223,7 @@
             this.$watch('filters.status', () => this.applyFilter());
             this.$watch('perPage', () => this.applyFilter());
         },
-    }" class="space-y-6">
+    }" x-on:upload-employee-selected.window="selectedUploadEmployeeId = $event.detail; prefillUploadSkMetadata()" class="space-y-6">
 
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -378,7 +448,7 @@
         <x-ui.modal
             show="showUploadModal"
             title="Unggah Dokumen Kepegawaian"
-            closeAction="if (!isUploading) showUploadModal = false"
+            closeAction="if (!isUploading) { showUploadModal = false; uploadMetadataHint = ''; uploadNomorFromAutofill = false; uploadTanggalFromAutofill = false; if (uploadMetadataController) { uploadMetadataController.abort(); uploadMetadataController = null; } }"
             maxWidth="lg"
             bodyClass="p-5 space-y-3"
         >
@@ -412,6 +482,7 @@
                     selectOption(opt) {
                         this.selectedId = opt.id;
                         this.selectedLabel = opt.label;
+                        this.$dispatch('upload-employee-selected', opt.id);
                         this.open = false;
                         this.search = '';
                     }
@@ -454,7 +525,7 @@
                 <div class="space-y-1">
                     <label class="text-xs font-semibold text-ink font-sans">Kategori Dokumen <span class="text-danger">*</span></label>
                     <div class="relative">
-                        <x-form.select name="kategori_dokumen" required>
+                        <x-form.select name="kategori_dokumen" required x-ref="uploadCategory" x-on:change="prefillUploadSkMetadata()">
                             <option value="">Pilih Kategori</option>
                             @foreach (\App\Support\Documents\DocumentCategory::editableLabels() as $val => $label)
                                 @if($val !== 'sk_status_pegawai')
@@ -478,16 +549,20 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Nomor Dokumen</label>
-                        <input type="text" name="nomor_dokumen" value="{{ old('nomor_dokumen') }}"
+                        <input type="text" name="nomor_dokumen" x-ref="uploadNomorDokumen" value="{{ old('nomor_dokumen') }}"
                             placeholder="SK-..."
+                            @input="uploadNomorFromAutofill = false"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                     </div>
                     <div class="space-y-1">
                         <label class="text-xs font-semibold text-ink font-sans">Tanggal Dokumen</label>
-                        <input type="date" name="tanggal_terbit" value="{{ old('tanggal_terbit') }}"
+                        <input type="date" name="tanggal_terbit" x-ref="uploadTanggalDokumen" value="{{ old('tanggal_terbit') }}"
+                            @input="uploadTanggalFromAutofill = false"
                             class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                     </div>
                 </div>
+
+                <p x-show="uploadMetadataHint" class="text-xs" :class="uploadMetadataHint.includes('diambil') ? 'text-success' : 'text-danger'" x-text="uploadMetadataHint"></p>
 
                 {{-- Deskripsi --}}
                 <div class="space-y-1">
@@ -507,7 +582,7 @@
 
                 {{-- Tombol Aksi --}}
                 <div class="flex justify-end gap-3 pt-3 border-t border-border">
-                    <button type="button" @click="showUploadModal = false" :disabled="isUploading"
+                    <button type="button" @click="showUploadModal = false; uploadMetadataHint = ''; uploadNomorFromAutofill = false; uploadTanggalFromAutofill = false; if (uploadMetadataController) { uploadMetadataController.abort(); uploadMetadataController = null; }" :disabled="isUploading"
                         class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans disabled:cursor-not-allowed disabled:opacity-60">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
