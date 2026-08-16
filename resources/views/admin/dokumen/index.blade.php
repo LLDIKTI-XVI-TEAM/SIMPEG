@@ -41,25 +41,42 @@
 
         uploadMetadataController: null,
 
+        // Membersihkan seluruh sisa state autofill metadata SK. Hanya nilai yang
+        // memang berasal dari autofill yang dikosongkan sehingga input manual
+        // pengguna tidak pernah terhapus tanpa alasan. Wajib dipanggil saat modal
+        // ditutup/dibatalkan dan setiap kali konteks pegawai/kategori berganti
+        // agar metadata pegawai sebelumnya tidak menempel pada pegawai berikutnya.
+        resetUploadMetadata() {
+            if (this.uploadMetadataController) {
+                this.uploadMetadataController.abort();
+                this.uploadMetadataController = null;
+            }
+
+            if (this.uploadNomorFromAutofill && this.$refs.uploadNomorDokumen) {
+                this.$refs.uploadNomorDokumen.value = '';
+            }
+            this.uploadNomorFromAutofill = false;
+
+            if (this.uploadTanggalFromAutofill && this.$refs.uploadTanggalDokumen) {
+                this.$refs.uploadTanggalDokumen.value = '';
+            }
+            this.uploadTanggalFromAutofill = false;
+
+            this.uploadMetadataHint = '';
+            this.uploadMetadataLoading = false;
+        },
+
         async prefillUploadSkMetadata() {
             const category = this.$refs.uploadCategory?.value;
-            this.uploadMetadataHint = '';
 
-            // Kosongkan nilai yang berasal dari autofill sebelumnya agar tidak tertinggal (bleed)
-            // ketika beralih dari satu konteks valid ke konteks valid lainnya.
-            if (this.uploadNomorFromAutofill)  { this.$refs.uploadNomorDokumen.value  = ''; this.uploadNomorFromAutofill  = false; }
-            if (this.uploadTanggalFromAutofill) { this.$refs.uploadTanggalDokumen.value = ''; this.uploadTanggalFromAutofill = false; }
+            // Konteks pegawai/kategori baru: bersihkan dulu sisa autofill konteks
+            // lama (termasuk request yang masih berjalan) sebelum menilai ulang.
+            this.resetUploadMetadata();
 
             if (!this.selectedUploadEmployeeId || !['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan', 'sk_kgb'].includes(category)) {
-                // Batalkan request lama yang mungkin sedang berjalan untuk pegawai/kategori sebelumnya.
-                if (this.uploadMetadataController) { this.uploadMetadataController.abort(); this.uploadMetadataController = null; }
                 return;
             }
 
-            // Batalkan request sebelumnya (jika ada) sebelum memulai yang baru.
-            // Ini mencegah respons lama menulis nilai ke input saat pengguna sudah
-            // mengganti pilihan pegawai atau kategori pada koneksi lambat.
-            if (this.uploadMetadataController) this.uploadMetadataController.abort();
             const controller = new AbortController();
             this.uploadMetadataController = controller;
 
@@ -70,7 +87,6 @@
             const snapshotCategory   = category;
 
             this.uploadMetadataLoading = true;
-            this.uploadMetadataHint = '';
             try {
                 const response = await fetch('/api/v1/pegawai/' + snapshotEmployeeId + '/status-dokumen', {
                     cache: 'no-store',
@@ -91,7 +107,9 @@
 
                 if (sk.nomor_sk)   { this.$refs.uploadNomorDokumen.value  = sk.nomor_sk;   this.uploadNomorFromAutofill  = true; }
                 if (sk.tanggal_sk) { this.$refs.uploadTanggalDokumen.value = sk.tanggal_sk; this.uploadTanggalFromAutofill = true; }
-                this.uploadMetadataHint = 'Nomor dan tanggal SK diambil dari riwayat yang perlu diperbaiki.';
+                // Riwayat bersifat append-only: autofill hanya menjaga metadata arsip
+                // tetap konsisten dengan riwayat resmi, bukan menimpa riwayat itu.
+                this.uploadMetadataHint = 'Nomor dan tanggal SK diambil dari metadata riwayat resmi.';
             } catch (error) {
                 // AbortError bukan error sesungguhnya — request sengaja dibatalkan.
                 if (error.name === 'AbortError') return;
@@ -448,7 +466,7 @@
         <x-ui.modal
             show="showUploadModal"
             title="Unggah Dokumen Kepegawaian"
-            closeAction="if (!isUploading) { showUploadModal = false; uploadMetadataHint = ''; uploadNomorFromAutofill = false; uploadTanggalFromAutofill = false; if (uploadMetadataController) { uploadMetadataController.abort(); uploadMetadataController = null; } }"
+            closeAction="if (!isUploading) { showUploadModal = false; resetUploadMetadata(); }"
             maxWidth="lg"
             bodyClass="p-5 space-y-3"
         >
@@ -582,7 +600,7 @@
 
                 {{-- Tombol Aksi --}}
                 <div class="flex justify-end gap-3 pt-3 border-t border-border">
-                    <button type="button" @click="showUploadModal = false; uploadMetadataHint = ''; uploadNomorFromAutofill = false; uploadTanggalFromAutofill = false; if (uploadMetadataController) { uploadMetadataController.abort(); uploadMetadataController = null; }" :disabled="isUploading"
+                    <button type="button" @click="showUploadModal = false; resetUploadMetadata()" :disabled="isUploading"
                         class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-soft cursor-pointer focus:outline-none font-sans disabled:cursor-not-allowed disabled:opacity-60">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />

@@ -42,6 +42,16 @@ class EmployeeHistoryAttachmentService
             return;
         }
 
+        // Path yang sudah pernah di-prime dalam request yang sama tidak di-query
+        // ulang agar priming tingkat halaman dan tingkat baris tidak menggandakan query.
+        $paths = $paths
+            ->reject(fn (string $path): bool => array_key_exists($path, $this->documentReferences))
+            ->values();
+
+        if ($paths->isEmpty()) {
+            return;
+        }
+
         foreach ($paths as $path) {
             $this->documentReferences[$path] = [];
         }

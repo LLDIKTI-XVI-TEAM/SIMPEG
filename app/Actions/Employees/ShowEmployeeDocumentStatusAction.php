@@ -57,7 +57,7 @@ class ShowEmployeeDocumentStatusAction
                 ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'tmt_pengangkatan', 'file_sk'])
                 ->orderByDesc('tmt_pengangkatan'),
             'documents' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'jenis_dokumen', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'keterangan'])
+                ->select(['id', 'employee_id', 'jenis_dokumen', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'keterangan', 'created_at'])
                 ->orderByDesc('tanggal_dokumen')
                 ->orderByDesc('created_at'),
         ]);

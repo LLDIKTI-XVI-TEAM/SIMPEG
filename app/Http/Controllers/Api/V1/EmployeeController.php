@@ -124,7 +124,7 @@ class EmployeeController extends Controller
             'appointments' => fn ($query) => $query
                 ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
                 ->orderByDesc('tmt_pengangkatan'),
-            'documents:id,employee_id,jenis_dokumen,file_path',
+            'documents:id,employee_id,jenis_dokumen,file_path,nomor_dokumen,tanggal_dokumen,created_at',
         ]);
 
         return response()->json([

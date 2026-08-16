@@ -2,13 +2,18 @@
 
 namespace App\Services;
 
-use App\Models\Document;
 use App\Models\Employee;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 
 /**
- * Menilai kelengkapan empat SK wajib pegawai berdasarkan data dan file fisik.
+ * Menilai kelengkapan dokumen SK pegawai berdasarkan riwayat kanonis, arsip
+ * dokumen, dan file fisik pada storage privat.
+ *
+ * Validasi ketersediaan file memakai EmployeeHistoryAttachmentService sehingga
+ * status kelengkapan dan unduhan terotorisasi bersumber dari keputusan yang
+ * sama: kepemilikan pegawai, kategori dokumen, dan keberadaan file fisik dicek
+ * secara fail-closed terhadap metadata yang saling bertentangan.
  */
 class EmployeeDocumentStatusService
 {
@@ -28,6 +33,40 @@ class EmployeeDocumentStatusService
         'sk_kgb' => 'salary',
     ];
 
+    public function __construct(
+        private readonly EmployeeHistoryAttachmentService $attachments,
+    ) {}
+
+    /**
+     * Prime metadata referensi dokumen untuk banyak pegawai sekaligus. Dipanggil
+     * pada halaman daftar sebelum baris dipetakan agar pemeriksaan status tiap
+     * baris tidak mengulang query metadata per pegawai.
+     *
+     * @param  iterable<int, Employee>  $employees  Pegawai dengan relasi riwayat/arsip sudah dimuat.
+     */
+    public function primeForEmployees(iterable $employees): void
+    {
+        $paths = [];
+
+        foreach ($employees as $employee) {
+            foreach (['appointments', 'rankHistories', 'positionHistories', 'salaryHistories'] as $relation) {
+                foreach ($employee->{$relation} as $history) {
+                    if (is_string($history->file_sk) && $history->file_sk !== '') {
+                        $paths[] = $history->file_sk;
+                    }
+                }
+            }
+
+            foreach ($employee->documents as $document) {
+                if (is_string($document->file_path) && $document->file_path !== '') {
+                    $paths[] = $document->file_path;
+                }
+            }
+        }
+
+        $this->attachments->primeDocumentReferences($paths);
+    }
+
     /**
      * @return array{
      *     status_kelengkapan: string,
@@ -41,14 +80,9 @@ class EmployeeDocumentStatusService
      */
     public function summarize(Employee $employee): array
     {
-        $jenisPegawai = strtolower($employee->jenisPegawai?->nama ?? '');
-        $isPns = $jenisPegawai === 'pns';
-
-        $requiredSksMatrix = $isPns ? self::REQUIRED_SK : [];
-
-        // Riwayat dikirim dalam urutan kanonis: terbaru di depan.
-        // Urutan ini konsisten dengan repairableHistory() di StoreDocumentAction
-        // sehingga evaluasi status selalu mengacu pada riwayat yang paling mutakhir.
+        // Riwayat dikirim dalam urutan kanonis: terbaru di depan. Evaluasi status
+        // selalu mengacu pada riwayat paling mutakhir sehingga kerusakan pada
+        // riwayat terbaru tidak tertutup oleh riwayat lama yang masih valid.
         $sources = [
             'sk_pengangkatan' => $this->historySources(
                 $employee->appointments->sortByDesc('tmt_pengangkatan')->values()
@@ -64,8 +98,8 @@ class EmployeeDocumentStatusService
             ),
         ];
 
-        foreach ($employee->documents as $document) {
-            if (! array_key_exists($document->jenis_dokumen, $requiredSksMatrix)) {
+        foreach ($employee->documents->sortByDesc('created_at')->values() as $document) {
+            if (! array_key_exists($document->jenis_dokumen, self::REQUIRED_SK)) {
                 continue;
             }
 
@@ -78,27 +112,34 @@ class EmployeeDocumentStatusService
             ];
         }
 
-        $disk = Storage::disk(Document::STORAGE_DISK);
+        // Metadata referensi dokumen di-prime satu kali per pegawai agar pemeriksaan
+        // scoped validator untuk banyak kandidat tidak memicu query per file.
+        $this->attachments->primeDocumentReferences(
+            collect($sources)->flatten(1)->pluck('file_path')
+        );
+
         $requiredSks = [];
         $tersediaCount = 0;
         $belumAdaCount = 0;
         $perluPerbaikanCount = 0;
 
-        foreach ($requiredSksMatrix as $key => $label) {
+        foreach (self::REQUIRED_SK as $key => $label) {
             $candidates = collect($sources[$key]);
 
-            // Riwayat kanonis adalah kandidat pertama dari historySources (sudah diurutkan
-            // terbaru di depan). Jika ia rusak — file_sk null atau file fisik hilang —
-            // langsung perlu_perbaikan tanpa memeriksa kandidat lain. Ini mencegah
-            // riwayat lama yang masih valid menyembunyikan kerusakan riwayat terbaru.
+            // Kandidat pertama dari riwayat adalah kandidat kanonis. Jika file-nya
+            // tidak lolos scoped validator, kategori langsung perlu_perbaikan tanpa
+            // memeriksa kandidat lain; arsip dokumen tidak boleh menutupi kerusakan
+            // referensi resmi pada riwayat.
             $canonical = $candidates->first();
             $canonicalBroken = $canonical !== null
                 && $canonical['source'] === 'Riwayat Pegawai'
-                && (blank($canonical['file_path']) || ! $disk->exists($canonical['file_path']));
+                && $this->scopedValidPath($employee, $key, $canonical) === null;
 
             $available = $canonicalBroken
                 ? null
-                : $candidates->first(fn (array $candidate): bool => filled($candidate['file_path']) && $disk->exists($candidate['file_path']));
+                : $candidates->first(
+                    fn (array $candidate): bool => $this->scopedValidPath($employee, $key, $candidate) !== null
+                );
 
             if ($available !== null) {
                 $state = 'tersedia';
@@ -116,14 +157,13 @@ class EmployeeDocumentStatusService
                 $perluPerbaikanCount++;
             }
 
-            $filePath = $available['file_path'] ?? null;
             $metadataSource = $candidates->first();
             $requiredSks[] = [
                 'jenis' => $key,
                 'label' => $label,
                 'status' => $state,
                 'status_label' => $statusLabel,
-                'file_path' => $filePath,
+                'file_path' => $available['file_path'] ?? null,
                 'file_url' => $this->resolveFileUrl($employee, $key, $available),
                 'nomor_sk' => $metadataSource['nomor_sk'] ?? null,
                 'tanggal_sk' => $metadataSource['tanggal_sk'] ?? null,
@@ -131,9 +171,8 @@ class EmployeeDocumentStatusService
             ];
         }
 
-        $totalWajib = count($requiredSksMatrix);
+        $totalWajib = count(self::REQUIRED_SK);
         $statusKelengkapan = match (true) {
-            $totalWajib === 0 => 'tidak_wajib',
             $perluPerbaikanCount > 0 => 'perlu_perbaikan',
             $tersediaCount === $totalWajib => 'lengkap',
             $belumAdaCount === $totalWajib => 'belum_ada',
@@ -142,7 +181,7 @@ class EmployeeDocumentStatusService
 
         return [
             'status_kelengkapan' => $statusKelengkapan,
-            'is_lengkap' => $statusKelengkapan === 'lengkap' || $statusKelengkapan === 'tidak_wajib',
+            'is_lengkap' => $statusKelengkapan === 'lengkap',
             'total_wajib' => $totalWajib,
             'tersedia_count' => $tersediaCount,
             'belum_ada_count' => $belumAdaCount,
@@ -173,6 +212,30 @@ class EmployeeDocumentStatusService
             'type' => self::ATTACHMENT_TYPES[$requiredSkKey],
             'history' => $candidate['history'],
         ]);
+    }
+
+    /**
+     * Memeriksa kandidat melalui scoped validator yang sama dengan unduhan
+     * terotorisasi sehingga status tidak pernah menampilkan link yang akan
+     * berakhir 404 karena kepemilikan atau kategori tidak cocok.
+     *
+     * @param  array<string, mixed>  $candidate
+     */
+    private function scopedValidPath(Employee $employee, string $requiredSkKey, array $candidate): ?string
+    {
+        if (blank($candidate['file_path'] ?? null)) {
+            return null;
+        }
+
+        if (array_key_exists('document', $candidate)) {
+            return $this->attachments->availableDocumentPath($employee, $candidate['document'], [$requiredSkKey]);
+        }
+
+        return $this->attachments->availablePath(
+            $employee,
+            self::ATTACHMENT_TYPES[$requiredSkKey],
+            $candidate['history'],
+        );
     }
 
     /**

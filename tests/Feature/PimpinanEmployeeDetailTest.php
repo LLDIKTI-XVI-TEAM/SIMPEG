@@ -106,8 +106,12 @@ class PimpinanEmployeeDetailTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('title="Status kelengkapan dokumen"', false)
-            ->assertSee("p.is_lengkap === 'lengkap'       ? 'Lengkap'", false)
-            ->assertSee("p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap'", false)
+            // Badge read-only memakai helper mapping yang sama dengan tampilan admin
+            // sehingga label/warna tidak berbeda untuk status yang sama.
+            ->assertSee('docBadgeClass(p.is_lengkap)', false)
+            ->assertSee('docStatusLabel(p.is_lengkap)', false)
+            ->assertDontSee("p.is_lengkap === 'tidak_lengkap'", false)
+            ->assertDontSee("p.is_lengkap === 'kosong'", false)
             ->assertDontSee('openDocumentStatus', false)
             ->assertDontSee('/status-dokumen', false)
             ->assertDontSee('Rincian Dokumen Pegawai')

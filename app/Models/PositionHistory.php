@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Contracts\HasSkDocument;
 use App\Models\Concerns\HasUuid;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
@@ -21,7 +20,7 @@ use Illuminate\Support\Carbon;
  * @property-read RefJabatan|null $jabatan
  * @property-read RefUnitKerja|null $unitKerja
  */
-class PositionHistory extends Model implements HasSkDocument
+class PositionHistory extends Model
 {
     use HasUuid;
 

@@ -30,7 +30,7 @@ class ListEmployeesAction
             $employees->onlyTrashed();
         }
 
-        return $employees
+        $paginator = $employees
             ->select([
                 'id',
                 'nama_lengkap',
@@ -63,8 +63,9 @@ class ListEmployeesAction
                 'appointments' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
                     ->orderByDesc('tmt_pengangkatan'),
-                // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan
-                'documents:id,employee_id,jenis_dokumen,file_path',
+                // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan.
+                // Metadata arsip ikut dimuat karena dipakai sebagai kandidat nomor/tanggal SK.
+                'documents:id,employee_id,jenis_dokumen,file_path,nomor_dokumen,tanggal_dokumen,created_at',
             ])
             ->when(
                 $validated['search'] ?? null,
@@ -119,7 +120,13 @@ class ListEmployeesAction
                 }
             )
             ->orderBy($sort, $direction)
-            ->paginate($perPage)
+            ->paginate($perPage);
+
+        // Metadata referensi arsip di-prime satu kali untuk seluruh halaman agar
+        // penilaian status kelengkapan tiap baris tidak mengulang query per pegawai.
+        $this->employeeDocumentStatusService->primeForEmployees($paginator->getCollection());
+
+        return $paginator
             ->withQueryString()
             ->through(fn (Employee $p) => $this->toTableRow($p));
     }
