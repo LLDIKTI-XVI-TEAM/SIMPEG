@@ -511,10 +511,6 @@
                             if (envelope.summary) this.pendidikanSummary = envelope.summary;
                             return;
                         }
-                    } else {
-                        // Cache lama tanpa envelope — pakai sebagai valid tapi upgrade ke envelope setelah fetch berikutnya
-                        this.pendidikanList = Array.isArray(envelope) ? envelope : (envelope.histories ?? envelope.data ?? envelope);
-                        if (Array.isArray(this.pendidikanList)) return;
                     }
                 } catch (e) {
                     // corrupted — biarkan jatuh ke fetch

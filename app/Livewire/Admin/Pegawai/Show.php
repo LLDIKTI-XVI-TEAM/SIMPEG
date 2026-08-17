@@ -104,7 +104,16 @@ class Show extends Component
             ?? $p->statusHistories->sortByDesc('tanggal_efektif')->first();
         $statusPresentation = EmployeeProfilePresentation::status($p, $latestStatusHistory);
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory'));
+        // Ikat cache browser pada master Program Studi dan riwayat pegawai agar
+        // perubahan nama maupun mutasi pendidikan memaksa pemuatan payload terbaru.
+        $pendidikanCacheVersion = md5(
+            (string) (RefProgramStudi::max('updated_at') ?? '0').'|'.
+            (string) ($p->updated_at ?? '0').'|'.
+            (string) ($p->educationHistories->max('updated_at') ?? '0').'|'.
+            (string) $p->educationHistories->count()
+        );
+
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory', 'pendidikanCacheVersion'));
     }
 
     /**

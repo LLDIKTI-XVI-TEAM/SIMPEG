@@ -677,11 +677,52 @@ class EmployeeShowTest extends TestCase
     {
         $employee = $this->employeeWithReferences();
 
-        $this->actingAs(User::factory()->adminKepegawaian()->create())
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('pegawai.show', $employee->id))
             ->assertOk()
             ->assertSee("pendidikan_v2_{$employee->id}", false)
-            ->assertDontSee("pendidikan_{$employee->id}", false);
+            ->assertDontSee("pendidikan_{$employee->id}", false)
+            ->getContent();
+
+        $this->assertStringNotContainsString('Cache lama tanpa envelope', $content);
+        $this->assertStringNotContainsString('if (Array.isArray(this.pendidikanList)) return;', $content);
+    }
+
+    public function test_detail_page_changes_education_cache_version_after_program_studi_is_renamed(): void
+    {
+        Carbon::setTestNow('2026-08-17 10:00:00');
+
+        try {
+            $programStudi = RefProgramStudi::create(['nama' => 'Program Studi Cache Lama']);
+            $employee = $this->employeeWithReferences([
+                'program_studi_id' => $programStudi->id,
+                'prodi_pendidikan_terakhir' => $programStudi->nama,
+            ]);
+            $superAdmin = User::factory()->superAdmin()->create();
+
+            $initialContent = $this->actingAs($superAdmin)
+                ->get(route('pegawai.show', $employee))
+                ->assertOk()
+                ->getContent();
+            $initialVersion = $this->extractPendidikanCacheVersion($initialContent);
+
+            Carbon::setTestNow('2026-08-17 10:01:00');
+            $this->withSession(['_token' => 'test-token'])
+                ->post(
+                    route('data-master.program-studi.update', $programStudi),
+                    ['_token' => 'test-token', 'nama' => 'Program Studi Cache Baru'],
+                )
+                ->assertRedirect();
+
+            $renamedContent = $this->get(route('pegawai.show', $employee))
+                ->assertOk()
+                ->getContent();
+            $renamedVersion = $this->extractPendidikanCacheVersion($renamedContent);
+
+            $this->assertNotSame($initialVersion, $renamedVersion);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_education_summary_is_bound_to_alpine_state_after_mutations(): void
@@ -1109,6 +1150,19 @@ class EmployeeShowTest extends TestCase
         $json = rtrim(trim(substr($html, $start + strlen($startMarker), $end - $start - strlen($startMarker))), ',');
 
         return json_decode(html_entity_decode($json, ENT_QUOTES | ENT_HTML5), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    private function extractPendidikanCacheVersion(string $html): string
+    {
+        $matches = [];
+
+        $this->assertSame(
+            1,
+            preg_match('/_pendidikanCacheVersion:\s*([\'\"])([a-f0-9]{32})\1/', $html, $matches),
+            'Versi cache pendidikan harus dikirim sebagai hash nonkosong ke halaman detail pegawai.',
+        );
+
+        return $matches[2];
     }
 
     private function seedEmployeeDetail(Employee $employee, Employee $supervisor): void
