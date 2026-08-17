@@ -252,21 +252,29 @@ Modal dialog serbaguna berbasis Alpine.js dengan transisi halus dan penanganan a
 
 **Contoh Penggunaan**:
 ```blade
-<x-ui.modal show="openModal" title="Tambah Jenjang Pendidikan" maxWidth="md" closeAction="openModal = false">
-    {{-- Form diberi ID, method POST, endpoint action, dan token @csrf agar tombol submit pada slot footer terhubung dan mengirimkan data mutasi --}}
-    <form id="form-tambah-jenjang" method="POST" action="{{ route('data-master.jenjang-pendidikan.store') }}" class="space-y-4">
-        @csrf
-        <x-form.input name="nama" label="Nama Jenjang" placeholder="Contoh: S1 / Sarjana" required />
-        <x-form.input name="tingkat" label="Tingkat" type="number" placeholder="Contoh: 6" required />
-    </form>
-    
-    <x-slot:footer>
-        <div class="flex justify-end gap-2">
-            <x-ui.button variant="secondary" size="sm" @click="openModal = false">Batal</x-ui.button>
-            <x-ui.button variant="primary" size="sm" type="submit" form="form-tambah-jenjang">Simpan</x-ui.button>
-        </div>
-    </x-slot:footer>
-</x-ui.modal>
+<div x-data="{ openModal: false }">
+    {{-- Tombol pemicu buka modal --}}
+    <x-ui.button variant="primary" size="sm" @click="openModal = true">
+        Tambah Jenjang
+    </x-ui.button>
+
+    {{-- Komponen modal dialog --}}
+    <x-ui.modal show="openModal" title="Tambah Jenjang Pendidikan" maxWidth="md" closeAction="openModal = false">
+        {{-- Form diberi ID, method POST, endpoint action, dan token @csrf agar tombol submit pada slot footer terhubung dan mengirimkan data mutasi --}}
+        <form id="form-tambah-jenjang" method="POST" action="{{ route('data-master.jenjang-pendidikan.store') }}" class="space-y-4">
+            @csrf
+            <x-form.input name="nama" label="Nama Jenjang" placeholder="Contoh: S1 / Sarjana" required />
+            <x-form.input name="urutan" label="Urutan" type="number" placeholder="Contoh: 1" />
+        </form>
+        
+        <x-slot:footer>
+            <div class="flex justify-end gap-2">
+                <x-ui.button variant="secondary" size="sm" @click="openModal = false">Batal</x-ui.button>
+                <x-ui.button variant="primary" size="sm" type="submit" form="form-tambah-jenjang">Simpan</x-ui.button>
+            </div>
+        </x-slot:footer>
+    </x-ui.modal>
+</div>
 ```
 
 ---
