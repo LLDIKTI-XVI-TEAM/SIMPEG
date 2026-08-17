@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Employees\AssignSupervisorAction;
+use App\Actions\Employees\ChangeEmployeeStatusAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ExportEmployeeAction;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
 use App\Http\Requests\Employee\BulkDeactivateEmployeesRequest;
 use App\Http\Requests\Employee\BulkRestoreEmployeesRequest;
+use App\Http\Requests\Employee\ChangeEmployeeStatusRequest;
 use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
@@ -47,6 +49,32 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PegawaiController extends Controller
 {
+    /**
+     * Mengubah status dari modal pada tabel Data Pegawai. Seluruh perubahan
+     * tetap melalui action domain agar riwayat, dokumen, audit, dan notifikasi
+     * memiliki perilaku yang sama dengan alur sebelumnya.
+     */
+    public function changeStatus(ChangeEmployeeStatusRequest $request, ChangeEmployeeStatusAction $action)
+    {
+        $validated = $request->validated();
+        $employee = Employee::findOrFail($validated['pegawai_id']);
+
+        try {
+            $action->execute($employee, $validated, $request, $request->file('berkas'));
+
+            return redirect()->route('data-pegawai')
+                ->with('success', 'Status pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                // Daftar dimuat dari sessionStorage; flag ini memaksanya meminta
+                // baris terbaru sehingga status pada tabel tidak tertinggal.
+                ->with('employee_data_changed', true);
+        } catch (\Throwable $e) {
+            return back()
+                ->withInput($request->except('berkas'))
+                ->with('error', 'Gagal memperbarui status pegawai: '.$e->getMessage())
+                ->with('open_status_modal', true);
+        }
+    }
+
     public function index(Request $request, ListEmployeesAction $listAction)
     {
         $perPage = (int) $request->query('per_page', 10);
@@ -259,8 +287,10 @@ class PegawaiController extends Controller
     }
 
     /**
-     * Halaman Data Backup — semua pegawai yang dinonaktifkan (soft deleted).
-     * Data tidak akan dihapus permanen secara otomatis. Hanya super_admin.
+     * Halaman Data Backup — daftar terpusat pegawai yang dinonaktifkan (soft deleted).
+     * Data tidak akan dihapus permanen secara otomatis. Dapat diakses Super Admin dan
+     * Admin Kepegawaian karena keduanya memegang permission employees.restore;
+     * pemulihan massal tetap terbatas pada Super Admin.
      */
     public function backup(Request $request)
     {
@@ -315,12 +345,17 @@ class PegawaiController extends Controller
             'per_page' => $paginator->perPage(),
         ];
 
+        // Pemulihan massal masih dibatasi Super Admin pada route, sehingga kontrol seleksi
+        // disembunyikan bagi role lain agar tombol tidak menjanjikan aksi yang akan ditolak backend.
+        $canBulkRestore = $request->user()?->role === 'super_admin';
+
         return view('admin.pegawai.backup', compact(
             'perPage',
             'search',
             'initialRows',
             'initialMeta',
             'dataChanged',
+            'canBulkRestore',
         ));
     }
 
@@ -459,7 +494,7 @@ class PegawaiController extends Controller
         $action->execute($employee, $request);
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan.')
+            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }
@@ -551,7 +586,7 @@ class PegawaiController extends Controller
         });
 
         return back()
-            ->with('success', $count.' pegawai berhasil dinonaktifkan.')
+            ->with('success', $count.' pegawai berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
             ->with('employee_data_changed', true)
             ->with('backup_data_changed', true);
     }

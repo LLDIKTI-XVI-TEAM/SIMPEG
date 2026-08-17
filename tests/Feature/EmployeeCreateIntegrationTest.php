@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Employees\CreateEmployeeAction;
+use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\RefAgama;
@@ -33,8 +34,9 @@ class EmployeeCreateIntegrationTest extends TestCase
 
     public function test_can_create_employee_via_ui_form()
     {
-
         // Arrange
+        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->create([
             'role' => 'admin_kepegawaian',
         ]);
@@ -142,8 +144,9 @@ class EmployeeCreateIntegrationTest extends TestCase
         $this->assertIsString($documentPath);
         $this->assertStringStartsWith('appointments/sk/', $documentPath);
         /** @var FilesystemAdapter $disk */
-        $disk = Storage::disk('public');
+        $disk = Storage::disk(Document::STORAGE_DISK);
         $disk->assertExists($documentPath);
+        Storage::disk('public')->assertMissing($documentPath);
 
         // Check if detail page renders
         $detailResponse = $this->actingAs($user)->get(route('pegawai.show', $employee->id));

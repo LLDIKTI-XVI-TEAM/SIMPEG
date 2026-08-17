@@ -20,125 +20,139 @@ class ValidateImportBatchAction
     private ?array $jenisPegawaiCache = null;
 
     /**
-     * Validate the import batch.
+     * Memvalidasi seluruh baris batch import sesuai pemetaan aktif dan aturan identitas pegawai.
      */
     public function execute(string $batchId, ?array $updatedRows, ?User $user): array
     {
-        $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
+        $lifecycleLock = Cache::lock(
+            UploadImportBatchAction::LIFECYCLE_LOCK_PREFIX.$batchId,
+            UploadImportBatchAction::LIFECYCLE_LOCK_SECONDS,
+        );
 
-        if ($batch === null) {
-            abort(404, 'Batch import tidak ditemukan atau sudah kedaluwarsa. Silakan upload ulang.');
-        }
-
-        if ($batch['user_id'] !== null && ($user === null || $batch['user_id'] !== $user->id)) {
-            abort(403, 'Anda tidak memiliki akses ke batch import ini.');
-        }
-
-        if ($updatedRows !== null) {
-            $batch['rows'] = $this->mergeEditedRows($batch['rows'], $updatedRows);
-            $batch['total_rows'] = count($batch['rows']);
-            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-        }
-
-        // Pemetaan aktif batch adalah sumber kebenaran tafsir kolom. Field wajib yang belum
-        // dipetakan menolak seluruh validasi lebih dulu dengan pesan yang menyebut field-nya,
-        // agar admin memperbaiki pemetaan sebelum menilai baris.
-        $mapping = $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']);
-        $missingRequired = ImportColumnMapping::missingRequired($mapping);
-
-        if ($missingRequired !== []) {
+        if (! $lifecycleLock->get()) {
             throw ValidationException::withMessages([
-                'mapping' => array_map(
-                    fn (string $target): string => "Field wajib {$target} belum dipetakan ke kolom mana pun.",
-                    $missingRequired,
-                ),
+                'message' => ['Batch import sedang diproses oleh permintaan lain. Silakan coba kembali.'],
             ]);
         }
 
-        // Setelah admin menyimpan mapping manual, heuristik kolom bergeser dimatikan
-        // agar pilihan admin tidak ditimpa tebakan positional.
-        $allowShiftDetection = ($batch['mapping_source'] ?? 'auto') !== 'manual';
+        try {
+            $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
 
-        $type = $batch['type'] ?? 'utama';
-        $results = [];
-        $validCount = 0;
-        $errorCount = 0;
-        $skipCount = 0;
-        $seenNips = [];
-        $seenEmails = [];
-        // Tracks NIP/email values that appeared more than once in the file,
-        // keyed by value → row number of the LATER duplicate occurrence.
-        $duplicatedNips = [];
-        $duplicatedEmails = [];
-
-        foreach ($batch['rows'] as $row) {
-            $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails, $mapping, $allowShiftDetection);
-            $results[] = $rowResult;
-
-            match ($rowResult['status']) {
-                'valid' => $validCount++,
-                'error' => $errorCount++,
-                'skip' => $skipCount++,
-            };
-        }
-
-        // Retroactive upgrade: the FIRST occurrence of a duplicate NIP/email was already
-        // stored as skip/valid/error before the later row revealed the collision.
-        // Upgrade those first-occurrence rows to error now.
-        if ($duplicatedNips !== [] || $duplicatedEmails !== []) {
-            foreach ($results as &$rowResult) {
-                if ($rowResult['status'] === 'error') {
-                    continue; // already an error — may already have the duplicate message
-                }
-
-                $data = $rowResult['validated_data'] ?? [];
-                $upgrades = [];
-
-                $nip = $data['nip'] ?? null;
-                if ($nip !== null && array_key_exists($nip, $duplicatedNips)) {
-                    $upgrades['NIP'][] = "NIP sudah ada pada baris {$duplicatedNips[$nip]}.";
-                }
-
-                $email = isset($data['email_pribadi']) ? strtolower($data['email_pribadi']) : null;
-                if ($email !== null && array_key_exists($email, $duplicatedEmails)) {
-                    $upgrades['Email Pegawai'][] = "Email pegawai sudah ada pada baris {$duplicatedEmails[$email]}.";
-                }
-
-                if ($upgrades !== []) {
-                    $prevStatus = $rowResult['status'];
-                    $rowResult['status'] = 'error';
-                    $rowResult['errors'] = array_merge_recursive($rowResult['errors'] ?? [], $upgrades);
-                    unset($rowResult['validated_data'], $rowResult['skip_reason']);
-
-                    if ($prevStatus === 'skip') {
-                        $skipCount--;
-                    } elseif ($prevStatus === 'valid') {
-                        $validCount--;
-                    }
-                    $errorCount++;
-                }
+            if ($batch === null) {
+                abort(404, 'Batch import tidak ditemukan atau sudah kedaluwarsa. Silakan upload ulang.');
             }
-            unset($rowResult);
+
+            if ($batch['user_id'] !== null && ($user === null || $batch['user_id'] !== $user->id)) {
+                abort(403, 'Anda tidak memiliki akses ke batch import ini.');
+            }
+
+            if ($updatedRows !== null) {
+                $batch['rows'] = $this->mergeEditedRows($batch['rows'], $updatedRows);
+                $batch['total_rows'] = count($batch['rows']);
+                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+            }
+
+            // Pemetaan aktif batch adalah sumber kebenaran tafsir kolom. Field wajib yang belum
+            // dipetakan menolak seluruh validasi lebih dulu dengan pesan yang menyebut field-nya,
+            // agar admin memperbaiki pemetaan sebelum menilai baris.
+            $mapping = $batch['mapping'] ?? ImportColumnMapping::autoMap($batch['headers']);
+            $missingRequired = ImportColumnMapping::missingRequired($mapping);
+
+            if ($missingRequired !== []) {
+                throw ValidationException::withMessages([
+                    'mapping' => array_map(
+                        fn (string $target): string => "Field wajib {$target} belum dipetakan ke kolom mana pun.",
+                        $missingRequired,
+                    ),
+                ]);
+            }
+
+            // Setelah admin menyimpan mapping manual, heuristik kolom bergeser dimatikan
+            // agar pilihan admin tidak ditimpa tebakan positional.
+            $allowShiftDetection = ($batch['mapping_source'] ?? 'auto') !== 'manual';
+
+            $type = $batch['type'] ?? 'utama';
+            $results = [];
+            $validCount = 0;
+            $errorCount = 0;
+            $skipCount = 0;
+            $seenNips = [];
+            $seenEmails = [];
+            // Catat NIP/email yang muncul lebih dari sekali dengan nomor baris
+            // kemunculan duplikat terakhir untuk koreksi retroaktif.
+            $duplicatedNips = [];
+            $duplicatedEmails = [];
+
+            foreach ($batch['rows'] as $row) {
+                $rowResult = $this->validateTemplateRow($type, $row, $seenNips, $seenEmails, $duplicatedNips, $duplicatedEmails, $mapping, $allowShiftDetection);
+                $results[] = $rowResult;
+
+                match ($rowResult['status']) {
+                    'valid' => $validCount++,
+                    'error' => $errorCount++,
+                    'skip' => $skipCount++,
+                };
+            }
+
+            // Kemunculan pertama sudah dinilai sebelum duplikat berikutnya ditemukan.
+            // Naikkan status kemunculan pertama menjadi error agar duplikasi dalam file simetris.
+            if ($duplicatedNips !== [] || $duplicatedEmails !== []) {
+                foreach ($results as &$rowResult) {
+                    if ($rowResult['status'] === 'error') {
+                        continue; // Pesan duplikasi mungkin sudah tercatat pada baris error ini.
+                    }
+
+                    $data = $rowResult['validated_data'] ?? [];
+                    $upgrades = [];
+
+                    $nip = $data['nip'] ?? null;
+                    if ($nip !== null && array_key_exists($nip, $duplicatedNips)) {
+                        $upgrades['NIP'][] = "NIP sudah ada pada baris {$duplicatedNips[$nip]}.";
+                    }
+
+                    $email = isset($data['email_pribadi']) ? strtolower($data['email_pribadi']) : null;
+                    if ($email !== null && array_key_exists($email, $duplicatedEmails)) {
+                        $upgrades['Email Pegawai'][] = "Email pegawai sudah ada pada baris {$duplicatedEmails[$email]}.";
+                    }
+
+                    if ($upgrades !== []) {
+                        $prevStatus = $rowResult['status'];
+                        $rowResult['status'] = 'error';
+                        $rowResult['errors'] = array_merge_recursive($rowResult['errors'] ?? [], $upgrades);
+                        unset($rowResult['validated_data'], $rowResult['skip_reason']);
+
+                        if ($prevStatus === 'skip') {
+                            $skipCount--;
+                        } elseif ($prevStatus === 'valid') {
+                            $validCount--;
+                        }
+                        $errorCount++;
+                    }
+                }
+                unset($rowResult);
+            }
+
+            $batch['validation'] = [
+                'valid_count' => $validCount,
+                'error_count' => $errorCount,
+                'skip_count' => $skipCount,
+                'results' => $results,
+            ];
+            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+
+            return [
+                'batch_id' => $batchId,
+                'type' => $type,
+                'type_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
+                'total_rows' => $batch['total_rows'],
+                'valid_count' => $validCount,
+                'error_count' => $errorCount,
+                'skip_count' => $skipCount,
+                'results' => $results,
+            ];
+        } finally {
+            $lifecycleLock->release();
         }
-
-        $batch['validation'] = [
-            'valid_count' => $validCount,
-            'error_count' => $errorCount,
-            'skip_count' => $skipCount,
-            'results' => $results,
-        ];
-        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-
-        return [
-            'batch_id' => $batchId,
-            'type' => $type,
-            'type_label' => UploadImportBatchAction::TEMPLATE_LABELS[$type] ?? UploadImportBatchAction::TEMPLATE_LABELS['utama'],
-            'total_rows' => $batch['total_rows'],
-            'valid_count' => $validCount,
-            'error_count' => $errorCount,
-            'skip_count' => $skipCount,
-            'results' => $results,
-        ];
     }
 
     /**
@@ -336,7 +350,7 @@ class ValidateImportBatchAction
 
             if (isset($seenNips[$nip])) {
                 $errors['nip'][] = "NIP sudah ada pada baris {$seenNips[$nip]}.";
-                // Record this NIP as duplicated so the retroactive pass can upgrade row 1
+                // Penanda ini memungkinkan koreksi retroaktif pada kemunculan pertama.
                 $duplicatedNips[$nip] = $row;
             } else {
                 $seenNips[$nip] = $row;
@@ -348,7 +362,7 @@ class ValidateImportBatchAction
 
             if (isset($seenEmails[$email])) {
                 $errors['email_pribadi'][] = "Email pegawai sudah ada pada baris {$seenEmails[$email]}.";
-                // Record this email as duplicated so the retroactive pass can upgrade row 1
+                // Penanda ini memungkinkan koreksi retroaktif pada kemunculan pertama.
                 $duplicatedEmails[$email] = $row;
             } else {
                 $seenEmails[$email] = $row;

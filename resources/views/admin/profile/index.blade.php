@@ -266,7 +266,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Email</span>
-                                    <p class="text-ink font-sans">{{ $p->email ?? '-' }}</p>
+                                    <p class="text-ink font-sans">{{ $p->email_pribadi ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Nomor HP</span>

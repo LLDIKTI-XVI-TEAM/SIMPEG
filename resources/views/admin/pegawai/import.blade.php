@@ -1,610 +1,9 @@
+@push('head')
+    @vite('resources/js/pages/employee-import.js')
+@endpush
+
 <x-layouts.app title="Import Data Pegawai">
-    <div class="space-y-6" x-data="{
-        step: 1,
-        fileName: '',
-        fileSize: '',
-        fileError: '',
-        fileValid: false,
-        dragover: false,
-        activeTemplate: 'utama',
-        templateFormat: 'xlsx',
-        downloadingType: '',
-
-        // Batch state dari server
-        batchId: null,
-        
-        // Loading states
-        isUploading: false,
-        isValidating: false,
-        isExecuting: false,
-        apiError: '',
-        
-        // File reference
-        selectedFile: null,
-        
-        // ALL rows data (editable) — [{row: N, data: {field: value, ...}}, ...]
-        mainHeaders: [],
-        allRows: [],
-        
-        // Mapping merupakan state batch server: satu sumber untuk preview,
-        // validasi, dan eksekusi import.
-        simpegTargetFields: [
-            { key: 'Nama Pegawai', label: 'Nama & Gelar (Nama Pegawai)' },
-            { key: 'Person', label: 'Nama Lengkap Tanpa Gelar (Person)' },
-            { key: 'NIP', label: 'NIP' },
-            { key: 'Email Pegawai', label: 'Email Pegawai' },
-            { key: 'Status Kepegawaian', label: 'Status Kepegawaian (PNS/PPPK/CPNS)' },
-            { key: 'Nomor Telepon', label: 'Nomor Telepon / No HP' },
-            { key: 'Tanggal Lahir', label: 'Tanggal Lahir' },
-            { key: 'Jabatan', label: 'Jabatan Terakhir' },
-            { key: 'Golongan', label: 'Golongan Terakhir' },
-            { key: 'Kelas Jabatan', label: 'Kelas Jabatan' },
-            { key: 'Pangkat', label: 'Pangkat Terakhir' },
-            { key: 'Pendidikan Terakhir', label: 'Pendidikan Terakhir' },
-            { key: 'Prodi Pendidikan Terakhir', label: 'Prodi Pendidikan Terakhir' },
-            { key: 'Pensiun', label: 'Tanggal Pensiun' },
-            { key: 'NIK', label: 'NIK (Opsional)' },
-            { key: 'No KK', label: 'No KK (Opsional)' },
-        ],
-        columnMapping: {},
-        requiredTargetFields: [],
-        serverWarnings: { unmatched_columns: [], missing_required: [] },
-        get unmappedHeaders() {
-            return this.mainHeaders.filter(header => !this.columnMapping[header] || this.columnMapping[header] === 'tidak_dipakai');
-        },
-        get unmappedHeadersCount() {
-            return this.unmappedHeaders.length;
-        },
-        get skippedSourceHeaders() {
-            return this.unmappedHeaders;
-        },
-        get unknownSourceHeaders() {
-            return this.unmappedHeaders.filter(header =>
-                !this.isCanonicalSourceHeader(header) && !this.isKnownIgnoredHeader(header)
-            );
-        },
-        get intentionallySkippedSourceHeaders() {
-            return this.unmappedHeaders.filter(header => this.isCanonicalSourceHeader(header));
-        },
-        get knownIgnoredSourceHeaders() {
-            return this.unmappedHeaders.filter(header => this.isKnownIgnoredHeader(header));
-        },
-        get mappedColumnCount() {
-            return this.mainHeaders.length - this.unmappedHeadersCount;
-        },
-        get hasDuplicateMapping() {
-            return this.duplicateMappedFields.length > 0;
-        },
-        get duplicateMappedFields() {
-            const counts = {};
-
-            Object.values(this.columnMapping).forEach(target => {
-                if (target && target !== 'tidak_dipakai') {
-                    counts[target] = (counts[target] || 0) + 1;
-                }
-            });
-
-            return Object.keys(counts).filter(target => counts[target] > 1);
-        },
-        get missingRequiredTargets() {
-            const selectedTargets = Object.values(this.columnMapping).filter(target => target && target !== 'tidak_dipakai');
-            return this.requiredTargetFields.filter(target => !selectedTargets.includes(target));
-        },
-        get canProceedToValidation() {
-            return !this.hasDuplicateMapping && this.missingRequiredTargets.length === 0;
-        },
-        mappingTargetLabel(target) {
-            if (!target || target === 'tidak_dipakai') return 'Tidak dipakai';
-
-            return this.simpegTargetFields.find(field => field.key === target)?.label || target;
-        },
-        mappingControlId(header, index) {
-            const slug = String(header).trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kolom';
-            return `mapping-${index}-${slug}`;
-        },
-        normalizeSourceHeader(header) {
-            // Samakan dengan ImportColumnMapping::normalize(): hanya normalisasi
-            // spasi dan huruf besar-kecil. Tanda baca tetap bermakna agar
-            // klasifikasi UI sesuai dengan mapping yang diproses server.
-            return String(header).trim().replace(/\s+/g, ' ').toLowerCase();
-        },
-        isCanonicalSourceHeader(header) {
-            const normalizedHeader = this.normalizeSourceHeader(header);
-
-            return this.simpegTargetFields.some(field => this.normalizeSourceHeader(field.key) === normalizedHeader);
-        },
-        isKnownIgnoredHeader(header) {
-            return ['no', 'person formula', 'role'].includes(this.normalizeSourceHeader(header));
-        },
-        isLockedIgnoredHeader(header) {
-            return ['no', 'role'].includes(this.normalizeSourceHeader(header));
-        },
-        sourceHeadersForErrors(errorTargets) {
-            // Key error backend mengikuti label atribut validasi, sedangkan mapping
-            // memakai header kanonis. Person perlu dinormalisasi agar error tetap
-            // menunjuk dan menyorot kolom sumber yang dipetakan secara manual.
-            const errorTargetAliases = {
-                'Nama Lengkap (Person)': 'Person',
-            };
-            const targets = new Set(errorTargets.map(target => errorTargetAliases[target] ?? target));
-            const sources = Object.entries(this.columnMapping)
-                .filter(([, target]) => targets.has(target))
-                .map(([source]) => source);
-
-            return sources.length > 0 ? sources : errorTargets;
-        },
-        onMappingChange() {
-            this.apiError = '';
-        },
-        async persistMapping() {
-            if (!this.batchId) return;
-
-            const res = await fetch('/api/pegawai/import/' + this.batchId + '/mapping', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                },
-                body: JSON.stringify({ mapping: this.columnMapping }),
-            });
-
-            const data = await res.json();
-            if (!res.ok) {
-                throw new Error(data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Gagal menyimpan pemetaan kolom.'));
-            }
-
-            this.columnMapping = data.mapping || this.columnMapping;
-            this.serverWarnings = data.warnings || this.serverWarnings;
-        },
-        getEditedRows() {
-            return this.allRows.filter((rowObj, index) => this.editedRowIndices.has(index));
-        },
-
-        // Pagination preview
-        previewPage: 1,
-        previewPerPage: 10,
-        previewRowCount: 0,
-        get previewTotalPages() { return Math.max(1, Math.ceil(this.previewRowCount / this.previewPerPage)); },
-        get paginatedRows() {
-            const start = (this.previewPage - 1) * this.previewPerPage;
-            return this.allRows.slice(start, Math.min(start + this.previewPerPage, this.previewRowCount));
-        },
-        
-        // Validation results (dari server)
-        validations: [],
-        totalRows: 0,
-        validRows: 0,
-        skipRows: 0,
-        errorRows: 0,
-        
-        // Validation pagination
-        valPage: 1,
-        valPerPage: 15,
-        valFilter: 'all',
-        validationRowLoads: {},
-        get filteredValidations() {
-            if (this.valFilter === 'all') return this.validations;
-            return this.validations.filter(v => v.status === this.valFilter);
-        },
-        get valTotalPages() { return Math.max(1, Math.ceil(this.filteredValidations.length / this.valPerPage)); },
-        get paginatedValidations() {
-            const start = (this.valPage - 1) * this.valPerPage;
-            return this.filteredValidations.slice(start, start + this.valPerPage);
-        },
-        
-        // Track edits
-        hasEdits: false,
-        editedRowIndices: new Set(),
-        
-        // Execute results
-        insertedCount: 0,
-        
-        // Progress
-        progress: 0,
-        progressText: 'Memulai proses impor...',
-        
-        // Unduh template via fetch+blob agar bisa menampilkan loader di kartu yang diklik.
-        // window.location.href dihindari karena navigasi browser tidak memberi hook async
-        // sehingga user tidak tahu apakah klik-nya sedang diproses.
-        async downloadTemplate(type) {
-            if (this.downloadingType) return;
-
-            this.downloadingType = type;
-            this.apiError = '';
-
-            try {
-                const res = await fetch('/pegawai/import/template/' + type + '?format=' + this.templateFormat, {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                    },
-                });
-
-                if (!res.ok) {
-                    throw new Error('Gagal mengunduh template. Silakan coba lagi.');
-                }
-
-                const blob = await res.blob();
-                const filename = 'template_' + type + '.' + this.templateFormat;
-
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.setAttribute('href', url);
-                link.setAttribute('download', filename);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-            } catch (e) {
-                this.apiError = e.message;
-            } finally {
-                this.downloadingType = '';
-            }
-        },
-        
-        // Handle File Upload Select
-        handleFileSelect(e) {
-            const file = e.target.files ? e.target.files[0] : (e.dataTransfer ? e.dataTransfer.files[0] : null);
-            if (file) {
-                this.selectedFile = file;
-                this.fileName = file.name;
-                const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
-                this.fileSize = sizeInMb + ' MB';
-                
-                if (file.size > 10 * 1024 * 1024) {
-                    this.fileError = 'Ukuran berkas melebihi batas 10MB! (Terdeteksi: ' + sizeInMb + 'MB)';
-                    this.fileValid = false;
-                    this.selectedFile = null;
-                    if (e.target && e.target.value) e.target.value = '';
-                } else {
-                    this.fileError = '';
-                    this.fileValid = true;
-                }
-            }
-        },
-        
-        // Mark cell as edited
-        onCellEdit(rowIndex, header) {
-            this.hasEdits = true;
-            this.editedRowIndices.add(rowIndex);
-        },
-
-        rowLoadStatus(row) {
-            return this.validationRowLoads[String(row)]?.status || 'idle';
-        },
-
-        rowLoadError(row) {
-            return this.validationRowLoads[String(row)]?.error || '';
-        },
-
-        // Baris di luar preview awal dimuat satu per satu hanya saat perlu diperbaiki.
-        async ensureValidationRow(item) {
-            if (!this.batchId || item.dataIndex >= 0 || !['error', 'skip'].includes(item.status)) return;
-
-            const key = String(item.row);
-            const currentStatus = this.rowLoadStatus(item.row);
-            if (currentStatus === 'loading' || currentStatus === 'loaded') return;
-
-            this.validationRowLoads = {
-                ...this.validationRowLoads,
-                [key]: { status: 'loading', error: '' },
-            };
-
-            try {
-                const res = await fetch('/api/pegawai/import/' + this.batchId + '/preview?row=' + encodeURIComponent(item.row), {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                    },
-                });
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.message || 'Gagal memuat data baris import.');
-                }
-
-                const loadedRow = data.rows?.[0];
-                if (!loadedRow || Number(loadedRow.row) !== Number(item.row)) {
-                    throw new Error('Data baris yang diterima tidak sesuai dengan hasil validasi.');
-                }
-
-                let dataIndex = this.allRows.findIndex(row => Number(row.row) === Number(item.row));
-                if (dataIndex < 0) {
-                    this.allRows.push(loadedRow);
-                    dataIndex = this.allRows.length - 1;
-                }
-
-                item.dataIndex = dataIndex;
-                this.validationRowLoads = {
-                    ...this.validationRowLoads,
-                    [key]: { status: 'loaded', error: '' },
-                };
-            } catch (e) {
-                this.validationRowLoads = {
-                    ...this.validationRowLoads,
-                    [key]: { status: 'error', error: e.message },
-                };
-            }
-        },
-        
-        // Step 1 → 2: Upload file ke server, lalu load preview
-        async uploadAndPreview() {
-            if (!this.selectedFile) return;
-            
-            this.isUploading = true;
-            this.apiError = '';
-            
-            try {
-                // Upload
-                const formData = new FormData();
-                formData.append('file', this.selectedFile);
-                formData.append('type', this.activeTemplate);
-                
-                const uploadRes = await fetch('/api/pegawai/import/upload', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                        'Accept': 'application/json',
-                    },
-                    body: formData,
-                });
-                
-                if (!uploadRes.ok) {
-                    const err = await uploadRes.json();
-                    throw new Error(err.errors?.file?.[0] || err.message || 'Upload gagal.');
-                }
-                
-                const uploadData = await uploadRes.json();
-                this.batchId = uploadData.batch_id;
-                this.totalRows = uploadData.total_rows;
-                this.activeTemplate = uploadData.type || this.activeTemplate;
-                
-                // Load Preview (all rows)
-                const previewRes = await fetch('/api/pegawai/import/' + this.batchId + '/preview', {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                    },
-                });
-                
-                if (!previewRes.ok) {
-                    const err = await previewRes.json();
-                    throw new Error(err.message || 'Gagal memuat preview.');
-                }
-                
-                const previewData = await previewRes.json();
-                this.mainHeaders = previewData.headers;
-                this.allRows = previewData.rows; // [{row: N, data: {...}}, ...] — maksimal 10 baris dari server
-                this.previewRowCount = previewData.rows.length;
-                this.validationRowLoads = {};
-                this.totalRows = previewData.total_rows;
-                this.previewPage = 1;
-                this.hasEdits = false;
-                this.editedRowIndices = new Set();
-                // Pemetaan awal dan peringatan kolom berasal dari state batch server,
-                // bukan tebakan ulang di browser.
-                this.columnMapping = previewData.mapping || {};
-                this.requiredTargetFields = previewData.required_targets || [];
-                this.serverWarnings = previewData.warnings || { unmatched_columns: [], missing_required: [] };
-                
-                this.step = 2;
-                
-            } catch (e) {
-                this.apiError = e.message;
-            } finally {
-                this.isUploading = false;
-            }
-        },
-        
-        // Step 2 → 3: Jalankan validasi (kirim rows yang diedit)
-        async runValidation() {
-            if (!this.batchId) return;
-
-            if (!this.canProceedToValidation) {
-                this.apiError = 'Selesaikan konflik pemetaan dan petakan seluruh field wajib sebelum melanjutkan.';
-                return;
-            }
-            
-            this.isValidating = true;
-            this.apiError = '';
-
-            try {
-                // Simpan mapping batch sebelum validasi. Baris yang tidak diedit
-                // tetap dibaca server dari batch dengan mapping yang sama.
-                await this.persistMapping();
-                const editedRows = this.getEditedRows();
-                const body = editedRows.length > 0 ? { rows: editedRows } : {};
-                
-                const res = await fetch('/api/pegawai/import/' + this.batchId + '/validate', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                    },
-                    body: JSON.stringify(body),
-                });
-                
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.message || 'Validasi gagal.');
-                }
-                
-                const data = await res.json();
-                this.totalRows = data.total_rows;
-                this.validRows = data.valid_count;
-                this.errorRows = data.error_count;
-                this.skipRows = data.skip_count;
-                
-                // Transform results untuk tabel validasi
-                this.validations = data.results.map((r) => {
-                    let errorMessages = [];
-                    let errorCols = [];
-                    if (r.errors && typeof r.errors === 'object') {
-                        for (const [col, msgs] of Object.entries(r.errors)) {
-                            errorCols.push(col);
-                            if (Array.isArray(msgs)) {
-                                errorMessages.push(...msgs);
-                            } else {
-                                errorMessages.push(String(msgs));
-                            }
-                        }
-                    }
-                    const errorSourceHeaders = this.sourceHeadersForErrors(errorCols);
-
-                    return {
-                        row: r.row,
-                        name: r.nama,
-                        status: r.status,
-                        // Simpan nama sumber sebagai array untuk sorotan input. String `col`
-                        // hanya dipakai sebagai keterangan; pencarian substring dapat membuat
-                        // header seperti "Email" ikut tersorot saat hanya "Email Address" error.
-                        errorSourceHeaders,
-                        col: errorSourceHeaders.join(', ') || '-',
-                        error: errorMessages.join('; ') || '',
-                        // Simpan index ke allRows untuk inline edit di step 3
-                        dataIndex: this.allRows.findIndex(row => Number(row.row) === Number(r.row)),
-                    };
-                });
-                
-                this.hasEdits = false;
-                this.editedRowIndices = new Set();
-                this.valPage = 1;
-                this.valFilter = 'all';
-                this.step = 3;
-                
-            } catch (e) {
-                this.apiError = e.message;
-            } finally {
-                this.isValidating = false;
-            }
-        },
-        
-        // Re-validate (dari step 3, setelah edit error rows)
-        async reValidate() {
-            // Karena allRows sudah diubah, kirim ulang
-            this.hasEdits = true;
-            await this.runValidation();
-        },
-        
-        // Step 3 → 4 → 5: Execute import
-        async executeImport() {
-            if (!this.batchId) return;
-            
-            this.isExecuting = true;
-            this.apiError = '';
-            this.step = 4;
-            this.progress = 0;
-            this.progressText = 'Menyiapkan impor...';
-            
-            try {
-                const res = await fetch('/api/pegawai/import/' + this.batchId + '/execute', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '',
-                    },
-                });
-                
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.message || 'Gagal memulai impor.');
-                }
-                
-                this.progressText = 'Impor dimasukkan ke antrean...';
-                
-                const checkStatus = async () => {
-                    try {
-                        const statusRes = await fetch('/api/pegawai/import/' + this.batchId + '/status', {
-                            headers: {
-                                'Accept': 'application/json',
-                            },
-                        });
-                        
-                        if (!statusRes.ok) {
-                            throw new Error('Gagal memeriksa status impor.');
-                        }
-                        
-                        const statusData = await statusRes.json();
-                        const status = statusData.status;
-                        
-                        if (status === 'queued') {
-                            this.progress = 5;
-                            this.progressText = 'Menunggu antrean diproses...';
-                            setTimeout(checkStatus, 1000);
-                        } else if (status === 'processing') {
-                            this.progress = Math.max(10, statusData.progress);
-                            this.progressText = `Memproses impor: ${statusData.processed_count} dari ${statusData.total_rows} pegawai...`;
-                            setTimeout(checkStatus, 1000);
-                        } else if (status === 'completed') {
-                            const result = statusData.result || {};
-                            this.insertedCount = result.inserted || 0;
-                            this.skipRows = result.skipped || 0;
-                            this.errorRows = result.failed || 0;
-                            this.validRows = result.inserted || 0;
-                            
-                            this.progress = 100;
-                            this.progressText = 'Impor selesai!';
-                            
-                            setTimeout(() => {
-                                this.step = 5;
-                                this.isExecuting = false;
-                            }, 500);
-                        } else if (status === 'failed') {
-                            throw new Error(statusData.error_message || 'Impor gagal di latar belakang.');
-                        } else {
-                            setTimeout(checkStatus, 1000);
-                        }
-                    } catch (err) {
-                        this.apiError = err.message;
-                        this.step = 3;
-                        this.isExecuting = false;
-                    }
-                };
-                
-                setTimeout(checkStatus, 1000);
-                
-            } catch (e) {
-                this.apiError = e.message;
-                this.step = 3;
-                this.isExecuting = false;
-            }
-        },
-        
-        // Reset semua state
-        resetAll() {
-            this.step = 1;
-            this.fileName = '';
-            this.fileSize = '';
-            this.fileError = '';
-            this.fileValid = false;
-            this.selectedFile = null;
-            this.batchId = null;
-            this.mainHeaders = [];
-            this.allRows = [];
-            this.columnMapping = {};
-            this.validations = [];
-            this.totalRows = 0;
-            this.validRows = 0;
-            this.skipRows = 0;
-            this.errorRows = 0;
-            this.insertedCount = 0;
-            this.apiError = '';
-            this.progress = 0;
-            this.hasEdits = false;
-            this.editedRowIndices = new Set();
-            this.previewPage = 1;
-            this.previewRowCount = 0;
-            this.valPage = 1;
-            this.valFilter = 'all';
-            this.validationRowLoads = {};
-            this.columnMapping = {};
-            this.requiredTargetFields = [];
-            this.serverWarnings = { unmatched_columns: [], missing_required: [] };
-        }
-    }">
-        
+    <div class="space-y-6" x-data="employeeImport">
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -951,23 +350,35 @@
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Baris</span>
                     <p class="text-2xl font-bold text-ink font-sans mt-1" x-text="totalRows"></p>
                 </x-ui.card>
-                <div class="rounded-lg border border-success/20 bg-success/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'valid' ? 'all' : 'valid'; valPage = 1">
+                <x-ui.button type="button" variant="ghost"
+                    @click="valFilter = valFilter === 'valid' ? 'all' : 'valid'; valPage = 1"
+                    x-bind:aria-pressed="valFilter === 'valid'"
+                    dusk="validation-filter-valid"
+                    class="h-full w-full flex-col rounded-lg border-success/20 bg-success/5 p-4 text-center hover:bg-success/10 focus:ring-success/30">
                     <x-ui.badge variant="success" size="sm" uppercase>Valid (Siap Impor)</x-ui.badge>
                     <p class="text-2xl font-bold text-success font-sans mt-1" x-text="validRows"></p>
-                </div>
-                <div class="rounded-lg border border-primary/20 bg-primary/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'skip' ? 'all' : 'skip'; valPage = 1">
-                    <x-ui.badge variant="primary" size="sm" uppercase>Di-skip (Duplikat)</x-ui.badge>
-                    <p class="text-2xl font-bold text-primary font-sans mt-1" x-text="skipRows"></p>
-                </div>
-                <div class="rounded-lg border border-danger/20 bg-danger/5 p-4 shadow-sm text-center cursor-pointer" @click="valFilter = valFilter === 'error' ? 'all' : 'error'; valPage = 1">
+                </x-ui.button>
+                <x-ui.button type="button" variant="ghost"
+                    @click="valFilter = valFilter === 'skip' ? 'all' : 'skip'; valPage = 1"
+                    x-bind:aria-pressed="valFilter === 'skip'"
+                    dusk="validation-filter-skip"
+                    class="h-full w-full flex-col rounded-lg border-primary/20 bg-primary/5 p-4 text-center hover:bg-primary/10 focus:ring-primary/30">
+                    <x-ui.badge variant="primary" size="sm">Terlewat (sudah ada)</x-ui.badge>
+                    <p dusk="validation-skip-count" class="text-2xl font-bold text-primary font-sans mt-1" x-text="skipRows"></p>
+                </x-ui.button>
+                <x-ui.button type="button" variant="ghost"
+                    @click="valFilter = valFilter === 'error' ? 'all' : 'error'; valPage = 1"
+                    x-bind:aria-pressed="valFilter === 'error'"
+                    dusk="validation-filter-error"
+                    class="h-full w-full flex-col rounded-lg border-danger/20 bg-danger/5 p-4 text-center hover:bg-danger/10 focus:ring-danger/30">
                     <x-ui.badge variant="danger" size="sm" uppercase>Error (Bermasalah)</x-ui.badge>
                     <p class="text-2xl font-bold text-danger font-sans mt-1" x-text="errorRows"></p>
-                </div>
+                </x-ui.button>
             </div>
 
             {{-- Filter indicator --}}
             <div x-show="valFilter !== 'all'" class="rounded-lg bg-soft border border-border p-3 flex items-center justify-between text-xs font-sans">
-                <span class="text-muted">Filter aktif: <span class="font-bold text-ink uppercase" x-text="valFilter"></span> (<span x-text="filteredValidations.length"></span> baris)</span>
+                <span class="text-muted">Filter aktif: <span class="font-bold text-ink" x-text="validationFilterLabel(valFilter)"></span> (<span x-text="filteredValidations.length"></span> baris)</span>
                 <button type="button" @click="valFilter = 'all'; valPage = 1" class="text-primary font-semibold hover:underline cursor-pointer">Tampilkan Semua</button>
             </div>
 
@@ -1001,7 +412,7 @@
                         </x-ui.table-head>
                         <x-ui.table-body>
                             <template x-for="item in paginatedValidations" :key="item.row">
-                                <x-ui.table-row x-init="ensureValidationRow(item)" x-bind:class="{
+                                <x-ui.table-row x-init="ensureValidationRow(item)" x-bind:dusk="'validation-row-' + item.row" x-bind:class="{
                                     'bg-danger/[0.03]': item.status === 'error',
                                     'bg-primary/[0.03]': item.status === 'skip',
                                     '': item.status === 'valid'
@@ -1018,27 +429,32 @@
                                                 'bg-danger/10 text-danger': item.status === 'error',
                                                 'bg-primary/10 text-primary': item.status === 'skip'
                                             }"
-                                            x-text="item.status"
+                                            x-bind:dusk="'validation-status-' + item.row"
+                                            x-text="validationStatusLabel(item.status)"
                                         ></x-ui.badge>
                                     </x-ui.table-td>
                                     <template x-for="header in mainHeaders" :key="'val-cell-' + item.row + '-' + header">
                                         <x-ui.table-td class="px-0.5 py-0.5 border-r border-border">
-                                            {{-- Error/skip rows: editable inputs --}}
-                                            <template x-if="item.status === 'error' || item.status === 'skip'">
+                                            {{-- Hanya error yang dapat diperbaiki Admin. --}}
+                                            <template x-if="item.status === 'error'">
                                                  <input
                                                      type="text"
                                                      :value="allRows[item.dataIndex]?.data[header] ?? ''"
                                                      :disabled="item.dataIndex < 0"
                                                      :aria-busy="rowLoadStatus(item.row) === 'loading'"
                                                      :aria-label="'Baris validasi ' + item.row + ', ' + header"
+                                                     x-bind:dusk="validationCellHook('validation-input', item.row, header)"
                                                      @input="if (item.dataIndex >= 0) { allRows[item.dataIndex].data[header] = $event.target.value; onCellEdit(item.dataIndex, header) }"
                                                      :class="item.errorSourceHeaders?.includes(header) ? 'border-danger/50 bg-danger/[0.03]' : 'border-transparent'"
                                                      class="w-full px-2 py-1.5 text-xs text-ink bg-transparent border rounded hover:border-border hover:bg-soft/10 focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary/30 transition min-w-[200px] disabled:cursor-wait disabled:bg-soft disabled:text-muted"
                                                  >
                                             </template>
-                                            {{-- Valid rows: read-only --}}
-                                            <template x-if="item.status === 'valid'">
-                                                <span class="px-2 py-1.5 text-xs text-ink block min-w-[200px]" x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
+                                            {{-- Valid dan terlewat: hanya untuk dibaca. --}}
+                                            <template x-if="item.status !== 'error'">
+                                                <span x-bind:dusk="validationCellHook('validation-value', item.row, header)"
+                                                    :class="item.status === 'skip' ? 'text-primary' : 'text-ink'"
+                                                    class="px-2 py-1.5 text-xs block min-w-[200px]"
+                                                    x-text="allRows[item.dataIndex]?.data[header] ?? '-'"></span>
                                             </template>
                                         </x-ui.table-td>
                                      </template>
@@ -1056,7 +472,7 @@
                                             'text-danger font-semibold': item.status === 'error',
                                             'text-primary': item.status === 'skip',
                                             'text-success': item.status === 'valid'
-                                        }" class="text-xs font-sans" x-text="item.error || 'Siap impor'"></span>
+                                        }" x-bind:dusk="'validation-description-' + item.row" class="text-xs font-sans" x-text="validationStatusDescription(item)"></span>
                                     </x-ui.table-td>
                                 </x-ui.table-row>
                             </template>
@@ -1080,22 +496,23 @@
                         Batalkan Semua
                     </x-ui.button>
                     <div class="flex items-center gap-3">
-                        <x-ui.button type="button" variant="muted" @click="step = 2; hasEdits = false;">
+                        <x-ui.button type="button" variant="muted" @click="step = 2">
                             ← Kembali ke Preview
                         </x-ui.button>
-                        <button type="button" @click="reValidate()" x-show="hasEdits" :disabled="isValidating"
-                            :class="isValidating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                            class="inline-flex items-center justify-center rounded-lg bg-warning px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans gap-2">
+                        <x-ui.button type="button" variant="warning" @click="reValidate()" x-show="hasEdits"
+                            x-bind:disabled="isValidating" dusk="validation-revalidate">
                             <x-ui.loading x-show="isValidating" size="md" />
-                            🔄 Validasi Ulang
-                        </button>
-                        <button type="button" @click="executeImport()" :disabled="validRows === 0 || isExecuting"
-                            :class="(validRows === 0 || isExecuting) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:opacity-90'"
-                            class="inline-flex items-center justify-center rounded-lg bg-success px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition font-sans">
+                            Validasi Ulang
+                        </x-ui.button>
+                        <x-ui.button type="button" variant="primary" @click="executeImport()"
+                            x-bind:disabled="validRows === 0 || hasEdits || isExecuting"
+                            aria-describedby="import-readiness-message" dusk="validation-import">
                             Import Valid (<span x-text="validRows"></span> baris)
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
+                <p id="import-readiness-message" aria-live="polite" class="text-xs text-muted"
+                    x-text="hasEdits ? 'Validasi ulang perubahan sebelum mengimpor.' : (validRows === 0 ? 'Tidak ada baris valid untuk diimpor.' : '')"></p>
             </x-ui.card>
         </div>
 
@@ -1148,7 +565,7 @@
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(Status Aktif di database)</span>
                     </div>
                     <div class="rounded-lg bg-primary/5 border border-primary/15 p-4">
-                        <x-ui.badge variant="primary" size="md" uppercase>Di-skip</x-ui.badge>
+                        <x-ui.badge variant="primary" size="md">Terlewat (sudah ada)</x-ui.badge>
                         <p class="text-2xl font-bold text-primary mt-1" x-text="skipRows"></p>
                         <span class="text-[9px] text-muted font-sans mt-0.5 block">(NIP terdaftar)</span>
                     </div>

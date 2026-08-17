@@ -209,7 +209,7 @@
                 Refresh
             </button>
             <a href="{{ route('data-pegawai') }}"
-                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans">
+                class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm font-sans">
                 <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                 </svg>
@@ -219,15 +219,16 @@
     </div>
 
     {{-- INFO BANNER --}}
-    <div class="mb-6 flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
-        <svg class="mt-0.5 w-5 h-5 shrink-0 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
-        </svg>
-        <div class="flex-1 min-w-0">
+    <div class="mb-6 rounded-xl border border-primary/20 bg-primary/5 px-5 py-4">
+        <div class="min-w-0">
             <p class="text-sm font-semibold text-ink font-sans">Data Backup Pegawai</p>
             <p class="text-xs text-muted font-sans mt-0.5">
                 Pegawai yang dinonaktifkan disimpan di sini dan <span class="font-semibold text-primary">tidak akan dihapus otomatis</span>.
-                Data dapat dipulihkan kapan saja. Pilih satu atau lebih untuk dipulihkan sekaligus.
+                @if ($canBulkRestore)
+                    Data dapat dipulihkan kapan saja. Pilih satu atau lebih untuk dipulihkan sekaligus.
+                @else
+                    Data dapat dipulihkan kapan saja, satu per satu sesuai permission Anda.
+                @endif
             </p>
         </div>
     </div>
@@ -236,14 +237,14 @@
     <x-ui.data-table
         rows="rows"
         meta="meta"
-        :columns="[
-            ['key' => 'check',            'label' => '', 'width' => 'w-10'],
+        :columns="array_values(array_filter([
+            $canBulkRestore ? ['key' => 'check', 'label' => '', 'width' => 'w-10'] : null,
             ['key' => 'nama_lengkap',     'label' => 'Pegawai'],
             ['key' => 'jabatan',          'label' => 'Jabatan & Unit Terakhir'],
             ['key' => 'golongan_terakhir','label' => 'Gol. / Jenis'],
             ['key' => 'deleted_at_human', 'label' => 'Dinonaktifkan Pada'],
             ['key' => 'aksi',             'label' => 'Aksi', 'align' => 'right'],
-        ]"
+        ]))"
         fetchPage="fetchPage(page)"
         isLoading="isLoading"
         perPage="perPage"
@@ -252,8 +253,8 @@
         searchPlaceholder="Cari nama atau NIP"
         emptyTitle="Tidak ada data backup."
         emptyIcon="document"
-        :colspanCount="6"
-        checkAllId="backup-check-all"
+        :colspanCount="$canBulkRestore ? 6 : 5"
+        :checkAllId="$canBulkRestore ? 'backup-check-all' : null"
         checkAllAction="toggleAll($event.target.checked)"
     >
         {{-- override select-all header dikerjakan manual via Alpine karena event @change tidak bisa di-bind di komponen --}}
@@ -263,11 +264,13 @@
             <template x-for="(p, index) in rows" :key="p.id">
                 <tr class="border-b border-border last:border-0 transition-colors hover:bg-soft/40">
 
-                    {{-- Checkbox --}}
-                    <td class="px-4 py-3.5">
-                        <input type="checkbox" class="backup-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
-                            :value="p.id" @change="_syncSelected()">
-                    </td>
+                    {{-- Checkbox seleksi hanya untuk role yang boleh memulihkan secara massal --}}
+                    @if ($canBulkRestore)
+                        <td class="px-4 py-3.5">
+                            <input type="checkbox" class="backup-check h-4 w-4 rounded border-border text-primary focus:ring-primary/20 cursor-pointer"
+                                :value="p.id" @change="_syncSelected()">
+                        </td>
+                    @endif
 
                     {{-- Pegawai --}}
                     <td class="px-4 py-3.5">
@@ -308,15 +311,18 @@
 
                     {{-- Aksi --}}
                     <td class="px-4 py-3.5 text-right">
-                        <button type="button"
-                            @click="openSingleRestore(p.id, p.nama_lengkap)"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-success/40 bg-surface px-3 py-1.5 text-xs font-semibold text-success transition hover:bg-success/10 hover:border-success shadow-sm font-sans"
-                            :aria-label="'Pulihkan ' + p.nama_lengkap">
-                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                            </svg>
-                            Pulihkan
-                        </button>
+                        <div class="flex items-center justify-end">
+                            <x-ui.tooltip text="Pulihkan" position="top-end">
+                                <button type="button"
+                                    @click="openSingleRestore(p.id, p.nama_lengkap)"
+                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-success/40 bg-surface text-success transition hover:bg-success/10 shadow-sm"
+                                    :aria-label="'Pulihkan ' + p.nama_lengkap">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                    </svg>
+                                </button>
+                            </x-ui.tooltip>
+                        </div>
                     </td>
 
                 </tr>
@@ -326,7 +332,7 @@
         {{-- Error state --}}
         <template x-if="!isLoading && fetchError">
             <tr>
-                <td colspan="7" class="px-4 py-10 text-center">
+                <td colspan="{{ $canBulkRestore ? 6 : 5 }}" class="px-4 py-10 text-center">
                     <div class="flex flex-col items-center gap-2">
                         <svg class="w-8 h-8 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
@@ -346,6 +352,9 @@
     {{-- ============================================================ --}}
     {{-- FLOATING BULK ACTION BAR --}}
     {{-- ============================================================ --}}
+    {{-- Endpoint pulihkan massal masih terbatas Super Admin, sehingga bar ini tidak
+         ditampilkan kepada role lain agar tidak menawarkan aksi yang pasti ditolak. --}}
+    @if ($canBulkRestore)
     <div x-show="selectedCount > 0"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 translate-y-4"
@@ -374,6 +383,7 @@
             Batal Pilih
         </button>
     </div>
+    @endif
 
     {{-- ============================================================ --}}
     {{-- MODAL RESTORE SINGLE (via API) --}}
@@ -413,6 +423,7 @@
     {{-- ============================================================ --}}
     {{-- MODAL BULK RESTORE (form POST) --}}
     {{-- ============================================================ --}}
+    @if ($canBulkRestore)
     <x-ui.modal
         show="showBulkRestoreModal"
         title="Pulihkan Pegawai Terpilih"
@@ -462,6 +473,7 @@
             </div>
         </div>
     </x-ui.modal>
+    @endif
 
 </div>{{-- end x-data --}}
 

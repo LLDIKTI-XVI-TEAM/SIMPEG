@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\DataMasterJenjangPendidikanController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
 use App\Http\Controllers\Admin\DataMasterUnitKerjaController;
 use App\Http\Controllers\Admin\DokumenController;
+use App\Http\Controllers\Admin\EmployeeHistoryAttachmentController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
 use App\Http\Controllers\Admin\EwsConfigController;
@@ -41,7 +42,6 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
-use App\Http\Controllers\Admin\StatusPegawaiController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
@@ -111,12 +111,14 @@ if (app()->environment(['local', 'testing'])) {
 Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/super-admin/status-pegawai', [StatusPegawaiController::class, 'index'])
-        ->middleware(['role:super_admin'])
+    // Halaman Status Pegawai telah dipindahkan ke aksi per-baris di Data Pegawai.
+    // Redirect menjaga bookmark lama tetap membuka titik kerja baru; nama route lama
+    // dipertahankan agar caller lama (helper, test, integrasi) tidak memicu RouteNotFoundException.
+    Route::redirect('/super-admin/status-pegawai', '/pegawai')
+        ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('super-admin.status-pegawai.index');
-
-    Route::post('/super-admin/status-pegawai', [StatusPegawaiController::class, 'store'])
-        ->middleware(['role:super_admin'])
+    Route::post('/super-admin/status-pegawai', [PegawaiController::class, 'changeStatus'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('super-admin.status-pegawai.store');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
@@ -289,8 +291,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-nonaktif');
 
+    // Gate halaman Data Backup disamakan dengan aksi restore agar Admin Kepegawaian
+    // yang memegang employees.restore tidak berakhir 403 saat membuka halaman ini.
     Route::get('/pegawai/data-backup', [PegawaiController::class, 'backup'])
-        ->middleware(['role:super_admin'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('data-backup');
 
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
@@ -366,6 +370,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/pegawai', [PegawaiController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.store');
+    Route::post('/pegawai/status', [PegawaiController::class, 'changeStatus'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->name('pegawai.status.update');
     Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
@@ -374,6 +381,12 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.edit');
+    Route::get('/pegawai/{employee}/attachment-riwayat/{type}/{history}/unduh', EmployeeHistoryAttachmentController::class)
+        ->whereUuid('employee')
+        ->whereUuid('history')
+        ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'discipline', 'education', 'status', 'status-snapshot'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->name('pegawai.history-attachments.download');
     Route::get('/pegawai/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update', 'throttle:60,1'])
@@ -619,10 +632,35 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/', fn () => redirect()->route('pimpinan.dashboard'));
             Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
 
-            Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])->name('pegawai.index');
+            // Daftar dan detail pegawai Pimpinan tetap memakai permission granular selain gate role.
+            Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])
+                ->middleware('permission:employees.read')
+                ->name('pegawai.index');
             Route::get('/pegawai/{employee}', [PimpinanEmployeeController::class, 'show'])
+                ->middleware('permission:employees.read')
                 ->whereUuid('employee')
                 ->name('pegawai.show');
+            Route::get('/pegawai/{employee}/dokumen/{document}/unduh', [PimpinanEmployeeController::class, 'downloadDocument'])
+                ->middleware('permission:employees.read')
+                ->whereUuid('employee')
+                ->whereUuid('document')
+                ->name('pegawai.documents.download');
+            Route::get('/pegawai/{employee}/hukuman-disiplin/{history}/unduh', [PimpinanEmployeeController::class, 'downloadDisciplineAttachment'])
+                ->middleware('permission:employees.read')
+                ->whereUuid('employee')
+                ->whereUuid('history')
+                ->name('pegawai.discipline-attachments.download');
+            Route::get('/pegawai/{employee}/status/{history}/unduh', [PimpinanEmployeeController::class, 'downloadStatusAttachment'])
+                ->middleware('permission:employees.read')
+                ->whereUuid('employee')
+                ->whereUuid('history')
+                ->name('pegawai.status-attachments.download');
+            Route::get('/pegawai/{employee}/attachment-riwayat/{type}/{history}/unduh', [PimpinanEmployeeController::class, 'downloadHistoryAttachment'])
+                ->middleware('permission:employees.read')
+                ->whereUuid('employee')
+                ->whereUuid('history')
+                ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'education'])
+                ->name('pegawai.history-attachments.download');
 
             Route::get('/cuti', [PimpinanLeaveController::class, 'index'])->name('cuti.index');
             Route::get('/cuti/{leave}', [PimpinanLeaveController::class, 'show'])

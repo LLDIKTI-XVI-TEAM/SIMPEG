@@ -3,9 +3,13 @@
         $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
         $isReadOnly = $isReadOnly ?? false;
+        $openStatusModal = $openStatusModal ?? false;
+        $statusFormEmployee = $statusFormEmployee ?? null;
+        $canChangeStatus = $canChangeStatus ?? false;
     @endphp
 
     <div x-data="{
+    @if (! $isReadOnly)
     // ===== State Modal Riwayat =====
     showRiwayatModal: false,
     riwayatType: '',
@@ -37,15 +41,26 @@
     documentStatus: { status_kelengkapan: 'kosong', is_lengkap: false, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
+    @endif
+
+    // ===== Modal Ubah Status Pegawai =====
+    showStatusModal: @js($openStatusModal),
+    statusEmployee: @js($statusFormEmployee ? [
+        'id' => $statusFormEmployee->id,
+        'nama_lengkap' => $statusFormEmployee->nama_lengkap,
+        'nip' => $statusFormEmployee->nip,
+    ] : null),
 
     // ===== State Tabel Pegawai =====
     pegawaiRows: @js($initialRows),
     meta: @js($initialMeta),
     isLoading: false,
     perPage: {{ $perPage }},
+    @if (! $isReadOnly)
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
     editedEmployeeData: @js(session('edited_employee_data', null)),
+    @endif
     sort: '{{ $sort }}',
     direction: '{{ $direction }}',
     employeeShowUrlPrefix: @js($employeeShowUrlPrefix),
@@ -61,6 +76,19 @@
 
     detailUrl(employee) {
         return `${this.employeeShowUrlPrefix}/${employee.id}`;
+    },
+
+    openStatusModal(employee) {
+        this.statusEmployee = {
+            id: employee.id,
+            nama_lengkap: employee.nama_lengkap,
+            nip: employee.nip,
+        };
+        this.showStatusModal = true;
+    },
+
+    closeStatusModal() {
+        this.showStatusModal = false;
     },
 
     get cacheKey() {
@@ -81,10 +109,12 @@
         this.clearCacheByPrefixes(['pegawai_']);
     },
 
+    @if (! $isReadOnly)
     clearEmployeeLifecycleCache() {
         // Perubahan status aktif/nonaktif memengaruhi daftar pegawai dan Data Backup.
         this.clearCacheByPrefixes(['pegawai_', 'backup_']);
     },
+    @endif
 
     async fetchPage(page) {
         const cKey = this.cacheKey + `_p${page}`;
@@ -94,11 +124,13 @@
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
+                @if (! $isReadOnly)
                 // Pilihan baris tidak boleh terbawa antar halaman atau antar mode filter.
                 this.$nextTick(() => {
                     document.querySelectorAll('.row-check').forEach(c => c.checked = false);
                     updateBulkBar();
                 });
+                @endif
                 return;
             } catch (e) {
                 sessionStorage.removeItem(cKey);
@@ -135,11 +167,13 @@
             sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
             this.pegawaiRows = rows;
             this.meta = meta;
+            @if (! $isReadOnly)
             // Reset semua checkbox saat data baru dimuat
             this.$nextTick(() => {
                 document.querySelectorAll('.row-check').forEach(c => c.checked = false);
                 updateBulkBar();
             });
+            @endif
         } catch (e) {
             console.error('Gagal fetch data pegawai:', e);
         } finally {
@@ -151,6 +185,7 @@
         this.fetchPage(1);
     },
 
+    @if (! $isReadOnly)
     /**
      * Nonaktifkan dan pulihkan memindahkan pegawai antar daftar sehingga jumlah data di server
      * berubah. Halaman dimuat ulang agar jumlah baris, penomoran, dan rentang data tidak
@@ -165,6 +200,7 @@
             await this.fetchPage(lastPage);
         }
     },
+    @endif
 
     setSort(column) {
         if (this.sort === column) {
@@ -181,7 +217,7 @@
         this.fetchPage(1);
     },
 
-
+    @if (! $isReadOnly)
     deletePegawai(id, name) {
         this.deletePegawaiId = id;
         this.deletePegawaiName = name || '';
@@ -217,7 +253,7 @@
         if (!this.deletePegawaiId) return;
         this.isDeleting = true;
         try {
-            // Soft delete menonaktifkan data dan dapat dipulihkan melalui daftar nonaktif.
+            // Soft delete — data dipindahkan ke Backup dan dapat dipulihkan.
             const res = await fetch(`/api/v1/pegawai/${this.deletePegawaiId}`, {
                 method: 'DELETE',
                 headers: {
@@ -390,7 +426,10 @@
         }
     },
 
+    @endif
+
     init() {
+        @if (! $isReadOnly)
         if (this.dataChanged) {
             if (this.editedEmployeeId && this.editedEmployeeData) {
                 // Perbarui cache secara sinkron tanpa loading delay untuk pengalaman instant save
@@ -405,6 +444,7 @@
             }
             return;
         }
+        @endif
         
         // ── Cek sessionStorage terlebih dahulu ──
         // Jika data ada → tampilkan langsung tanpa loading, tanpa skeleton
@@ -550,24 +590,26 @@
             emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null" checkAllShow="!filters.show_nonaktif" filterClass="lg:grid-cols-6">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
-                <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
-                    <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
-                        aria-label="Tampilkan Pegawai Non-Aktif"
-                        class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
-                    Tampilkan Pegawai Non-Aktif
-                </label>
-                @if (auth()->user()->hasPermission('employees.restore'))
-                    {{-- Tautan hanya muncul pada mode nonaktif agar halaman kelola nonaktif tidak
-                         perlu ditemukan lewat URL manual. --}}
-                    <a x-show="filters.show_nonaktif" href="{{ route('data-nonaktif') }}" wire:navigate
-                        class="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 text-xs font-semibold text-primary transition hover:bg-soft">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                        </svg>
-                        Kelola Pegawai Non-Aktif
-                    </a>
+                @if (! $isReadOnly)
+                    <label class="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-ink cursor-pointer">
+                        <input type="checkbox" x-model="filters.show_nonaktif" @change="applyFilter()"
+                            aria-label="Tampilkan Pegawai Non-Aktif"
+                            class="h-4 w-4 rounded border-border text-primary focus:ring-primary">
+                        Tampilkan Pegawai Non-Aktif
+                    </label>
+                    @if (auth()->user()->hasPermission('employees.restore'))
+                        {{-- Tautan hanya muncul pada mode nonaktif agar halaman kelola nonaktif tidak
+                             perlu ditemukan lewat URL manual. --}}
+                        <a x-show="filters.show_nonaktif" href="{{ route('data-nonaktif') }}" wire:navigate
+                            class="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 text-xs font-semibold text-primary transition hover:bg-soft">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                            </svg>
+                            Kelola Pegawai Non-Aktif
+                        </a>
+                    @endif
                 @endif
                 {{-- Filter Golongan --}}
                 <div>
@@ -700,6 +742,29 @@
 
                         {{-- Dokumen --}}
                         <td class="px-4 py-3">
+                            @if ($isReadOnly)
+                            <span x-show="!filters.show_nonaktif"
+                                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
+                                :class="{
+                                'bg-success/10 text-success': p.is_lengkap === 'lengkap',
+                                'bg-warning/10 text-warning': p.is_lengkap === 'tidak_lengkap',
+                                'bg-primary/10 text-primary': p.is_lengkap === 'tersedia',
+                                'bg-muted/20 text-muted': p.is_lengkap === 'kosong',
+                            }" title="Status kelengkapan dokumen">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="{
+                                    'bg-success': p.is_lengkap === 'lengkap',
+                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
+                                    'bg-primary': p.is_lengkap === 'tersedia',
+                                    'bg-muted': p.is_lengkap === 'kosong',
+                                }"></span>
+                                <span x-text="
+                                    p.is_lengkap === 'lengkap'       ? 'Lengkap' :
+                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
+                                                                       'Belum Ada'
+                                "></span>
+                            </span>
+                            @else
                             <button x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 :class="{
@@ -725,6 +790,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
                                 </svg>
                             </button>
+                            @endif
                         </td>
 
                         {{-- Aksi --}}
@@ -761,9 +827,24 @@
                                 </x-ui.tooltip>
                                 @endif
 
-                                @if(auth()->user()->hasPermission('employees.deactivate'))
-                                    {{-- Nonaktifkan → masuk Backup sesuai permission soft delete --}}
-                                    <x-ui.tooltip text="Nonaktifkan" position="top-end">
+                                @if ($canChangeStatus)
+                                    {{-- Ubah status tersedia bagi pengelola pegawai yang memiliki
+                                         permission employees.update; backend menegakkan batas
+                                         yang sama melalui middleware route dan FormRequest. --}}
+                                    <x-ui.tooltip text="Ubah Status" position="top">
+                                        <button type="button" data-testid="change-status-trigger" @click="openStatusModal(p)"
+                                            :aria-label="'Ubah status pegawai ' + p.nama_lengkap"
+                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-3.75 6c0-1.035.84-1.875 1.875-1.875h.008c1.035 0 1.875.84 1.875 1.875v.375H6.75v-.375Z" />
+                                            </svg>
+                                        </button>
+                                    </x-ui.tooltip>
+                                @endif
+
+                                @if (! $isReadOnly && auth()->user()->hasPermission('employees.deactivate'))
+                                    {{-- Nonaktifkan → masuk Backup (berdasarkan permission) --}}
+                                    <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
                                         <button x-show="!filters.show_nonaktif" type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
                                             :aria-label="'Nonaktifkan pegawai ' + p.nama_lengkap"
                                             class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
@@ -779,7 +860,7 @@
 
                             {{-- Mode nonaktif hanya menampilkan pemulihan; aksi khusus pegawai aktif
                                  seperti detail, edit, dan nonaktifkan tidak berlaku untuk record terhapus. --}}
-                            @if (auth()->user()->hasPermission('employees.restore'))
+                            @if (! $isReadOnly && auth()->user()->hasPermission('employees.restore'))
                                 <div x-show="filters.show_nonaktif" class="flex items-center justify-start gap-1.5">
                                     <x-ui.tooltip text="Aktifkan Kembali" position="top-end">
                                         <button type="button" @click="restorePegawai(p.id, p.nama_lengkap)"
@@ -830,7 +911,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                 </svg>
-                Nonaktifkan Terpilih
+                Nonaktifkan Pegawai
             </button>
             <button
                 onclick="document.querySelectorAll(\'.row-check\').forEach(c => c.checked = false); updateBulkBar();"
@@ -840,6 +921,7 @@
         </div>
         @endif
 
+        @if (! $isReadOnly)
         {{-- ============================================================ --}}
         {{-- MODAL RINCIAN STATUS DOKUMEN --}}
         {{-- ============================================================ --}}
@@ -955,10 +1037,10 @@
 
 
         {{-- ============================================================ --}}
-        {{-- MODAL HAPUS PEGAWAI → BACKUP (Super Admin Only) --}}
+        {{-- MODAL NONAKTIFKAN PEGAWAI → BACKUP (berdasarkan permission) --}}
         {{-- ============================================================ --}}
         <x-ui.modal show="showDeleteModal" title="Nonaktifkan Pegawai" closeAction="showDeleteModal = false"
-            maxWidth="sm">
+            maxWidth="sm" dusk="deactivate-employee-modal">
             <div class="space-y-4">
                 {{-- Info backup --}}
                 <div class="flex items-start gap-3 rounded-lg bg-warning/10 border border-warning/20 p-3">
@@ -972,9 +1054,10 @@
                             Konfirmasi Nonaktifkan Pegawai
                         </p>
                         <p class="text-xs text-muted font-sans mt-1">
-                            Apakah Anda yakin ingin menonaktifkan pegawai
-                            <strong x-text="deletePegawaiName" class="text-ink"></strong>?
-                            Data tidak dihapus dan bisa diaktifkan kembali.
+                            Pegawai <strong x-text="deletePegawaiName" class="text-ink"></strong> akan dinonaktifkan
+                            dan dipindahkan dari daftar pegawai aktif ke <strong>Data Backup</strong>. Seluruh data,
+                            riwayat, dan dokumen tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang
+                            memiliki <strong>permission pemulihan</strong>. Data tidak dihapus permanen secara otomatis.
                         </p>
                     </div>
                 </div>
@@ -998,37 +1081,34 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                         </svg>
-                        <span x-text="isDeleting ? 'Memproses...' : 'Ya, Nonaktifkan'"></span>
+                        <span x-text="isDeleting ? 'Memproses...' : 'Ya, Nonaktifkan Pegawai'"></span>
                     </button>
                 </div>
             </div>
         </x-ui.modal>
 
-
         {{-- ============================================================ --}}
         {{-- MODAL AKTIFKAN KEMBALI PEGAWAI --}}
         {{-- ============================================================ --}}
         <x-ui.modal show="showRestoreModal" title="Aktifkan Kembali Pegawai"
-            closeAction="showRestoreModal = false" maxWidth="sm">
+            closeAction="showRestoreModal = false" maxWidth="sm" dusk="restore-employee-modal">
             <div class="space-y-4">
-                <div class="flex items-start gap-3 rounded-lg bg-success/10 border border-success/20 p-3">
-                    <svg class="w-5 h-5 mt-0.5 shrink-0 text-success" fill="none" stroke="currentColor"
+                <div class="flex items-start gap-3 rounded-lg border border-success/20 bg-success/10 p-3">
+                    <svg class="mt-0.5 h-5 w-5 shrink-0 text-success" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                     </svg>
                     <div>
-                        <p class="text-sm font-semibold text-ink font-sans">
-                            Konfirmasi Aktifkan Kembali Pegawai
-                        </p>
-                        <p class="text-xs text-muted font-sans mt-1">
+                        <p class="text-sm font-semibold text-ink font-sans">Konfirmasi Aktifkan Kembali Pegawai</p>
+                        <p class="mt-1 text-xs text-muted font-sans">
                             Apakah Anda yakin ingin mengaktifkan kembali pegawai
                             <strong x-text="restorePegawaiName" class="text-ink"></strong>?
                             Data akan kembali muncul di daftar pegawai aktif.
                         </p>
                     </div>
                 </div>
-                <div class="flex justify-end gap-3 pt-2 border-t border-border">
+                <div class="flex justify-end gap-3 border-t border-border pt-2">
                     <button type="button" @click="showRestoreModal = false" :disabled="isRestoring"
                         class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
                         Batal
@@ -1043,8 +1123,8 @@
                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                             </path>
                         </svg>
-                        <svg x-show="!isRestoring" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24" stroke-width="1.5">
+                        <svg x-show="!isRestoring" class="mr-1.5 h-4 w-4 shrink-0" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                         </svg>
@@ -1055,10 +1135,11 @@
         </x-ui.modal>
 
         {{-- ============================================================ --}}
-        {{-- MODAL BULK HAPUS KE BACKUP (Super Admin Only) --}}
+        {{-- MODAL BULK NONAKTIFKAN PEGAWAI → BACKUP (berdasarkan permission) --}}
         {{-- ============================================================ --}}
         <div x-data="{ open: false, isBulkDeleting: false }" @open-confirm-bulk-delete.window="open = true">
-            <x-ui.modal show="open" title="" closeAction="open = false" maxWidth="sm">
+            <x-ui.modal show="open" title="" closeAction="open = false" maxWidth="sm"
+                dusk="bulk-deactivate-employee-modal">
                 <div class="space-y-4">
                     <p id="modal-title-bulk-delete" class="text-sm font-bold text-ink font-sans">Nonaktifkan Pegawai
                     </p>
@@ -1069,8 +1150,11 @@
                                 d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
                         </svg>
                         <p class="text-xs text-muted font-sans">
-                            Apakah Anda yakin ingin menonaktifkan pegawai terpilih?
-                            Data tidak dihapus dan bisa diaktifkan kembali.
+                            Pegawai terpilih akan dinonaktifkan dan dipindahkan dari daftar pegawai aktif ke
+                            <strong class="text-ink">Data Backup</strong>. Seluruh data, riwayat, dan dokumen tetap
+                            disimpan dan dapat dipulihkan kembali oleh pengguna yang memiliki
+                            <strong class="text-ink">permission pemulihan</strong>. Data tidak dihapus permanen secara
+                            otomatis.
                         </p>
                     </div>
 
@@ -1108,7 +1192,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                             </svg>
-                            <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Nonaktifkan'"></span>
+                            <span x-text="isBulkDeleting ? 'Memproses...' : 'Ya, Nonaktifkan Pegawai'"></span>
                         </button>
                     </div>
                 </div>
@@ -1329,9 +1413,108 @@
                 </button>
             </div>
         </x-ui.modal>
+        @endif
+
+    @if ($canChangeStatus)
+        <x-ui.modal
+            show="showStatusModal"
+            title="Ubah Status Pegawai"
+            titleId="change-status-modal-title"
+            descriptionId="change-status-modal-description"
+            maxWidth="2xl"
+            closeAction="closeStatusModal()"
+        >
+            <p id="change-status-modal-description" class="mb-5 text-sm text-muted">
+                Perubahan dicatat sebagai riwayat, dapat disertai berkas SK, dan akan memberi notifikasi kepada pegawai.
+            </p>
+
+            <form id="change-status-form" action="{{ route('pegawai.status.update') }}" method="POST" enctype="multipart/form-data" class="space-y-5">
+                @csrf
+                <input type="hidden" name="pegawai_id" :value="statusEmployee?.id ?? ''">
+
+                <div class="rounded-lg border border-border bg-soft px-4 py-3">
+                    <p class="text-xs font-semibold text-muted">Pegawai</p>
+                    <p class="mt-1 text-sm font-semibold text-ink" x-text="statusEmployee ? statusEmployee.nama_lengkap : 'Pegawai tidak ditemukan'"></p>
+                    <p class="mt-0.5 text-xs text-muted" x-text="statusEmployee?.nip ? 'NIP. ' + statusEmployee.nip : ''"></p>
+                </div>
+                @error('pegawai_id')
+                    <p class="text-xs font-medium text-danger">{{ $message }}</p>
+                @enderror
+
+                <div class="grid gap-5 md:grid-cols-2">
+                    <div>
+                        <label for="status_pegawai_id" class="mb-1.5 block text-sm font-semibold text-ink">Status Baru <span class="text-danger">*</span></label>
+                        <select name="status_pegawai_id" id="status_pegawai_id" required aria-describedby="status_pegawai_id-error"
+                            class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 @error('status_pegawai_id') border-danger @enderror">
+                            <option value="">-- Pilih Status --</option>
+                            @foreach($statusChangeOptions as $status)
+                                <option value="{{ $status->id }}" @selected(old('status_pegawai_id') === $status->id)>{{ $status->nama }}</option>
+                            @endforeach
+                        </select>
+                        @error('status_pegawai_id')
+                            <p id="status_pegawai_id-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="tanggal" class="mb-1.5 block text-sm font-semibold text-ink">Tanggal Efektif Status Kepegawaian <span class="text-danger">*</span></label>
+                        <input type="date" name="tanggal" id="tanggal" value="{{ old('tanggal') }}" required aria-describedby="tanggal-error"
+                            class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 @error('tanggal') border-danger @enderror">
+                        @error('tanggal')
+                            <p id="tanggal-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="nomor_berkas" class="mb-1.5 block text-sm font-semibold text-ink">Nomor Berkas (Otomatis)</label>
+                        <input type="text" id="nomor_berkas" value="SK-STATUS-{{ date('Ymd') }}-XXX" disabled
+                            class="block w-full cursor-not-allowed rounded-lg border border-border bg-soft px-3 py-2 text-sm text-muted">
+                        <p class="mt-1 text-xs text-muted">Nomor berkas dibuat otomatis hanya jika Anda melampirkan berkas pendukung.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="keterangan" class="mb-1.5 block text-sm font-semibold text-ink">Keterangan <span class="font-normal text-muted">(Opsional)</span></label>
+                    <textarea name="keterangan" id="keterangan" rows="3" placeholder="Masukkan catatan atau keterangan perubahan status..." aria-describedby="keterangan-error"
+                        class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 @error('keterangan') border-danger @enderror">{{ old('keterangan') }}</textarea>
+                    @error('keterangan')
+                        <p id="keterangan-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="berkas" class="mb-1.5 block text-sm font-semibold text-ink">Upload Berkas SK Pendukung <span class="font-normal text-muted">(Opsional)</span></label>
+                    <input type="file" name="berkas" id="berkas" accept=".pdf,.jpg,.jpeg,.png" aria-describedby="berkas-help berkas-error"
+                        class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-primary-hover @error('berkas') border-danger @enderror">
+                    <p id="berkas-help" class="mt-1 text-xs text-muted">PDF, JPG, atau PNG; maksimal 10 MB. Berkas akan tersimpan pada arsip dokumen pegawai.</p>
+                    @error('berkas')
+                        <p id="berkas-error" class="mt-1 text-xs font-medium text-danger">{{ $message }}</p>
+                    @enderror
+                </div>
+            </form>
+
+            <x-slot:footer>
+                <div class="flex items-center justify-end gap-3">
+                    <x-ui.button type="button" variant="muted" @click="closeStatusModal()">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                        <span>Batal</span>
+                    </x-ui.button>
+                    <x-ui.button type="submit" variant="primary" form="change-status-form">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                        <span>Simpan Status</span>
+                    </x-ui.button>
+                </div>
+            </x-slot:footer>
+        </x-ui.modal>
+    @endif
 
     </div>{{-- end x-data --}}
 
+    @if (! $isReadOnly)
     <script>
         function updateBulkBar() {
             // Baris yang dinonaktifkan (mode daftar nonaktif) tidak boleh ikut dihitung sebagai
@@ -1341,6 +1524,8 @@
             const bar = document.getElementById('bulk-bar');
             const count = document.getElementById('selected-count');
             const checkAll = document.getElementById('check-all');
+
+            if (!bar || !count || !checkAll) return;
 
             // Bulk bar visibility
             if (checked.length > 0) {
@@ -1474,5 +1659,6 @@
             });
         });
     </script>
+    @endif
 
 </div>
