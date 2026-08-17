@@ -42,11 +42,13 @@ class EducationHistoryObserver
         if ($latestEducation) {
             $employee->updateQuietly([
                 'pendidikan_terakhir' => $latestEducation->getAttribute('jenjang_nama'),
-                'prodi_pendidikan_terakhir' => $latestEducation->jurusan,
+                'program_studi_id' => $latestEducation->program_studi_id,
+                'prodi_pendidikan_terakhir' => $latestEducation->programStudi?->nama ?? $latestEducation->jurusan,
             ]);
         } else {
             $employee->updateQuietly([
                 'pendidikan_terakhir' => null,
+                'program_studi_id' => null,
                 'prodi_pendidikan_terakhir' => null,
             ]);
         }

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -53,6 +54,178 @@ class EducationHistoryTest extends TestCase
         ]);
     }
 
+    public function test_education_history_uses_program_studi_reference(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Publik']);
+
+        $response = $this->actingAs($user)->postJsonWithCsrf($this->endpoint($employee), $this->validPayload([
+            'program_studi_id' => $programStudi->id,
+            'jurusan' => 'Data lama yang harus ditimpa',
+        ]));
+
+        $response->assertCreated()
+            ->assertJsonPath('history.program_studi_id', $programStudi->id)
+            ->assertJsonPath('history.program_studi', 'Administrasi Publik')
+            ->assertJsonPath('education_summary.pendidikan_terakhir', 'D4 / S1')
+            ->assertJsonPath('education_summary.program_studi', 'Administrasi Publik');
+        $this->assertDatabaseHas('education_histories', [
+            'employee_id' => $employee->id,
+            'program_studi_id' => $programStudi->id,
+            'jurusan' => 'Administrasi Publik',
+        ]);
+        $this->assertSame($programStudi->id, $employee->refresh()->program_studi_id);
+    }
+
+    public function test_free_text_jurusan_is_not_used_by_normal_education_history_crud(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($user)->postJsonWithCsrf($this->endpoint($employee), $this->validPayload([
+            'jurusan' => 'Jurusan Bebas Dari Client',
+        ]));
+
+        $response->assertCreated()->assertJsonPath('history.jurusan', null);
+    }
+
+    public function test_admin_cannot_create_education_history_with_inactive_program_studi(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Nonaktif',
+            'is_active' => false,
+        ]);
+
+        $response = $this->actingAs($user)->postJsonWithCsrf($this->endpoint($employee), $this->validPayload([
+            'program_studi_id' => $programStudi->id,
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('program_studi_id');
+        $this->assertDatabaseMissing('education_histories', [
+            'employee_id' => $employee->id,
+            'program_studi_id' => $programStudi->id,
+        ]);
+    }
+
+    public function test_admin_can_preserve_inactive_program_studi_on_education_history_update(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Lama Nonaktif',
+            'is_active' => false,
+        ]);
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'program_studi_id' => $programStudi->id,
+        ]));
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $this->validPayload([
+                'program_studi_id' => $programStudi->id,
+                'nama_institusi' => 'Universitas Diperbarui',
+            ]),
+        );
+
+        $response->assertOk()->assertJsonPath('history.program_studi_id', $programStudi->id);
+        $this->assertDatabaseHas('education_histories', [
+            'id' => $history->id,
+            'program_studi_id' => $programStudi->id,
+            'nama_institusi' => 'Universitas Diperbarui',
+        ]);
+    }
+
+    public function test_admin_cannot_replace_education_history_program_studi_with_inactive_reference(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $currentProgramStudi = RefProgramStudi::create(['nama' => 'Program Studi Aktif']);
+        $inactiveProgramStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Pengganti Nonaktif',
+            'is_active' => false,
+        ]);
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'program_studi_id' => $currentProgramStudi->id,
+        ]));
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $this->validPayload(['program_studi_id' => $inactiveProgramStudi->id]),
+        );
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('program_studi_id');
+        $this->assertSame($currentProgramStudi->id, $history->fresh()->program_studi_id);
+    }
+
+    public function test_admin_can_clear_program_studi_from_education_history(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Program Studi Untuk Dihapus']);
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'program_studi_id' => $programStudi->id,
+            'jurusan' => $programStudi->nama,
+        ]));
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $this->validPayload(['program_studi_id' => null]),
+        );
+
+        $response->assertOk()
+            ->assertJsonStructure(['education_summary' => ['pendidikan_terakhir', 'program_studi']])
+            ->assertJsonPath('history.program_studi_id', null)
+            ->assertJsonPath('history.program_studi', null)
+            ->assertJsonPath('history.jurusan', null)
+            ->assertJsonPath('education_summary.pendidikan_terakhir', 'D4 / S1')
+            ->assertJsonPath('education_summary.program_studi', null);
+        $this->assertDatabaseHas('education_histories', [
+            'id' => $history->id,
+            'program_studi_id' => null,
+            'jurusan' => null,
+        ]);
+        $this->assertNull($employee->fresh()->program_studi_id);
+        $this->assertNull($employee->fresh()->prodi_pendidikan_terakhir);
+    }
+
+    public function test_admin_can_update_education_history_without_changing_free_text_jurusan(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'jurusan' => 'Jurusan Manual',
+        ]));
+        $payload = $this->validPayload(['nama_institusi' => 'Universitas Diperbarui']);
+        unset($payload['jurusan'], $payload['program_studi_id']);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $payload,
+        );
+
+        $response->assertOk()->assertJsonPath('history.jurusan', 'Jurusan Manual');
+        $this->assertSame('Jurusan Manual', $history->fresh()->jurusan);
+    }
+
+    public function test_free_text_jurusan_cannot_overwrite_legacy_snapshot_on_update(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $history = EducationHistory::create(array_merge($this->educationPayload($employee), [
+            'jurusan' => 'Snapshot Legacy',
+        ]));
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee)."/{$history->id}",
+            $this->validPayload(['jurusan' => 'Teks Baru Dari Client']),
+        );
+
+        $response->assertOk()->assertJsonPath('history.jurusan', 'Snapshot Legacy');
+    }
+
     public function test_admin_can_update_employee_education_history(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -64,7 +237,8 @@ class EducationHistoryTest extends TestCase
             $this->validPayload(['nama_institusi' => 'Universitas Diperbarui']),
         );
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonStructure(['education_summary' => ['pendidikan_terakhir', 'program_studi']]);
         $response->assertJsonPath('history.nama_institusi', 'Universitas Diperbarui');
         $this->assertDatabaseHas('education_histories', [
             'id' => $history->id,
@@ -81,7 +255,10 @@ class EducationHistoryTest extends TestCase
         $response = $this->actingAs($user)
             ->deleteJsonWithCsrf($this->endpoint($employee)."/{$history->id}");
 
-        $response->assertOk();
+        $response->assertOk()
+            ->assertJsonStructure(['education_summary' => ['pendidikan_terakhir', 'program_studi']]);
+        $response->assertJsonPath('education_summary.pendidikan_terakhir', null);
+        $response->assertJsonPath('education_summary.program_studi', null);
         $this->assertDatabaseMissing('education_histories', ['id' => $history->id]);
     }
 

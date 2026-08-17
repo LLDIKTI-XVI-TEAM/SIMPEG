@@ -77,16 +77,21 @@
         keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'nik' => $f->nik, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
+        pendidikanSummary: @js([
+            'pendidikan_terakhir' => $p->pendidikan_terakhir,
+            'program_studi' => $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir,
+        ]),
         pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'download_url' => $r->admin_attachment_download_url])->toJson() }},
         jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'download_url' => $j->admin_attachment_download_url])->toJson() }},
         kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'download_url' => $s->admin_attachment_download_url])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->admin_attachment_download_url])->toJson() }},
-        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->admin_attachment_download_url])->toJson() }},
+        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'program_studi_id' => $e->program_studi_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->programStudi?->nama ?? $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->admin_attachment_download_url])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
         editingPendidikan: null,
         editPendidikanError: '',
-        editPendidikanForm: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
+        editPendidikanForm: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
+        _initialProgramStudiId: null,
         isUpdatingPendidikan: false,
         isDeletingPendidikan: false,
         
@@ -96,7 +101,7 @@
         newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
         newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
-        newPendidikan: { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' },
+        newPendidikan: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
 
         // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen.
         showUploadBerkas: false,
@@ -388,7 +393,9 @@
         },
         // ===== LAZY FETCH & CACHING KELUARGA + PENDIDIKAN =====
         _keluargaCacheKey:  'keluarga_{{ $p->id }}',
-        _pendidikanCacheKey: 'pendidikan_{{ $p->id }}',
+        _pendidikanCacheKey: 'pendidikan_v2_{{ $p->id }}',
+        _pendidikanCacheVersion: @js($pendidikanCacheVersion ?? ''),
+        _pendidikanCacheTTL: 5*60*1000,
 
         formatDate(dateString) {
             if (!dateString || dateString === '-') return '-';
@@ -491,15 +498,24 @@
         },
 
         async fetchPendidikan() {
-            // Coba baca dari sessionStorage terlebih dahulu.
+            // Coba baca dari sessionStorage — validasi versi + TTL sebelum dipakai.
             const cached = sessionStorage.getItem(this._pendidikanCacheKey);
             if (cached) {
                 try {
-                    this.pendidikanList = JSON.parse(cached);
-                    return;
+                    const envelope = JSON.parse(cached);
+                    const isEnvelope = envelope && typeof envelope === 'object' && Array.isArray(envelope.data) && 'v' in envelope && 't' in envelope;
+                    if (isEnvelope) {
+                        const fresh = envelope.v === this._pendidikanCacheVersion && (Date.now() - envelope.t) < this._pendidikanCacheTTL;
+                        if (fresh) {
+                            this.pendidikanList = envelope.data;
+                            if (envelope.summary) this.pendidikanSummary = envelope.summary;
+                            return;
+                        }
+                    }
                 } catch (e) {
-                    sessionStorage.removeItem(this._pendidikanCacheKey);
+                    // corrupted — biarkan jatuh ke fetch
                 }
+                sessionStorage.removeItem(this._pendidikanCacheKey);
             }
             this.pendidikanLoading = true;
             try {
@@ -509,7 +525,8 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const json = await res.json();
                 this.pendidikanList = json.histories ?? [];
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                this.applyEducationSummary(json.education_summary);
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: json.education_summary ?? null }));
             } catch (e) {
                 console.error('Gagal memuat riwayat pendidikan:', e);
             } finally {
@@ -517,13 +534,23 @@
             }
         },
 
+        applyEducationSummary(summary) {
+            if (!summary) return;
+
+            this.pendidikanSummary = {
+                pendidikan_terakhir: summary.pendidikan_terakhir ?? null,
+                program_studi: summary.program_studi ?? null,
+            };
+        },
+
         openEditPendidikan(edu) {
             this.editingPendidikan = edu;
             this.editPendidikanError = '';
+            this._initialProgramStudiId = edu.program_studi_id ?? null;
             this.editPendidikanForm = {
                 jenjang_id:     edu.jenjang_id ?? '',
                 nama_institusi: edu.institusi ?? '',
-                jurusan:        edu.prodi ?? '',
+                program_studi_id: edu.program_studi_id ?? '',
                 tahun_lulus:    edu.lulus ?? '',
                 no_ijazah:      edu.no_ijazah ?? '',
             };
@@ -533,6 +560,10 @@
         async submitEditPendidikan() {
             this.editPendidikanError = '';
             this.isUpdatingPendidikan = true;
+            const payload = { ...this.editPendidikanForm };
+            const cur = payload.program_studi_id || null;
+            const init = this._initialProgramStudiId ?? null;
+            if (cur === init) delete payload.program_studi_id;
             try {
                 const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${this.editingPendidikan.id}`, {
                     method: 'PUT',
@@ -542,7 +573,7 @@
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify(this.editPendidikanForm),
+                    body: JSON.stringify(payload),
                 });
                 const result = await res.json().catch(() => ({}));
                 if (!res.ok) {
@@ -558,15 +589,17 @@
                     this.pendidikanList[idx] = {
                         id:        h.id,
                         jenjang_id: h.jenjang_id,
+                        program_studi_id: h.program_studi_id,
                         tingkat:   h.tingkat,
                         institusi: h.nama_institusi,
-                        prodi:     h.jurusan ?? '-',
+                        prodi:     h.program_studi ?? h.jurusan ?? '-',
                         lulus:     h.tahun_lulus,
                         no_ijazah: h.no_ijazah ?? '-',
                         download_url: h.download_url,
                     };
                 }
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
+                this.applyEducationSummary(result.education_summary);
                 this.showEditPendidikan = false;
                 this.editingPendidikan = null;
                 this.toast = { show: true, message: 'Riwayat pendidikan berhasil diperbarui.', type: 'success' };
@@ -590,13 +623,14 @@
                         'X-Requested-With': 'XMLHttpRequest',
                     },
                 });
+                const result = await res.json().catch(() => ({}));
                 if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
+                    this.toast = { show: true, message: result.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
                     return;
                 }
                 this.pendidikanList.splice(index, 1);
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
+                this.applyEducationSummary(result.education_summary);
                 this.toast = { show: true, message: 'Riwayat pendidikan berhasil dihapus.', type: 'success' };
                 setTimeout(() => this.toast.show = false, 3000);
             } catch (e) {
@@ -750,13 +784,16 @@
                             id:             h.id,
                             tingkat:        h.tingkat,
                             institusi:      h.nama_institusi,
-                            prodi:          h.jurusan ?? '-',
+                            program_studi_id: h.program_studi_id,
+                            prodi:          h.program_studi ?? h.jurusan ?? '-',
                             lulus:          h.tahun_lulus,
                             no_ijazah:      h.no_ijazah ?? '-',
+                            download_url:   h.download_url,
                         });
                         // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
-                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
-                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', jurusan: '', tahun_lulus: '', no_ijazah: '' };
+                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
+                        this.applyEducationSummary(result.education_summary);
+                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
                     }
                     
                     this.showModal = false;
@@ -1065,7 +1102,6 @@
                     </button>
                             @endif
                 </div>
-
                 {{-- Loading skeleton --}}
                 <div x-show="keluargaLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
                     <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
@@ -1282,7 +1318,17 @@
                         </svg>
                         Tambah Pendidikan
                     </button>
-                            @endif
+                    @endif
+                </div>
+                <div class="grid gap-3 rounded-lg border border-border bg-soft/30 p-4 sm:grid-cols-2">
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Pendidikan Terakhir</p>
+                        <p class="mt-1 text-sm font-semibold text-ink" x-text="pendidikanSummary.pendidikan_terakhir ?? '-'">{{ $p->pendidikan_terakhir ?? '-' }}</p>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Program Studi</p>
+                        <p class="mt-1 text-sm font-semibold text-ink" x-text="pendidikanSummary.program_studi ?? '-'">{{ $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir ?? '-' }}</p>
+                    </div>
                 </div>
                 {{-- Loading skeleton --}}
                 <div x-show="pendidikanLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
@@ -1957,7 +2003,12 @@
                                 </div>
                                 <div class="space-y-1">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                                    <input type="text" x-model="newPendidikan.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                    <select x-model="newPendidikan.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                        <option value="">-- Pilih Program Studi --</option>
+                                        @foreach($programStudiOptions as $programStudi)
+                                            <option value="{{ $programStudi->id }}">{{ $programStudi->nama }}</option>
+                                        @endforeach
+                                    </select>
                                 </div>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div class="space-y-1">
@@ -2061,7 +2112,12 @@
 
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                    <input type="text" x-model="editPendidikanForm.jurusan" placeholder="Manajemen Keuangan" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    <select x-model="editPendidikanForm.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <option value="">-- Pilih Program Studi --</option>
+                        @foreach($educationProgramStudiOptions as $programStudi)
+                            <option value="{{ $programStudi->id }}" :disabled="{{ $programStudi->is_active ? 'false' : 'editPendidikanForm.program_studi_id !== \''. $programStudi->id .'\'' }}">{{ $programStudi->nama }}{{ ! $programStudi->is_active ? ' (Nonaktif)' : '' }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">

@@ -9,6 +9,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -51,14 +52,72 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        // 21 permission dasar + 16 permission modul cuti setelah hak hapus disiplin dihilangkan.
-        $this->assertSame(37, Permission::count());
+        // 24 permission non-cuti + 13 permission modul cuti + 1 permission data referensi.
+        $this->assertSame(38, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
         );
         $this->assertTrue(Permission::where('name', 'employees.deactivate')->exists());
         $this->assertTrue(Permission::where('name', 'employees.restore')->exists());
+    }
+
+    public function test_reference_table_permission_only_belongs_to_super_admin(): void
+    {
+        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
+
+        $this->assertSame('reference_tables', $permission->module);
+        $this->assertSame('Mengelola data referensi SIMPEG', $permission->description);
+        $this->assertTrue(Role::where('name', 'super_admin')->firstOrFail()->permissions()->whereKey($permission->id)->exists());
+
+        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $roleName) {
+            $this->assertFalse(Role::where('name', $roleName)->firstOrFail()->permissions()->whereKey($permission->id)->exists());
+        }
+    }
+
+    public function test_permission_data_migration_backfills_existing_database_without_running_seeder(): void
+    {
+        Permission::where('name', 'reference_tables.manage')->delete();
+
+        $migration = require database_path('migrations/2026_08_17_000002_add_reference_tables_manage_permission.php');
+        $migration->up();
+        $migration->up();
+
+        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
+        $superAdmin = Role::where('name', 'super_admin')->firstOrFail();
+
+        $this->assertSame('reference_tables', $permission->module);
+        $this->assertSame('Mengelola data referensi SIMPEG', $permission->description);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $superAdmin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
+    }
+
+    public function test_permission_data_migration_rollback_preserves_preexisting_permission_and_mappings(): void
+    {
+        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
+        $superAdmin = Role::where('name', 'super_admin')->firstOrFail();
+        $adminKepegawaian = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $adminKepegawaian->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $migration = require database_path('migrations/2026_08_17_000002_add_reference_tables_manage_permission.php');
+        $migration->up();
+        $migration->down();
+
+        $this->assertDatabaseHas('permissions', [
+            'id' => $permission->id,
+            'name' => 'reference_tables.manage',
+        ]);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $superAdmin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $adminKepegawaian->id,
+            'permission_id' => $permission->id,
+        ]);
     }
 
     public function test_permission_middleware_allows_user_with_permission(): void

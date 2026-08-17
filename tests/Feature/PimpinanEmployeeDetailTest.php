@@ -16,6 +16,7 @@ use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -70,6 +71,21 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertSee('history-export-unavailable', false)
             ->assertDontSee($employee->nik)
             ->assertDontSee('/pimpinan/laporan/pegawai/custom', false);
+    }
+
+    public function test_profil_pimpinan_memprioritaskan_relasi_program_studi_dari_snapshot(): void
+    {
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Negara Kanonik']);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+            'prodi_pendidikan_terakhir' => 'Snapshot Program Studi Lama',
+        ]);
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee('Administrasi Negara Kanonik')
+            ->assertDontSee('Snapshot Program Studi Lama');
     }
 
     public function test_pimpinan_employee_list_uses_real_employee_rows(): void

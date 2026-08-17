@@ -19,10 +19,10 @@ class ListEducationHistoriesAction
     public function execute(Employee $employee): Collection
     {
         $histories = $employee->educationHistories()
-            ->with('jenjang')
             ->orderByDesc('tahun_lulus')
             ->orderByDesc('created_at')
             ->get();
+        $histories->loadMissing(['jenjang', 'programStudi']);
         $this->payload->primeAttachmentReferences($histories->pluck('file_ijazah'));
 
         return $histories

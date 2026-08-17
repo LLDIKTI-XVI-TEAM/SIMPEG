@@ -206,7 +206,7 @@
                 'Golongan Saat Ini' => $latestRank?->golongan?->kode ?? $employee->golongan_terakhir,
                 'Kelas Jabatan' => $employee->kelas_jabatan_terakhir,
                 'Pendidikan Terakhir' => $employee->pendidikan_terakhir,
-                'Program Studi' => $employee->prodi_pendidikan_terakhir,
+                'Program Studi' => $employee->programStudi?->nama ?? $employee->prodi_pendidikan_terakhir ?? '-',
             ] as $label => $value)
                 <div class="space-y-0.5">
                     <dt class="font-semibold text-muted font-sans">{{ $label }}</dt>

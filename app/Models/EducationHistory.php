@@ -16,6 +16,7 @@ class EducationHistory extends Model
     protected $fillable = [
         'employee_id',
         'jenjang_id',
+        'program_studi_id',
         'nama_institusi',
         'jurusan',
         'tahun_lulus',
@@ -38,5 +39,11 @@ class EducationHistory extends Model
     public function jenjang(): BelongsTo
     {
         return $this->belongsTo(RefJenjangPendidikan::class, 'jenjang_id');
+    }
+
+    /** @return BelongsTo<RefProgramStudi, $this> */
+    public function programStudi(): BelongsTo
+    {
+        return $this->belongsTo(RefProgramStudi::class, 'program_studi_id');
     }
 }
