@@ -30,6 +30,27 @@ class DocumentAuthorization
             && $user->hasPermission('employees.update');
     }
 
+    /**
+     * Cek izin khusus untuk endpoint berkas SK.
+     * Kategori yang membuat riwayat (pangkat/jabatan/KGB) memerlukan izin employee_histories.create.
+     * Kategori pengangkatan hanya mengganti appointment, cukup employees.update.
+     */
+    public static function canStoreBerkasSk(?User $user, string $kategori): bool
+    {
+        if (! self::hasManagerRole($user)) {
+            return false;
+        }
+
+        // sk_pengangkatan hanya mengganti appointment, tidak membuat riwayat baru
+        if ($kategori === 'sk_pengangkatan') {
+            return $user->hasPermission('employees.update');
+        }
+
+        // sk_pangkat, sk_jabatan, sk_kgb membuat riwayat append-only
+        return $user->hasPermission('employees.update')
+            && $user->hasPermission('employee_histories.create');
+    }
+
     public static function canDelete(?User $user): bool
     {
         return $user !== null && $user->role === 'super_admin';

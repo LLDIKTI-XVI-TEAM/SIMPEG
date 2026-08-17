@@ -227,4 +227,24 @@ class StoreBerkasSkActionTest extends TestCase
 
         Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
     }
+
+    public function test_replace_pengangkatan_tidak_menghapus_file_baru_jika_transaksi_berhasil(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+
+        $action = app(StoreBerkasSkAction::class);
+        $document = $action->execute($employee, [
+            'kategori_dokumen' => 'sk_pengangkatan',
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2024-01-01',
+            'no_sk' => 'SK/ANGKAT/SUCCESS',
+            'tanggal_sk' => '2023-12-01',
+            'file_sk' => UploadedFile::fake()->create('sk-sukses.pdf', 100, 'application/pdf'),
+        ], request());
+
+        // File baru harus tetap ada di storage setelah transaksi sukses
+        $this->assertNotNull($document->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists((string) $document->file_path);
+    }
 }

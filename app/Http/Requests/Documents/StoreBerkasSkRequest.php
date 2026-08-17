@@ -16,7 +16,9 @@ class StoreBerkasSkRequest extends FormRequest
             return true;
         }
 
-        return DocumentAuthorization::canManage($this->user());
+        $kategori = (string) $this->input('kategori_dokumen', '');
+
+        return DocumentAuthorization::canStoreBerkasSk($this->user(), $kategori);
     }
 
     public function rules(): array

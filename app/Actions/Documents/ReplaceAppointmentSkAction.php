@@ -40,6 +40,8 @@ class ReplaceAppointmentSkAction
         $file = $data['file_sk'];
         $newPath = $this->files->storeSk($file);
 
+        $transactionCommitted = false;
+
         try {
             [$document, $oldFilePath] = DB::transaction(function () use ($employee, $data, $newPath, $request): array {
                 $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
@@ -101,19 +103,26 @@ class ReplaceAppointmentSkAction
                 return [$document, $oldFilePath];
             });
 
-            // Penghapusan file lama hanya boleh terjadi setelah transaksi ter-commit:
-            // bila commit/sync gagal, database tetap menunjuk ke file lama yang utuh
-            // dan blok catch cukup membersihkan file baru yang tidak terpakai.
-            if (filled($oldFilePath) && $oldFilePath !== $newPath && ! $this->fileIsStillReferenced($oldFilePath)) {
-                Storage::disk(Document::STORAGE_DISK)->delete($oldFilePath);
-            }
-
-            return $document;
+            $transactionCommitted = true;
         } catch (\Throwable $exception) {
+            // File baru hanya dihapus jika transaksi gagal sebelum commit
             Storage::disk(Document::STORAGE_DISK)->delete($newPath);
 
             throw $exception;
         }
+
+        // Cleanup file lama dilakukan di luar blok try-catch transaksi:
+        // kegagalan cleanup pasca-commit tidak boleh membatalkan file baru yang sudah sah di database
+        try {
+            if (filled($oldFilePath) && $oldFilePath !== $newPath && ! $this->fileIsStillReferenced($oldFilePath)) {
+                Storage::disk(Document::STORAGE_DISK)->delete($oldFilePath);
+            }
+        } catch (\Throwable $cleanupException) {
+            // Catat log jika cleanup gagal, tetapi tidak mengganggu kembalian dokumen
+            report($cleanupException);
+        }
+
+        return $document;
     }
 
     /**
