@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SwitchRoleRequest extends FormRequest
@@ -29,7 +30,7 @@ class SwitchRoleRequest extends FormRequest
     {
         return [
             'target_role' => ['required', 'string', 'in:admin_kepegawaian,pimpinan,kepala_bagian,pegawai'],
-            'temporary_permission' => ['nullable', 'string'],
+            'temporary_permission' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -63,6 +64,56 @@ class SwitchRoleRequest extends FormRequest
                     "Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli Anda."
                 );
             }
+
+            // temporary_permission hanya boleh memuat permission yang benar-benar dimiliki role target.
+            // Daftar dibentuk/divalidasi server-side sebagai subset izin, bukan dipercaya mentah dari payload.
+            $temporaryPermission = $this->input('temporary_permission');
+            if (is_string($targetRole) && is_string($temporaryPermission) && $temporaryPermission !== '') {
+                $allowed = Role::query()
+                    ->where('name', $targetRole)
+                    ->with('permissions')
+                    ->first()
+                    ?->permissions
+                    ->pluck('name')
+                    ->all() ?? [];
+
+                foreach ($this->parsePermissionList($temporaryPermission) as $permission) {
+                    if (! in_array($permission, $allowed, true)) {
+                        $validator->errors()->add(
+                            'temporary_permission',
+                            "Permission '{$permission}' tidak dimiliki role target {$targetRole} sehingga tidak dapat dijadikan permission sementara."
+                        );
+                    }
+                }
+            }
         });
+    }
+
+    /**
+     * Mengurai daftar permission dari JSON array atau CSV.
+     *
+     * @return list<string>
+     */
+    private function parsePermissionList(string $value): array
+    {
+        $decoded = json_decode($value, true);
+
+        $items = is_array($decoded) ? $decoded : explode(',', $value);
+
+        $permissions = [];
+
+        foreach ($items as $item) {
+            if (! is_string($item)) {
+                continue;
+            }
+
+            $permission = trim($item);
+
+            if ($permission !== '') {
+                $permissions[] = $permission;
+            }
+        }
+
+        return array_values(array_unique($permissions));
     }
 }

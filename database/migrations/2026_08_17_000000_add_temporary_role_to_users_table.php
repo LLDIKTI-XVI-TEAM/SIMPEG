@@ -13,7 +13,8 @@ return new class extends Migration
             // Digunakan oleh Super Admin untuk demo/testing dengan role yang lebih rendah.
             $table->string('temporary_role')->nullable()->after('role');
             // Kolom untuk permission tambahan sementara (opsional, jika diperlukan).
-            $table->string('temporary_permission')->nullable()->after('temporary_role');
+            // Memakai text agar mampu menampung daftar permission lengkap dari role target (US-1.6/K-MTG-03).
+            $table->text('temporary_permission')->nullable()->after('temporary_role');
             // Timestamp kapan switch role dilakukan (untuk audit).
             $table->timestamp('temporary_role_started_at')->nullable()->after('temporary_permission');
             // User ID yang melakukan switch (untuk audit trail, biasanya sama dengan id user sendiri).

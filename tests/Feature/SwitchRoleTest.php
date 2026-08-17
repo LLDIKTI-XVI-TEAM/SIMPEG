@@ -274,10 +274,10 @@ class SwitchRoleTest extends TestCase
     {
         $user = $this->createUserWithRole('super_admin');
 
-        // Switch dengan temporary_permission kustom
+        // Switch dengan temporary_permission yang merupakan subset hak role pegawai
         $this->actingAs($user)->post(route('switch-role'), [
             'target_role' => 'pegawai',
-            'temporary_permission' => json_encode(['employees.read_self', 'special.custom_permission']),
+            'temporary_permission' => json_encode(['employees.read_self', 'employee_histories.read']),
         ]);
 
         $user->refresh();
@@ -285,7 +285,7 @@ class SwitchRoleTest extends TestCase
         $this->assertNotNull($user->temporary_permission);
 
         // Permission yang terdaftar di temporary_permission harus true
-        $this->assertTrue($user->hasPermission('special.custom_permission'));
+        $this->assertTrue($user->hasPermission('employee_histories.read'));
         $this->assertTrue($user->hasPermission('employees.read_self'));
 
         // Permission di luar temporary_permission harus false
@@ -296,6 +296,70 @@ class SwitchRoleTest extends TestCase
         $user->refresh();
         $this->assertNull($user->temporary_permission);
         $this->assertNull($user->temporary_role);
+    }
+
+    public function test_switch_role_rejects_temporary_permission_outside_target_role(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // cuti.read_all bukan milik role pegawai -> harus ditolak oleh validasi server-side
+        $response = $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+            'temporary_permission' => json_encode(['cuti.read_all']),
+        ]);
+
+        $response->assertSessionHasErrors('temporary_permission');
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+        $this->assertNull($user->temporary_permission);
+    }
+
+    public function test_switch_role_rejects_overlong_temporary_permission(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $response = $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+            'temporary_permission' => str_repeat('x', 2001),
+        ]);
+
+        $response->assertSessionHasErrors('temporary_permission');
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+    }
+
+    public function test_simulation_cancelled_by_mapping_change_logs_revert_role(): void
+    {
+        $actor = $this->createUserWithRole('super_admin');
+        $target = $this->createUserWithRole('super_admin');
+        $target->forceFill(['keycloak_id' => 'kc-simulation-cancel'])->save();
+
+        // Target switch ke admin_kepegawaian
+        $this->actingAs($target)->post(route('switch-role'), [
+            'target_role' => 'admin_kepegawaian',
+        ]);
+
+        $target->refresh();
+        $this->assertEquals('admin_kepegawaian', $target->temporary_role);
+
+        // Admin lain memetakan ulang target menjadi pegawai -> simulasi gugur
+        $this->actingAs($actor)->post(route('user-management.update'), [
+            'employee_id' => $target->employee_id,
+            'keycloak_id' => $target->keycloak_id,
+            'role' => 'pegawai',
+        ])->assertRedirect();
+
+        $target->refresh();
+        $this->assertEquals('pegawai', $target->role);
+        $this->assertNull($target->temporary_role);
+        $this->assertNull($target->temporary_permission);
+
+        // Pembatalan simulasi tercatat sebagai REVERT_ROLE dengan snapshot temporary_permission
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'REVERT_ROLE',
+            'auditable_type' => 'User',
+            'auditable_id' => $target->id,
+        ]);
     }
 
     public function test_audit_logs_record_simulation_context_during_active_temporary_role(): void

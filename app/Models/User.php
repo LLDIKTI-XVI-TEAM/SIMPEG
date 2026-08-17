@@ -98,12 +98,13 @@ class User extends Authenticatable
     /**
      * Mengecek apakah role pengguna memiliki permission tertentu.
      * Fail-closed: role kosong atau tidak terdaftar selalu mengembalikan false.
-     * Jika temporary_permission diisi secara eksplisit, evaluasi permission mengutamakan temporary_permission tersebut.
-     * Jika temporary_role aktif, permission dicek terhadap role efektif tersebut.
+     * temporary_permission hanya berlaku ketika temporary_role sedang aktif, dan nilainya selalu
+     * merupakan subset permission role target hasil validasi server-side.
+     * Jika temporary_role aktif tanpa temporary_permission, permission dicek terhadap role efektif tersebut.
      */
     public function hasPermission(string $permission): bool
     {
-        if ($this->temporary_permission !== null && $this->temporary_permission !== '') {
+        if ($this->temporary_role !== null && $this->temporary_permission !== null && $this->temporary_permission !== '') {
             $perms = json_decode($this->temporary_permission, true);
             if (is_array($perms)) {
                 return in_array($permission, $perms, true);

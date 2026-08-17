@@ -69,7 +69,9 @@ class UpdateUserMappingAction
 
                 // Jika role asli akun diubah dan temporary_role tidak lagi valid (misalnya role diturunkan
                 // sehingga temporary_role tidak lagi lebih rendah dari role baru), batalkan simulasi.
+                $simulationCancelled = false;
                 if ($user->temporary_role !== null && ! $user->canSwitchToRole($user->temporary_role)) {
+                    $simulationCancelled = true;
                     $user->temporary_role = null;
                     $user->temporary_permission = null;
                     $user->temporary_role_started_at = null;
@@ -87,6 +89,19 @@ class UpdateUserMappingAction
                         $this->auditValues($user),
                         $request,
                     );
+
+                    // Pembatalan simulasi karena perubahan role juga wajib diaudit agar jejak
+                    // SWITCH_ROLE tidak menggantung tanpa akhir yang dapat ditelusuri.
+                    if ($simulationCancelled) {
+                        $this->audit->logOrFail(
+                            'REVERT_ROLE',
+                            'User',
+                            $user->id,
+                            $oldValues,
+                            $this->auditValues($user),
+                            $request,
+                        );
+                    }
                 } catch (Throwable $exception) {
                     throw new UserMappingAuditException($exception);
                 }
@@ -224,6 +239,10 @@ class UpdateUserMappingAction
             'role' => $user->role,
             'mapping_status' => $user->keycloak_id ? 'connected' : 'disconnected',
             'keycloak_id_masked' => $this->maskIdentifier($user->keycloak_id),
+            'temporary_role' => $user->temporary_role,
+            'temporary_permission' => $user->temporary_permission,
+            'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
+            'temporary_role_switched_by' => $user->temporary_role_switched_by,
         ];
     }
 

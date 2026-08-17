@@ -22,6 +22,7 @@ class RevertRoleAction
         $oldValues = [
             'role' => $user->role,
             'temporary_role' => $user->temporary_role,
+            'temporary_permission' => $user->temporary_permission,
             'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
             'temporary_role_switched_by' => $user->temporary_role_switched_by,
         ];
