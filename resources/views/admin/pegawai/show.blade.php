@@ -91,6 +91,7 @@
         editingPendidikan: null,
         editPendidikanError: '',
         editPendidikanForm: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
+        _initialProgramStudiId: null,
         isUpdatingPendidikan: false,
         isDeletingPendidikan: false,
         
@@ -393,6 +394,8 @@
         // ===== LAZY FETCH & CACHING KELUARGA + PENDIDIKAN =====
         _keluargaCacheKey:  'keluarga_{{ $p->id }}',
         _pendidikanCacheKey: 'pendidikan_v2_{{ $p->id }}',
+        _pendidikanCacheVersion: @js($pendidikanCacheVersion ?? ''),
+        _pendidikanCacheTTL: 5*60*1000,
 
         formatDate(dateString) {
             if (!dateString || dateString === '-') return '-';
@@ -495,15 +498,28 @@
         },
 
         async fetchPendidikan() {
-            // Coba baca dari sessionStorage terlebih dahulu.
+            // Coba baca dari sessionStorage — validasi versi + TTL sebelum dipakai.
             const cached = sessionStorage.getItem(this._pendidikanCacheKey);
             if (cached) {
                 try {
-                    this.pendidikanList = JSON.parse(cached);
-                    return;
+                    const envelope = JSON.parse(cached);
+                    const isEnvelope = envelope && typeof envelope === 'object' && Array.isArray(envelope.data) && 'v' in envelope && 't' in envelope;
+                    if (isEnvelope) {
+                        const fresh = envelope.v === this._pendidikanCacheVersion && (Date.now() - envelope.t) < this._pendidikanCacheTTL;
+                        if (fresh) {
+                            this.pendidikanList = envelope.data;
+                            if (envelope.summary) this.pendidikanSummary = envelope.summary;
+                            return;
+                        }
+                    } else {
+                        // Cache lama tanpa envelope — pakai sebagai valid tapi upgrade ke envelope setelah fetch berikutnya
+                        this.pendidikanList = Array.isArray(envelope) ? envelope : (envelope.histories ?? envelope.data ?? envelope);
+                        if (Array.isArray(this.pendidikanList)) return;
+                    }
                 } catch (e) {
-                    sessionStorage.removeItem(this._pendidikanCacheKey);
+                    // corrupted — biarkan jatuh ke fetch
                 }
+                sessionStorage.removeItem(this._pendidikanCacheKey);
             }
             this.pendidikanLoading = true;
             try {
@@ -514,7 +530,7 @@
                 const json = await res.json();
                 this.pendidikanList = json.histories ?? [];
                 this.applyEducationSummary(json.education_summary);
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: json.education_summary ?? null }));
             } catch (e) {
                 console.error('Gagal memuat riwayat pendidikan:', e);
             } finally {
@@ -534,6 +550,7 @@
         openEditPendidikan(edu) {
             this.editingPendidikan = edu;
             this.editPendidikanError = '';
+            this._initialProgramStudiId = edu.program_studi_id ?? null;
             this.editPendidikanForm = {
                 jenjang_id:     edu.jenjang_id ?? '',
                 nama_institusi: edu.institusi ?? '',
@@ -547,6 +564,10 @@
         async submitEditPendidikan() {
             this.editPendidikanError = '';
             this.isUpdatingPendidikan = true;
+            const payload = { ...this.editPendidikanForm };
+            const cur = payload.program_studi_id || null;
+            const init = this._initialProgramStudiId ?? null;
+            if (cur === init) delete payload.program_studi_id;
             try {
                 const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${this.editingPendidikan.id}`, {
                     method: 'PUT',
@@ -556,7 +577,7 @@
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         'X-Requested-With': 'XMLHttpRequest',
                     },
-                    body: JSON.stringify(this.editPendidikanForm),
+                    body: JSON.stringify(payload),
                 });
                 const result = await res.json().catch(() => ({}));
                 if (!res.ok) {
@@ -581,7 +602,7 @@
                         download_url: h.download_url,
                     };
                 }
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
                 this.applyEducationSummary(result.education_summary);
                 this.showEditPendidikan = false;
                 this.editingPendidikan = null;
@@ -612,7 +633,7 @@
                     return;
                 }
                 this.pendidikanList.splice(index, 1);
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
                 this.applyEducationSummary(result.education_summary);
                 this.toast = { show: true, message: 'Riwayat pendidikan berhasil dihapus.', type: 'success' };
                 setTimeout(() => this.toast.show = false, 3000);
@@ -774,7 +795,7 @@
                             download_url:   h.download_url,
                         });
                         // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
-                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify(this.pendidikanList));
+                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
                         this.applyEducationSummary(result.education_summary);
                         this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
                     }

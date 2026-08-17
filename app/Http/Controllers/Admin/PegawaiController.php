@@ -428,7 +428,12 @@ class PegawaiController extends Controller
         $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName'));
+        $pendidikanCacheVersion = md5(
+            (string) (\App\Models\RefProgramStudi::max('updated_at') ?? '0').'|'.
+            (string) ($p->educationHistories()->max('updated_at') ?? '0')
+        );
+
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'pendidikanCacheVersion'));
     }
 
     public function edit($id, PrepareEmployeeEditFormDataAction $action)
@@ -666,6 +671,8 @@ class PegawaiController extends Controller
             $action->execute($employee, $request);
 
             return response()->json(['success' => true, 'message' => 'Data riwayat berhasil disimpan.']);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
