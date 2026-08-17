@@ -362,8 +362,8 @@ class EmployeeDocumentStatusServiceTest extends TestCase
             'tmt_pengangkatan' => '2020-01-01',
             'no_sk' => 'SK/LAMA/2020',
             'file_sk' => $filePathLama,
-            'created_at' => now()->subDay(),
         ]);
+        DB::table('appointments')->where('id', $appointmentLama->id)->update(['created_at' => now()->subDays(2)]);
 
         // Appointment baru dengan TMT yang sama tapi created_at lebih baru
         $appointmentBaru = Appointment::create([
@@ -372,8 +372,8 @@ class EmployeeDocumentStatusServiceTest extends TestCase
             'tmt_pengangkatan' => '2020-01-01',
             'no_sk' => 'SK/BARU/2020',
             'file_sk' => $filePathBaru,
-            'created_at' => now(),
         ]);
+        DB::table('appointments')->where('id', $appointmentBaru->id)->update(['created_at' => now()]);
 
         $result = $this->service->summarize($employee->fresh());
         $skPengangkatan = collect($result['required_sks'])->firstWhere('jenis', 'sk_pengangkatan');

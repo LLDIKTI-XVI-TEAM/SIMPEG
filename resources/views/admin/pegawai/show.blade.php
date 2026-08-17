@@ -33,6 +33,7 @@
                 'kategori_label' => \App\Support\Documents\DocumentCategory::label($d->jenis_dokumen),
                 'nomor_dokumen'  => $d->nomor_dokumen,
                 'tanggal_dokumen'=> $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('d-m-Y') : null,
+                'tanggal_dokumen_raw' => $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('Y-m-d') : null,
                 'file_size'      => $d->fileSizeLabel(),
                 'file_path'      => $d->file_path,
                 'file_tersedia'  => $d->fileExists(),
@@ -329,15 +330,32 @@
         },
 
         // ===== Unggah arsip / perbaiki berkas SK =====
-        openSkFileModal(kategori = 'sk_pangkat') {
-            this.skFileForm = { kategori_dokumen: kategori, nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null };
-            this.skFileError = '';
-            this.skFileErrors = {};
-            this.skFileHint = '';
-            this.skNomorFromAutofill = false;
-            this.skTanggalFromAutofill = false;
-            this.showSkFileModal = true;
-            this.$nextTick(() => this.prefillSkFileMetadata());
+        openSkFileModal(kategori = 'sk_pangkat', doc = null) {
+            if (doc) {
+                this.skFileForm = {
+                    kategori_dokumen: doc.jenis_dokumen || kategori,
+                    nama_dokumen: doc.nama_dokumen || '',
+                    nomor_dokumen: doc.nomor_dokumen || '',
+                    tanggal_terbit: doc.tanggal_dokumen_raw || '',
+                    deskripsi: doc.keterangan || '',
+                    file: null
+                };
+                this.skFileError = '';
+                this.skFileErrors = {};
+                this.skFileHint = 'Mengunggah berkas baru untuk dokumen ini.';
+                this.skNomorFromAutofill = false;
+                this.skTanggalFromAutofill = false;
+                this.showSkFileModal = true;
+            } else {
+                this.skFileForm = { kategori_dokumen: kategori, nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null };
+                this.skFileError = '';
+                this.skFileErrors = {};
+                this.skFileHint = '';
+                this.skNomorFromAutofill = false;
+                this.skTanggalFromAutofill = false;
+                this.showSkFileModal = true;
+                this.$nextTick(() => this.prefillSkFileMetadata());
+            }
         },
         async prefillSkFileMetadata() {
             const category = this.skFileForm.kategori_dokumen;

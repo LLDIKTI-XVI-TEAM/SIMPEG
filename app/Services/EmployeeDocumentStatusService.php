@@ -88,29 +88,79 @@ class EmployeeDocumentStatusService
         $sources = [
             'sk_pengangkatan' => $this->historySources(
                 $employee->appointments
-                    ->sortBy([
-                        fn ($item) => $item->tmt_pengangkatan?->timestamp ?? 0,
-                        fn ($item) => $item->created_at?->timestamp ?? 0,
-                    ], descending: true)
+                    ->sort(function ($a, $b) {
+                        $tmtA = $a->tmt_pengangkatan?->timestamp ?? 0;
+                        $tmtB = $b->tmt_pengangkatan?->timestamp ?? 0;
+                        if ($tmtA !== $tmtB) {
+                            return $tmtB <=> $tmtA;
+                        }
+
+                        $createdA = $a->created_at?->timestamp ?? 0;
+                        $createdB = $b->created_at?->timestamp ?? 0;
+                        if ($createdA !== $createdB) {
+                            return $createdB <=> $createdA;
+                        }
+
+                        return strcmp((string) $b->id, (string) $a->id);
+                    })
                     ->values()
             ),
             'sk_pangkat' => $this->historySources(
-                $employee->rankHistories->sortBy([
-                    fn ($item) => $item->is_latest ? 1 : 0,
-                    fn ($item) => $item->tmt_pangkat?->timestamp ?? 0,
-                ], descending: true)->values()
+                $employee->rankHistories
+                    ->sort(function ($a, $b) {
+                        $latestA = $a->is_latest ? 1 : 0;
+                        $latestB = $b->is_latest ? 1 : 0;
+                        if ($latestA !== $latestB) {
+                            return $latestB <=> $latestA;
+                        }
+
+                        $tmtA = $a->tmt_pangkat?->timestamp ?? 0;
+                        $tmtB = $b->tmt_pangkat?->timestamp ?? 0;
+                        if ($tmtA !== $tmtB) {
+                            return $tmtB <=> $tmtA;
+                        }
+
+                        return ($b->created_at?->timestamp ?? 0) <=> ($a->created_at?->timestamp ?? 0);
+                    })
+                    ->values()
             ),
             'sk_jabatan' => $this->historySources(
-                $employee->positionHistories->sortBy([
-                    fn ($item) => $item->is_latest ? 1 : 0,
-                    fn ($item) => $item->tmt_jabatan?->timestamp ?? 0,
-                ], descending: true)->values()
+                $employee->positionHistories
+                    ->sort(function ($a, $b) {
+                        $latestA = $a->is_latest ? 1 : 0;
+                        $latestB = $b->is_latest ? 1 : 0;
+                        if ($latestA !== $latestB) {
+                            return $latestB <=> $latestA;
+                        }
+
+                        $tmtA = $a->tmt_jabatan?->timestamp ?? 0;
+                        $tmtB = $b->tmt_jabatan?->timestamp ?? 0;
+                        if ($tmtA !== $tmtB) {
+                            return $tmtB <=> $tmtA;
+                        }
+
+                        return ($b->created_at?->timestamp ?? 0) <=> ($a->created_at?->timestamp ?? 0);
+                    })
+                    ->values()
             ),
             'sk_kgb' => $this->historySources(
-                $employee->salaryHistories->sortBy([
-                    fn ($item) => $item->is_latest ? 1 : 0,
-                    fn ($item) => $item->tmt_kgb?->timestamp ?? 0,
-                ], descending: true)->values()
+                $employee->salaryHistories
+                    ->sort(function ($a, $b) {
+                        $latestA = $a->is_latest ? 1 : 0;
+                        $latestB = $b->is_latest ? 1 : 0;
+                        if ($latestA !== $latestB) {
+                            return $latestB <=> $latestA;
+                        }
+
+                        $tmtA = $a->tmt_kgb?->timestamp ?? 0;
+                        $tmtB = $b->tmt_kgb?->timestamp ?? 0;
+                        if ($tmtA !== $tmtB) {
+                            return $tmtB <=> $tmtA;
+                        }
+
+                        return ($b->created_at?->timestamp ?? 0) <=> ($a->created_at?->timestamp ?? 0);
+                    })
+                    ->values()
             ),
         ];
 
