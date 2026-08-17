@@ -253,8 +253,9 @@ Modal dialog serbaguna berbasis Alpine.js dengan transisi halus dan penanganan a
 **Contoh Penggunaan**:
 ```blade
 <x-ui.modal show="openModal" title="Tambah Data Riwayat" maxWidth="lg" closeAction="openModal = false">
-    {{-- Form diberi ID agar tombol submit pada slot footer tetap dapat mengirimkan form --}}
-    <form id="form-tambah-riwayat" class="space-y-4">
+    {{-- Form diberi ID, method POST, endpoint action, dan token @csrf agar tombol submit pada slot footer terhubung dan mengirimkan data mutasi --}}
+    <form id="form-tambah-riwayat" method="POST" action="{{ route('pegawai.store') }}" class="space-y-4">
+        @csrf
         <x-form.input name="nomor_sk" label="Nomor SK" required />
     </form>
     
@@ -280,6 +281,29 @@ Sakelar toggle boolean (switch) berbasis CSS peer-checked.
 **Contoh Penggunaan**:
 ```blade
 <x-ui.toggle name="is_active" :checked="true" />
+```
+
+---
+
+### 🔀 `x-ui.segmented-control` & `x-ui.segmented-item`
+Kontrol pemilih segmen opsi kompak berbasis tombol tab terpadu.
+
+**Props `x-ui.segmented-control`**:
+- `label`: (string|null) Aksesibilitas `aria-label`.
+
+**Props `x-ui.segmented-item`**:
+- `active`: (string, required) Ekspresi boolean Alpine.js untuk menandai item aktif (misal: `currentMode === 'ringkas'`).
+- `click`: (string|null) Handler Alpine.js saat item diklik (misal: `currentMode = 'ringkas'`).
+- `type`: (string, default: `'button'`).
+
+**Contoh Penggunaan**:
+```blade
+<div x-data="{ currentMode: 'ringkas' }">
+    <x-ui.segmented-control label="Mode Tampilan">
+        <x-ui.segmented-item active="currentMode === 'ringkas'" @click="currentMode = 'ringkas'">Ringkas</x-ui.segmented-item>
+        <x-ui.segmented-item active="currentMode === 'detail'" @click="currentMode = 'detail'">Detail</x-ui.segmented-item>
+    </x-ui.segmented-control>
+</div>
 ```
 
 ---
@@ -457,7 +481,7 @@ Komponen tabel data lengkap yang menggabungkan bar filter pencarian, pengurutan 
 Direktori: `resources/views/components/form/`
 
 Komponen input teks, select, date, textarea, dan checkbox secara otomatis terintegrasi dengan validasi Laravel (`$errors`), old value (`old()`), penentuan ID otomatis, serta accessibility label (`aria-describedby` & `aria-invalid`).  
-> *Catatan: Komponen `<x-form.file-upload>` secara teknis dikecualikan dari pemulihan nilai `old()` karena batasan keamanan standar browser.*
+> *Catatan: Nilai `old()` sengaja tidak dipulihkan pada `<x-form.input type="password">` demi standar keamanan autentikasi, serta pada `<x-form.file-upload>` karena batasan keamanan standar browser.*
 
 ### 1. `x-form.input`
 Input teks, nomor, email, password.
