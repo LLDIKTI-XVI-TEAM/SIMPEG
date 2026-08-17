@@ -487,10 +487,12 @@ Komponen tabel data lengkap yang menggabungkan bar filter pencarian, pengurutan 
 
 ## 📝 4. Katalog Komponen Form (`<x-form.*>`)
 
-Direktori: `resources/views/components/form/`
+Komponen form terintegrasi dengan validasi Laravel (`$errors`), penentuan ID otomatis, serta accessibility label (`aria-describedby` & `aria-invalid`). Pemulihan nilai input sebelumnya via `old()` didukung penuh untuk input teks, select, date, dan textarea.
 
-Komponen input teks, select, date, textarea, dan checkbox secara otomatis terintegrasi dengan validasi Laravel (`$errors`), old value (`old()`), penentuan ID otomatis, serta accessibility label (`aria-describedby` & `aria-invalid`).  
-> *Catatan: Nilai `old()` sengaja tidak dipulihkan pada `<x-form.input type="password">` demi standar keamanan autentikasi, serta pada `<x-form.file-upload>` karena batasan keamanan standar browser.*
+> *Catatan Penanganan Nilai `old()`*:
+> - **Input Password**: `<x-form.input type="password">` sengaja tidak mengisi nilai `old()` demi standar keamanan autentikasi.
+> - **File Upload**: `<x-form.file-upload>` tidak memulihkan nilai `old()` karena batasan keamanan standar browser.
+> - **Checkbox**: Karena browser tidak mengirimkan data saat checkbox tidak dicentang (*unchecked*), `<x-form.checkbox>` mengevaluasi `old($field, $checked)`. Untuk form dengan nilai awal `checked=true`, disarankan menyertakan hidden input bernilai `0` sebelum checkbox jika ingin mempertahankan status unchecked saat validasi gagal.
 
 ### 1. `x-form.input`
 Input teks, nomor, email, password.
@@ -541,7 +543,7 @@ Input kotak centang pilihan boolean.
 <x-form.checkbox 
     name="is_active" 
     label="Status Aktif" 
-    :checked="true" 
+    value="1" 
 />
 ```
 
