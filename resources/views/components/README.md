@@ -222,7 +222,7 @@ Modal konfirmasi aksi berbahaya (soft delete, reset, mutasi status) dengan pengi
     message="Apakah Anda yakin ingin menonaktifkan {{ $pegawai->nama }}? Pegawai ini akan dipindahkan ke daftar nonaktif."
     confirmText="Nonaktifkan"
     variant="danger"
-    :action="route('pegawai.deactivate', $pegawai->id)"
+    :action="route('pegawai.destroy', $pegawai->id)"
     method="POST"
 >
     <x-slot:trigger>
@@ -252,17 +252,18 @@ Modal dialog serbaguna berbasis Alpine.js dengan transisi halus dan penanganan a
 
 **Contoh Penggunaan**:
 ```blade
-<x-ui.modal show="openModal" title="Tambah Data Riwayat" maxWidth="lg" closeAction="openModal = false">
+<x-ui.modal show="openModal" title="Tambah Jenjang Pendidikan" maxWidth="md" closeAction="openModal = false">
     {{-- Form diberi ID, method POST, endpoint action, dan token @csrf agar tombol submit pada slot footer terhubung dan mengirimkan data mutasi --}}
-    <form id="form-tambah-riwayat" method="POST" action="{{ route('pegawai.store') }}" class="space-y-4">
+    <form id="form-tambah-jenjang" method="POST" action="{{ route('data-master.jenjang-pendidikan.store') }}" class="space-y-4">
         @csrf
-        <x-form.input name="nomor_sk" label="Nomor SK" required />
+        <x-form.input name="nama" label="Nama Jenjang" placeholder="Contoh: S1 / Sarjana" required />
+        <x-form.input name="tingkat" label="Tingkat" type="number" placeholder="Contoh: 6" required />
     </form>
     
     <x-slot:footer>
         <div class="flex justify-end gap-2">
             <x-ui.button variant="secondary" size="sm" @click="openModal = false">Batal</x-ui.button>
-            <x-ui.button variant="primary" size="sm" type="submit" form="form-tambah-riwayat">Simpan</x-ui.button>
+            <x-ui.button variant="primary" size="sm" type="submit" form="form-tambah-jenjang">Simpan</x-ui.button>
         </div>
     </x-slot:footer>
 </x-ui.modal>
