@@ -17,7 +17,7 @@ class BackfillProgramStudiReferences
         $names = DB::table('employees')->whereNotNull('prodi_pendidikan_terakhir')->pluck('prodi_pendidikan_terakhir')
             ->merge(DB::table('education_histories')->whereNotNull('jurusan')->pluck('jurusan'))
             ->map(function ($name): array {
-                $normalizedName = ProgramStudiNameNormalizer::normalize($name);
+                $normalizedName = ProgramStudiNameNormalizer::normalize((string) $name);
 
                 return ['nama' => $normalizedName, 'key' => ProgramStudiNameNormalizer::key($normalizedName)];
             })
@@ -39,14 +39,14 @@ class BackfillProgramStudiReferences
         }
 
         DB::table('employees')->select(['id', 'prodi_pendidikan_terakhir'])->orderBy('id')->each(function (object $employee) use ($idsByName): void {
-            $key = ProgramStudiNameNormalizer::key($employee->prodi_pendidikan_terakhir);
+            $key = ProgramStudiNameNormalizer::key((string) $employee->prodi_pendidikan_terakhir);
             if ($key !== '' && isset($idsByName[$key])) {
                 DB::table('employees')->where('id', $employee->id)->update(['program_studi_id' => $idsByName[$key]]);
             }
         });
 
         DB::table('education_histories')->select(['id', 'jurusan'])->orderBy('id')->each(function (object $history) use ($idsByName): void {
-            $key = ProgramStudiNameNormalizer::key($history->jurusan);
+            $key = ProgramStudiNameNormalizer::key((string) $history->jurusan);
             if ($key !== '' && isset($idsByName[$key])) {
                 DB::table('education_histories')->where('id', $history->id)->update(['program_studi_id' => $idsByName[$key]]);
             }

@@ -94,6 +94,31 @@ class DataMasterProgramStudiTest extends TestCase
         $this->assertSame('Teknik Informatika', $programStudi->nama);
     }
 
+    public function test_store_rejects_array_program_studi_name_as_validation_error(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+
+        $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.store'), [
+            'nama' => ['Teknik Informatika'],
+        ])->assertSessionHasErrors('nama');
+
+        $this->assertDatabaseCount('ref_program_studi', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_update_rejects_numeric_program_studi_name_as_validation_error(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Hukum']);
+
+        $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.update', $programStudi), [
+            'nama' => 123,
+        ])->assertSessionHasErrors('nama');
+
+        $this->assertSame('Hukum', $programStudi->fresh()->nama);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
     public function test_renaming_program_studi_syncs_education_and_employee_snapshots(): void
     {
         $user = User::factory()->superAdmin()->create();

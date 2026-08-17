@@ -13,7 +13,7 @@ return new class extends Migration
             $groups = [];
 
             foreach (DB::table('ref_program_studi')->orderBy('created_at')->orderBy('id')->get() as $programStudi) {
-                $nama = ProgramStudiNameNormalizer::normalize($programStudi->nama);
+                $nama = ProgramStudiNameNormalizer::normalize((string) $programStudi->nama);
                 $key = ProgramStudiNameNormalizer::key($nama);
 
                 if (! isset($groups[$key])) {

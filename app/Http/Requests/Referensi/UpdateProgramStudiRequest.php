@@ -10,8 +10,10 @@ class UpdateProgramStudiRequest extends FormRequest
 {
     protected function prepareForValidation(): void
     {
-        if ($this->has('nama')) {
-            $this->merge(['nama' => ProgramStudiNameNormalizer::normalize($this->input('nama'))]);
+        $name = $this->input('nama');
+
+        if (is_string($name)) {
+            $this->merge(['nama' => ProgramStudiNameNormalizer::normalize($name)]);
         }
     }
 
@@ -28,6 +30,7 @@ class UpdateProgramStudiRequest extends FormRequest
 
         return [
             'nama' => [
+                'bail',
                 'required',
                 'string',
                 'max:255',
