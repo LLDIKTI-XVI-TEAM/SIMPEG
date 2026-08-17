@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -308,7 +310,7 @@ class SwitchRoleTest extends TestCase
         $user->refresh();
 
         // Aksi yang memicu audit selama simulasi
-        \App\Services\AuditService::log(
+        AuditService::log(
             'UPDATE',
             'Employee',
             $user->employee_id,
@@ -316,7 +318,7 @@ class SwitchRoleTest extends TestCase
             ['keterangan' => 'baru'],
         );
 
-        $audit = \App\Models\AuditLog::where('event', 'UPDATE')
+        $audit = AuditLog::where('event', 'UPDATE')
             ->where('auditable_type', 'Employee')
             ->where('user_id', $user->id)
             ->latest('created_at')
