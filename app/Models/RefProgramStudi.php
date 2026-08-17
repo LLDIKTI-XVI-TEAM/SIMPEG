@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
 use App\Observers\RefProgramStudiObserver;
+use App\Support\ProgramStudi\ProgramStudiNameNormalizer;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -30,7 +31,7 @@ class RefProgramStudi extends Model
     /** Samakan nilai tersimpan dan input validasi dalam bentuk kanonis. */
     public function setNamaAttribute(string $value): void
     {
-        $this->attributes['nama'] = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
+        $this->attributes['nama'] = ProgramStudiNameNormalizer::normalize($value);
     }
 
     /** @return HasMany<Employee, $this> */

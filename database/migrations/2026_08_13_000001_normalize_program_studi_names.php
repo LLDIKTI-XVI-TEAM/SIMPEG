@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\ProgramStudi\ProgramStudiNameNormalizer;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
@@ -12,8 +13,8 @@ return new class extends Migration
             $groups = [];
 
             foreach (DB::table('ref_program_studi')->orderBy('created_at')->orderBy('id')->get() as $programStudi) {
-                $nama = preg_replace('/\s+/u', ' ', trim((string) $programStudi->nama)) ?? trim((string) $programStudi->nama);
-                $key = mb_strtolower($nama);
+                $nama = ProgramStudiNameNormalizer::normalize($programStudi->nama);
+                $key = ProgramStudiNameNormalizer::key($nama);
 
                 if (! isset($groups[$key])) {
                     $groups[$key] = [
@@ -54,7 +55,7 @@ return new class extends Migration
         });
 
         if (DB::connection()->getDriverName() === 'pgsql') {
-            DB::statement("CREATE UNIQUE INDEX ref_program_studi_normalized_name_unique ON ref_program_studi (LOWER(REGEXP_REPLACE(TRIM(nama), '\\s+', ' ', 'g')))");
+            DB::statement("CREATE UNIQUE INDEX ref_program_studi_normalized_name_unique ON ref_program_studi (LOWER(TRIM(REGEXP_REPLACE(nama, '\\s+', ' ', 'g'))))");
         } else {
             DB::statement('CREATE UNIQUE INDEX ref_program_studi_normalized_name_unique ON ref_program_studi (LOWER(nama))');
         }

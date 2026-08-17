@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Referensi;
 
 use App\Models\RefProgramStudi;
+use App\Support\ProgramStudi\ProgramStudiNameNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreProgramStudiRequest extends FormRequest
@@ -10,7 +11,7 @@ class StoreProgramStudiRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->has('nama')) {
-            $this->merge(['nama' => preg_replace('/\s+/u', ' ', trim((string) $this->input('nama')))]);
+            $this->merge(['nama' => ProgramStudiNameNormalizer::normalize($this->input('nama'))]);
         }
     }
 

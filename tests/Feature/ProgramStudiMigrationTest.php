@@ -54,7 +54,7 @@ class ProgramStudiMigrationTest extends TestCase
         DB::table('ref_program_studi')->insert([
             [
                 'id' => $canonicalId,
-                'nama' => 'Teknik   Informatika',
+                'nama' => "\u{00A0}Teknik\u{2003}\u{2003}Informatika\u{00A0}",
                 'is_active' => true,
                 'created_at' => $now,
                 'updated_at' => $now,

@@ -85,6 +85,15 @@ class DataMasterProgramStudiTest extends TestCase
         ])->assertSessionHasErrors('nama');
     }
 
+    public function test_direct_model_write_normalizes_unicode_whitespace(): void
+    {
+        $programStudi = RefProgramStudi::create([
+            'nama' => "\u{00A0}Teknik\u{2003}\u{2003}Informatika\u{00A0}",
+        ]);
+
+        $this->assertSame('Teknik Informatika', $programStudi->nama);
+    }
+
     public function test_renaming_program_studi_syncs_education_and_employee_snapshots(): void
     {
         $user = User::factory()->superAdmin()->create();
