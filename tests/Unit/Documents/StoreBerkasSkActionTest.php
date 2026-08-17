@@ -290,4 +290,51 @@ class StoreBerkasSkActionTest extends TestCase
         // File lama harus tetap ada karena masih dipakai riwayat pendidikan
         Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
     }
+
+    public function test_replace_pengangkatan_cleanup_old_document_path_yang_berbeda_dari_appointment(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+
+        // appointment.file_sk = A
+        $appointmentPath = 'sk/appointment-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($appointmentPath, 'appointment lama');
+        $employee->appointments()->create([
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK/ANGKAT/A',
+            'tanggal_sk' => '2019-12-01',
+            'file_sk' => $appointmentPath,
+        ]);
+
+        // Document sk_pengangkatan terbaru memakai path B yang TIDAK cocok dengan A
+        // (fallback ke latest dokumen, bukan path appointment).
+        $documentPath = 'sk/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($documentPath, 'dokumen lama');
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pengangkatan',
+            'nama_dokumen' => 'SK Pengangkatan Lama',
+            'file_path' => $documentPath,
+        ]);
+
+        $action = app(StoreBerkasSkAction::class);
+        $document = $action->execute($employee, [
+            'kategori_dokumen' => 'sk_pengangkatan',
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2022-01-01',
+            'no_sk' => 'SK/ANGKAT/BARU',
+            'tanggal_sk' => '2021-12-01',
+            'file_sk' => UploadedFile::fake()->create('sk-baru.pdf', 80, 'application/pdf'),
+        ], request());
+
+        // Appointment & Document menunjuk ke file baru.
+        $this->assertSame($document->file_path, $employee->appointments()->first()?->file_sk);
+        $this->assertSame($document->file_path, $document->fresh()->file_path);
+
+        // Kedua path lama (appointment A dan dokumen B) tidak lagi direferensikan → dihapus.
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($appointmentPath);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($documentPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists((string) $document->file_path);
+    }
 }

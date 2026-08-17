@@ -3,9 +3,11 @@
 namespace Tests\Feature\Documents;
 
 use App\Models\Document;
+use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
+use App\Models\RefJenjangPendidikan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -195,7 +197,8 @@ class EmployeeDocumentApiTest extends TestCase
         $this->post("/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}", [
             'nama_dokumen' => 'SK Pangkat Diubah',
             'kategori_dokumen' => 'sk_pangkat',
-        ], ['Accept' => 'application/json'])->assertForbidden();
+        ], ['Accept' => 'application/json'])->assertUnprocessable()
+            ->assertJsonValidationErrors('kategori_dokumen');
 
         $this->assertSame('SK Pangkat', $document->refresh()->nama_dokumen);
     }
@@ -221,5 +224,71 @@ class EmployeeDocumentApiTest extends TestCase
             'employee_id' => $otherEmployee->id,
             'nama_dokumen' => 'Dokumen Milik Route',
         ]);
+    }
+
+    public function test_update_cannot_reclassify_non_sk_to_sk_category(): void
+    {
+        // Direct API caller tidak boleh mengubah ktp_kk/ijazah/lainnya menjadi
+        // kategori SK tanpa melewati jalur riwayat append-only & permission
+        // employee_histories.create.
+        $this->actingAsRole('admin_kepegawaian');
+        $employee = Employee::factory()->create();
+        $path = 'berkas/ktp.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($path, 'isi');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'KTP',
+            'file_path' => $path,
+        ]);
+
+        $this->post("/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}", [
+            'nama_dokumen' => 'SK Pangkat',
+            'kategori_dokumen' => 'sk_pangkat',
+        ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('kategori_dokumen');
+
+        $this->assertSame('ktp_kk', $document->refresh()->jenis_dokumen);
+        $this->assertSame('KTP', $document->refresh()->nama_dokumen);
+    }
+
+    public function test_replace_ijazah_syncs_education_history_file_ijazah(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+        $employee = Employee::factory()->create();
+        $oldPath = 'berkas/ijazah-lama.pdf';
+        $newPath = 'berkas/ijazah-baru.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'ijazah lama');
+        Storage::disk(Document::STORAGE_DISK)->put($newPath, 'ijazah baru');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Ijazah',
+            'file_path' => $oldPath,
+        ]);
+
+        $jenjang = RefJenjangPendidikan::firstOrCreate(['nama' => 'S1'], ['urutan' => 1, 'is_active' => true]);
+        $education = EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => $jenjang->id,
+            'nama_institusi' => 'Universitas Test',
+            'tahun_lulus' => 2019,
+            'file_ijazah' => $oldPath,
+        ]);
+
+        $this->post("/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}", [
+            'nama_dokumen' => 'Ijazah Baru',
+            'kategori_dokumen' => 'ijazah',
+            'berkas' => UploadedFile::fake()->create('ijazah-baru.pdf', 80, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertOk();
+
+        // EducationHistory.file_ijazah harus di-sync ke path baru, bukan dangling ke file lama.
+        $this->assertSame($document->refresh()->file_path, $education->refresh()->file_ijazah);
+        $this->assertNotSame($oldPath, $education->refresh()->file_ijazah);
+        Storage::disk(Document::STORAGE_DISK)->assertExists((string) $education->refresh()->file_ijazah);
     }
 }

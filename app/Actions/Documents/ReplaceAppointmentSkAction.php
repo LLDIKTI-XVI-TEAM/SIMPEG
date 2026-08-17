@@ -44,7 +44,7 @@ class ReplaceAppointmentSkAction
         $transactionCommitted = false;
 
         try {
-            [$document, $oldFilePath] = DB::transaction(function () use ($employee, $data, $newPath, $request): array {
+            [$document, $oldFilePath, $oldDocumentPath] = DB::transaction(function () use ($employee, $data, $newPath, $request): array {
                 $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
 
                 $appointment = $employee->appointments()
@@ -90,7 +90,7 @@ class ReplaceAppointmentSkAction
                     );
                 }
 
-                [$document] = $this->replaceDocument($employee, $appointment, $oldFilePath, $newPath);
+                [$document, $oldDocumentPath] = $this->replaceDocument($employee, $appointment, $oldFilePath, $newPath);
 
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
                     strtoupper((string) $appointment->jenis_pengangkatan),
@@ -101,7 +101,7 @@ class ReplaceAppointmentSkAction
 
                 $this->tmtCalculator->syncForEmployee($employee);
 
-                return [$document, $oldFilePath];
+                return [$document, $oldFilePath, $oldDocumentPath];
             });
 
             $transactionCommitted = true;
@@ -113,10 +113,13 @@ class ReplaceAppointmentSkAction
         }
 
         // Cleanup file lama dilakukan di luar blok try-catch transaksi:
-        // kegagalan cleanup pasca-commit tidak boleh membatalkan file baru yang sudah sah di database
+        // kegagalan cleanup pasca-commit tidak boleh membatalkan file baru yang sudah sah di database.
+        // Cleanup dilakukan untuk keduanya: path appointment lama DAN path dokumen lama yang diganti.
         try {
-            if (filled($oldFilePath) && $oldFilePath !== $newPath && ! $this->fileIsStillReferenced($oldFilePath)) {
-                Storage::disk(Document::STORAGE_DISK)->delete($oldFilePath);
+            foreach (array_filter([$oldFilePath, $oldDocumentPath]) as $stalePath) {
+                if ($stalePath !== $newPath && ! $this->fileIsStillReferenced($stalePath)) {
+                    Storage::disk(Document::STORAGE_DISK)->delete($stalePath);
+                }
             }
         } catch (\Throwable $cleanupException) {
             // Catat log jika cleanup gagal, tetapi tidak mengganggu kembalian dokumen
@@ -127,7 +130,7 @@ class ReplaceAppointmentSkAction
     }
 
     /**
-     * @return array{0: Document, 1: string|null}
+     * @return array{0: Document, 1: string|null} 0: dokumen arsip, 1: path file lama dokumen yang diganti
      */
     private function replaceDocument(
         Employee $employee,
@@ -152,6 +155,10 @@ class ReplaceAppointmentSkAction
             ->lockForUpdate()
             ->first();
 
+        // Path lama dokumen arsip sebelum di-update. Bisa berbeda dari oldFilePath
+        // (path appointment) bila fallback ke latest dokumen sk_pengangkatan.
+        $oldDocumentPath = $document?->file_path;
+
         $payload = [
             'jenis_dokumen' => 'sk_pengangkatan',
             'nama_dokumen' => 'SK Pengangkatan '.$appointment->jenis_pengangkatan,
@@ -165,7 +172,7 @@ class ReplaceAppointmentSkAction
             $document = $employee->documents()->create($payload);
             AuditService::logOrFail('CREATE', 'Document', $document->id, null, $this->auditPayload($document));
 
-            return [$document, $oldFilePath];
+            return [$document, null];
         }
 
         $oldValues = $this->auditPayload($document);
@@ -178,7 +185,7 @@ class ReplaceAppointmentSkAction
             $this->auditPayload($document->fresh()),
         );
 
-        return [$document, $oldFilePath];
+        return [$document, $oldDocumentPath];
     }
 
     /**

@@ -40,6 +40,7 @@ class ShowEmployeeDocumentStatusAction
     public function execute(Employee $employee): array
     {
         $employee->load([
+            'jenisPegawai:id,nama',
             'rankHistories' => fn ($query) => $query
                 ->select(['id', 'employee_id', 'golongan_id', 'no_sk', 'tanggal_sk', 'tmt_pangkat', 'file_sk', 'is_latest'])
                 ->with('golongan:id,kode,nama')

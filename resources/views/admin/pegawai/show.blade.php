@@ -168,18 +168,6 @@
         skUploadErrors: {},
         newSk: { kategori_dokumen: 'sk_pangkat', no_sk: '', tanggal_sk: '', file_sk: null, golongan_id: '', tmt_pangkat: '', jabatan_id: '', jenis_jabatan_id: '', unit_kerja_id: '', kelas_jabatan: '', tmt_jabatan: '', gaji_pokok: '', tmt_kgb: '', jenis_pengangkatan: 'CPNS', tmt_pengangkatan: '' },
 
-        // Unggah arsip / perbaiki berkas SK yang rusak
-        showSkFileModal: false,
-        isUploadingSkFile: false,
-        skFileError: '',
-        skFileErrors: {},
-        skFileHint: '',
-        skMetadataLoading: false,
-        skNomorFromAutofill: false,
-        skTanggalFromAutofill: false,
-        skFileController: null,
-        skFileForm: { kategori_dokumen: 'sk_pangkat', nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null },
-
         // Edit metadata berkas lainnya
         showEditBerkasModal: false,
         isUpdatingBerkas: false,
@@ -329,121 +317,17 @@
             }
         },
 
-        // ===== Unggah arsip / perbaiki berkas SK =====
-        openSkFileModal(kategori = 'sk_pangkat', doc = null) {
-            if (doc) {
-                this.skFileForm = {
-                    kategori_dokumen: doc.jenis_dokumen || kategori,
-                    nama_dokumen: doc.nama_dokumen || '',
-                    nomor_dokumen: doc.nomor_dokumen || '',
-                    tanggal_terbit: doc.tanggal_dokumen_raw || '',
-                    deskripsi: doc.keterangan || '',
-                    file: null
-                };
-                this.skFileError = '';
-                this.skFileErrors = {};
-                this.skFileHint = 'Mengunggah berkas baru untuk dokumen ini.';
-                this.skNomorFromAutofill = false;
-                this.skTanggalFromAutofill = false;
-                this.showSkFileModal = true;
-            } else {
-                this.skFileForm = { kategori_dokumen: kategori, nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null };
-                this.skFileError = '';
-                this.skFileErrors = {};
-                this.skFileHint = '';
-                this.skNomorFromAutofill = false;
-                this.skTanggalFromAutofill = false;
-                this.showSkFileModal = true;
-                this.$nextTick(() => this.prefillSkFileMetadata());
-            }
-        },
-        async prefillSkFileMetadata() {
-            const category = this.skFileForm.kategori_dokumen;
-            this.skFileHint = '';
-
-            if (this.skNomorFromAutofill)   { this.skFileForm.nomor_dokumen = ''; this.skNomorFromAutofill = false; }
-            if (this.skTanggalFromAutofill) { this.skFileForm.tanggal_terbit = ''; this.skTanggalFromAutofill = false; }
-
-            if (!['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan', 'sk_kgb'].includes(category)) {
-                if (this.skFileController) { this.skFileController.abort(); this.skFileController = null; }
-                return;
-            }
-
-            // Batalkan request sebelumnya agar respons lama tidak menulis ke form
-            // ketika pengguna berganti kategori pada koneksi lambat.
-            if (this.skFileController) this.skFileController.abort();
-            const controller = new AbortController();
-            this.skFileController = controller;
-            const snapshotCategory = category;
-
-            this.skMetadataLoading = true;
-            try {
-                const response = await fetch('/api/v1/pegawai/{{ $p->id }}/status-dokumen', {
-                    cache: 'no-store',
-                    signal: controller.signal,
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                });
-                if (!response.ok) throw new Error('Metadata SK tidak dapat dimuat.');
-
-                const data = await response.json();
-                if (this.skFileForm.kategori_dokumen !== snapshotCategory) return;
-
-                const sk = data.document_status?.required_sks?.find(item => item.jenis === snapshotCategory);
-                if (!sk || sk.status !== 'perlu_perbaikan') return;
-
-                if (sk.nomor_sk)   { this.skFileForm.nomor_dokumen = sk.nomor_sk;   this.skNomorFromAutofill = true; }
-                if (sk.tanggal_sk) { this.skFileForm.tanggal_terbit = sk.tanggal_sk; this.skTanggalFromAutofill = true; }
-                this.skFileHint = 'Nomor dan tanggal SK diambil dari metadata riwayat resmi dan tidak dapat diubah.';
-            } catch (error) {
-                if (error.name === 'AbortError') return;
-                this.skFileHint = error.message || 'Metadata SK tidak dapat dimuat.';
-            } finally {
-                this.skMetadataLoading = false;
-                if (this.skFileController === controller) this.skFileController = null;
-            }
-        },
-        async submitSkFile() {
-            if (!this.skFileForm.file) {
-                this.skFileError = 'Berkas wajib dipilih.';
-                return;
-            }
-            this.isUploadingSkFile = true;
-            this.skFileError = '';
-            this.skFileErrors = {};
-
-            const fd = new FormData();
-            fd.append('pegawai_id', '{{ $p->id }}');
-            fd.append('kategori_dokumen', this.skFileForm.kategori_dokumen);
-            fd.append('nama_dokumen', this.skFileForm.nama_dokumen || ('Berkas ' + this.skFileForm.kategori_dokumen.replace('_', ' ').toUpperCase()));
-            fd.append('nomor_dokumen', this.skFileForm.nomor_dokumen);
-            fd.append('tanggal_terbit', this.skFileForm.tanggal_terbit);
-            fd.append('deskripsi', this.skFileForm.deskripsi);
-            fd.append('berkas', this.skFileForm.file);
-
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen`, {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: fd,
-                });
-
-                if (res.ok) {
-                    // Perbaikan menyentuh riwayat kanonis dan status kelengkapan;
-                    // muat ulang agar seluruh tabel dan badge sinkron.
-                    this.invalidateDokumenCache();
-                    window.location.reload();
-                } else if (res.status === 422) {
-                    const json = await res.json();
-                    this.skFileErrors = json.errors ?? {};
-                    this.skFileError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
-                } else {
-                    this.skFileError = 'Gagal menyimpan berkas. Silakan coba lagi.';
-                }
-            } catch (e) {
-                this.skFileError = 'Gagal menyimpan berkas. Periksa koneksi internet Anda.';
-            } finally {
-                this.isUploadingSkFile = false;
-            }
+        // ===== Tambah / ganti SK via riwayat baru (append-only) =====
+        // Tombol kelola SK di tabel membuka form "Tambah Berkas SK" dengan kategori
+        // ter-prefill. Jalur ini menuju /berkas-sk → StoreBerkasSkAction yang membuat
+        // riwayat baru, sesuai US-2.6 append-only (bukan mutasi existing history).
+        openSkRiwayatForm(kategori = 'sk_pangkat') {
+            this.resetSkTypeFields();
+            this.newSk.kategori_dokumen = kategori;
+            this.skUploadError = '';
+            this.skUploadErrors = {};
+            this.showUploadSkForm = true;
+            this.showUploadBerkas = false;
         },
 
         // ===== Edit metadata berkas lainnya =====

@@ -32,11 +32,12 @@ class UpdateDocumentRequest extends FormRequest
 
         $isStatusDoc = $document !== null && $document->jenis_dokumen === 'sk_status_pegawai';
 
-        $editableKeys = DocumentCategory::editableKeys();
-
+        // Target category dibatasi ke berkas non-SK agar direct API caller tidak
+        // dapat mereklasifikasi ijazah/ktp_kk/lainnya menjadi kategori SK tanpa
+        // melewati jalur riwayat append-only dan permission employee_histories.create.
         $kategoriRules = $isStatusDoc
             ? ['required', 'string', Rule::in(['sk_status_pegawai'])]
-            : ['required', 'string', Rule::in(array_filter($editableKeys, fn ($key) => $key !== 'sk_status_pegawai'))];
+            : ['required', 'string', Rule::in(DocumentCategory::otherUploadKeys())];
 
         return [
             'nama_dokumen' => ['required', 'string', 'max:255'],

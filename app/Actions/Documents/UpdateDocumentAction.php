@@ -6,6 +6,7 @@ use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
+use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
@@ -125,6 +126,15 @@ class UpdateDocumentAction
             'file_sk' => $document->file_path,
         ]);
 
+        // Sinkronkan file_ijazah pada EducationHistory yang masih merujuk path file lama.
+        // Kategori ijazah memakai path file (bukan nomor SK) sebagai satu-satunya identifier.
+        if ($oldCategory === 'ijazah') {
+            EducationHistory::query()
+                ->where('employee_id', $document->employee_id)
+                ->where('file_ijazah', $oldFilePath)
+                ->update(['file_ijazah' => $document->file_path]);
+        }
+
         Employee::query()
             ->where('id', $document->employee_id)
             ->where(function (Builder $query) use ($oldFilePath, $oldNomorSk, $oldCategory): void {
@@ -176,6 +186,7 @@ class UpdateDocumentAction
             || PositionHistory::query()->where('file_sk', $filePath)->exists()
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()
             || DisciplineRecord::query()->where('file_sk', $filePath)->exists()
-            || Appointment::query()->where('file_sk', $filePath)->exists();
+            || Appointment::query()->where('file_sk', $filePath)->exists()
+            || EducationHistory::query()->where('file_ijazah', $filePath)->exists();
     }
 }

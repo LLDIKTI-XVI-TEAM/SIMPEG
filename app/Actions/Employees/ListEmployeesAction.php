@@ -47,22 +47,28 @@ class ListEmployeesAction
                 'statusPegawai:id,nama',
                 // Semua riwayat dibutuhkan untuk memeriksa kelengkapan SK, bukan
                 // hanya riwayat terbaru yang sebelumnya diperlukan oleh tabel.
+                // created_at wajib dimuat agar tie-breaker kanonis (TMT → created_at)
+                // konsisten dengan detail/API; tanpa created_at sorting jatuh ke UUID.
                 'rankHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_pangkat'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_pangkat', 'created_at'])
                     ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_pangkat'),
+                    ->orderByDesc('tmt_pangkat')
+                    ->orderByDesc('created_at'),
                 'positionHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_jabatan'),
+                    ->orderByDesc('tmt_jabatan')
+                    ->orderByDesc('created_at'),
                 'salaryHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_kgb'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_kgb', 'created_at'])
                     ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_kgb'),
+                    ->orderByDesc('tmt_kgb')
+                    ->orderByDesc('created_at'),
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
-                    ->orderByDesc('tmt_pengangkatan'),
+                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                    ->orderByDesc('tmt_pengangkatan')
+                    ->orderByDesc('created_at'),
                 // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan.
                 // Metadata arsip ikut dimuat karena dipakai sebagai kandidat nomor/tanggal SK.
                 'documents:id,employee_id,jenis_dokumen,file_path,nomor_dokumen,tanggal_dokumen,created_at',

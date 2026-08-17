@@ -86,6 +86,7 @@
             belum_lengkap: 'Belum Lengkap',
             perlu_perbaikan: 'Perlu Perbaikan',
             belum_ada: 'Belum Ada',
+            tidak_wajib: 'Tidak Wajib',
         }[state] ?? 'Belum Ada';
     },
 
@@ -95,6 +96,7 @@
             belum_lengkap: 'bg-warning/10 text-warning',
             perlu_perbaikan: 'bg-danger/10 text-danger',
             belum_ada: 'bg-muted/20 text-muted',
+            tidak_wajib: 'bg-soft text-muted',
         }[state] ?? 'bg-muted/20 text-muted';
 
         const hover = {
@@ -102,6 +104,7 @@
             belum_lengkap: 'hover:bg-warning/15',
             perlu_perbaikan: 'hover:bg-danger/15',
             belum_ada: 'hover:bg-muted/30',
+            tidak_wajib: 'hover:bg-soft/80',
         }[state] ?? 'hover:bg-muted/30';
 
         return withHover ? `${base} ${hover}` : base;
@@ -113,6 +116,7 @@
             belum_lengkap: 'bg-warning',
             perlu_perbaikan: 'bg-danger',
             belum_ada: 'bg-muted',
+            tidak_wajib: 'bg-muted/50',
         }[state] ?? 'bg-muted';
     },
 

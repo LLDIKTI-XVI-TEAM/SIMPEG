@@ -272,9 +272,9 @@
                             </a>
                             @if($canManageDocuments)
                             <button type="button"
-                                @click="openSkFileModal(doc.jenis_dokumen, doc)"
+                                @click="openSkRiwayatForm(doc.jenis_dokumen)"
                                 class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                title="Unggah / Perbaiki Berkas SK">
+                                title="Tambah / Ganti Berkas SK (riwayat baru, append-only)">
                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                 </svg>
@@ -484,114 +484,6 @@
             </template>
         </x-pegawai.detail.table>
     </div>
-
-    {{-- ==================== Modal: Unggah / Perbaiki Berkas SK ==================== --}}
-    @if($canManageDocuments)
-    <x-ui.modal
-        show="showSkFileModal"
-        title="Unggah / Perbaiki Berkas SK"
-        closeAction="if (!isUploadingSkFile) { showSkFileModal = false; if (skFileController) { skFileController.abort(); skFileController = null; } }"
-        maxWidth="lg"
-        bodyClass="p-5 space-y-3"
-    >
-        <div class="space-y-3">
-            <p class="text-xs text-muted font-sans">
-                Berkas SK yang belum diunggah pada riwayat terbaru akan dilengkapi otomatis dari unggahan ini.
-                Untuk riwayat dengan file fisik yang hilang atau metadata salah, tambahkan riwayat SK baru;
-                jika tidak ada yang perlu dilengkapi, berkas disimpan sebagai arsip dokumen.
-            </p>
-
-            <p x-show="skFileError" x-text="skFileError" class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans"></p>
-
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kategori SK <span class="text-danger">*</span></label>
-                    <div class="relative">
-                        <select x-model="skFileForm.kategori_dokumen" @change="prefillSkFileMetadata()"
-                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="sk_pengangkatan">SK Pengangkatan</option>
-                            <option value="sk_pangkat">SK Pangkat</option>
-                            <option value="sk_jabatan">SK Jabatan</option>
-                            <option value="sk_kgb">SK KGB</option>
-                            <option value="sk_hukuman_disiplin">SK Hukuman Disiplin</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
-                    </div>
-                    <p x-show="skFileErrors.kategori_dokumen" x-text="skFileErrors.kategori_dokumen?.[0]" class="text-xs text-danger font-sans"></p>
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Dokumen <span class="text-danger">*</span></label>
-                    <input type="text" x-model="skFileForm.nama_dokumen"
-                        placeholder="Opsional — diisi otomatis bila kosong"
-                        class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                    <p x-show="skFileErrors.nama_dokumen" x-text="skFileErrors.nama_dokumen?.[0]" class="text-xs text-danger font-sans"></p>
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                        Nomor SK
-                        <span x-show="skMetadataLoading" class="ml-1 text-muted normal-case font-normal">(memuat…)</span>
-                    </label>
-                    <input type="text" x-ref="skNomorInput" x-model="skFileForm.nomor_dokumen"
-                        :readonly="skNomorFromAutofill"
-                        :class="skNomorFromAutofill ? 'bg-soft text-muted' : ''"
-                        class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK</label>
-                    <input type="date" x-ref="skTanggalInput" x-model="skFileForm.tanggal_terbit"
-                        :readonly="skTanggalFromAutofill"
-                        :class="skTanggalFromAutofill ? 'bg-soft text-muted' : ''"
-                        class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                </div>
-
-                <div class="space-y-1 sm:col-span-2">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Keterangan</label>
-                    <input type="text" x-model="skFileForm.deskripsi" placeholder="Opsional"
-                        class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                </div>
-
-                <div class="space-y-1 sm:col-span-2">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                        File Berkas <span class="text-danger">*</span>
-                    </label>
-                    <div class="flex items-center gap-2">
-                        <label for="sk_file_modal_input"
-                            class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft font-sans">Pilih File</label>
-                        <input type="file" id="sk_file_modal_input" class="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                            @change="skFileForm.file = $event.target.files[0] || null">
-                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="skFileForm.file ? 'text-ink' : 'text-muted'"
-                            x-text="skFileForm.file ? skFileForm.file.name : 'Belum ada file dipilih'"></span>
-                        <button x-show="skFileForm.file" type="button"
-                            @click="skFileForm.file = null; document.getElementById('sk_file_modal_input').value = ''"
-                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
-                    </div>
-                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG/DOC/DOCX, maks. 10 MB.</p>
-                    <p x-show="skFileErrors.berkas" x-text="skFileErrors.berkas?.[0]" class="text-xs text-danger font-sans"></p>
-                </div>
-            </div>
-
-            <p x-show="skFileHint" x-text="skFileHint" class="rounded-lg bg-primary/5 border border-primary/15 p-3 text-xs text-primary font-sans"></p>
-
-            <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                <button type="button" @click="showSkFileModal = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft cursor-pointer font-sans">
-                    Batal
-                </button>
-                <button type="button" @click="submitSkFile()" :disabled="isUploadingSkFile"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                    <span x-text="isUploadingSkFile ? 'Menyimpan...' : 'Simpan Berkas'"></span>
-                </button>
-            </div>
-        </div>
-    </x-ui.modal>
-    @endif
 
     {{-- ==================== Modal: Edit Berkas Lainnya ==================== --}}
     @if($canManageDocuments)

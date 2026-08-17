@@ -37,6 +37,18 @@ class EmployeeDocumentTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
+    /**
+     * Pegawai PNS — satu-satunya jenis yang dievaluasi pada 4 SK wajib (K-DOK-02).
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function createPnsEmployee(array $attributes = []): Employee
+    {
+        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+
+        return Employee::factory()->create(array_merge(['jenis_pegawai_id' => $pns->id], $attributes));
+    }
+
     public function test_rank_history_creation_syncs_to_documents_table(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -67,7 +79,7 @@ class EmployeeDocumentTest extends TestCase
     {
         Storage::fake(Document::STORAGE_DISK);
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
         $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
 
         $filePathHilang = 'riwayat/'.$employee->id.'/file-yang-hilang.pdf';
@@ -131,7 +143,7 @@ class EmployeeDocumentTest extends TestCase
     {
         Storage::fake(Document::STORAGE_DISK);
         $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
         $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
 
         $rankHistory = RankHistory::create([
@@ -224,24 +236,23 @@ class EmployeeDocumentTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->assertExists($appointment->file_sk);
     }
 
-    public function test_upload_modal_resets_autofill_metadata_on_close_and_cancel(): void
+    public function test_sk_management_button_opens_append_only_history_form(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
-        // Regression bleed metadata: modal berkas SK pada profil pegawai harus
-        // memulai dari form bersih setiap dibuka, membersihkan nilai autofill
-        // saat kategori berganti, dan membatalkan request yang masih berjalan
-        // saat modal ditutup.
+        // Temuan 2: tombol kelola SK di baris membuka form "Tambah Berkas SK"
+        // (riwayat baru → /berkas-sk) alih-alih modal repair yang memutasi
+        // existing history. Jalur mutasi existing (skFileForm/submitSkFile)
+        // tidak boleh lagi dirender di view.
         $this->actingAs($user)
             ->get("/pegawai/{$employee->id}")
             ->assertOk()
-            ->assertSee("this.skFileForm = { kategori_dokumen: kategori, nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null };", false)
-            ->assertSee('this.skNomorFromAutofill = false;', false)
-            ->assertSee('this.skTanggalFromAutofill = false;', false)
-            ->assertSee("if (this.skNomorFromAutofill)   { this.skFileForm.nomor_dokumen = ''; this.skNomorFromAutofill = false; }", false)
-            ->assertSee("if (this.skTanggalFromAutofill) { this.skFileForm.tanggal_terbit = ''; this.skTanggalFromAutofill = false; }", false)
-            ->assertSee('if (this.skFileController) { this.skFileController.abort(); this.skFileController = null; }', false);
+            ->assertSee('openSkRiwayatForm(doc.jenis_dokumen)', false)
+            ->assertSee('this.resetSkTypeFields();', false)
+            ->assertSee('this.showUploadSkForm = true;', false)
+            ->assertDontSee('submitSkFile()', false)
+            ->assertDontSee('this.skFileForm', false);
     }
 
     public function test_position_history_creation_syncs_to_documents_table(): void

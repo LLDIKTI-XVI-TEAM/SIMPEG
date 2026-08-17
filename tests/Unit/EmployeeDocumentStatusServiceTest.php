@@ -6,6 +6,7 @@ use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RankHistory;
+use App\Models\RefJenisPegawai;
 use App\Services\EmployeeDocumentStatusService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,13 @@ class EmployeeDocumentStatusServiceTest extends TestCase
         $this->service = app(EmployeeDocumentStatusService::class);
     }
 
+    private function createPnsEmployee(): Employee
+    {
+        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+
+        return Employee::factory()->create(['jenis_pegawai_id' => $pns->id]);
+    }
+
     // -------------------------------------------------------------------------
     // sk_pangkat: kasus inti bug
     // -------------------------------------------------------------------------
@@ -34,7 +42,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_sk_pangkat_tersedia_ketika_riwayat_terbaru_punya_file_valid(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         $filePath = 'rank/sk-pangkat-baru.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'isi SK');
@@ -69,7 +77,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_sk_pangkat_perlu_perbaikan_ketika_riwayat_terbaru_file_sk_null_meski_riwayat_lama_valid(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         $filePathLama = 'rank/sk-pangkat-lama.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePathLama, 'isi SK lama');
@@ -105,7 +113,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_sk_pangkat_perlu_perbaikan_ketika_file_fisik_riwayat_terbaru_hilang_meski_riwayat_lama_valid(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         $filePathLama = 'rank/sk-pangkat-lama.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePathLama, 'isi SK lama');
@@ -137,7 +145,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
     /** Label kerusakan harus mengikuti SK kanonis, bukan file_sk kosong pada riwayat lama. */
     public function test_sk_pangkat_file_hilang_pada_riwayat_kanonis_tidak_dilabeli_belum_diunggah_dari_riwayat_lama(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         RankHistory::create([
             'employee_id' => $employee->id,
@@ -171,7 +179,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_sk_pangkat_belum_ada_ketika_tidak_ada_riwayat(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         $result = $this->service->summarize($employee->fresh());
         $skPangkat = collect($result['required_sks'])->firstWhere('jenis', 'sk_pangkat');
@@ -184,7 +192,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_status_kelengkapan_lengkap_ketika_semua_empat_sk_tersedia(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         foreach (['sk_pengangkatan', 'sk_pangkat', 'sk_jabatan', 'sk_kgb'] as $jenis) {
             $path = "sk/{$jenis}.pdf";
@@ -210,7 +218,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_status_kelengkapan_perlu_perbaikan_ketika_ada_satu_kategori_riwayat_terbaru_rusak(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         // Tiga kategori lain: lengkap via arsip dokumen
         foreach (['sk_pengangkatan', 'sk_jabatan', 'sk_kgb'] as $jenis) {
@@ -258,7 +266,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_sk_pengangkatan_perlu_perbaikan_ketika_appointment_terbaru_rusak(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         $filePathLama = 'appointments/sk-pengangkatan-lama.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePathLama, 'isi');
@@ -291,8 +299,8 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_path_dengan_metadata_arsip_bertentangan_tidak_dianggap_tersedia(): void
     {
-        $employee = Employee::factory()->create();
-        $employeeLain = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
+        $employeeLain = $this->createPnsEmployee();
 
         $filePath = 'rank/sk-diperebutkan.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'isi SK');
@@ -327,7 +335,7 @@ class EmployeeDocumentStatusServiceTest extends TestCase
      */
     public function test_summarize_does_not_execute_n_plus_1_queries(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
         // pre-load relations
         $employee->load(['appointments', 'rankHistories', 'positionHistories', 'salaryHistories', 'documents', 'jenisPegawai']);
 
@@ -342,13 +350,34 @@ class EmployeeDocumentStatusServiceTest extends TestCase
     }
 
     /**
+     * K-DOK-02 — pegawai non-PNS (CPNS/PPPK/jenis lain) berstatus tidak_wajib,
+     * total_wajib = 0, dan is_lengkap = true meskipun tidak memiliki 4 SK.
+     */
+    public function test_non_pns_employee_is_tidak_wajib(): void
+    {
+        $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
+
+        $result = $this->service->summarize($employee->fresh());
+
+        $this->assertSame('tidak_wajib', $result['status_kelengkapan']);
+        $this->assertTrue($result['is_lengkap']);
+        $this->assertSame(0, $result['total_wajib']);
+        $this->assertSame(0, $result['tersedia_count']);
+        $this->assertCount(4, $result['required_sks']);
+        foreach ($result['required_sks'] as $sk) {
+            $this->assertSame('tidak_wajib', $sk['status']);
+        }
+    }
+
+    /**
      * Tie-breaker appointment kanonis — ketika ada multiple appointments dengan
      * tmt_pengangkatan yang sama, created_at yang lebih baru harus dipilih sebagai kanonis.
      * Konsisten dengan ReplaceAppointmentSkAction yang memakai orderByDesc('tmt_pengangkatan')->orderByDesc('created_at').
      */
     public function test_appointment_kanonis_dipilih_berdasarkan_tmt_lalu_created_at(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = $this->createPnsEmployee();
 
         $filePathLama = 'appointments/sk-pengangkatan-lama.pdf';
         $filePathBaru = 'appointments/sk-pengangkatan-baru.pdf';
