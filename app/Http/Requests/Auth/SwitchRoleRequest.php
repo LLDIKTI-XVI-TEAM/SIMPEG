@@ -50,10 +50,14 @@ class SwitchRoleRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            if ($validator->errors()->has('target_role')) {
+                return;
+            }
+
             $user = $this->user();
             $targetRole = $this->input('target_role');
 
-            if ($user && $targetRole && ! $user->canSwitchToRole($targetRole)) {
+            if ($user && is_string($targetRole) && ! $user->canSwitchToRole($targetRole)) {
                 $validator->errors()->add(
                     'target_role',
                     "Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli Anda."

@@ -41,25 +41,24 @@ class SwitchRoleAction
             'temporary_role_switched_by' => $user->id,
         ]);
 
-        // Simpan dengan transaksi untuk memastikan atomicity
-        DB::transaction(function () use ($user): void {
+        // Simpan dengan transaksi untuk memastikan atomicity antara state dan audit
+        DB::transaction(function () use ($user, $targetRole, $temporaryPermission, $oldValues, $request): void {
             $user->save();
-        });
 
-        // Log audit: SWITCH_ROLE
-        AuditService::log(
-            'SWITCH_ROLE',
-            'User',
-            $user->id,
-            $oldValues,
-            [
-                'role' => $user->role,
-                'temporary_role' => $targetRole,
-                'temporary_permission' => $temporaryPermission,
-                'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
-                'temporary_role_switched_by' => $user->id,
-            ],
-            $request,
-        );
+            AuditService::logOrFail(
+                'SWITCH_ROLE',
+                'User',
+                $user->id,
+                $oldValues,
+                [
+                    'role' => $user->role,
+                    'temporary_role' => $targetRole,
+                    'temporary_permission' => $temporaryPermission,
+                    'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
+                    'temporary_role_switched_by' => $user->id,
+                ],
+                $request,
+            );
+        });
     }
 }

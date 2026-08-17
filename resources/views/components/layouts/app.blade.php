@@ -473,17 +473,17 @@
 
                 <div class="h-6 w-px bg-border"></div>
 
-                {{-- Indikator Simulasi Role aktif --}}
+                {{-- Indikator Simulasi Role aktif (tampil di desktop dan mobile) --}}
                 @if(auth()->check() && auth()->user()->temporary_role)
-                    <div class="hidden lg:flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                    <div class="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-warning/40 bg-warning/10 px-2 sm:px-3 py-1 text-xs font-semibold text-warning">
+                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                         </svg>
-                        <span>Mode Simulasi Role: <strong>{{ ucwords(str_replace('_', ' ', auth()->user()->temporary_role)) }}</strong></span>
-                        <form method="POST" action="{{ route('revert-role') }}" class="ml-1">
+                        <span class="hidden sm:inline">Simulasi: <strong>{{ ucwords(str_replace('_', ' ', auth()->user()->temporary_role)) }}</strong></span>
+                        <form method="POST" action="{{ route('revert-role') }}" class="ml-0.5 sm:ml-1">
                             @csrf
-                            <button type="submit" class="rounded-md bg-warning/20 px-2 py-0.5 text-xs font-semibold text-warning hover:bg-warning/30 transition-colors">
-                                Kembali
+                            <button type="submit" class="rounded-md bg-warning/20 px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs font-semibold text-warning hover:bg-warning/30 transition-colors">
+                                Revert
                             </button>
                         </form>
                     </div>

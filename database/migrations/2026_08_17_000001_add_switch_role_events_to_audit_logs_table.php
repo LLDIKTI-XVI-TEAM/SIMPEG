@@ -102,13 +102,13 @@ return new class extends Migration
             user_id varchar,
             user_name varchar,
             event varchar not null check (event in ({$quotedEvents})),
-            auditable_type varchar,
+            auditable_type varchar not null,
             auditable_id varchar,
             old_values text,
             new_values text,
             ip_address varchar,
             user_agent varchar,
-            created_at datetime
+            created_at datetime default CURRENT_TIMESTAMP not null
         )");
         DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
         DB::statement('DROP TABLE audit_logs_old');
@@ -148,13 +148,13 @@ return new class extends Migration
             user_id varchar,
             user_name varchar,
             event varchar not null check (event in ({$quotedEvents})),
-            auditable_type varchar,
+            auditable_type varchar not null,
             auditable_id varchar,
             old_values text,
             new_values text,
             ip_address varchar,
             user_agent varchar,
-            created_at datetime
+            created_at datetime default CURRENT_TIMESTAMP not null
         )");
         DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
         DB::statement('DROP TABLE audit_logs_old');

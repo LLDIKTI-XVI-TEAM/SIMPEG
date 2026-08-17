@@ -368,4 +368,18 @@ class SwitchRoleTest extends TestCase
         // Accessor getEffectiveRole harus menolak temporary_role admin_kepegawaian karena lebih tinggi dari role pegawai
         $this->assertEquals('pegawai', $user->getEffectiveRole());
     }
+
+    public function test_switch_role_array_payload_returns_validation_error_not_500(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Kirim target_role sebagai array
+        $response = $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => ['pegawai'],
+        ]);
+
+        $response->assertSessionHasErrors('target_role');
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+    }
 }
