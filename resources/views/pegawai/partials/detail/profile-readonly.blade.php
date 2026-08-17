@@ -146,9 +146,19 @@
         </div>
 
         <div class="space-y-4 rounded-lg border border-border bg-soft/30 p-4">
-            <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
-                Status Kepegawaian
-            </h3>
+            <div class="flex items-center justify-between">
+                <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
+                    Status Kepegawaian
+                </h3>
+                @if($employee->statusHistories && $employee->statusHistories->count() > 0)
+                    <button type="button" @click="showRiwayatStatus = true" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 shadow-sm cursor-pointer font-sans">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Lihat Riwayat
+                    </button>
+                @endif
+            </div>
             <dl class="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
                 <div class="space-y-0.5">
                     <dt class="font-semibold text-muted font-sans">Status Saat Ini</dt>
