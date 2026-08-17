@@ -190,9 +190,9 @@ class SwitchRoleTest extends TestCase
         $user->refresh();
         $this->assertEquals('kepala_bagian', $user->temporary_role);
 
-        // Request lain masih menunjukkan temporary_role
+        // Request lain masih menunjukkan temporary_role, route dashboard me-redirect kepala_bagian ke kepala-bagian.dashboard
         $response = $this->actingAs($user)->get(route('dashboard'));
-        $response->assertOk();
+        $response->assertRedirect(route('kepala-bagian.dashboard'));
 
         $user->refresh();
         $this->assertEquals('kepala_bagian', $user->temporary_role);
@@ -326,5 +326,46 @@ class SwitchRoleTest extends TestCase
         $this->assertTrue($audit->new_values['_simulation'] ?? false);
         $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
         $this->assertEquals('pegawai', $audit->new_values['_effective_role'] ?? null);
+    }
+
+    public function test_dashboard_and_requests_use_effective_role_during_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch role ke pimpinan
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pimpinan',
+        ]);
+
+        $user->refresh();
+
+        // Dashboard request harus mengarahkan ke dashboard pimpinan
+        $response = $this->actingAs($user)->get(route('dashboard'));
+        $response->assertRedirect(route('pimpinan.dashboard'));
+
+        // FormRequest filter pimpinan harus mengotorisasi request
+        $filterResponse = $this->actingAs($user)->get(route('pimpinan.laporan.kepangkatan'));
+        $filterResponse->assertOk();
+    }
+
+    public function test_simulation_is_cancelled_if_account_role_is_demoted(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch role ke admin_kepegawaian
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'admin_kepegawaian',
+        ]);
+
+        $user->refresh();
+        $this->assertEquals('admin_kepegawaian', $user->temporary_role);
+        $this->assertEquals('admin_kepegawaian', $user->getEffectiveRole());
+
+        // Akun asli diubah / didemosi menjadi pegawai
+        $user->role = 'pegawai';
+        $user->save();
+
+        // Accessor getEffectiveRole harus menolak temporary_role admin_kepegawaian karena lebih tinggi dari role pegawai
+        $this->assertEquals('pegawai', $user->getEffectiveRole());
     }
 }

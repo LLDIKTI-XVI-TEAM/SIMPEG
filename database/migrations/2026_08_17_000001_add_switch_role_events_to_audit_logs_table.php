@@ -113,6 +113,10 @@ return new class extends Migration
         DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
         DB::statement('DROP TABLE audit_logs_old');
         DB::statement('CREATE INDEX audit_logs_event_index ON audit_logs (event)');
+        DB::statement('CREATE INDEX audit_logs_user_id_index ON audit_logs (user_id)');
+        DB::statement('CREATE INDEX audit_logs_auditable_type_index ON audit_logs (auditable_type)');
+        DB::statement('CREATE INDEX audit_logs_created_at_index ON audit_logs (created_at)');
+        DB::statement('CREATE INDEX audit_logs_user_name_index ON audit_logs (user_name)');
     }
 
     public function down(): void
@@ -155,5 +159,9 @@ return new class extends Migration
         DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
         DB::statement('DROP TABLE audit_logs_old');
         DB::statement('CREATE INDEX audit_logs_event_index ON audit_logs (event)');
+        DB::statement('CREATE INDEX audit_logs_user_id_index ON audit_logs (user_id)');
+        DB::statement('CREATE INDEX audit_logs_auditable_type_index ON audit_logs (auditable_type)');
+        DB::statement('CREATE INDEX audit_logs_created_at_index ON audit_logs (created_at)');
+        DB::statement('CREATE INDEX audit_logs_user_name_index ON audit_logs (user_name)');
     }
 };

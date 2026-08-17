@@ -9,7 +9,7 @@ class KepalaBagianLeaveDecisionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'kepala_bagian' && $this->user()?->employee_id !== null;
+        return $this->user()?->getEffectiveRole() === 'kepala_bagian' && $this->user()?->employee_id !== null;
     }
 
     public function rules(): array

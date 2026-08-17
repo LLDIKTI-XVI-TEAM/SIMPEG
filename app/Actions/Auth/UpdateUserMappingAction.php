@@ -66,6 +66,16 @@ class UpdateUserMappingAction
                     'keycloak_id' => $keycloakId,
                     'role' => $data['role'],
                 ]);
+
+                // Jika role asli akun diubah dan temporary_role tidak lagi valid (misalnya role diturunkan
+                // sehingga temporary_role tidak lagi lebih rendah dari role baru), batalkan simulasi.
+                if ($user->temporary_role !== null && ! $user->canSwitchToRole($user->temporary_role)) {
+                    $user->temporary_role = null;
+                    $user->temporary_permission = null;
+                    $user->temporary_role_started_at = null;
+                    $user->temporary_role_switched_by = null;
+                }
+
                 $user->save();
 
                 try {

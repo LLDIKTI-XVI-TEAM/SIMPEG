@@ -80,10 +80,19 @@ class User extends Authenticatable
     /**
      * Mengembalikan role efektif pengguna, memperhitungkan simulasi role sementara.
      * Digunakan oleh middleware dan otorisasi untuk menentukan hak akses saat ini.
+     * Jika temporary_role tidak lagi valid (misalnya role asli akun telah diturunkan sehingga
+     * temporary_role tidak lebih rendah dari role asli), simulasi dianggap gugur dan mengembalikan role asli.
      */
     public function getEffectiveRole(): ?string
     {
-        return $this->temporary_role ?? $this->role;
+        if ($this->temporary_role !== null) {
+            // Validasi bahwa temporary_role harus selalu berada di hierarki yang lebih rendah dari role asli saat ini
+            if ($this->canSwitchToRole($this->temporary_role)) {
+                return $this->temporary_role;
+            }
+        }
+
+        return $this->role;
     }
 
     /**
