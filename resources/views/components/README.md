@@ -48,12 +48,12 @@ Semua token warna terdaftar di `resources/css/app.css` via Tailwind CSS v4 `@the
 Direktori: `resources/views/components/ui/`
 
 ### 🔘 `x-ui.button`
-Komponen tombol standar dan anchor link dengan dukungan variasi visual, ukuran, state loading, dan tooltip.
+Komponen tombol standar dan anchor link dengan dukungan variasi visual, ukuran, disabled state, dan tooltip.
 
 **Props**:
-- `variant`: `primary` (default), `secondary`, `muted`, `danger`, `danger-solid`, `success`, `warning`, `ghost`, `link`.
-- `size`: `xs`, `sm`, `md` (default), `lg`, `icon`.
-- `type`: `button` (default), `submit`, `reset`.
+- `variant`: `'primary'` (default), `'secondary'`, `'muted'`, `'danger'`, `'danger-solid'`, `'success'`, `'warning'`, `'ghost'`, `'link'`.
+- `size`: `'xs'`, `'sm'`, `'md'` (default), `'lg'`, `'icon'`.
+- `type`: `'button'` (default), `'submit'`, `'reset'`.
 - `href`: (string|null) Jika diisi, otomatis dirender sebagai tag `<a>`.
 - `as`: (string|null) `'a'` atau `'button'`.
 - `disabled`: (bool) Menandai tombol nonaktif.
@@ -201,15 +201,18 @@ Navigasi jejak remah halaman.
 Modal konfirmasi aksi berbahaya (soft delete, reset, mutasi status) dengan pengiriman form HTTP bermetode `POST`/`DELETE` ber-CSRF.
 
 **Props**:
-- `id`: (string) Identifier modal dialog.
-- `title`: (string) Judul konfirmasi.
-- `message`: (string) Pesan penjelasan dampak aksi.
-- `confirm-text`: (string, default: `'Ya, Lanjutkan'`) Teks tombol konfirmasi.
-- `cancel-text`: (string, default: `'Batal'`) Teks tombol batal.
-- `variant`: `'danger'`, `'warning'`, `'primary'`.
-- `action`: (string) URL endpoint tujuan submit.
-- `method`: `'POST'`, `'DELETE'`, `'PUT'`, `'PATCH'`.
-- `size`: `'md'`, `'sm'`, `'lg'`.
+- `id`: (string, required) Identifier modal dialog.
+- `title`: (string, default: `'Konfirmasi'`) Judul konfirmasi.
+- `message`: (string, default: `'Apakah Anda yakin ingin melanjutkan?'`) Pesan penjelasan dampak aksi.
+- `confirmText`: (string, default: `'Ya, Lanjutkan'`) Teks tombol konfirmasi.
+- `cancelText`: (string, default: `'Batal'`) Teks tombol batal.
+- `variant`: `'primary'` (default), `'danger'`, `'warning'`.
+- `action`: (string|null) URL endpoint tujuan submit form.
+- `method`: `'POST'` (default), `'DELETE'`, `'PUT'`, `'PATCH'`.
+
+**Slots**:
+- `$trigger`: Elemen tombol atau trigger pembuka modal.
+- `$slot`: Konten tambahan di dalam dialog.
 
 **Contoh Penggunaan**:
 ```blade
@@ -217,7 +220,7 @@ Modal konfirmasi aksi berbahaya (soft delete, reset, mutasi status) dengan pengi
     id="hapus-pegawai-{{ $pegawai->id }}"
     title="Nonaktifkan Pegawai"
     message="Apakah Anda yakin ingin menonaktifkan {{ $pegawai->nama }}? Pegawai ini akan dipindahkan ke daftar nonaktif."
-    confirm-text="Nonaktifkan"
+    confirmText="Nonaktifkan"
     variant="danger"
     :action="route('pegawai.deactivate', $pegawai->id)"
     method="POST"
@@ -234,23 +237,31 @@ Modal konfirmasi aksi berbahaya (soft delete, reset, mutasi status) dengan pengi
 Modal dialog serbaguna berbasis Alpine.js dengan transisi halus dan penanganan aksesibilitas ARIA dialog.
 
 **Props**:
-- `show`: (string|null) Nama variabel boolean state Alpine.js (misal: `'showModal'`).
+- `show`: (string|null) Nama variabel boolean state Alpine.js (misal: `'openModal'`).
 - `title`: (string|null) Judul modal pada header.
+- `titleId`: (string|null) Kustom ID elemen judul untuk accessibility `aria-labelledby`.
+- `descriptionId`: (string|null) Kustom ID elemen deskripsi untuk `aria-describedby`.
 - `maxWidth`: `'sm'`, `'md'` (default), `'lg'`, `'xl'`, `'2xl'`, `'3xl'`, `'4xl'`.
-- `closeAction`: (string|null) Ekspresi Alpine.js saat modal ditutup (misal: `'showModal = false'`).
+- `closeAction`: (string|null) Ekspresi Alpine.js saat modal ditutup (misal: `'openModal = false'`).
 - `bodyClass`: (string, default: `'p-6'`).
+- `panelClass`, `headerClass`, `footerClass`, `overlayClass`: Kustom kelas Tailwind tambahan.
+
+**Slots**:
+- `$slot`: Konten body modal.
+- `$footer`: (opsional) Area footer modal dengan latar `bg-soft` dan border atas.
 
 **Contoh Penggunaan**:
 ```blade
 <x-ui.modal show="openModal" title="Tambah Data Riwayat" maxWidth="lg" closeAction="openModal = false">
-    <form class="space-y-4">
+    {{-- Form diberi ID agar tombol submit pada slot footer tetap dapat mengirimkan form --}}
+    <form id="form-tambah-riwayat" class="space-y-4">
         <x-form.input name="nomor_sk" label="Nomor SK" required />
     </form>
     
     <x-slot:footer>
         <div class="flex justify-end gap-2">
             <x-ui.button variant="secondary" size="sm" @click="openModal = false">Batal</x-ui.button>
-            <x-ui.button variant="primary" size="sm" type="submit">Simpan</x-ui.button>
+            <x-ui.button variant="primary" size="sm" type="submit" form="form-tambah-riwayat">Simpan</x-ui.button>
         </div>
     </x-slot:footer>
 </x-ui.modal>
@@ -273,16 +284,171 @@ Sakelar toggle boolean (switch) berbasis CSS peer-checked.
 
 ---
 
+### 🔍 `x-ui.filter-bar`
+Bar pencarian dan filter data di atas tabel atau daftar.
+
+**Props**:
+- `searchModel`: (string|null) Nama properti Alpine.js `x-model` untuk input pencarian.
+- `searchId`: (string|null) ID elemen input pencarian.
+- `searchName`: (string|null) Nama field input pencarian.
+- `searchValue`: (string|null) Nilai awal input pencarian.
+- `searchPlaceholder`: (string, default: `'Cari...'`).
+- `searchCols`: (string, default: `'col-span-1 sm:col-span-2 lg:col-span-1'`).
+- `searchLabel`: (string|null) Label di atas input pencarian.
+- `gridClass`: (string, default: `'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'`).
+
+**Slots**:
+- `$header`: (opsional) Header filter bar.
+- `$actions`: (opsional) Tombol aksi di sisi kanan header.
+- `$slot`: Filter kustom tambahan (select dropdown, date picker, dll).
+
+---
+
+### 📂 `x-ui.empty-state`
+Tampilan ramah saat data kosong atau pencarian tidak menemukan hasil.
+
+**Props**:
+- `icon`: `'folder'` (default), `'document'`, `'search'`, atau `'none'`.
+- `title`: (string, default: `'Tidak ada data'`).
+- `message`: (string|null) Pesan penjelas.
+
+**Slots**:
+- `$action`: (opsional) Tombol aksi untuk menambahkan data baru atau mereset filter.
+
+**Contoh Penggunaan**:
+```blade
+<x-ui.empty-state
+    icon="search"
+    title="Data tidak ditemukan"
+    message="Coba periksa kata kunci atau ubah filter pencarian Anda."
+>
+    <x-slot:action>
+        <x-ui.button variant="secondary" size="sm" @click="resetFilter()">Reset Filter</x-ui.button>
+    </x-slot:action>
+</x-ui.empty-state>
+```
+
+---
+
+### ⏳ `x-ui.loading`
+Indikator spinner pemuatan berbasis animasi SVG.
+
+**Props**:
+- `size`: `'xs'`, `'sm'`, `'md'` (default), `'lg'`, `'xl'`.
+- `color`: `'current'` (default), `'primary'`, `'white'`, `'muted'`.
+
+**Contoh Penggunaan**:
+```blade
+<x-ui.loading size="lg" color="primary" />
+```
+
+---
+
+### 📑 `x-ui.tabs` & `x-ui.tab`
+Navigasi tab konten berbasis state Alpine.js.
+
+**Props `x-ui.tabs`**:
+- `variant`: `'underline'` (default), `'sidebar'`, `'sidebar-soft'`, `'pills'`.
+- `label`: (string|null) Accessibility `aria-label`.
+
+**Props `x-ui.tab`**:
+- `active`: (string, required) Ekspresi boolean Alpine.js untuk menentukan tab aktif (misal: `activeTab === 'profil'`).
+- `click`: (string|null) Ekspresi Alpine.js saat tab diklik (misal: `activeTab = 'profil'`).
+- `variant`: `'underline'` (default), `'sidebar'`, `'sidebar-soft'`, `'pills'`.
+- `type`: `'button'` (default).
+
+**Contoh Penggunaan**:
+```blade
+<div x-data="{ currentTab: 'umum' }">
+    <x-ui.tabs variant="underline">
+        <x-ui.tab active="currentTab === 'umum'" @click="currentTab = 'umum'">Informasi Umum</x-ui.tab>
+        <x-ui.tab active="currentTab === 'riwayat'" @click="currentTab = 'riwayat'">Riwayat SK</x-ui.tab>
+    </x-ui.tabs>
+</div>
+```
+
+---
+
+### 💬 `x-ui.tooltip`
+Tooltip mengambang berbasis Alpine.js saat hover.
+
+**Props**:
+- `text`: (string, default: `''`) Teks statis tooltip.
+- `dynamicText`: (string|null) Ekspresi Alpine.js untuk teks tooltip dinamis.
+- `position`: `'top'` (default), `'bottom'`, `'left'`, `'right'`, `'top-end'`, `'bottom-end'`.
+- `nowrap`: (bool, default: `true`).
+
+**Contoh Penggunaan**:
+```blade
+<x-ui.tooltip text="Cetak Dokumen PDF" position="top">
+    <x-ui.button variant="secondary" size="icon">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+    </x-ui.button>
+</x-ui.tooltip>
+```
+
+---
+
+### ⏳ `x-ui.timeline` & `x-ui.timeline-item`
+Visualisasi riwayat alur status berurutan (misal: proses verifikasi usulan cuti).
+
+**Props `x-ui.timeline-item`**:
+- `variant`: `'success'` (default), `'danger'`, `'warning'`, `'muted'`.
+- `title`: (string, default: `''`) Judul tahapan.
+- `description`: (string, default: `''`) Keterangan atau tanggal tahapan.
+- `pulse`: (bool, default: `false`) Efek animasi denyut pada titik status aktif.
+
+**Contoh Penggunaan**:
+```blade
+<x-ui.timeline>
+    <x-ui.timeline-item variant="success" title="Pengajuan Dibuat" description="12 Agu 2026 - Oleh Budi Santoso" />
+    <x-ui.timeline-item variant="warning" title="Menunggu Persetujuan Atasan" description="Sedang diproses" :pulse="true" />
+    <x-ui.timeline-item variant="muted" title="Penerbitan SK Cuti" description="Tahap akhir" />
+</x-ui.timeline>
+```
+
+---
+
+### 📄 `x-ui.pagination`
+Komponen kontrol paginasi nomor halaman berbasis Alpine.js.
+
+**Props**:
+- `current`: (string, default: `'currentPage'`) Variabel Alpine.js penampung halaman aktif.
+- `total`: (string, default: `'totalPages'`) Variabel Alpine.js penampung total halaman.
+- `action`: (string|null) Perintah navigasi saat tombol diklik (misal: `'fetchData(page)'`).
+
+---
+
 ### 🗃️ `x-ui.table` & Sub-Komponen Tabel
 Struktur tabel semantik data kepegawaian.
 
 **Sub-komponen**:
-- `<x-ui.table>`: Pembungkus tabel utama.
+- `<x-ui.table>`: Pembungkus tabel utama (`:caption` opsional).
 - `<x-ui.table-head>`: Bagian header tabel (`bg-soft`).
 - `<x-ui.table-body>`: Badan tabel.
-- `<x-ui.table-row>`: Baris data (`:interactive="true"` untuk efek hover).
-- `<x-ui.table-th>`: Kolom header dengan typography `text-xs font-semibold uppercase text-muted`.
-- `<x-ui.table-td>`: Sel data dengan padding `comfortable` atau `compact`.
+- `<x-ui.table-row>`: Baris data. Mendukung prop `:interactive="true"` untuk menambahkan kelas `cursor-pointer` (efek transisi warna `hover:bg-soft/60` diterapkan secara default).
+- `<x-ui.table-th>`: Kolom header dengan typography `text-xs font-semibold uppercase text-muted` (opsi `align`: `'left'`, `'center'`, `'right'`).
+- `<x-ui.table-td>`: Sel data tabel.
+  - `align`: `'left'` (default), `'center'`, `'right'`.
+  - `padding`: `'xs'` (px-3 py-2), `'sm'` (px-4 py-3), `'md'` (px-4 py-3.5, default), `'wide'` (px-5 py-3.5), `'lg'` (px-5 py-4), `'xl'` (px-6 py-5), `'comfortable'` (px-6 py-4).
+
+---
+
+### 🗂️ `x-ui.data-table`
+Komponen tabel data lengkap yang menggabungkan bar filter pencarian, pengurutan kolom (*sorting*), indikator pemuatan (*loading state*), *empty state*, dan kontrol paginasi footer dalam satu komponen terpadu.
+
+**Props Utama**:
+- `rows`: (string, required) Variabel array data baris di Alpine.js.
+- `meta`: (string, required) Objek metadata pagination Laravel (`current_page`, `last_page`, `from`, `to`, `total`).
+- `columns`: (array, required) Definisi kolom tabel `[['key' => '...', 'label' => '...', 'sortable' => true, 'align' => 'left'], ...]`.
+- `fetchPage`: (string, required) Fungsi callback pemanggil API halaman (misal: `'fetchEmployees(page)'`).
+- `isLoading`: (string, default: `'isLoading'`) State boolean loading.
+- `perPage`: (string, default: `'perPage'`) State per-page.
+- `setPerPage`: (string, default: `'setPerPage($event.target.value)'`).
+- `sort`: (string|null), `direction`: (string|null), `setSort`: (string|null).
+- `searchModel`: (string|null), `searchPlaceholder`: (string, default: `'Cari...'`).
+- `emptyTitle`: (string, default: `'Tidak ada data'`), `emptyIcon`: (string, default: `'search'`).
+- `checkAllId`, `checkAllAction`, `checkAllShow`: (string|null) Konfigurasi fitur *select-all checkbox*.
 
 ---
 
@@ -290,7 +456,8 @@ Struktur tabel semantik data kepegawaian.
 
 Direktori: `resources/views/components/form/`
 
-Semua komponen form terintegrasi dengan validasi Laravel (`$errors`), old value (`old()`), ID otomatis, serta accessibility label (`aria-describedby`).
+Komponen input teks, select, date, textarea, dan checkbox secara otomatis terintegrasi dengan validasi Laravel (`$errors`), old value (`old()`), penentuan ID otomatis, serta accessibility label (`aria-describedby` & `aria-invalid`).  
+> *Catatan: Komponen `<x-form.file-upload>` secara teknis dikecualikan dari pemulihan nilai `old()` karena batasan keamanan standar browser.*
 
 ### 1. `x-form.input`
 Input teks, nomor, email, password.
@@ -346,12 +513,27 @@ Input kotak centang pilihan boolean.
 ```
 
 ### 6. `x-form.file-upload`
-Area upload berkas/dokumen pendukung.
+Area upload berkas dokumen pendukung dengan mode standar inline atau dropzone seret-lepas.
+
+**Props**:
+- `name`: (string|null) Nama field file input.
+- `label`: (string|null) Label dokumen.
+- `accept`: (string|null) MIME type/ekstensi berkas (misal: `'.pdf,.jpg,.jpeg,.png'`).
+- `required`: (bool, default: `false`).
+- `disabled`: (bool, default: `false`).
+- `mode`: `'inline'` (default) atau `'dropzone'`.
+- `size`: `'sm'`, `'md'` (default).
+- `title`: (string, default: `'Klik atau seret berkas di sini'`).
+- `hint`: (string|null) Teks petunjuk batasan ukuran/format berkas.
+
+**Contoh Penggunaan**:
 ```blade
 <x-form.file-upload 
     name="file_sk" 
     label="Dokumen SK (PDF/Gambar)" 
     accept=".pdf,.jpg,.jpeg,.png" 
+    mode="dropzone"
+    hint="Ukuran maksimal berkas 2MB"
     required 
 />
 ```
@@ -361,11 +543,11 @@ Area upload berkas/dokumen pendukung.
 ## 🔒 5. Session Management & Keamanan Autentikasi
 
 ### Mekanisme Session Timeout (Server-Side Enforced):
-Sistem SIMPEG menerapkan penegakan *idle timeout* berbasis request di sisi server melalui middleware `App\Http\Middleware\SessionTimeoutMessage`:
+Sistem SIMPEG menerapkan penegakan *idle timeout* berbasis request di sisi server melalui middleware `App\Http\Middleware\SessionTimeoutMessage` yang dipasang pada grup rute web terautentikasi dan API notifikasi:
 
 1. **`SIMPEG_SESSION_IDLE_TIMEOUT=30`**:
    - Sesuai spesifikasi **US-1.3** dan keputusan kanonis **K-US-03**, batas waktu tidak aktif (*idle*) ditetapkan sebesar **30 menit** berdasarkan selisih waktu `now() - last_activity_at`.
-   - Evaluasi timeout terjadi pada **request HTTP berikutnya yang masuk ke aplikasi**.
+   - Evaluasi timeout terjadi pada **request HTTP berikutnya yang masuk ke rute yang dilindungi middleware**.
    - Ketika idle time melebihi 30 menit:
      1. Middleware mencatat riwayat audit dengan event resmi **`SESSION_TIMEOUT`** lengkap dengan identitas pengguna (`user_id` dan `user_name`).
      2. Memanggil `Auth::logout()` dan `session()->invalidate()`.
