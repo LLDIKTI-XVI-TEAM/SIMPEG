@@ -543,26 +543,28 @@
                                 </a>
                             @endif
 
-                            {{-- Switch Role Menu (Super Admin or has permission) --}}
-                            @if(auth()->check() && (auth()->user()->role === 'super_admin' || auth()->user()->hasPermission('users.switch_role')))
+                            {{-- Switch Role Menu (Hanya tampil jika user memiliki effective permission users.switch_role atau sedang dalam mode simulasi untuk revert) --}}
+                            @if(auth()->check() && (auth()->user()->hasPermission('users.switch_role') || auth()->user()->temporary_role))
                                 <div class="border-t border-border/60 my-1 pt-1">
-                                    <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
-                                        Simulasi Role
-                                    </div>
-                                    @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
-                                        @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
-                                            <form method="POST" action="{{ route('switch-role') }}">
-                                                @csrf
-                                                <input type="hidden" name="target_role" value="{{ $roleKey }}">
-                                                <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-4 py-1.5 text-xs text-ink hover:bg-soft transition-colors font-sans">
-                                                    <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                                    </svg>
-                                                    Switch ke {{ $roleLabel }}
-                                                </button>
-                                            </form>
-                                        @endif
-                                    @endforeach
+                                    @if(auth()->user()->hasPermission('users.switch_role'))
+                                        <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
+                                            Simulasi Role
+                                        </div>
+                                        @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
+                                            @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
+                                                <form method="POST" action="{{ route('switch-role') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="target_role" value="{{ $roleKey }}">
+                                                    <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-4 py-1.5 text-xs text-ink hover:bg-soft transition-colors font-sans">
+                                                        <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                                        </svg>
+                                                        Switch ke {{ $roleLabel }}
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        @endforeach
+                                    @endif
                                     @if(auth()->user()->temporary_role)
                                         <form method="POST" action="{{ route('revert-role') }}" class="mt-1">
                                             @csrf

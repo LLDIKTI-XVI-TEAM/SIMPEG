@@ -197,4 +197,134 @@ class SwitchRoleTest extends TestCase
         $user->refresh();
         $this->assertEquals('kepala_bagian', $user->temporary_role);
     }
+
+    public function test_switch_role_persists_across_logout_and_login(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch role ke pegawai
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+        ]);
+
+        $user->refresh();
+        $this->assertEquals('pegawai', $user->temporary_role);
+
+        // Simulasi logout (flush session auth)
+        $this->post(route('logout'));
+        $this->assertGuest();
+
+        // Login kembali dengan user yang sama
+        $this->actingAs($user);
+        $this->assertAuthenticatedAs($user);
+
+        // State simulasi tetap tersimpan persisten di database
+        $user->refresh();
+        $this->assertEquals('pegawai', $user->temporary_role);
+        $this->assertEquals('pegawai', $user->getEffectiveRole());
+    }
+
+    public function test_switched_super_admin_cannot_switch_again_due_to_effective_permission(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch ke pegawai
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+        ]);
+
+        $user->refresh();
+        $this->assertEquals('pegawai', $user->getEffectiveRole());
+
+        // Coba switch lagi saat mode pegawai -> harus 403 Forbidden karena role pegawai tidak punya users.switch_role
+        $response = $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'admin_kepegawaian',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_user_ownership_scope_and_identity_preserved_during_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $originalEmployeeId = $user->employee_id;
+        $originalName = $user->name;
+
+        // Switch role ke pegawai
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+        ]);
+
+        $user->refresh();
+
+        // Identitas asli tidak berubah
+        $this->assertEquals($originalEmployeeId, $user->employee_id);
+        $this->assertEquals($originalName, $user->name);
+        $this->assertEquals('super_admin', $user->role);
+        $this->assertEquals('pegawai', $user->temporary_role);
+
+        // Akses data sendiri (read_self) tetap valid untuk employee asli
+        $this->assertTrue($user->hasPermission('employees.read_self'));
+        $this->assertFalse($user->hasPermission('employees.create'));
+    }
+
+    public function test_temporary_permission_is_stored_and_evaluated_correctly(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch dengan temporary_permission kustom
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+            'temporary_permission' => json_encode(['employees.read_self', 'special.custom_permission']),
+        ]);
+
+        $user->refresh();
+        $this->assertEquals('pegawai', $user->temporary_role);
+        $this->assertNotNull($user->temporary_permission);
+
+        // Permission yang terdaftar di temporary_permission harus true
+        $this->assertTrue($user->hasPermission('special.custom_permission'));
+        $this->assertTrue($user->hasPermission('employees.read_self'));
+
+        // Permission di luar temporary_permission harus false
+        $this->assertFalse($user->hasPermission('employees.create'));
+
+        // Revert harus membersihkan temporary_permission juga
+        $this->actingAs($user)->post(route('revert-role'));
+        $user->refresh();
+        $this->assertNull($user->temporary_permission);
+        $this->assertNull($user->temporary_role);
+    }
+
+    public function test_audit_logs_record_simulation_context_during_active_temporary_role(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch role
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+        ]);
+
+        $user->refresh();
+
+        // Aksi yang memicu audit selama simulasi
+        \App\Services\AuditService::log(
+            'UPDATE',
+            'Employee',
+            $user->employee_id,
+            ['keterangan' => 'lama'],
+            ['keterangan' => 'baru'],
+        );
+
+        $audit = \App\Models\AuditLog::where('event', 'UPDATE')
+            ->where('auditable_type', 'Employee')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertTrue($audit->new_values['_simulation'] ?? false);
+        $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
+        $this->assertEquals('pegawai', $audit->new_values['_effective_role'] ?? null);
+    }
 }

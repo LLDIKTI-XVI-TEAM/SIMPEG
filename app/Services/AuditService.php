@@ -161,6 +161,19 @@ class AuditService
     ): array {
         $user = Auth::user();
 
+        // Sertakan konteks simulasi role bila user sedang berada dalam mode switch role
+        if ($user && $user->temporary_role) {
+            $simulationMeta = [
+                '_simulation' => true,
+                '_original_role' => $user->role,
+                '_effective_role' => $user->getEffectiveRole(),
+            ];
+
+            $newValues = is_array($newValues)
+                ? array_merge($newValues, $simulationMeta)
+                : $simulationMeta;
+        }
+
         return [
             'user_id' => $user?->id,
             'user_name' => $user?->name,

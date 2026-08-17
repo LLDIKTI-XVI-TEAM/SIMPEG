@@ -8,7 +8,8 @@ class SwitchRoleRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     * Hanya user dengan role super_admin atau permission khusus yang boleh switch role.
+     * Hanya user dengan permission users.switch_role secara efektif yang boleh switch role.
+     * Tidak ada bypass raw role asli; simulasi harus mengikuti permission efektif.
      */
     public function authorize(): bool
     {
@@ -18,12 +19,6 @@ class SwitchRoleRequest extends FormRequest
             return false;
         }
 
-        // Super Admin selalu boleh switch role
-        if ($user->role === 'super_admin') {
-            return true;
-        }
-
-        // Atau user dengan permission users.switch_role
         return $user->hasPermission('users.switch_role');
     }
 
@@ -34,6 +29,7 @@ class SwitchRoleRequest extends FormRequest
     {
         return [
             'target_role' => ['required', 'string', 'in:admin_kepegawaian,pimpinan,kepala_bagian,pegawai'],
+            'temporary_permission' => ['nullable', 'string'],
         ];
     }
 

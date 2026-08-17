@@ -17,9 +17,11 @@ class SwitchRoleController extends Controller
     public function switchRole(SwitchRoleRequest $request, SwitchRoleAction $action): RedirectResponse
     {
         $user = $request->user();
-        $targetRole = $request->validated()['target_role'];
+        $validated = $request->validated();
+        $targetRole = $validated['target_role'];
+        $temporaryPermission = $validated['temporary_permission'] ?? null;
 
-        $action->execute($user, $targetRole, $request);
+        $action->execute($user, $targetRole, $request, $temporaryPermission);
 
         $roleLabels = [
             'admin_kepegawaian' => 'Admin Kepegawaian',

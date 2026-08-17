@@ -14,7 +14,7 @@ class SwitchRoleAction
      * Switch role adalah simulasi role, bukan impersonasi identitas.
      * Identitas aktor, kepemilikan data, dan jejak audit tidak berubah.
      */
-    public function execute(User $user, string $targetRole, Request $request): void
+    public function execute(User $user, string $targetRole, Request $request, ?string $temporaryPermission = null): void
     {
         // Validasi: tidak boleh switch ke role yang sama
         if ($targetRole === $user->role) {
@@ -30,11 +30,13 @@ class SwitchRoleAction
         $oldValues = [
             'role' => $user->role,
             'temporary_role' => $user->temporary_role,
+            'temporary_permission' => $user->temporary_permission,
         ];
 
         // Update temporary_role dan metadata
         $user->forceFill([
             'temporary_role' => $targetRole,
+            'temporary_permission' => $temporaryPermission,
             'temporary_role_started_at' => now(),
             'temporary_role_switched_by' => $user->id,
         ]);
@@ -53,6 +55,7 @@ class SwitchRoleAction
             [
                 'role' => $user->role,
                 'temporary_role' => $targetRole,
+                'temporary_permission' => $temporaryPermission,
                 'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
                 'temporary_role_switched_by' => $user->id,
             ],
