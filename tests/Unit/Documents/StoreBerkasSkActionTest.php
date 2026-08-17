@@ -5,11 +5,13 @@ namespace Tests\Unit\Documents;
 use App\Actions\Documents\StoreBerkasSkAction;
 use App\Models\Appointment;
 use App\Models\Document;
+use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefJenjangPendidikan;
 use App\Models\RefUnitKerja;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -246,5 +248,46 @@ class StoreBerkasSkActionTest extends TestCase
         // File baru harus tetap ada di storage setelah transaksi sukses
         $this->assertNotNull($document->file_path);
         Storage::disk(Document::STORAGE_DISK)->assertExists((string) $document->file_path);
+    }
+
+    public function test_replace_pengangkatan_mempertahankan_file_lama_yang_dipakai_riwayat_pendidikan(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $oldPath = 'shared/ijazah-pengangkatan.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'SK lama');
+
+        $employee->appointments()->create([
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK/ANGKAT/LAMA',
+            'tanggal_sk' => '2019-12-01',
+            'file_sk' => $oldPath,
+        ]);
+
+        $jenjang = RefJenjangPendidikan::firstOrCreate(['nama' => 'S1'], ['urutan' => 1, 'is_active' => true]);
+
+        // Path yang sama dipakai oleh riwayat pendidikan (data legacy)
+        EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => $jenjang->id,
+            'nama_institusi' => 'Universitas Test',
+            'jurusan' => 'Teknik Informatika',
+            'tahun_lulus' => 2019,
+            'file_ijazah' => $oldPath,
+        ]);
+
+        $action = app(StoreBerkasSkAction::class);
+        $action->execute($employee, [
+            'kategori_dokumen' => 'sk_pengangkatan',
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2022-01-01',
+            'no_sk' => 'SK/ANGKAT/BARU',
+            'tanggal_sk' => '2021-12-01',
+            'file_sk' => UploadedFile::fake()->create('sk-baru.pdf', 80, 'application/pdf'),
+        ], request());
+
+        // File lama harus tetap ada karena masih dipakai riwayat pendidikan
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
     }
 }

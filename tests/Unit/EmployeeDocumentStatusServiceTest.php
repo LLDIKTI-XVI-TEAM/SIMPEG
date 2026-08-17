@@ -340,4 +340,46 @@ class EmployeeDocumentStatusServiceTest extends TestCase
 
         DB::disableQueryLog();
     }
+
+    /**
+     * Tie-breaker appointment kanonis — ketika ada multiple appointments dengan
+     * tmt_pengangkatan yang sama, created_at yang lebih baru harus dipilih sebagai kanonis.
+     * Konsisten dengan ReplaceAppointmentSkAction yang memakai orderByDesc('tmt_pengangkatan')->orderByDesc('created_at').
+     */
+    public function test_appointment_kanonis_dipilih_berdasarkan_tmt_lalu_created_at(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $filePathLama = 'appointments/sk-pengangkatan-lama.pdf';
+        $filePathBaru = 'appointments/sk-pengangkatan-baru.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePathLama, 'isi lama');
+        Storage::disk(Document::STORAGE_DISK)->put($filePathBaru, 'isi baru');
+
+        // Appointment lama dengan TMT yang sama tapi created_at lebih awal
+        $appointmentLama = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK/LAMA/2020',
+            'file_sk' => $filePathLama,
+            'created_at' => now()->subDay(),
+        ]);
+
+        // Appointment baru dengan TMT yang sama tapi created_at lebih baru
+        $appointmentBaru = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK/BARU/2020',
+            'file_sk' => $filePathBaru,
+            'created_at' => now(),
+        ]);
+
+        $result = $this->service->summarize($employee->fresh());
+        $skPengangkatan = collect($result['required_sks'])->firstWhere('jenis', 'sk_pengangkatan');
+
+        // Harus memilih appointment yang created_at lebih baru sebagai kanonis
+        $this->assertSame('tersedia', $skPengangkatan['status']);
+        $this->assertSame($filePathBaru, $skPengangkatan['file_path']);
+    }
 }

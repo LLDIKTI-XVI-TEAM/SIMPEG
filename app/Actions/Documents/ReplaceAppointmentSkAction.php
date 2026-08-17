@@ -6,6 +6,7 @@ use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
+use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
@@ -193,6 +194,7 @@ class ReplaceAppointmentSkAction
             || PositionHistory::query()->where('file_sk', $filePath)->exists()
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()
             || DisciplineRecord::query()->where('file_sk', $filePath)->exists()
-            || Appointment::query()->where('file_sk', $filePath)->exists();
+            || Appointment::query()->where('file_sk', $filePath)->exists()
+            || EducationHistory::query()->where('file_ijazah', $filePath)->exists();
     }
 }

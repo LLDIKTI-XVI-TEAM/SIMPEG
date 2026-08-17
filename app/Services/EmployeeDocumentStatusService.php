@@ -87,16 +87,30 @@ class EmployeeDocumentStatusService
         // riwayat terbaru tidak tertutup oleh riwayat lama yang masih valid.
         $sources = [
             'sk_pengangkatan' => $this->historySources(
-                $employee->appointments->sortByDesc('tmt_pengangkatan')->values()
+                $employee->appointments
+                    ->sortBy([
+                        fn ($item) => $item->tmt_pengangkatan?->timestamp ?? 0,
+                        fn ($item) => $item->created_at?->timestamp ?? 0,
+                    ], descending: true)
+                    ->values()
             ),
             'sk_pangkat' => $this->historySources(
-                $employee->rankHistories->sortByDesc('tmt_pangkat')->sortByDesc('is_latest')->values()
+                $employee->rankHistories->sortBy([
+                    fn ($item) => $item->is_latest ? 1 : 0,
+                    fn ($item) => $item->tmt_pangkat?->timestamp ?? 0,
+                ], descending: true)->values()
             ),
             'sk_jabatan' => $this->historySources(
-                $employee->positionHistories->sortByDesc('tmt_jabatan')->sortByDesc('is_latest')->values()
+                $employee->positionHistories->sortBy([
+                    fn ($item) => $item->is_latest ? 1 : 0,
+                    fn ($item) => $item->tmt_jabatan?->timestamp ?? 0,
+                ], descending: true)->values()
             ),
             'sk_kgb' => $this->historySources(
-                $employee->salaryHistories->sortByDesc('tmt_kgb')->sortByDesc('is_latest')->values()
+                $employee->salaryHistories->sortBy([
+                    fn ($item) => $item->is_latest ? 1 : 0,
+                    fn ($item) => $item->tmt_kgb?->timestamp ?? 0,
+                ], descending: true)->values()
             ),
         ];
 
