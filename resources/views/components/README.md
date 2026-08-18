@@ -34,7 +34,7 @@ Semua token warna terdaftar di `resources/css/app.css` via Tailwind CSS v4 `@the
 | **Border** | `border-border` | `#E5E7EB` | Garis batas, divider, border input |
 | **Success** | `bg-success`, `text-success`, `border-success` | `#16A34A` | Status aktif, disetujui, sukses |
 | **Warning** | `bg-warning`, `text-warning`, `border-warning` | `#F59E0B` | Status menunggu, perhatian, H-60 |
-| **Danger** | `bg-danger`, `text-danger`, `border-danger` | `#DC2626` | Status ditolak, nonaktif, bahaya, aksi destruktif |
+| **Danger** | `bg-danger`, `text-danger`, `border-danger` | `#DC2626` | Status Tidak Disetujui, nonaktif, bahaya, aksi destruktif |
 | **Info** | `bg-info`, `text-info`, `border-info` | `#0284C7` | Informasi umum, H-90, petunjuk |
 
 **Typography**:
@@ -568,7 +568,7 @@ Area upload berkas dokumen pendukung dengan mode standar inline atau dropzone se
     label="Dokumen SK (PDF/Gambar)" 
     accept=".pdf,.jpg,.jpeg,.png" 
     mode="dropzone"
-    hint="Ukuran maksimal berkas 2MB"
+    hint="Ukuran maksimal berkas 10MB (sesuai PRD §7.4)"
     required 
 />
 ```
@@ -578,7 +578,7 @@ Area upload berkas dokumen pendukung dengan mode standar inline atau dropzone se
 ## 🔒 5. Session Management & Keamanan Autentikasi
 
 ### Mekanisme Session Timeout (Server-Side Enforced):
-Sistem SIMPEG menerapkan penegakan *idle timeout* berbasis request di sisi server melalui middleware `App\Http\Middleware\SessionTimeoutMessage` yang dipasang pada grup rute web terautentikasi dan API notifikasi:
+Sistem SIMPEG menerapkan penegakan *idle timeout* berbasis request di sisi server melalui middleware `App\Http\Middleware\SessionTimeoutMessage` yang dipasang seragam pada seluruh surface terautentikasi (seluruh grup rute web terlindungi di `routes/web.php` dan seluruh endpoint API bisnis di `routes/api/v1/*.php`):
 
 1. **`SIMPEG_SESSION_IDLE_TIMEOUT=30`**:
    - Sesuai spesifikasi **US-1.3** dan keputusan kanonis **K-US-03**, batas waktu tidak aktif (*idle*) ditetapkan sebesar **30 menit** berdasarkan selisih waktu `now() - last_activity_at`.

@@ -8,7 +8,7 @@ $disableEmployeeApiAuth = app()->environment('local')
 
 $dokumenGroupMiddleware = $disableEmployeeApiAuth
     ? []
-    : ['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian'];
+    : ['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian'];
 
 Route::middleware($dokumenGroupMiddleware)
     ->prefix('dokumen')

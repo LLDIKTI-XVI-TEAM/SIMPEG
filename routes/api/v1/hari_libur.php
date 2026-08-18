@@ -3,7 +3,7 @@
 use App\Http\Controllers\Api\V1\HariLiburController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'keycloak.auth', 'role:super_admin'])
+Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:super_admin'])
     ->prefix('hari-libur')
     ->name('hari-libur.')
     ->group(function (): void {
