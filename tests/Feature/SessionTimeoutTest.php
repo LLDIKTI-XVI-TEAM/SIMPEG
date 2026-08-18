@@ -218,4 +218,27 @@ class SessionTimeoutTest extends TestCase
         $response->assertSee('SESSION_TIMEOUT: Sesi berakhir karena idle timeout', false);
         $response->assertSee('autentikasi');
     }
+
+    public function test_business_api_request_after_timeout_receives_unauthenticated_response_and_audited(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create(['name' => 'Admin API Timeout']);
+
+        $this->actingAs($user)
+            ->withSession([
+                'last_activity_at' => now()->subMinutes(31)->timestamp,
+                'last_authenticated_user_id' => $user->id,
+                'last_authenticated_user_name' => $user->name,
+            ])
+            ->getJson(route('api.v1.pegawai.index'))
+            ->assertUnauthorized()
+            ->assertJson([
+                'message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
+            ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => $user->id,
+            'user_name' => 'Admin API Timeout',
+            'event' => 'SESSION_TIMEOUT',
+        ]);
+    }
 }
