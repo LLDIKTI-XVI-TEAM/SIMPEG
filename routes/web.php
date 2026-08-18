@@ -247,13 +247,13 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('jenjang')->name('jenjang-pendidikan.destroy');
 
         Route::post('/program-studi', [DataMasterProgramStudiController::class, 'store'])
-            ->middleware('permission:reference_tables.manage')->name('program-studi.store');
+            ->name('program-studi.store');
         Route::post('/program-studi/{programStudi}/update', [DataMasterProgramStudiController::class, 'update'])
-            ->whereUuid('programStudi')->middleware('permission:reference_tables.manage')->name('program-studi.update');
+            ->whereUuid('programStudi')->name('program-studi.update');
         Route::post('/program-studi/{programStudi}/toggle-aktif', [DataMasterProgramStudiController::class, 'toggle'])
-            ->whereUuid('programStudi')->middleware('permission:reference_tables.manage')->name('program-studi.toggle');
+            ->whereUuid('programStudi')->name('program-studi.toggle');
         Route::post('/program-studi/{programStudi}/destroy', [DataMasterProgramStudiController::class, 'destroy'])
-            ->whereUuid('programStudi')->middleware('permission:reference_tables.manage')->name('program-studi.destroy');
+            ->whereUuid('programStudi')->name('program-studi.destroy');
 
         Route::post('/golongan', [DataMasterGolonganController::class, 'store'])->name('golongan.store');
         Route::post('/golongan/{golongan}/update', [DataMasterGolonganController::class, 'update'])

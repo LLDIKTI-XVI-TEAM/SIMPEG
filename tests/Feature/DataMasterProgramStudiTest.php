@@ -4,10 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\EducationHistory;
 use App\Models\Employee;
-use App\Models\Permission;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
-use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,16 +43,18 @@ class DataMasterProgramStudiTest extends TestCase
         $this->assertFalse($programStudi->refresh()->is_active);
     }
 
-    public function test_program_studi_mutation_requires_reference_table_permission(): void
+    public function test_program_studi_mutation_is_restricted_to_super_admin_role(): void
     {
-        $user = User::factory()->superAdmin()->create();
-        $role = Role::where('name', 'super_admin')->firstOrFail();
-        $permissionId = Permission::where('name', 'reference_tables.manage')->value('id');
-        $role->permissions()->detach($permissionId);
+        // Program Studi mengikuti pola referensi Data Master lain: hanya peran super_admin
+        // yang boleh memutasinya, tidak bergantung pada pivot permission database.
+        $nonAdmin = User::factory()->adminKepegawaian()->create();
 
-        $this->actingAs($user)
+        $this->actingAs($nonAdmin)
             ->postWithCsrf(route('data-master.program-studi.store'), ['nama' => 'Teknik Informatika'])
             ->assertForbidden();
+
+        $this->assertDatabaseCount('ref_program_studi', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
     }
 
     public function test_program_studi_used_by_employee_cannot_be_deleted(): void

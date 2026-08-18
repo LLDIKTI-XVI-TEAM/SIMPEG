@@ -8,8 +8,10 @@ class DeleteProgramStudiRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Permission menjadi sumber otorisasi agar backend tetap fail-closed saat role berubah.
-        return (bool) $this->user()?->hasPermission('reference_tables.manage');
+        // Program Studi adalah data referensi Data Master; hanya super_admin yang boleh
+        // mengelolanya (lapisan kedua di atas role middleware pada route), konsisten dengan
+        // referensi lain yang memakai role langsung, bukan permission database.
+        return $this->user()?->role === 'super_admin';
     }
 
     public function rules(): array
