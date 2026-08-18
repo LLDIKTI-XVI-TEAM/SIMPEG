@@ -50,6 +50,7 @@ class ReplaceAppointmentSkAction
                 $appointment = $employee->appointments()
                     ->orderByDesc('tmt_pengangkatan')
                     ->orderByDesc('created_at')
+                    ->orderByDesc('id')
                     ->lockForUpdate()
                     ->first();
 

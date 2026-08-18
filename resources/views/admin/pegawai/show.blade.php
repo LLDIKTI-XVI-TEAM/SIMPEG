@@ -142,14 +142,14 @@
         skList: {{ $riwayatSk->map($mapDokumenRow)->toJson() }},
         berkasList: {{ $riwayatBerkas->map($mapDokumenRow)->toJson() }},
 
-        // Arsip terpusat menyimpan hasil fetch di sessionStorage tanpa TTL; setelah
-        // mutasi dari tab ini cache-nya wajib dibuang agar navigasi kembali tidak
+        // Arsip terpusat & daftar pegawai menyimpan hasil fetch di sessionStorage tanpa TTL;
+        // setelah mutasi dari tab ini cache-nya wajib dibuang agar navigasi kembali tidak
         // menampilkan data lama.
         invalidateDokumenCache() {
             const toDelete = [];
             for (let i = 0; i < sessionStorage.length; i++) {
                 const key = sessionStorage.key(i);
-                if (key && key.startsWith('dokumen_')) toDelete.push(key);
+                if (key && (key.startsWith('dokumen_') || key.startsWith('pegawai_'))) toDelete.push(key);
             }
             toDelete.forEach(k => sessionStorage.removeItem(k));
         },
@@ -166,7 +166,7 @@
         isUploadingSk: false,
         skUploadError: '',
         skUploadErrors: {},
-        newSk: { kategori_dokumen: 'sk_pangkat', no_sk: '', tanggal_sk: '', file_sk: null, golongan_id: '', tmt_pangkat: '', jabatan_id: '', jenis_jabatan_id: '', unit_kerja_id: '', kelas_jabatan: '', tmt_jabatan: '', gaji_pokok: '', tmt_kgb: '', jenis_pengangkatan: 'CPNS', tmt_pengangkatan: '' },
+        newSk: { kategori_dokumen: '{{ $canCreateEmployeeHistory ? 'sk_pangkat' : 'sk_pengangkatan' }}', no_sk: '', tanggal_sk: '', file_sk: null, golongan_id: '', tmt_pangkat: '', jabatan_id: '', jenis_jabatan_id: '', unit_kerja_id: '', kelas_jabatan: '', tmt_jabatan: '', gaji_pokok: '', tmt_kgb: '', jenis_pengangkatan: 'CPNS', tmt_pengangkatan: '' },
 
         // Edit metadata berkas lainnya
         showEditBerkasModal: false,
