@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -145,8 +146,18 @@ class HandleKeycloakCallbackAction
             if ($employee
                 && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail
                 && ! $this->emailIsOwnedByAnotherEmployee($employee, $verifiedEmail)) {
-                $employee->email_pribadi = $verifiedEmail;
-                $employee->saveQuietly();
+                try {
+                    $employee->email_pribadi = $verifiedEmail;
+                    $employee->saveQuietly();
+                } catch (QueryException $exception) {
+                    // Dua callback untuk pegawai berbeda bisa membawa email yang sama secara bersamaan;
+                    // keduanya lolos pemeriksaan kepemilikan sebelum salah satu menulis. Penulisan kedua
+                    // melanggar index unik case-insensitive employees_email_pribadi_unique; perlakukan
+                    // benturan sebagai "email sudah dipakai" agar login tetap berhasil tanpa mengubah email.
+                    if (! $this->isEmailPribadiConflict($exception)) {
+                        throw $exception;
+                    }
+                }
             }
         }
 
@@ -195,6 +206,31 @@ class HandleKeycloakCallbackAction
                     ->orWhereRaw('lower(email) = ?', [$email]);
             })
             ->exists();
+    }
+
+    /**
+     * Memastikan unique violation berasal dari index email_pribadi (functional index
+     * case-insensitive), bukan constraint unik lain pada tabel pegawai.
+     *
+     * Deteksi portabel: PostgreSQL memakai SQLSTATE 23505 (unique_violation) dan SQLite
+     * memetakan semua pelanggaran integritas ke 23000 sehingga wajib menegaskan email_pribadi.
+     */
+    private function isEmailPribadiConflict(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverDiagnostic = (string) ($exception->errorInfo[2] ?? '');
+
+        if ($sqlState === '23505') {
+            preg_match('/unique constraint ["\']([^"\']+)["\']/i', $driverDiagnostic, $matches);
+
+            return ($matches[1] ?? null) === 'employees_email_pribadi_unique';
+        }
+
+        return $sqlState === '23000'
+            && preg_match(
+                '/unique constraint failed:\s*(?:employees\.email_pribadi\b|index ["\']employees_email_pribadi_unique["\'])/i',
+                $driverDiagnostic,
+            ) === 1;
     }
 
     /**

@@ -656,6 +656,56 @@ class KeycloakCallbackMappingTest extends TestCase
     }
 
     /**
+     * Dua callback untuk pegawai berbeda yang membawa email baru yang sama dapat melewati
+     * pemeriksaan kepemilikan sebelum salah satu transaksi menulis. Penulisan kedua melanggar
+     * index unik case-insensitive employees_email_pribadi_unique; login tetap harus berhasil
+     * tanpa mengubah email, seperti halnya konflik yang sudah tersimpan.
+     */
+    public function test_login_survives_unique_race_on_email_pribadi_sync(): void
+    {
+        $employee = Employee::factory()->create(['email_pribadi' => 'aktif@example.com']);
+        User::factory()->create([
+            'email' => 'aktif@example.com',
+            'keycloak_id' => 'kc-race',
+            'employee_id' => $employee->id,
+        ]);
+
+        // Simulasikan penulisan kedua yang ditolak index unik lewat trigger database,
+        // karena saveQuietly melewati event model sehingga tidak bisa disimulasikan via listener.
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER reject_email_pribadi_race
+            BEFORE UPDATE OF email_pribadi ON employees
+            WHEN NEW.email_pribadi = 'baru@example.com'
+            BEGIN
+                SELECT RAISE(ABORT, 'UNIQUE constraint failed: index ''employees_email_pribadi_unique''');
+            END;
+            SQL);
+
+        try {
+            $this->fakeKeycloakUser([
+                'id' => 'kc-race',
+                'nickname' => 'race',
+                'name' => 'Race',
+                'email' => 'baru@example.com',
+                'raw' => ['email' => 'baru@example.com', 'email_verified' => true, 'preferred_username' => 'race'],
+            ]);
+
+            $response = $this->get('/auth/keycloak/callback');
+
+            $response->assertRedirect(route('dashboard'));
+            $this->assertAuthenticated();
+        } finally {
+            DB::unprepared('DROP TRIGGER IF EXISTS reject_email_pribadi_race');
+        }
+
+        // Email tetap di tangan pegawai semula; login tidak terganggu benturan unik.
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'aktif@example.com',
+        ]);
+    }
+
+    /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
     private function fakeKeycloakUser(array $attributes): void

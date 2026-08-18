@@ -2144,12 +2144,9 @@
                                     {{ Str::limit($history->keterangan, 100) }}
                                 </p>
                                 @endif
-                                @php
-                                    $currentFile = $history->document?->file_path ?? $history->file_sk;
-                                @endphp
-                                @if($currentFile)
+                                @if($history->admin_attachment_download_url)
                                 <p class="pt-1">
-                                    <a href="{{ $history->admin_attachment_download_url ?? asset('storage/'.$currentFile) }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
+                                    <a href="{{ $history->admin_attachment_download_url }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                         </svg>
