@@ -187,6 +187,45 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseCount('users', 0);
     }
 
+    /** Akun yang sudah ada tetap tidak mendapat role baru apabila pegawai terkait sudah dinonaktifkan. */
+    public function test_role_not_initialized_for_account_of_soft_deleted_employee(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Nonaktif Terpeta',
+            'email' => 'softdel-account@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'softdel-account@example.com',
+            'keycloak_id' => 'kc-softdel-account',
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+        $employee->delete();
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-softdel-account',
+            'nickname' => 'softdel-account',
+            'name' => 'Nonaktif Terpeta',
+            'email' => 'softdel-account@example.com',
+            'raw' => ['email' => 'softdel-account@example.com', 'email_verified' => true, 'preferred_username' => 'softdel-account'],
+        ]);
+
+        $this->get('/auth/keycloak/callback');
+
+        // Role tetap kosong (akses yang dicabut lewat deaktivasi tidak pulih) dan tidak ada
+        // audit inisialisasi role untuk akun ini.
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'User',
+            'auditable_id' => $user->id,
+        ]);
+    }
+
     public function test_employee_email_matching_is_case_insensitive(): void
     {
         $employee = Employee::factory()->create([

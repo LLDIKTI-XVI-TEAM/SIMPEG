@@ -135,7 +135,13 @@ class HandleKeycloakCallbackAction
 
         // Role internal kosong (null atau string kosong) pada mapping pegawai valid
         // diinisialisasi sebagai Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
-        if ($user->employee_id !== null && in_array($user->role, [null, ''], true)) {
+        // Inisialisasi hanya untuk pegawai yang masih aktif: pegawai yang sudah dinonaktifkan
+        // (soft-delete) tidak layak menerima role baru, agar akses yang dicabut lewat deaktivasi
+        // tidak pulih hanya karena role account lama masih kosong.
+        if ($user->employee_id !== null
+            && is_string($user->employee_id)
+            && ! $this->employeeIsSoftDeleted($user->employee_id)
+            && in_array($user->role, [null, ''], true)) {
             $user->role = 'pegawai';
         }
 
@@ -217,6 +223,15 @@ class HandleKeycloakCallbackAction
             ['role' => $user->role, 'employee_id' => $user->employee_id, 'source' => 'sso_mapping'],
             $request,
         );
+    }
+
+    /**
+     * Apakah pegawai terpeta sudah dinonaktifkan (soft-delete). Pegawai nonaktif tidak berhak
+     * atas inisialisasi role baru lewat SSO.
+     */
+    private function employeeIsSoftDeleted(string $employeeId): bool
+    {
+        return (bool) Employee::withTrashed()->whereKey($employeeId)->value('deleted_at');
     }
 
     /**
