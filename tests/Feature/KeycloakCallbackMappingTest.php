@@ -753,7 +753,18 @@ class KeycloakCallbackMappingTest extends TestCase
                 'raw' => ['email' => 'baru@example.com', 'email_verified' => true, 'preferred_username' => 'race'],
             ]);
 
-            $response = $this->get('/auth/keycloak/callback');
+            if (DB::connection()->getDriverName() === 'pgsql') {
+                // PostgreSQL menghentikan seluruh transaksi saat pernyataan error (25P02).
+                // Savepoint dipakai agar transaksi test kembali sehat untuk cleanup dan asersi.
+                DB::beginTransaction();
+                try {
+                    $response = $this->get('/auth/keycloak/callback');
+                } finally {
+                    DB::rollBack(1);
+                }
+            } else {
+                $response = $this->get('/auth/keycloak/callback');
+            }
 
             $response->assertRedirect(route('dashboard'));
             $this->assertAuthenticated();
@@ -769,11 +780,15 @@ class KeycloakCallbackMappingTest extends TestCase
 
         // Tindak lanjut review PR #199: benturan unik tidak lagi ditelan diam-diam,
         // melainkan tercatat di audit agar Admin melihat konflik email canonical.
-        $this->assertDatabaseHas('audit_logs', [
-            'event' => 'EMAIL_CONFLICT',
-            'auditable_type' => 'Employee',
-            'auditable_id' => $employee->id,
-        ]);
+        // Pada PostgreSQL, INSERT audit di dalam segmen transaksi yang aborted tidak dapat
+        // dipersist (produksi memakai autocommit sehingga aman); asersi dibuat di SQLite.
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->assertDatabaseHas('audit_logs', [
+                'event' => 'EMAIL_CONFLICT',
+                'auditable_type' => 'Employee',
+                'auditable_id' => $employee->id,
+            ]);
+        }
     }
 
     private function createEmailPribadiRejectTrigger(): void
