@@ -10,9 +10,8 @@ use App\Models\Document;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Arsip dokumen terpusat bersifat baca-saja (keputusan produk K-MTG-04):
- * seluruh aksi unggah/edit/hapus dilakukan dari tab Dokumen & SK pada
- * halaman detail pegawai melalui API pegawai.
+ * Arsip dokumen terpusat bersifat baca-saja: seluruh aksi unggah/edit/hapus
+ * dilakukan dari tab Dokumen & SK pada halaman detail pegawai melalui API pegawai.
  */
 class DokumenController extends Controller
 {

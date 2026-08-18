@@ -55,7 +55,10 @@ class StoreDocumentRequest extends FormRequest
             'kategori_dokumen' => [
                 'required',
                 'string',
-                Rule::in(array_filter(DocumentCategory::editableKeys(), fn ($key) => $key !== 'sk_status_pegawai')),
+                // Endpoint profile-scoped ini hanya melayani Berkas Lainnya. Dokumen SK
+                // hanya boleh dibuat lewat jalur domain masing-masing (/berkas-sk untuk
+                // riwayat append-only atau replace pengangkatan), bukan endpoint generic.
+                Rule::in(DocumentCategory::otherUploadKeys()),
             ],
             'pegawai_id' => ['required', 'uuid', 'exists:employees,id'],
             'deskripsi' => ['nullable', 'string'],

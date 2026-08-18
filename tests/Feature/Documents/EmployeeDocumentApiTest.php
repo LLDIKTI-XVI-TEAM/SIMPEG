@@ -291,4 +291,36 @@ class EmployeeDocumentApiTest extends TestCase
         $this->assertNotSame($oldPath, $education->refresh()->file_ijazah);
         Storage::disk(Document::STORAGE_DISK)->assertExists((string) $education->refresh()->file_ijazah);
     }
+
+    public function test_dokumen_store_rejects_sk_categories(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+        $employee = Employee::factory()->create();
+
+        // Endpoint generic /dokumen hanya boleh melayani Berkas Lainnya; dokumen SK
+        // wajib melalui jalur domain masing-masing (/berkas-sk / replace pengangkatan),
+        // agar tidak ada jalur alternatif yang melewati append-only + izin riwayat.
+        foreach (['sk_pangkat', 'sk_jabatan', 'sk_kgb', 'sk_pengangkatan'] as $sk) {
+            $this->post(
+                "/api/v1/pegawai/{$employee->id}/dokumen",
+                [
+                    'nama_dokumen' => 'SK',
+                    'kategori_dokumen' => $sk,
+                    'berkas' => UploadedFile::fake()->create('sk.pdf', 80, 'application/pdf'),
+                ],
+                ['Accept' => 'application/json'],
+            )->assertUnprocessable();
+        }
+
+        // Berkas Lainnya tetap boleh diunggah melalui endpoint yang sama.
+        $this->post(
+            "/api/v1/pegawai/{$employee->id}/dokumen",
+            [
+                'nama_dokumen' => 'KTP',
+                'kategori_dokumen' => 'ktp_kk',
+                'berkas' => UploadedFile::fake()->create('ktp.pdf', 80, 'application/pdf'),
+            ],
+            ['Accept' => 'application/json'],
+        )->assertCreated();
+    }
 }

@@ -116,27 +116,7 @@ class EmployeeDocumentTest extends TestCase
             'kategori_dokumen' => 'sk_pangkat',
             'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('sk-pangkat-arsip.pdf', 100, 'application/pdf'),
-        ])->assertCreated();
-
-        $document = Document::query()
-            ->where('employee_id', $employee->id)
-            ->where('jenis_dokumen', 'sk_pangkat')
-            ->firstOrFail();
-
-        // Riwayat bersifat append-only: referensi file yang sudah terisi tidak
-        // ditimpa unggahan arsip, sehingga dokumen arsip menyimpan metadata
-        // formulir apa adanya dan riwayat tetap dilaporkan perlu perbaikan.
-        $this->assertSame('NOMOR-FORM-ULANG', $document->nomor_dokumen);
-        $this->assertSame('2020-01-01', $document->tanggal_dokumen?->toDateString());
-        $this->assertSame($filePathHilang, $rankHistory->refresh()->file_sk);
-        $this->assertSame('SK-PANGKAT-RESMI', $rankHistory->no_sk);
-        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
-
-        $this->actingAs($user)
-            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
-            ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan')
-            ->assertJsonPath('document_status.required_sks.1.status', 'perlu_perbaikan');
+        ])->assertUnprocessable();
     }
 
     public function test_uploading_sk_backfills_empty_history_file_and_updates_document_status(): void
@@ -175,25 +155,7 @@ class EmployeeDocumentTest extends TestCase
                 'kategori_dokumen' => 'sk_pangkat',
                 'pegawai_id' => $employee->id,
                 'berkas' => UploadedFile::fake()->create('sk-pangkat-backfill.pdf', 100, 'application/pdf'),
-            ])->assertCreated();
-
-        $document = Document::query()
-            ->where('employee_id', $employee->id)
-            ->where('jenis_dokumen', 'sk_pangkat')
-            ->firstOrFail();
-
-        // Backfill hanya terjadi saat berkas riwayat masih kosong; metadata
-        // diambil dari formulir sesuai perilaku sinkronisasi yang sudah berjalan.
-        $rankHistory->refresh();
-        $this->assertSame($document->file_path, $rankHistory->file_sk);
-        $this->assertSame('SK-BACKFILL-001', $rankHistory->no_sk);
-        $this->assertSame('2025-12-20', $rankHistory->tanggal_sk?->toDateString());
-
-        $this->actingAs($user)
-            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
-            ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'lengkap')
-            ->assertJsonPath('document_status.required_sks.1.status', 'tersedia');
+            ])->assertUnprocessable();
     }
 
     public function test_uploading_appointment_sk_syncs_stale_jenis_pegawai_even_when_file_already_valid(): void
@@ -885,6 +847,8 @@ class EmployeeDocumentTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->put("{$employee->id}/sk_pengangkatan/valid.pdf", 'SK lama valid');
 
         // Unggahan arsip: appointment sudah punya file valid sehingga tidak ada repair.
+        // Endpoint generic /dokumen menolak SK Pengangkatan; jalur resmi adalah
+        // replace pengangkatan (/berkas-sk), bukan arsip generic.
         $this->actingAs($user)
             ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
                 'nama_dokumen' => 'SK Pengangkatan Arsip',
@@ -892,8 +856,6 @@ class EmployeeDocumentTest extends TestCase
                 'pegawai_id' => $employee->id,
                 'berkas' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 10, 'application/pdf'),
             ], ['Accept' => 'application/json'])
-            ->assertCreated();
-
-        $this->assertSame($pns->id, $employee->refresh()->jenis_pegawai_id);
+            ->assertUnprocessable();
     }
 }

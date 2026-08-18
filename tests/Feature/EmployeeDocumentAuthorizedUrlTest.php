@@ -108,16 +108,16 @@ class EmployeeDocumentAuthorizedUrlTest extends TestCase
 
         $this->actingAs($user)
             ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
-                'nama_dokumen' => 'SK Pangkat Privat',
-                'kategori_dokumen' => 'sk_pangkat',
+                'nama_dokumen' => 'Ijazah Privat',
+                'kategori_dokumen' => 'ijazah',
                 'pegawai_id' => $employee->id,
-                'berkas' => UploadedFile::fake()->create('sk-pangkat.pdf', 10, 'application/pdf'),
+                'berkas' => UploadedFile::fake()->create('ijazah.pdf', 10, 'application/pdf'),
             ], ['Accept' => 'application/json'])
             ->assertCreated();
 
         $document = Document::query()
             ->where('employee_id', $employee->id)
-            ->where('jenis_dokumen', 'sk_pangkat')
+            ->where('jenis_dokumen', 'ijazah')
             ->firstOrFail();
 
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);

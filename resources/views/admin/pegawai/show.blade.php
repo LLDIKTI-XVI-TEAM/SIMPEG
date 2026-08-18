@@ -13,7 +13,7 @@
             && auth()->user()->hasPermission('employee_histories.create');
 
         // Tab Dokumen & SK menjadi satu-satunya tempat aksi kelola dokumen; arsip
-        // terpusat hanya baca-saja (K-MTG-04).
+        // terpusat dibuat baca-saja.
         $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
         $canDeleteBerkas = \App\Support\Documents\DocumentAuthorization::canDelete(auth()->user());
 
@@ -327,8 +327,8 @@
 
         // ===== Tambah / ganti SK via riwayat baru (append-only) =====
         // Tombol kelola SK di tabel membuka form "Tambah Berkas SK" dengan kategori
-        // ter-prefill. Jalur ini menuju /berkas-sk → StoreBerkasSkAction yang membuat
-        // riwayat baru, sesuai US-2.6 append-only (bukan mutasi existing history).
+        // ter-prefill. Jalur ini menuju /berkas-sk dan selalu membuat riwayat baru,
+        // tidak pernah memutasi record yang sudah ada.
         openSkRiwayatForm(kategori = 'sk_pangkat') {
             this.resetSkTypeFields();
             this.newSk.kategori_dokumen = kategori;
