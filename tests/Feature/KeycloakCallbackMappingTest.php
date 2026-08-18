@@ -126,6 +126,67 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
     }
 
+    /** Role string kosong diperlakukan sama seperti role null: diinisialisasi menjadi pegawai dan diaudit. */
+    public function test_existing_mapped_user_with_empty_role_is_initialized_to_pegawai_on_login(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kadir Kosong',
+            'email' => 'kadir-empty@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'kadir-empty@example.com',
+            'keycloak_id' => 'kc-empty-role',
+            'employee_id' => $employee->id,
+            'role' => '',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-empty-role',
+            'nickname' => 'kadir-empty',
+            'name' => 'Kadir Kosong',
+            'email' => 'kadir-empty@example.com',
+            'raw' => ['email' => 'kadir-empty@example.com', 'email_verified' => true, 'preferred_username' => 'kadir-empty'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_id', $user->id)->sole();
+        $this->assertSame(['role' => ''], $audit->old_values);
+        $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
+    }
+
+    /** Pegawai yang sudah di-soft-delete tidak boleh dipetakan menjadi akun SSO baru. */
+    public function test_soft_deleted_employee_cannot_match_keycloak_login(): void
+    {
+        $trashed = Employee::factory()->create([
+            'nama_lengkap' => 'Nonaktif',
+            'email' => 'nonaktif@example.com',
+        ]);
+        $trashed->delete();
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-nonaktif',
+            'nickname' => 'nonaktif',
+            'name' => 'Nonaktif',
+            'email' => 'nonaktif@example.com',
+            'raw' => ['email' => 'nonaktif@example.com', 'email_verified' => true, 'preferred_username' => 'nonaktif'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Akun Keycloak belum terdaftar');
+        $this->assertGuest();
+        $this->assertDatabaseCount('users', 0);
+    }
+
     public function test_employee_email_matching_is_case_insensitive(): void
     {
         $employee = Employee::factory()->create([

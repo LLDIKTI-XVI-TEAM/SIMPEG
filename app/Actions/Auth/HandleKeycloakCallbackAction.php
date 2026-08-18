@@ -133,17 +133,19 @@ class HandleKeycloakCallbackAction
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        // Role internal kosong pada mapping pegawai valid diinisialisasi sebagai Pegawai;
-        // role yang sudah ditetapkan tidak pernah dioverwrite.
-        if ($user->employee_id !== null && $user->role === null) {
+        // Role internal kosong (null atau string kosong) pada mapping pegawai valid
+        // diinisialisasi sebagai Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
+        if ($user->employee_id !== null && in_array($user->role, [null, ''], true)) {
             $user->role = 'pegawai';
         }
 
         // Inisialisasi role adalah mutasi penting: disimpan bersama jejak auditnya dalam satu
-        // transaksi (old role null → role baru) agar perubahan mapping/role selalu punya evidence.
+        // transaksi (old role null/kosong → role baru) agar perubahan mapping/role selalu punya evidence.
         $rawPreviousRole = $user->getRawOriginal('role');
         $previousRole = is_string($rawPreviousRole) ? $rawPreviousRole : null;
-        $roleInitialized = $previousRole === null && $user->role !== null;
+        $roleInitialized = in_array($previousRole, [null, ''], true)
+            && $user->role !== null
+            && $user->role !== '';
 
         if ($roleInitialized) {
             DB::transaction(function () use ($user, $previousRole, $request): void {
@@ -180,13 +182,21 @@ class HandleKeycloakCallbackAction
             return Employee::where(function ($query) use ($matchedEmail): void {
                 $query
                     ->whereRaw('lower(email_pribadi) = ?', [$matchedEmail])
-                    // Kolom email lama tanpa index unik: hanya cocokkan pegawai aktif;
+                    // Kolom email legacy (tanpa index unik) dicocokkan pada pegawai aktif;
                     // pegawai nonaktif hanya memegang email_pribadi kanonisnya.
-                    ->orWhere(fn ($query) => $query->withTrashed()->whereRaw('lower(email) = ?', [$matchedEmail]));
-            })->limit(2)->get();
+                    ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
+            })
+                // Permukaan autentikasi hanya memetakan pegawai aktif; pegawai yang sudah
+                // di-soft-delete tidak boleh menjadi pintu masuk akun SSO baru.
+                ->whereNull('deleted_at')
+                ->limit(2)
+                ->get();
         }
 
-        return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
+        return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])
+            ->whereNull('deleted_at')
+            ->limit(2)
+            ->get();
     }
 
     /**

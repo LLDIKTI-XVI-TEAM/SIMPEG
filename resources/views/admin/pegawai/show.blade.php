@@ -88,7 +88,6 @@
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'program_studi_id' => $e->program_studi_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->programStudi?->nama ?? $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->admin_attachment_download_url])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
-        showRiwayatStatus: false,
         editingPendidikan: null,
         editPendidikanError: '',
         editPendidikanForm: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
@@ -2153,65 +2152,6 @@
             </form>
         </div>
     </div>
-
-    {{-- Modal: Riwayat Perubahan Status --}}
-    <x-ui.modal
-        show="showRiwayatStatus"
-        title="Riwayat Perubahan Status Kepegawaian"
-        closeAction="showRiwayatStatus = false"
-        maxWidth="4xl"
-        bodyClass="p-6"
-    >
-        @if($p->statusHistories && $p->statusHistories->count() > 0)
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2">
-                @foreach($p->statusHistories->sortByDesc('tanggal_efektif') as $history)
-                    <div class="rounded-lg border {{ $history->is_latest ? 'border-primary bg-primary/5' : 'border-border bg-soft/30' }} p-4">
-                        <div class="space-y-2">
-                            <div class="flex items-center gap-2">
-                                <span class="font-bold text-ink text-sm font-sans">{{ $history->status_nama }}</span>
-                                @if($history->is_latest)
-                                    <span class="inline-flex items-center rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-white uppercase">Aktif</span>
-                                @endif
-                            </div>
-                            <div class="text-xs text-muted font-sans space-y-1">
-                                <p>
-                                    <span class="font-semibold text-ink">Tanggal:</span>
-                                    {{ $history->tanggal_efektif->format('d M Y') }}
-                                </p>
-                                @if($history->keterangan)
-                                <p>
-                                    <span class="font-semibold text-ink">Keterangan:</span>
-                                    {{ Str::limit($history->keterangan, 100) }}
-                                </p>
-                                @endif
-                                @if($history->admin_attachment_download_url)
-                                <p class="pt-1">
-                                    <a href="{{ $history->admin_attachment_download_url }}" target="_blank" class="inline-flex items-center gap-1 text-primary hover:underline font-semibold text-[11px]">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                        </svg>
-                                        Lihat SK
-                                    </a>
-                                </p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @else
-            <div class="rounded-lg border border-border bg-soft/30 p-8 text-center">
-                <p class="text-sm text-muted font-sans">Belum ada riwayat perubahan status kepegawaian.</p>
-            </div>
-        @endif
-
-        <x-slot name="footer">
-            <button type="button" @click="showRiwayatStatus = false"
-                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
-                Tutup
-            </button>
-        </x-slot>
-    </x-ui.modal>
 
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
