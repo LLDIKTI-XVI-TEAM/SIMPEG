@@ -2,15 +2,16 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 
 class SwitchRoleRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
-     * Hanya user dengan permission users.switch_role secara efektif yang boleh switch role.
-     * Tidak ada bypass raw role asli; simulasi harus mengikuti permission efektif.
+     *
+     * Invariant keamanan: aksi switch hanya tersedia bagi akun yang role ASLI-nya
+     * super_admin dan memiliki permission users.switch_role. Role lain tetap ditolak
+     * walaupun permission tersebut salah konfigurasi/terpasang pada role lain.
      */
     public function authorize(): bool
     {
@@ -20,11 +21,15 @@ class SwitchRoleRequest extends FormRequest
             return false;
         }
 
-        return $user->hasPermission('users.switch_role');
+        return $user->role === 'super_admin' && $user->hasPermission('users.switch_role');
     }
 
     /**
      * Get the validation rules that apply to the request.
+     *
+     * target_role dibatasi fail-closed ke matrix role tujuan Fase 1.
+     * temporary_permission hanyalah metadata simulasi (opsional) dan tidak pernah
+     * menjadi sumber otorisasi; batas panjang sekadar pengaman penyimpanan.
      */
     public function rules(): array
     {
@@ -64,56 +69,6 @@ class SwitchRoleRequest extends FormRequest
                     "Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli Anda."
                 );
             }
-
-            // temporary_permission hanya boleh memuat permission yang benar-benar dimiliki role target.
-            // Daftar dibentuk/divalidasi server-side sebagai subset izin, bukan dipercaya mentah dari payload.
-            $temporaryPermission = $this->input('temporary_permission');
-            if (is_string($targetRole) && is_string($temporaryPermission) && $temporaryPermission !== '') {
-                $allowed = Role::query()
-                    ->where('name', $targetRole)
-                    ->with('permissions')
-                    ->first()
-                    ?->permissions
-                    ->pluck('name')
-                    ->all() ?? [];
-
-                foreach ($this->parsePermissionList($temporaryPermission) as $permission) {
-                    if (! in_array($permission, $allowed, true)) {
-                        $validator->errors()->add(
-                            'temporary_permission',
-                            "Permission '{$permission}' tidak dimiliki role target {$targetRole} sehingga tidak dapat dijadikan permission sementara."
-                        );
-                    }
-                }
-            }
         });
-    }
-
-    /**
-     * Mengurai daftar permission dari JSON array atau CSV.
-     *
-     * @return list<string>
-     */
-    private function parsePermissionList(string $value): array
-    {
-        $decoded = json_decode($value, true);
-
-        $items = is_array($decoded) ? $decoded : explode(',', $value);
-
-        $permissions = [];
-
-        foreach ($items as $item) {
-            if (! is_string($item)) {
-                continue;
-            }
-
-            $permission = trim($item);
-
-            if ($permission !== '') {
-                $permissions[] = $permission;
-            }
-        }
-
-        return array_values(array_unique($permissions));
     }
 }

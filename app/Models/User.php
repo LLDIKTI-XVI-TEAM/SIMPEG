@@ -99,14 +99,10 @@ class User extends Authenticatable
      * Mengecek apakah role pengguna memiliki permission tertentu.
      * Fail-closed: role kosong atau tidak terdaftar selalu mengembalikan false.
      *
-     * temporary_permission (bila simulasi aktif) berperan sebagai PEMBATAS sekaligus PENAMBAH
-     * izin sementara, tetapi tidak pernah menjadi otoritatif terhadap RBAC terkini: sebuah
-     * permission hanya dianggap dimiliki jika (a) terdaftar di snapshot temporary_permission DAN
-     * (b) MASIH dimiliki role efektif di tabel RBAC saat pemeriksaan dilakukan. Re-validasi ini
-     * memastikan snapshot yang dapat kedaluwarsa (misalnya permission dicabut dari role target
-     * setelah switch) tidak lagi lolos pemeriksaan selama simulasi belum di-revert.
-     *
-     * Jika temporary_role aktif tanpa temporary_permission, permission dicek terhadap role efektif tersebut.
+     * Permission efektif SELALU diturunkan dinamis dari role efektif pada setiap pemeriksaan,
+     * termasuk selama simulasi (dari role tujuan). temporary_permission hanyalah metadata
+     * simulasi untuk keperluan audit/backward-compatibility dan tidak pernah memberikan
+     * maupun membatasi otorisasi; perubahan konfigurasi permission berlaku pada request berikutnya.
      */
     public function hasPermission(string $permission): bool
     {
@@ -116,34 +112,10 @@ class User extends Authenticatable
             return false;
         }
 
-        $roleOwnsPermission = Role::query()
+        return Role::query()
             ->where('name', $effectiveRole)
             ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
             ->exists();
-
-        // Simulasi dengan temporary_permission: izin sementara hanya berlaku apabila
-        // masih dimiliki role efektif (keanggotaan divalidasi ulang setiap pemeriksaan).
-        if ($this->temporary_role !== null && $this->temporary_permission !== null && $this->temporary_permission !== '') {
-            return $this->hasTemporaryPermission($permission) && $roleOwnsPermission;
-        }
-
-        return $roleOwnsPermission;
-    }
-
-    /**
-     * Memeriksa apakah permission terdaftar pada snapshot temporary_permission (JSON array atau CSV).
-     */
-    private function hasTemporaryPermission(string $permission): bool
-    {
-        $perms = json_decode((string) $this->temporary_permission, true);
-
-        if (is_array($perms)) {
-            return in_array($permission, $perms, true);
-        }
-
-        $perms = array_map('trim', explode(',', (string) $this->temporary_permission));
-
-        return in_array($permission, $perms, true);
     }
 
     /**

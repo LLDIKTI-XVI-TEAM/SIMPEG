@@ -39,7 +39,7 @@ return new class extends Migration
         'CHANGE_REQUESTED',
         'DEFER',
         'NOT_APPROVED',
-        // US-1.6: simulasi role untuk demo/testing/support
+        // Event simulasi role: switch (masuk mode) dan revert (keluar mode) wajib tercatat audit.
         'SWITCH_ROLE',
         'REVERT_ROLE',
     ];

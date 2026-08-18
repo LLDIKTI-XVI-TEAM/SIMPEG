@@ -274,48 +274,52 @@ class SwitchRoleTest extends TestCase
         $this->assertFalse($user->hasPermission('employees.create'));
     }
 
-    public function test_temporary_permission_is_stored_and_evaluated_correctly(): void
+    public function test_temporary_permission_is_metadata_and_permissions_stay_dynamic(): void
     {
         $user = $this->createUserWithRole('super_admin');
 
-        // Switch dengan temporary_permission yang merupakan subset hak role pegawai
+        // Switch dengan temporary_permission hanya metadata; otorisasi tidak boleh
+        // dibatasi maupun diganti oleh snapshot tersebut.
         $this->actingAs($user)->post(route('switch-role'), [
             'target_role' => 'pegawai',
-            'temporary_permission' => json_encode(['employees.read_self', 'employee_histories.read']),
+            'temporary_permission' => json_encode(['employees.read_self']),
         ]);
 
         $user->refresh();
         $this->assertEquals('pegawai', $user->temporary_role);
         $this->assertNotNull($user->temporary_permission);
 
-        // Permission yang terdaftar di temporary_permission harus true
-        $this->assertTrue($user->hasPermission('employee_histories.read'));
+        // Permission milik role tujuan tetap berlaku meskipun tidak tercantum di snapshot.
         $this->assertTrue($user->hasPermission('employees.read_self'));
+        $this->assertTrue($user->hasPermission('employee_histories.read'));
 
-        // Permission di luar temporary_permission harus false
+        // Permission di luar hak role tujuan tetap false.
         $this->assertFalse($user->hasPermission('employees.create'));
 
-        // Revert harus membersihkan temporary_permission juga
+        // Revert membersihkan metadata temporary_permission juga.
         $this->actingAs($user)->post(route('revert-role'));
         $user->refresh();
         $this->assertNull($user->temporary_permission);
         $this->assertNull($user->temporary_role);
     }
 
-    public function test_switch_role_rejects_temporary_permission_outside_target_role(): void
+    public function test_switch_role_accepts_temporary_permission_as_inert_metadata(): void
     {
         $user = $this->createUserWithRole('super_admin');
 
-        // cuti.read_all bukan milik role pegawai -> harus ditolak oleh validasi server-side
+        // Metadata boleh memuat nama permission apa pun; ia tidak pernah memberi otorisasi.
         $response = $this->actingAs($user)->post(route('switch-role'), [
             'target_role' => 'pegawai',
-            'temporary_permission' => json_encode(['cuti.read_all']),
+            'temporary_permission' => json_encode(['audit_logs.read']),
         ]);
 
-        $response->assertSessionHasErrors('temporary_permission');
+        $response->assertRedirect(route('dashboard'));
         $user->refresh();
-        $this->assertNull($user->temporary_role);
-        $this->assertNull($user->temporary_permission);
+        $this->assertEquals('pegawai', $user->temporary_role);
+        $this->assertNotNull($user->temporary_permission);
+
+        // audit_logs.read tetap false karena role tujuan (pegawai) tidak memilikinya.
+        $this->assertFalse($user->hasPermission('audit_logs.read'));
     }
 
     public function test_switch_role_rejects_overlong_temporary_permission(): void
@@ -484,28 +488,73 @@ class SwitchRoleTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_temporary_permission_restricts_even_when_role_still_owns_permission(): void
+    public function test_permission_added_to_target_role_after_switch_applies_on_next_request(): void
     {
         $user = $this->createUserWithRole('super_admin');
 
-        // Snapshot hanya employees.read, meskipun role admin_kepegawaian juga memiliki employees.update.
+        // Switch ke pegawai dengan snapshot lama yang belum memuat employees.read.
         $this->actingAs($user)->post(route('switch-role'), [
-            'target_role' => 'admin_kepegawaian',
-            'temporary_permission' => json_encode(['employees.read']),
+            'target_role' => 'pegawai',
+            'temporary_permission' => json_encode(['employees.read_self']),
         ]);
 
         $user->refresh();
+        $this->assertFalse($user->hasPermission('employees.read'));
 
+        // Permission ditambahkan ke role target SETELAH switch (keputusan RBAC baru).
+        $pegawaiRole = Role::where('name', 'pegawai')->firstOrFail();
+        $readPermission = Permission::where('name', 'employees.read')->firstOrFail();
+        $pegawaiRole->permissions()->syncWithoutDetaching([$readPermission->id]);
+
+        // Request berikutnya langsung menikmati permission baru — snapshot tidak membatasi.
+        $user->refresh();
         $this->assertTrue($user->hasPermission('employees.read'));
-        $this->assertFalse($user->hasPermission('employees.update'));
+    }
 
-        // HTTP: route perubahan status (permission:employees.update) tetap ditolak di luar snapshot.
-        $response = $this->actingAs($user)->post(route('pegawai.status.update'), [
-            'employee_id' => $user->employee_id,
-            'status' => 'aktif',
+    public function test_switch_role_only_allowed_for_super_admin_origin(): void
+    {
+        // users.switch_role sengaja dipasang ke role non-Super-Admin (salah konfigurasi).
+        $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        $adminRole->permissions()->syncWithoutDetaching([$switchPermission->id]);
+
+        $admin = $this->createUserWithRole('admin_kepegawaian');
+        $this->assertTrue($admin->hasPermission('users.switch_role'));
+
+        // Invariant source role: admin_kepegawaian tetap ditolak walaupun punya permission.
+        $response = $this->actingAs($admin)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
         ]);
 
         $response->assertForbidden();
+        $admin->refresh();
+        $this->assertNull($admin->temporary_role);
+    }
+
+    public function test_cuti_create_button_uses_effective_role_during_pegawai_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Super Admin biasa: tombol Ajukan Cuti Baru tidak tampil.
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('Ajukan Cuti Baru');
+
+        // Simulasi pegawai: role efektif pegawai memenuhi syarat cuti.create,
+        // tombol harus tampil meskipun role asli tetap super_admin.
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+        ]);
+
+        $user->refresh();
+        $this->assertEquals('pegawai', $user->getEffectiveRole());
+        $this->assertTrue($user->hasPermission('cuti.create'));
+
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertSee('Ajukan Cuti Baru');
     }
 
     public function test_switch_to_unregistered_target_blocks_requests_but_revert_still_works(): void

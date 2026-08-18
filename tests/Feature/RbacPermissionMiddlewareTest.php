@@ -120,6 +120,27 @@ class RbacPermissionMiddlewareTest extends TestCase
         ]);
     }
 
+    public function test_switch_role_permission_migration_backfills_existing_database_without_running_seeder(): void
+    {
+        // Simulasikan instalasi existing yang belum pernah menjalankan seeder: permission hilang.
+        Permission::where('name', 'users.switch_role')->delete();
+
+        $migration = require database_path('migrations/2026_08_18_000000_add_switch_role_permission.php');
+        $migration->up();
+        $migration->up();
+
+        $permission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        $superAdmin = Role::where('name', 'super_admin')->firstOrFail();
+
+        $this->assertSame('users', $permission->module);
+        $this->assertSame('Melakukan simulasi beralih ke role yang lebih rendah untuk demo/testing/support', $permission->description);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $superAdmin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
+    }
+
     public function test_permission_middleware_allows_user_with_permission(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

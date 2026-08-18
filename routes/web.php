@@ -625,9 +625,14 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     });
 
     // =========================================================================
-    // SWITCH & REVERT ROLE (US-1.6)
+    // SWITCH & REVERT ROLE
     // =========================================================================
+
+    // Coarse gate route dibuat eksplisit: aksi switch hanya untuk Super Admin yang
+    // memiliki users.switch_role. FormRequest tetap menjadi mutation boundary dengan
+    // invariant yang sama (role asli super_admin + permission khusus).
     Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
+        ->middleware(['role:super_admin', 'permission:users.switch_role'])
         ->name('switch-role');
 
     // /revert-role WAJIB berada di luar pemeriksaan role efektif (EnsureRole).
