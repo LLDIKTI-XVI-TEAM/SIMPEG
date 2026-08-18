@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -47,21 +48,22 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_new_sso_matched_user_after_bootstrap_gets_null_role(): void
+    /** K-MTG-02 (addendum 15 Agu 2026): user baru ter-map valid setelah bootstrap langsung mendapat role pegawai. */
+    public function test_new_sso_matched_user_after_bootstrap_defaults_to_pegawai_role(): void
     {
         User::factory()->superAdmin()->create();
 
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Budi Santoso',
-            'email' => 'budi-null-role@example.com',
+            'email' => 'budi-mapped@example.com',
         ]);
 
         $this->fakeKeycloakUser([
-            'id' => 'kc-pegawai-null-role',
-            'nickname' => 'budi-null-role',
+            'id' => 'kc-pegawai-baru',
+            'nickname' => 'budi-baru',
             'name' => 'Budi SSO',
-            'email' => 'budi-null-role@example.com',
-            'raw' => ['email' => 'budi-null-role@example.com', 'email_verified' => true, 'preferred_username' => 'budi-null-role'],
+            'email' => 'budi-mapped@example.com',
+            'raw' => ['email' => 'budi-mapped@example.com', 'email_verified' => true, 'preferred_username' => 'budi-baru'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -69,10 +71,42 @@ class KeycloakCallbackMappingTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
-            'email' => 'budi-null-role@example.com',
-            'keycloak_id' => 'kc-pegawai-null-role',
+            'email' => 'budi-mapped@example.com',
+            'keycloak_id' => 'kc-pegawai-baru',
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+    }
+
+    /** K-MTG-02: user lama dengan role kosong (pra-addendum) + mapping valid diinisialisasi menjadi pegawai saat login. */
+    public function test_existing_mapped_user_with_blank_role_is_initialized_to_pegawai_on_login(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Siti Lama',
+            'email' => 'siti-lama@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'siti-lama@example.com',
+            'keycloak_id' => 'kc-siti-lama',
             'employee_id' => $employee->id,
             'role' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-siti-lama',
+            'nickname' => 'siti-lama',
+            'name' => 'Siti Lama',
+            'email' => 'siti-lama@example.com',
+            'raw' => ['email' => 'siti-lama@example.com', 'email_verified' => true, 'preferred_username' => 'siti-lama'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
         ]);
     }
 
@@ -389,7 +423,8 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_keycloak_role_claim_does_not_assign_role_to_new_non_bootstrap_user(): void
+    /** K-MTG-02: claim role Keycloak tidak pernah menjadi sumber RBAC; user baru non-bootstrap tetap mendapat default pegawai. */
+    public function test_keycloak_role_claim_does_not_override_pegawai_default_for_new_mapped_user(): void
     {
         User::factory()->superAdmin()->create();
 
@@ -417,7 +452,7 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'siti@example.com',
             'employee_id' => $employee->id,
-            'role' => null,
+            'role' => 'pegawai',
         ]);
     }
 
@@ -593,6 +628,39 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
+    /** Tindak lanjut review PR #199: mutasi email canonical dicatat ke audit dengan old/new value + sumber SSO. */
+    public function test_email_sync_writes_audit_with_old_and_new_values(): void
+    {
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'lama-audit@example.com',
+        ]);
+        User::factory()->create([
+            'email' => 'lama-audit@example.com',
+            'keycloak_id' => 'kc-audit-sync',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-audit-sync',
+            'nickname' => 'audit-sync',
+            'name' => 'Audit Sync',
+            'email' => 'baru-audit@example.com',
+            'raw' => ['email' => 'baru-audit@example.com', 'email_verified' => true, 'preferred_username' => 'audit-sync'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'baru-audit@example.com',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'EMAIL_SYNCED')->where('auditable_id', $employee->id)->sole();
+        $this->assertSame(['email_pribadi' => 'lama-audit@example.com'], $audit->old_values);
+        $this->assertSame(['email_pribadi' => 'baru-audit@example.com', 'source' => 'keycloak'], $audit->new_values);
+        $this->assertNotNull($audit->user_id);
+    }
+
     /** Sync tidak boleh menimpa email yang dicadangkan pegawai nonaktif; login harus tetap berhasil. */
     public function test_login_does_not_crash_when_keycloak_email_belongs_to_trashed_employee(): void
     {
@@ -672,14 +740,9 @@ class KeycloakCallbackMappingTest extends TestCase
 
         // Simulasikan penulisan kedua yang ditolak index unik lewat trigger database,
         // karena saveQuietly melewati event model sehingga tidak bisa disimulasikan via listener.
-        DB::unprepared(<<<'SQL'
-            CREATE TRIGGER reject_email_pribadi_race
-            BEFORE UPDATE OF email_pribadi ON employees
-            WHEN NEW.email_pribadi = 'baru@example.com'
-            BEGIN
-                SELECT RAISE(ABORT, 'UNIQUE constraint failed: index ''employees_email_pribadi_unique''');
-            END;
-            SQL);
+        // Trigger dibuat sesuai driver: SQLite memakai RAISE(ABORT) bawaan, sedangkan PostgreSQL
+        // memakai fungsi PL/pgSQL yang menaikkan SQLSTATE 23505 dengan pesan constraint yang sama.
+        $this->createEmailPribadiRejectTrigger();
 
         try {
             $this->fakeKeycloakUser([
@@ -695,7 +758,7 @@ class KeycloakCallbackMappingTest extends TestCase
             $response->assertRedirect(route('dashboard'));
             $this->assertAuthenticated();
         } finally {
-            DB::unprepared('DROP TRIGGER IF EXISTS reject_email_pribadi_race');
+            $this->dropEmailPribadiRejectTrigger();
         }
 
         // Email tetap di tangan pegawai semula; login tidak terganggu benturan unik.
@@ -703,6 +766,58 @@ class KeycloakCallbackMappingTest extends TestCase
             'id' => $employee->id,
             'email_pribadi' => 'aktif@example.com',
         ]);
+
+        // Tindak lanjut review PR #199: benturan unik tidak lagi ditelan diam-diam,
+        // melainkan tercatat di audit agar Admin melihat konflik email canonical.
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'EMAIL_CONFLICT',
+            'auditable_type' => 'Employee',
+            'auditable_id' => $employee->id,
+        ]);
+    }
+
+    private function createEmailPribadiRejectTrigger(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared(<<<'SQL'
+                CREATE OR REPLACE FUNCTION reject_email_pribadi_race_fn() RETURNS trigger
+                LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.email_pribadi = 'baru@example.com' THEN
+                        RAISE EXCEPTION 'duplicate key value violates unique constraint "employees_email_pribadi_unique"'
+                            USING ERRCODE = '23505';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$;
+                CREATE TRIGGER reject_email_pribadi_race
+                BEFORE UPDATE OF email_pribadi ON employees
+                FOR EACH ROW EXECUTE FUNCTION reject_email_pribadi_race_fn();
+                SQL);
+
+            return;
+        }
+
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER reject_email_pribadi_race
+            BEFORE UPDATE OF email_pribadi ON employees
+            WHEN NEW.email_pribadi = 'baru@example.com'
+            BEGIN
+                SELECT RAISE(ABORT, 'UNIQUE constraint failed: index ''employees_email_pribadi_unique''');
+            END;
+            SQL);
+    }
+
+    private function dropEmailPribadiRejectTrigger(): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS reject_email_pribadi_race ON employees');
+            DB::unprepared('DROP FUNCTION IF EXISTS reject_email_pribadi_race_fn()');
+
+            return;
+        }
+
+        DB::unprepared('DROP TRIGGER IF EXISTS reject_email_pribadi_race');
     }
 
     /**

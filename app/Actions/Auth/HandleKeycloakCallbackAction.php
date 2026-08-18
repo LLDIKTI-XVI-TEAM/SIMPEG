@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
@@ -103,8 +104,10 @@ class HandleKeycloakCallbackAction
             ]);
 
             if (! $user->exists) {
-                // Bootstrap pertama memberi akses super_admin; setelah itu role wajib ditetapkan admin SIMPEG.
-                $user->role = User::query()->exists() ? null : 'super_admin';
+                // K-MTG-02 (addendum 15 Agu 2026): mapping pegawai valid + role internal belum
+                // diinisialisasi → default SSO Pegawai menginisialisasi role pegawai. Bootstrap
+                // pertama tetap super_admin agar sistem dapat dikonfigurasi sebelum ada admin.
+                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
                 $user->password = Str::random(48);
             }
 
@@ -134,6 +137,13 @@ class HandleKeycloakCallbackAction
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
+        // K-MTG-02 (addendum 15 Agu 2026): user lama dari perilaku pra-addendum — role internal
+        // kosong padahal mapping pegawai valid — diinisialisasi menjadi pegawai saat login.
+        // Role yang sudah ditetapkan admin tidak pernah dioverwrite.
+        if ($user->employee_id !== null && $user->role === null) {
+            $user->role = 'pegawai';
+        }
+
         $user->save();
 
         // Sync email Keycloak yang sudah diverifikasi ke kolom email_pribadi pegawai,
@@ -146,17 +156,31 @@ class HandleKeycloakCallbackAction
             if ($employee
                 && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail
                 && ! $this->emailIsOwnedByAnotherEmployee($employee, $verifiedEmail)) {
+                $previousEmail = (string) $employee->getRawOriginal('email_pribadi');
+
                 try {
                     $employee->email_pribadi = $verifiedEmail;
                     $employee->saveQuietly();
+
+                    // Tindak lanjut review PR #199: mutasi persisted email canonical dicatat ke
+                    // audit dengan old/new value + aktor SSO. Tidak menyimpan raw claim/token Keycloak.
+                    $this->auditEmailSync($user, $employee, $previousEmail, $verifiedEmail, $request);
                 } catch (QueryException $exception) {
                     // Dua callback untuk pegawai berbeda bisa membawa email yang sama secara bersamaan;
                     // keduanya lolos pemeriksaan kepemilikan sebelum salah satu menulis. Penulisan kedua
-                    // melanggar index unik case-insensitive employees_email_pribadi_unique; perlakukan
-                    // benturan sebagai "email sudah dipakai" agar login tetap berhasil tanpa mengubah email.
+                    // melanggar index unik case-insensitive employees_email_pribadi_unique.
                     if (! $this->isEmailPribadiConflict($exception)) {
                         throw $exception;
                     }
+
+                    // Keputusan produk (tindak lanjut review PR #199): login tetap berhasil, tetapi
+                    // benturan tidak lagi ditelan diam-diam — dicatat ke audit + log agar Admin punya
+                    // jejak yang terlihat dan bisa melakukan remediasi atas konflik email canonical.
+                    Log::warning('Sinkronisasi email canonical gagal karena benturan index unik employees_email_pribadi_unique', [
+                        'employee_id' => $employee->id,
+                        'user_id' => $user->id,
+                    ]);
+                    $this->auditEmailSyncConflict($user, $employee, $previousEmail, $verifiedEmail, $request);
                 }
             }
         }
@@ -206,6 +230,46 @@ class HandleKeycloakCallbackAction
                     ->orWhereRaw('lower(email) = ?', [$email]);
             })
             ->exists();
+    }
+
+    /**
+     * Mencatat perubahan email canonical (email_pribadi) hasil sinkronisasi Keycloak ke audit.
+     *
+     * Payload memakai kunci non-sensitif saja; email bukan nomor identitas sehingga tidak
+     * disamarkan oleh AuditPayloadMasker, dan tidak pernah menyimpan raw claim/token Keycloak.
+     */
+    private function auditEmailSync(User $user, Employee $employee, string $previousEmail, string $verifiedEmail, Request $request): void
+    {
+        AuditService::logAs(
+            $user->id,
+            $user->name,
+            'EMAIL_SYNCED',
+            'Employee',
+            $employee->id,
+            ['email_pribadi' => $previousEmail],
+            ['email_pribadi' => $verifiedEmail, 'source' => 'keycloak'],
+            $request,
+        );
+    }
+
+    /**
+     * Mencatat benturan index unik saat sinkronisasi email canonical tidak dapat diselesaikan.
+     *
+     * Login tetap berhasil (keputusan produk PR #199); email pegawai tidak berubah. Konflik
+     * tercatat di audit + log supaya Admin melihat ada email canonical yang belum terselesaikan.
+     */
+    private function auditEmailSyncConflict(User $user, Employee $employee, string $previousEmail, string $attemptedEmail, Request $request): void
+    {
+        AuditService::logAs(
+            $user->id,
+            $user->name,
+            'EMAIL_CONFLICT',
+            'Employee',
+            $employee->id,
+            ['email_pribadi' => $previousEmail],
+            ['email_pribadi' => $previousEmail, 'attempted_email' => $attemptedEmail, 'source' => 'keycloak'],
+            $request,
+        );
     }
 
     /**
