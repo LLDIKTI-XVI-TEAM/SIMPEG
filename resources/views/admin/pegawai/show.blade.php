@@ -39,7 +39,7 @@
                 'file_tersedia'  => $d->fileExists(),
                 'keterangan'     => $d->keterangan,
                 'is_latest'      => filled($d->file_path)
-                    && in_array($d->file_path, array_filter($canonicalSkFiles), true),
+                    && ($canonicalSkFiles[$d->jenis_dokumen] ?? null) === $d->file_path,
                 'is_deletable'   => \App\Support\Documents\DocumentCategory::isDeletable($d->jenis_dokumen),
                 'detail_url'     => route('dokumen.show', $d->id),
                 'download_url'   => route('dokumen.download', $d->id),

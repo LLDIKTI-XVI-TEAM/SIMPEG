@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Documents;
 
+use App\Models\Employee;
 use App\Support\Documents\DocumentAuthorization;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
@@ -20,6 +21,29 @@ class StoreDocumentRequest extends FormRequest
 
         return $user !== null
             && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+    }
+
+    /**
+     * Endpoint store di-scope oleh {employee} dari route, sehingga pegawai_id
+     * tidak perlu diwajibkan dari payload klien. Saat tidak dikirim, id pegawai
+     * diisi dari route (model binding) agar aturan uuid/exists tetap tervalidasi
+     * dan klien tidak perlu memilih pegawai lain yang nilainya akan diabaikan.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('pegawai_id')) {
+            return;
+        }
+
+        $routeEmployee = $this->route('employee');
+
+        $employeeId = $routeEmployee instanceof Employee
+            ? $routeEmployee->id
+            : (is_string($routeEmployee) || is_numeric($routeEmployee) ? (string) $routeEmployee : '');
+
+        if ($employeeId !== '') {
+            $this->merge(['pegawai_id' => $employeeId]);
+        }
     }
 
     public function rules(): array

@@ -450,20 +450,20 @@ class PegawaiController extends Controller
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,nama',
                 'rankHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_pangkat'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_pangkat', 'created_at'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_pangkat'),
                 'positionHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
                 'salaryHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_kgb'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_kgb', 'created_at'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_kgb'),
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
+                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan', 'created_at'])
                     ->orderByDesc('tmt_pengangkatan'),
                 'documents:id,employee_id,jenis_dokumen,file_path,nomor_dokumen,tanggal_dokumen,created_at',
             ]);

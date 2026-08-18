@@ -42,20 +42,20 @@ class ShowEmployeeDocumentStatusAction
         $employee->load([
             'jenisPegawai:id,nama',
             'rankHistories' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'golongan_id', 'no_sk', 'tanggal_sk', 'tmt_pangkat', 'file_sk', 'is_latest'])
+                ->select(['id', 'employee_id', 'golongan_id', 'no_sk', 'tanggal_sk', 'tmt_pangkat', 'file_sk', 'is_latest', 'created_at'])
                 ->with('golongan:id,kode,nama')
                 ->orderByDesc('is_latest')
                 ->orderByDesc('tmt_pangkat'),
             'positionHistories' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'nama_jabatan', 'no_sk', 'tanggal_sk', 'tmt_jabatan', 'file_sk', 'is_latest'])
+                ->select(['id', 'employee_id', 'nama_jabatan', 'no_sk', 'tanggal_sk', 'tmt_jabatan', 'file_sk', 'is_latest', 'created_at'])
                 ->orderByDesc('is_latest')
                 ->orderByDesc('tmt_jabatan'),
             'salaryHistories' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'gaji_pokok', 'no_sk', 'tanggal_sk', 'tmt_kgb', 'file_sk', 'is_latest'])
+                ->select(['id', 'employee_id', 'gaji_pokok', 'no_sk', 'tanggal_sk', 'tmt_kgb', 'file_sk', 'is_latest', 'created_at'])
                 ->orderByDesc('is_latest')
                 ->orderByDesc('tmt_kgb'),
             'appointments' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'tmt_pengangkatan', 'file_sk'])
+                ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'tmt_pengangkatan', 'file_sk', 'created_at'])
                 ->orderByDesc('tmt_pengangkatan'),
             'documents' => fn ($query) => $query
                 ->select(['id', 'employee_id', 'jenis_dokumen', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'keterangan', 'created_at'])

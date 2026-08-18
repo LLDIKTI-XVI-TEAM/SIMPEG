@@ -35,13 +35,17 @@
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis SK <span class="text-danger">*</span></label>
                     <div class="relative">
-                        <select x-model="newSk.kategori_dokumen" @change="resetSkTypeFields()"
-                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                            <option value="sk_pangkat">SK Pangkat</option>
-                            <option value="sk_kgb">SK KGB</option>
-                            <option value="sk_jabatan">SK Jabatan</option>
-                            <option value="sk_pengangkatan">SK Pengangkatan</option>
-                        </select>
+                            <select x-model="newSk.kategori_dokumen" @change="resetSkTypeFields()"
+                                class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
+                                {{-- SK append-only (pangkat/KGB/jabatan) membutuhkan izin riwayat;
+                                    SK Pengangkatan tetap tersedia bagi pengelola dokumen. --}}
+                                @if($canCreateEmployeeHistory)
+                                <option value="sk_pangkat">SK Pangkat</option>
+                                <option value="sk_kgb">SK KGB</option>
+                                <option value="sk_jabatan">SK Jabatan</option>
+                                @endif
+                                <option value="sk_pengangkatan">SK Pengangkatan</option>
+                            </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
