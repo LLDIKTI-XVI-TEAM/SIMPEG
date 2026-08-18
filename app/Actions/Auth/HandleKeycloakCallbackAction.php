@@ -10,6 +10,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -153,34 +154,55 @@ class HandleKeycloakCallbackAction
             // agar tidak menyinkronkan email ke pegawai lain saat index unik masih mencadangkannya.
             $employee = Employee::withTrashed()->find($user->employee_id);
 
+            // Nilai lama disimpan apa adanya (nullable): pegawai legacy bisa punya email_pribadi
+            // NULL, dan jejak audit harus merekam null, bukan string kosong (follow-up review PR #199).
+            $rawPreviousEmail = $employee?->getRawOriginal('email_pribadi');
+            $previousEmail = is_string($rawPreviousEmail) ? $rawPreviousEmail : null;
+
             if ($employee
-                && strtolower(trim((string) $employee->getRawOriginal('email_pribadi'))) !== $verifiedEmail
-                && ! $this->emailIsOwnedByAnotherEmployee($employee, $verifiedEmail)) {
-                $previousEmail = (string) $employee->getRawOriginal('email_pribadi');
-
-                try {
-                    $employee->email_pribadi = $verifiedEmail;
-                    $employee->saveQuietly();
-
-                    // Tindak lanjut review PR #199: mutasi persisted email canonical dicatat ke
-                    // audit dengan old/new value + aktor SSO. Tidak menyimpan raw claim/token Keycloak.
-                    $this->auditEmailSync($user, $employee, $previousEmail, $verifiedEmail, $request);
-                } catch (QueryException $exception) {
-                    // Dua callback untuk pegawai berbeda bisa membawa email yang sama secara bersamaan;
-                    // keduanya lolos pemeriksaan kepemilikan sebelum salah satu menulis. Penulisan kedua
-                    // melanggar index unik case-insensitive employees_email_pribadi_unique.
-                    if (! $this->isEmailPribadiConflict($exception)) {
-                        throw $exception;
-                    }
-
-                    // Keputusan produk (tindak lanjut review PR #199): login tetap berhasil, tetapi
-                    // benturan tidak lagi ditelan diam-diam — dicatat ke audit + log agar Admin punya
-                    // jejak yang terlihat dan bisa melakukan remediasi atas konflik email canonical.
-                    Log::warning('Sinkronisasi email canonical gagal karena benturan index unik employees_email_pribadi_unique', [
+                && strtolower(trim((string) $previousEmail)) !== $verifiedEmail) {
+                if ($this->emailIsOwnedByAnotherEmployee($employee, $verifiedEmail)) {
+                    // Jalur konflik paling umum terjadi SEBELUM penulisan: email sudah dimiliki
+                    // pegawai lain (termasuk yang dihapus sementara). Login tetap berhasil, tetapi
+                    // konflik dicatat ke audit + log agar Admin punya jejak remediasi.
+                    Log::warning('Sinkronisasi email canonical ditolak karena email sudah dimiliki pegawai lain', [
                         'employee_id' => $employee->id,
                         'user_id' => $user->id,
+                        'attempted_email' => $verifiedEmail,
                     ]);
                     $this->auditEmailSyncConflict($user, $employee, $previousEmail, $verifiedEmail, $request);
+                } else {
+                    try {
+                        // Penulisan diisolasi dalam transaksi (nested → savepoint di PostgreSQL) agar
+                        // pelanggaran index unik tidak menghentikan transaksi luar yang sedang berjalan
+                        // (25P02 current transaction is aborted). Mutasi + audit ditulis atomik lewat
+                        // logAsOrFail: email canonical tidak berubah tanpa jejak EMAIL_SYNCED.
+                        DB::transaction(function () use ($user, $employee, $previousEmail, $verifiedEmail, $request): void {
+                            $employee->email_pribadi = $verifiedEmail;
+                            $employee->saveQuietly();
+
+                            // Tindak lanjut review PR #199: mutasi persisted email canonical dicatat ke
+                            // audit dengan old/new value + aktor SSO. Tidak menyimpan raw claim/token Keycloak.
+                            $this->auditEmailSync($user, $employee, $previousEmail, $verifiedEmail, $request);
+                        });
+                    } catch (QueryException $exception) {
+                        // Dua callback untuk pegawai berbeda bisa membawa email yang sama secara bersamaan;
+                        // keduanya lolos pemeriksaan kepemilikan sebelum salah satu menulis. Penulisan kedua
+                        // melanggar index unik case-insensitive employees_email_pribadi_unique.
+                        if (! $this->isEmailPribadiConflict($exception)) {
+                            throw $exception;
+                        }
+
+                        // Setelah unit penulisan di-rollback ke savepoint, transaksi kembali sehat;
+                        // konflik dicatat ke audit + log agar Admin melihat email canonical yang belum
+                        // terselesaikan (follow-up review PR #199).
+                        Log::warning('Sinkronisasi email canonical gagal karena benturan index unik employees_email_pribadi_unique', [
+                            'employee_id' => $employee->id,
+                            'user_id' => $user->id,
+                            'attempted_email' => $verifiedEmail,
+                        ]);
+                        $this->auditEmailSyncConflict($user, $employee, $previousEmail, $verifiedEmail, $request);
+                    }
                 }
             }
         }
@@ -235,12 +257,14 @@ class HandleKeycloakCallbackAction
     /**
      * Mencatat perubahan email canonical (email_pribadi) hasil sinkronisasi Keycloak ke audit.
      *
-     * Payload memakai kunci non-sensitif saja; email bukan nomor identitas sehingga tidak
-     * disamarkan oleh AuditPayloadMasker, dan tidak pernah menyimpan raw claim/token Keycloak.
+     * Fail-closed (follow-up review PR #199): kegagalan menulis audit menggagalkan operasi lewat
+     * logAsOrFail, sehingga email canonical tidak pernah berubah tanpa jejak EMAIL_SYNCED. Nilai
+     * lama nullable (pegawai legacy bisa punya email_pribadi NULL); payload memakai kunci
+     * non-sensitif dan tidak pernah menyimpan raw claim/token Keycloak.
      */
-    private function auditEmailSync(User $user, Employee $employee, string $previousEmail, string $verifiedEmail, Request $request): void
+    private function auditEmailSync(User $user, Employee $employee, ?string $previousEmail, string $verifiedEmail, Request $request): void
     {
-        AuditService::logAs(
+        AuditService::logAsOrFail(
             $user->id,
             $user->name,
             'EMAIL_SYNCED',
@@ -253,14 +277,15 @@ class HandleKeycloakCallbackAction
     }
 
     /**
-     * Mencatat benturan index unik saat sinkronisasi email canonical tidak dapat diselesaikan.
+     * Mencatat konflik email canonical yang tidak dapat diselesaikan, baik karena benturan index
+     * unik saat penulisan maupun karena email sudah dimiliki pegawai lain sebelum penulisan.
      *
-     * Login tetap berhasil (keputusan produk PR #199); email pegawai tidak berubah. Konflik
-     * tercatat di audit + log supaya Admin melihat ada email canonical yang belum terselesaikan.
+     * Login tetap berhasil (keputusan produk PR #199); email pegawai tidak berubah. Fail-closed:
+     * kegagalan menulis audit ikut menggagalkan operasi agar konflik tidak menguap tanpa jejak.
      */
-    private function auditEmailSyncConflict(User $user, Employee $employee, string $previousEmail, string $attemptedEmail, Request $request): void
+    private function auditEmailSyncConflict(User $user, Employee $employee, ?string $previousEmail, string $attemptedEmail, Request $request): void
     {
-        AuditService::logAs(
+        AuditService::logAsOrFail(
             $user->id,
             $user->name,
             'EMAIL_CONFLICT',

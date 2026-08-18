@@ -661,7 +661,7 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertNotNull($audit->user_id);
     }
 
-    /** Sync tidak boleh menimpa email yang dicadangkan pegawai nonaktif; login harus tetap berhasil. */
+    /** Sync tidak boleh menimpa email yang dicadangkan pegawai nonaktif; login tetap berhasil dan konflik dicatat. */
     public function test_login_does_not_crash_when_keycloak_email_belongs_to_trashed_employee(): void
     {
         $trashedOwner = Employee::factory()->create(['email_pribadi' => 'dinas@example.com']);
@@ -693,6 +693,91 @@ class KeycloakCallbackMappingTest extends TestCase
             'id' => $employee->id,
             'email_pribadi' => 'aktif@example.com',
         ]);
+
+        // Follow-up review PR #199: konflik yang terdeteksi sebelum penulisan (ownership check)
+        // juga dicatat ke audit agar Admin punya jejak remediasi.
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'EMAIL_CONFLICT',
+            'auditable_type' => 'Employee',
+            'auditable_id' => $employee->id,
+        ]);
+    }
+
+    /** Follow-up review PR #199: email aktif milik pegawai lain juga menghasilkan EMAIL_CONFLICT yang terlihat. */
+    public function test_login_records_conflict_when_keycloak_email_owned_by_active_employee(): void
+    {
+        $owner = Employee::factory()->create(['email_pribadi' => 'dinas@example.com']);
+        $employee = Employee::factory()->create(['email_pribadi' => 'aktif@example.com']);
+        User::factory()->create([
+            'email' => 'aktif@example.com',
+            'keycloak_id' => 'kc-active-owner',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-active-owner',
+            'nickname' => 'aktif',
+            'name' => 'Aktif',
+            'email' => 'dinas@example.com',
+            'raw' => ['email' => 'dinas@example.com', 'email_verified' => true, 'preferred_username' => 'aktif'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $owner->id,
+            'email_pribadi' => 'dinas@example.com',
+        ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'aktif@example.com',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'EMAIL_CONFLICT',
+            'auditable_type' => 'Employee',
+            'auditable_id' => $employee->id,
+        ]);
+
+        $conflict = AuditLog::query()->where('event', 'EMAIL_CONFLICT')->where('auditable_id', $employee->id)->sole();
+        $this->assertSame('dinas@example.com', $conflict->new_values['attempted_email'] ?? null);
+    }
+
+    /** Follow-up review PR #199: nilai lama NULL pada email_pribadi direkam sebagai null, bukan string kosong. */
+    public function test_email_sync_preserves_null_previous_email_in_audit(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Legacy Null',
+            'email' => 'legacy-null@example.com',
+        ]);
+
+        // Setter model selalu menyinkronkan email ↔ email_pribadi, jadi data legacy dengan
+        // email_pribadi NULL hanya bisa hadir lewat baris lama: tulis ulang via query builder.
+        DB::table('employees')->where('id', $employee->id)->update(['email_pribadi' => null]);
+
+        User::factory()->create([
+            'email' => 'legacy-null@example.com',
+            'keycloak_id' => 'kc-legacy-null',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-legacy-null',
+            'nickname' => 'legacy-null',
+            'name' => 'Legacy Null',
+            'email' => 'kanonik@example.com',
+            'raw' => ['email' => 'kanonik@example.com', 'email_verified' => true, 'preferred_username' => 'legacy-null'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'kanonik@example.com',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'EMAIL_SYNCED')->where('auditable_id', $employee->id)->sole();
+        $this->assertSame(['email_pribadi' => null], $audit->old_values);
+        $this->assertSame(['email_pribadi' => 'kanonik@example.com', 'source' => 'keycloak'], $audit->new_values);
     }
 
     /** User lama milik pegawai yang dinonaktifkan tetap sync email-nya ke record trashed tersebut. */
@@ -753,18 +838,9 @@ class KeycloakCallbackMappingTest extends TestCase
                 'raw' => ['email' => 'baru@example.com', 'email_verified' => true, 'preferred_username' => 'race'],
             ]);
 
-            if (DB::connection()->getDriverName() === 'pgsql') {
-                // PostgreSQL menghentikan seluruh transaksi saat pernyataan error (25P02).
-                // Savepoint dipakai agar transaksi test kembali sehat untuk cleanup dan asersi.
-                DB::beginTransaction();
-                try {
-                    $response = $this->get('/auth/keycloak/callback');
-                } finally {
-                    DB::rollBack(1);
-                }
-            } else {
-                $response = $this->get('/auth/keycloak/callback');
-            }
+            // Isolasi savepoint kini dilakukan di kode produksi (DB::transaction bersarang →
+            // savepoint di PostgreSQL), sehingga transaksi test tetap sehat tanpa bantuan test ini.
+            $response = $this->get('/auth/keycloak/callback');
 
             $response->assertRedirect(route('dashboard'));
             $this->assertAuthenticated();
@@ -780,15 +856,11 @@ class KeycloakCallbackMappingTest extends TestCase
 
         // Tindak lanjut review PR #199: benturan unik tidak lagi ditelan diam-diam,
         // melainkan tercatat di audit agar Admin melihat konflik email canonical.
-        // Pada PostgreSQL, INSERT audit di dalam segmen transaksi yang aborted tidak dapat
-        // dipersist (produksi memakai autocommit sehingga aman); asersi dibuat di SQLite.
-        if (DB::connection()->getDriverName() !== 'pgsql') {
-            $this->assertDatabaseHas('audit_logs', [
-                'event' => 'EMAIL_CONFLICT',
-                'auditable_type' => 'Employee',
-                'auditable_id' => $employee->id,
-            ]);
-        }
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'EMAIL_CONFLICT',
+            'auditable_type' => 'Employee',
+            'auditable_id' => $employee->id,
+        ]);
     }
 
     private function createEmailPribadiRejectTrigger(): void
