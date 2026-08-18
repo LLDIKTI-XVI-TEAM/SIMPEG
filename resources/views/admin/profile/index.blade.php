@@ -11,7 +11,7 @@
                 </div>
                 <div>
                     <h1 class="text-2xl font-semibold text-ink">{{ auth()->user()->name }}</h1>
-                    <p class="text-sm text-muted">{{ auth()->user()->email }} &bull; Role: {{ session('active_role', auth()->user()->role) }}</p>
+                    <p class="text-sm text-muted">{{ auth()->user()->email }} &bull; Role: {{ auth()->user()->getEffectiveRole() }}</p>
                 </div>
             </div>
 
@@ -37,7 +37,7 @@
                         </div>
                         <div class="space-y-1">
                             <label class="block text-sm font-semibold text-ink">Role Aktif Saat Ini</label>
-                            <input type="text" readonly value="{{ session('active_role', auth()->user()->role) }}" class="w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-sm text-ink shadow-sm cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+                            <input type="text" readonly value="{{ auth()->user()->getEffectiveRole() }}" class="w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-sm text-ink shadow-sm cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
                         </div>
                     </div>
                 </div>
@@ -151,7 +151,7 @@
                             <p class="text-xs text-muted">NIP. {{ $p->nip }} &bull; Email: {{ auth()->user()->email }}</p>
                             <div class="mt-1.5 flex flex-wrap items-center gap-2">
                                 <span class="inline-block rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-semibold font-sans uppercase">{{ $p->jenisPegawai->nama ?? '-' }}</span>
-                                <span class="inline-block rounded-full bg-secondary/10 text-secondary px-2.5 py-0.5 text-xs font-semibold font-sans">Role: {{ auth()->user()->role ?? 'Pegawai' }}</span>
+                                <span class="inline-block rounded-full bg-secondary/10 text-secondary px-2.5 py-0.5 text-xs font-semibold font-sans">Role: {{ auth()->user()->getEffectiveRole() ?? 'Pegawai' }}</span>
                                 @if(auth()->user()->keycloak_id)
                                     <span class="inline-block rounded-full bg-success/10 text-success px-2.5 py-0.5 text-xs font-semibold font-sans">SSO Terhubung</span>
                                 @else

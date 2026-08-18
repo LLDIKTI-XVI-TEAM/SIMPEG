@@ -679,4 +679,35 @@ class SwitchRoleTest extends TestCase
         // URL hasil pegawai harus menunjuk route namespace pimpinan.
         $this->assertStringContainsString('/pimpinan/', (string) $pimpinanJson['Pegawai'][0]['url']);
     }
+
+    public function test_async_explicit_audit_resolves_simulation_context_from_actor_id(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $user->forceFill([
+            'temporary_role' => 'admin_kepegawaian',
+            'temporary_role_started_at' => now(),
+        ])->save();
+
+        // Tanpa actingAs: Auth::user() = null (menyerupai worker queue), padahal state
+        // temporary_role persisten di database. Konteks harus di-resolve dari $userId.
+        AuditService::logAsOrFail(
+            $user->id,
+            $user->name,
+            'IMPORT',
+            'User',
+            $user->id,
+            null,
+            ['batch' => 'stub'],
+        );
+
+        $audit = AuditLog::where('event', 'IMPORT')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertTrue($audit->new_values['_simulation'] ?? false);
+        $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
+        $this->assertEquals('admin_kepegawaian', $audit->new_values['_effective_role'] ?? null);
+    }
 }

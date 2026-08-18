@@ -299,4 +299,21 @@ class ProfileTest extends TestCase
 
         $this->actingAs($user)->get('/dashboard/profil')->assertDontSee('Aksi & Administrasi Sistem', false);
     }
+
+    public function test_profile_active_role_label_shows_effective_role_during_simulation(): void
+    {
+        $adminEmployee = Employee::factory()->create();
+        $user = User::factory()->superAdmin()->create(['employee_id' => $adminEmployee->id]);
+
+        // Super Admin (tidak simulasi): role aktif = super_admin.
+        $this->actingAs($user)->get('/dashboard/profil')->assertSee('Role: super_admin', false);
+
+        // Simulasi pimpinan: label role aktif harus mengikuti role efektif,
+        // bukan session('active_role') yang masih super_admin.
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pimpinan']);
+        $user->refresh();
+        $this->assertEquals('pimpinan', $user->getEffectiveRole());
+
+        $this->actingAs($user)->get('/dashboard/profil')->assertSee('Role: pimpinan', false);
+    }
 }

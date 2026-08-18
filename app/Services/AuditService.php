@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -205,9 +206,11 @@ class AuditService
         ?string $userAgent,
     ): array {
         // Sertakan konteks simulasi role pada jalur aktor eksplisit (LOGIN/LOGOUT/
-        // SESSION_TIMEOUT) agar jejak audit selama simulasi tetap dapat ditelusuri
-        // ke role asli dan role efektif, sama seperti jalur authenticatedPayload().
-        $user = Auth::user();
+        // SESSION_TIMEOUT, dan jalur async/queue seperti import) agar jejak audit
+        // selama simulasi tetap dapat ditelusuri ke role asli dan role efektif.
+        // Aktor di-resolve dari $userId (bukan facade Auth) karena worker queue tidak
+        // memiliki session terautentikasi padahal state temporary_role-nya persisten.
+        $user = filled($userId) ? User::query()->find($userId) : null;
 
         if ($user && $user->temporary_role) {
             $simulationMeta = [
