@@ -204,6 +204,23 @@ class AuditService
         ?string $ipAddress,
         ?string $userAgent,
     ): array {
+        // Sertakan konteks simulasi role pada jalur aktor eksplisit (LOGIN/LOGOUT/
+        // SESSION_TIMEOUT) agar jejak audit selama simulasi tetap dapat ditelusuri
+        // ke role asli dan role efektif, sama seperti jalur authenticatedPayload().
+        $user = Auth::user();
+
+        if ($user && $user->temporary_role) {
+            $simulationMeta = [
+                '_simulation' => true,
+                '_original_role' => $user->role,
+                '_effective_role' => $user->getEffectiveRole(),
+            ];
+
+            $newValues = is_array($newValues)
+                ? array_merge($newValues, $simulationMeta)
+                : $simulationMeta;
+        }
+
         return [
             'user_id' => $userId,
             'user_name' => $userName,

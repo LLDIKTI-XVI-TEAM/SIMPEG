@@ -283,4 +283,20 @@ class ProfileTest extends TestCase
         $this->assertStringNotContainsString($user->refresh()->password, $isiAudit);
         $this->assertTrue($audit->new_values['password_changed']);
     }
+
+    public function test_profile_admin_shortcuts_follow_effective_role_during_simulation(): void
+    {
+        $adminEmployee = Employee::factory()->create();
+        $user = User::factory()->superAdmin()->create(['employee_id' => $adminEmployee->id]);
+
+        // Super Admin (tidak simulasi): kartu Aksi & Administrasi Sistem tampil.
+        $this->actingAs($user)->get('/dashboard/profil')->assertSee('Aksi & Administrasi Sistem', false);
+
+        // Simulasi pimpinan: kartu admin disembunyikan mengikuti role efektif.
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pimpinan']);
+        $user->refresh();
+        $this->assertEquals('pimpinan', $user->getEffectiveRole());
+
+        $this->actingAs($user)->get('/dashboard/profil')->assertDontSee('Aksi & Administrasi Sistem', false);
+    }
 }

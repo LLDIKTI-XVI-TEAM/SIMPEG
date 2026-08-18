@@ -402,6 +402,39 @@ class SwitchRoleTest extends TestCase
         $this->assertEquals('pegawai', $audit->new_values['_effective_role'] ?? null);
     }
 
+    public function test_audit_explicit_path_carries_simulation_context(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pegawai',
+        ]);
+
+        $user->refresh();
+
+        // Jalur aktor eksplisit (dipakai LOGIN/LOGOUT/session timeout) juga wajib
+        // membawa konteks simulasi agar jejak audit tetap dapat ditelusuri.
+        AuditService::logAsOrFail(
+            $user->id,
+            $user->name,
+            'LOGOUT',
+            'User',
+            $user->id,
+            null,
+            ['catatan' => 'keluar saat simulasi aktif'],
+        );
+
+        $audit = AuditLog::where('event', 'LOGOUT')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertTrue($audit->new_values['_simulation'] ?? false);
+        $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
+        $this->assertEquals('pegawai', $audit->new_values['_effective_role'] ?? null);
+    }
+
     public function test_dashboard_and_requests_use_effective_role_during_simulation(): void
     {
         $user = $this->createUserWithRole('super_admin');

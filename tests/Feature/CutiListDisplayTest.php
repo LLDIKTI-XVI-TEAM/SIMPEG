@@ -395,4 +395,57 @@ class CutiListDisplayTest extends TestCase
             'status' => $status,
         ]);
     }
+
+    public function test_simulated_pegawai_is_scoped_to_own_leave_even_when_read_all_granted(): void
+    {
+        // Pegawai sengaja diberi cuti.read_all (salah konfigurasi) untuk memastikan pengaman
+        // scope data-milik-sendiri memakai role efektif, bukan role asli penyerang.
+        $pegawaiRole = Role::where('name', 'pegawai')->firstOrFail();
+        $readAll = Permission::where('name', 'cuti.read_all')->firstOrFail();
+        $pegawaiRole->permissions()->syncWithoutDetaching([$readAll->id]);
+
+        $ownEmployee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Tahunan',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
+        ]);
+
+        $ownLeave = LeaveRequest::create([
+            'employee_id' => $ownEmployee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-01',
+            'tanggal_selesai' => '2026-08-02',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Cuti milik sendiri',
+            'status' => 'menunggu_approval',
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $otherEmployee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-03',
+            'tanggal_selesai' => '2026-08-04',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Cuti pegawai lain',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $user = User::factory()->superAdmin()->create(['employee_id' => $ownEmployee->id]);
+
+        // Simulasi pegawai: role efektif = pegawai, meski role asli tetap super_admin.
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pegawai']);
+        $user->refresh();
+        $this->assertEquals('pegawai', $user->getEffectiveRole());
+        $this->assertTrue($user->hasPermission('cuti.read_all'));
+
+        $response = $this->actingAs($user)->get(route('cuti'));
+        $response->assertOk();
+
+        // Scope data-milik-sendiri harus tetap membatasi ke cuti milik sendiri.
+        $riwayat = $response->viewData('riwayatCuti');
+        $this->assertSame(1, $riwayat->total());
+        $this->assertSame($ownLeave->id, $riwayat->getCollection()->first()['id']);
+    }
 }

@@ -92,6 +92,13 @@ return new class extends Migration
             return;
         }
 
+        // Rebuild tabel hanya didukung pada SQLite. Driver lain (MySQL/MariaDB/SQL Server)
+        // tidak menjalankan rebuild gaya ini; dijaga sebagai no-op yang disengaja karena
+        // sintaks di bawah tidak portabel dan aplikasi menyasar PostgreSQL + SQLite (test).
+        if (DB::getDriverName() !== 'sqlite') {
+            return;
+        }
+
         // SQLite: rebuild tabel karena tidak mendukung ALTER CHECK inline.
         $quotedEvents = collect($this->eventsWithSwitchRole)
             ->map(fn (string $event): string => "'{$event}'")->join(', ');
@@ -136,6 +143,11 @@ return new class extends Migration
             DB::statement('ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_event_check');
             DB::statement("ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_event_check CHECK (event IN ({$quotedEvents}))");
 
+            return;
+        }
+
+        // Rebuild hanya untuk SQLite; driver lain no-op (aplikasi menyasar PostgreSQL + SQLite).
+        if (DB::getDriverName() !== 'sqlite') {
             return;
         }
 

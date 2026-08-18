@@ -54,8 +54,9 @@ class ListLeaveRequestsAction
             ])
             ->latest();
 
-        // Role pegawai selalu dibatasi ke data sendiri meski mapping permission salah konfigurasi.
-        $dibatasiKeDataSendiri = $user->role === 'pegawai' || ! $user->hasPermission('cuti.read_all');
+        // Role pegawai (termasuk hasil simulasi role) selalu dibatasi ke data sendiri
+        // meski mapping permission salah konfigurasi.
+        $dibatasiKeDataSendiri = $user->getEffectiveRole() === 'pegawai' || ! $user->hasPermission('cuti.read_all');
 
         if ($dibatasiKeDataSendiri) {
             $query->where('employee_id', $user->employee_id);

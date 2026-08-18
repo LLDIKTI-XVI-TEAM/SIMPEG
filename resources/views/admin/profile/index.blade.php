@@ -675,7 +675,7 @@
             </div>
 
             {{-- SUPER ADMIN SHORTCUTS CARD (BOTTOM) --}}
-            @if(session('active_role', auth()->user()->role) === 'super_admin')
+            @if(auth()->user()->getEffectiveRole() === 'super_admin')
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm mt-6">
             <div class="mb-6">
                 <h3 class="text-sm font-bold text-ink font-sans">
