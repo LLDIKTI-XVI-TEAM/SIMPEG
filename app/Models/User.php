@@ -98,33 +98,52 @@ class User extends Authenticatable
     /**
      * Mengecek apakah role pengguna memiliki permission tertentu.
      * Fail-closed: role kosong atau tidak terdaftar selalu mengembalikan false.
-     * temporary_permission hanya berlaku ketika temporary_role sedang aktif, dan nilainya selalu
-     * merupakan subset permission role target hasil validasi server-side.
+     *
+     * temporary_permission (bila simulasi aktif) berperan sebagai PEMBATAS sekaligus PENAMBAH
+     * izin sementara, tetapi tidak pernah menjadi otoritatif terhadap RBAC terkini: sebuah
+     * permission hanya dianggap dimiliki jika (a) terdaftar di snapshot temporary_permission DAN
+     * (b) MASIH dimiliki role efektif di tabel RBAC saat pemeriksaan dilakukan. Re-validasi ini
+     * memastikan snapshot yang dapat kedaluwarsa (misalnya permission dicabut dari role target
+     * setelah switch) tidak lagi lolos pemeriksaan selama simulasi belum di-revert.
+     *
      * Jika temporary_role aktif tanpa temporary_permission, permission dicek terhadap role efektif tersebut.
      */
     public function hasPermission(string $permission): bool
     {
-        if ($this->temporary_role !== null && $this->temporary_permission !== null && $this->temporary_permission !== '') {
-            $perms = json_decode($this->temporary_permission, true);
-            if (is_array($perms)) {
-                return in_array($permission, $perms, true);
-            }
-
-            $perms = array_map('trim', explode(',', $this->temporary_permission));
-
-            return in_array($permission, $perms, true);
-        }
-
         $effectiveRole = $this->getEffectiveRole();
 
         if ($effectiveRole === null || $effectiveRole === '') {
             return false;
         }
 
-        return Role::query()
+        $roleOwnsPermission = Role::query()
             ->where('name', $effectiveRole)
             ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
             ->exists();
+
+        // Simulasi dengan temporary_permission: izin sementara hanya berlaku apabila
+        // masih dimiliki role efektif (keanggotaan divalidasi ulang setiap pemeriksaan).
+        if ($this->temporary_role !== null && $this->temporary_permission !== null && $this->temporary_permission !== '') {
+            return $this->hasTemporaryPermission($permission) && $roleOwnsPermission;
+        }
+
+        return $roleOwnsPermission;
+    }
+
+    /**
+     * Memeriksa apakah permission terdaftar pada snapshot temporary_permission (JSON array atau CSV).
+     */
+    private function hasTemporaryPermission(string $permission): bool
+    {
+        $perms = json_decode((string) $this->temporary_permission, true);
+
+        if (is_array($perms)) {
+            return in_array($permission, $perms, true);
+        }
+
+        $perms = array_map('trim', explode(',', (string) $this->temporary_permission));
+
+        return in_array($permission, $perms, true);
     }
 
     /**

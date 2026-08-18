@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\AuditLog;
+use App\Models\Document;
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\RefUnitKerja;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
@@ -447,5 +451,150 @@ class SwitchRoleTest extends TestCase
         $response->assertSessionHasErrors('target_role');
         $user->refresh();
         $this->assertNull($user->temporary_role);
+    }
+
+    public function test_temporary_permission_is_no_longer_effective_after_revoked_from_role(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Switch ke admin_kepegawaian dengan snapshot employees.update (dimiliki role saat itu).
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'admin_kepegawaian',
+            'temporary_permission' => json_encode(['employees.update']),
+        ]);
+
+        $user->refresh();
+        $this->assertTrue($user->hasPermission('employees.update'));
+
+        // Permission dicabut dari role target melalui konfigurasi RBAC.
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permission = Permission::where('name', 'employees.update')->firstOrFail();
+        $role->permissions()->detach($permission);
+
+        // Snapshot lama tidak boleh lagi dianggap otoritatif: re-validasi RBAC saat runtime.
+        $user->refresh();
+        $this->assertFalse($user->hasPermission('employees.update'));
+
+        // Level HTTP: route yang digate permission:employees.update harus ditolak.
+        $response = $this->actingAs($user)->post(route('pegawai.status.update'), [
+            'employee_id' => $user->employee_id,
+            'status' => 'aktif',
+        ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_temporary_permission_restricts_even_when_role_still_owns_permission(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Snapshot hanya employees.read, meskipun role admin_kepegawaian juga memiliki employees.update.
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'admin_kepegawaian',
+            'temporary_permission' => json_encode(['employees.read']),
+        ]);
+
+        $user->refresh();
+
+        $this->assertTrue($user->hasPermission('employees.read'));
+        $this->assertFalse($user->hasPermission('employees.update'));
+
+        // HTTP: route perubahan status (permission:employees.update) tetap ditolak di luar snapshot.
+        $response = $this->actingAs($user)->post(route('pegawai.status.update'), [
+            'employee_id' => $user->employee_id,
+            'status' => 'aktif',
+        ]);
+
+        $response->assertForbidden();
+    }
+
+    public function test_switch_to_unregistered_target_blocks_requests_but_revert_still_works(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Role target dihapus / tidak terdaftar di tabel roles (validasi switch hanya
+        // memakai whitelist string + hierarki keras, tidak mengecek keberadaan record role).
+        Role::where('name', 'pimpinan')->delete();
+
+        // Switch tetap berhasil menyimpan state simulasi.
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pimpinan',
+        ])->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+        $this->assertEquals('pimpinan', $user->temporary_role);
+        $this->assertEquals('pimpinan', $user->getEffectiveRole());
+
+        // Semua request lain ditolak EnsureRole karena role efektif tidak terdaftar di tabel roles.
+        $this->actingAs($user)->get(route('dashboard'))->assertForbidden();
+
+        // Jalur pemulihan revert wajib tetap berjalan walau state simulasi tidak valid.
+        $response = $this->actingAs($user)->post(route('revert-role'));
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHas('success');
+
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+        $this->assertNull($user->temporary_permission);
+        $this->assertNull($user->temporary_role_started_at);
+        $this->assertNull($user->temporary_role_switched_by);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'REVERT_ROLE',
+            'auditable_type' => 'User',
+            'auditable_id' => $user->id,
+        ]);
+    }
+
+    public function test_global_search_uses_effective_role_for_pimpinan_simulation(): void
+    {
+        $haystack = 'xXSearchTargetXx';
+
+        $user = $this->createUserWithRole('super_admin');
+
+        $employee = Employee::factory()->create(['nama_lengkap' => $haystack.' Pegawai']);
+        RefUnitKerja::create(['nama' => $haystack.' Unit']);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => $haystack.' Dokumen',
+            'file_path' => 'test.pdf',
+        ]);
+        User::factory()->create([
+            'name' => $haystack.' Pengguna',
+            'email' => 'pengguna-'.$haystack.'@example.com',
+            'role' => 'pegawai',
+        ]);
+
+        // Mode admin (belum simulasi): seluruh section hasil muncul.
+        $adminJson = $this->actingAs($user)
+            ->getJson(route('global.search').'?q='.$haystack)
+            ->assertOk()
+            ->json();
+
+        $this->assertArrayHasKey('Pegawai', $adminJson);
+        $this->assertArrayHasKey('Unit Kerja', $adminJson);
+        $this->assertArrayHasKey('Dokumen', $adminJson);
+        $this->assertArrayHasKey('Pengguna Sistem', $adminJson);
+        $this->assertStringNotContainsString('/pimpinan/', (string) $adminJson['Pegawai'][0]['url']);
+
+        // Simulasi pimpinan.
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pimpinan']);
+        $user->refresh();
+        $this->assertEquals('pimpinan', $user->getEffectiveRole());
+
+        // Mode pimpinan: hanya hasil khusus pimpinan, tanpa unit kerja/dokumen/pengguna sistem.
+        $pimpinanJson = $this->actingAs($user)
+            ->getJson(route('global.search').'?q='.$haystack)
+            ->assertOk()
+            ->json();
+
+        $this->assertArrayHasKey('Pegawai', $pimpinanJson);
+        $this->assertArrayNotHasKey('Unit Kerja', $pimpinanJson);
+        $this->assertArrayNotHasKey('Dokumen', $pimpinanJson);
+        $this->assertArrayNotHasKey('Pengguna Sistem', $pimpinanJson);
+
+        // URL hasil pegawai harus menunjuk route namespace pimpinan.
+        $this->assertStringContainsString('/pimpinan/', (string) $pimpinanJson['Pegawai'][0]['url']);
     }
 }

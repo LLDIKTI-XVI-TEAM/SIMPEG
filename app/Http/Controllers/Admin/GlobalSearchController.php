@@ -23,7 +23,10 @@ class GlobalSearchController extends Controller
 
         $results = [];
 
-        $isPimpinan = auth()->user()?->role === 'pimpinan';
+        // Pemilah hasil wajib memakai role efektif (getEffectiveRole), bukan role asli, agar
+        // mode simulasi switch-role benar-benar berfungsi: pengguna yang sedang bersimulasi
+        // sebagai pimpinan harus menerima hasil khusus pimpinan, bukan hasil admin.
+        $isPimpinan = auth()->user()?->getEffectiveRole() === 'pimpinan';
         $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         // 1. Search Employees (Pegawai & NIP)

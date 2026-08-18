@@ -630,7 +630,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
         ->name('switch-role');
 
+    // /revert-role WAJIB berada di luar pemeriksaan role efektif (EnsureRole).
+    // Validasi switch hanya memakai whitelist string + hierarki keras dan tidak mensyaratkan
+    // role target terdaftar di tabel roles; bila target tidak/belum terdaftar, getEffectiveRole()
+    // tetap mengembalikannya sehingga SEMUA request (termasuk revert) ditolak 403 oleh grup ini
+    // dan pengguna terkunci permanen dalam simulasi yang tidak valid. Revert adalah jalur
+    // pemulihan yang hanya perlu autentikasi, jadi middleware 'role' dari grup induk dikecualikan
+    // (string harus identik dengan middleware grup agar resolve exclusion sama).
     Route::post('/revert-role', [SwitchRoleController::class, 'revertRole'])
+        ->withoutMiddleware('role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai')
         ->name('revert-role');
 
     Route::get('/notifications', [NotificationController::class, 'index'])
