@@ -57,7 +57,10 @@ class EmployeeValidationRules
 
             // Pendidikan snapshot
             'pendidikan_terakhir' => ['nullable', 'string', 'max:50'],
-            'prodi_pendidikan_terakhir' => ['nullable', 'string', 'max:255'],
+            'program_studi_id' => ['nullable', 'uuid', Rule::exists('ref_program_studi', 'id')->where('is_active', true)],
+            // Pengosongan harus eksplisit agar snapshot hasil import yang belum
+            // direkonsiliasi tidak terhapus hanya karena select mengirim nilai kosong.
+            'clear_program_studi' => ['sometimes', 'boolean'],
 
             // Pensiun
             // Jika diisi, ini adalah tanggal pensiun manual yang diprioritaskan EWS.
@@ -123,6 +126,8 @@ class EmployeeValidationRules
                 }
             },
         ];
+        $rules['program_studi_id'] = ['nullable', 'uuid', Rule::exists('ref_program_studi', 'id')
+            ->where(fn ($query) => self::allowStoredReference($query, $employee->program_studi_id))];
 
         $rules['nik'] = [
             'nullable',
@@ -143,6 +148,15 @@ class EmployeeValidationRules
         ];
 
         return $rules;
+    }
+
+    private static function allowStoredReference(mixed $query, ?string $storedId): void
+    {
+        $query->where('is_active', true);
+
+        if ($storedId !== null) {
+            $query->orWhere('id', $storedId);
+        }
     }
 
     /**
@@ -208,6 +222,7 @@ class EmployeeValidationRules
             'kelas_jabatan_terakhir' => 'Kelas Jabatan',
             'pendidikan_terakhir' => 'Pendidikan Terakhir',
             'prodi_pendidikan_terakhir' => 'Prodi Pendidikan Terakhir',
+            'program_studi_id' => 'Program Studi',
             'tanggal_pensiun' => 'Tanggal Pensiun',
 
             'is_kepala_lembaga' => 'Penanda Kepala Lembaga',

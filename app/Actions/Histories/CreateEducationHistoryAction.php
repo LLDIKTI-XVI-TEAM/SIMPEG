@@ -4,6 +4,7 @@ namespace App\Actions\Histories;
 
 use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\RefProgramStudi;
 use App\Services\AuditService;
 use App\Support\Histories\EducationHistoryPayload;
 use Illuminate\Http\Request;
@@ -22,6 +23,10 @@ class CreateEducationHistoryAction
             // Kolom no_ijazah belum nullable di DB pada schema awal;
             // coerce null ke string kosong sebagai safety net sebelum migration dijalankan.
             $data['no_ijazah'] = $data['no_ijazah'] ?? '';
+            // Jurusan adalah snapshot legacy; CRUD baru hanya boleh
+            // menurunkannya dari data master yang dipilih.
+            unset($data['jurusan']);
+            $this->syncProgramStudiSnapshot($data);
 
             $history = $employee->educationHistories()->create($data);
 
@@ -34,7 +39,15 @@ class CreateEducationHistoryAction
                 $request,
             );
 
-            return $history->load('jenjang');
+            return $history->load(['jenjang', 'programStudi']);
         });
+    }
+
+    /** @param array<string, mixed> $data */
+    private function syncProgramStudiSnapshot(array &$data): void
+    {
+        if (! empty($data['program_studi_id'])) {
+            $data['jurusan'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        }
     }
 }

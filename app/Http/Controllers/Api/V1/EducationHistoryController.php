@@ -23,6 +23,7 @@ class EducationHistoryController extends Controller
         return response()->json([
             'employee_id' => $employee->id,
             'histories' => $action->execute($employee),
+            'education_summary' => $this->payload->educationSummary($employee),
         ]);
     }
 
@@ -36,6 +37,7 @@ class EducationHistoryController extends Controller
         return response()->json([
             'message' => 'Riwayat pendidikan berhasil ditambahkan.',
             'history' => $this->payload->response($history, $employee),
+            'education_summary' => $this->payload->educationSummary($employee),
         ], 201);
     }
 
@@ -50,6 +52,7 @@ class EducationHistoryController extends Controller
         return response()->json([
             'message' => 'Riwayat pendidikan berhasil diperbarui.',
             'history' => $this->payload->response($history, $employee),
+            'education_summary' => $this->payload->educationSummary($employee),
         ]);
     }
 
@@ -62,6 +65,7 @@ class EducationHistoryController extends Controller
 
         return response()->json([
             'message' => 'Riwayat pendidikan berhasil dihapus.',
+            'education_summary' => $this->payload->educationSummary($employee),
         ]);
     }
 }

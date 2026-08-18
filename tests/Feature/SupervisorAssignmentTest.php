@@ -567,7 +567,7 @@ class SupervisorAssignmentTest extends TestCase
     public function test_assignment_hari_ini_mengambil_lock_global_sebelum_lock_timeline(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Uji lock advisory membutuhkan PostgreSQL.');
+            $this->markTestSkipped('Urutan advisory lock penugasan atasan diverifikasi khusus pada PostgreSQL.');
         }
 
         $employee = Employee::factory()->create();
@@ -598,7 +598,7 @@ class SupervisorAssignmentTest extends TestCase
     public function test_assignment_masa_depan_hanya_mengambil_lock_timeline(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
-            $this->markTestSkipped('Uji lock advisory membutuhkan PostgreSQL.');
+            $this->markTestSkipped('Advisory lock penugasan masa depan diverifikasi khusus pada PostgreSQL.');
         }
 
         $employee = Employee::factory()->create();

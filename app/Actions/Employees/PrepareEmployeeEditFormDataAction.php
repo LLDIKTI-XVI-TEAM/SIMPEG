@@ -9,6 +9,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -48,6 +49,14 @@ class PrepareEmployeeEditFormDataAction
         $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
+        $programStudiOptions = RefProgramStudi::query()
+            ->where('is_active', true)
+            ->when(
+                $p->program_studi_id,
+                fn ($query) => $query->orWhere('id', $p->program_studi_id),
+            )
+            ->orderBy('nama')
+            ->get();
         $latestRank = $p->rankHistories->firstWhere('is_latest', true);
         $latestPosition = $p->positionHistories->firstWhere('is_latest', true);
         $latestSalary = $p->salaryHistories->firstWhere('is_latest', true);
@@ -130,6 +139,7 @@ class PrepareEmployeeEditFormDataAction
             'statusPegawai',
             'golonganRefOptions',
             'eselonOptions',
+            'programStudiOptions',
             'latestRank',
             'latestPosition',
             'latestSalary',

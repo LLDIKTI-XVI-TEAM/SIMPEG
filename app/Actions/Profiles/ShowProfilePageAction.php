@@ -24,6 +24,8 @@ class ShowProfilePageAction
             'salaryHistories',
             'disciplineRecords',
             'educationHistories.jenjang',
+            'educationHistories.programStudi',
+            'programStudi',
             'documents',
             'kepalaBagian',
         ])->first();

@@ -13,6 +13,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
 use App\Models\SalaryHistory;
 use App\Models\User;
@@ -232,6 +233,110 @@ class EmployeeUpdateTest extends TestCase
 
         $response->assertRedirect(route('data-pegawai'));
         $this->assertSame('2030-01-01', $employee->fresh()->tanggal_pensiun?->toDateString());
+    }
+
+    public function test_edit_page_loads_current_inactive_program_studi(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Teknik Lingkungan',
+            'is_active' => false,
+        ]);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.edit', $employee->id))
+            ->assertOk()
+            ->assertSee('name="program_studi_id"', false)
+            ->assertSee($programStudi->nama);
+    }
+
+    public function test_admin_can_preserve_current_inactive_program_studi_when_updating_employee(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Lama Nonaktif',
+            'is_active' => false,
+        ]);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'program_studi_id' => $programStudi->id,
+            'nama_lengkap' => 'Nama Diperbarui',
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'program_studi_id' => $programStudi->id,
+            'nama_lengkap' => 'Nama Diperbarui',
+        ]);
+    }
+
+    public function test_admin_cannot_replace_employee_program_studi_with_inactive_reference(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $inactiveProgramStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Pengganti Nonaktif',
+            'is_active' => false,
+        ]);
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'program_studi_id' => $inactiveProgramStudi->id,
+        ]));
+
+        $response->assertUnprocessable()->assertJsonValidationErrors('program_studi_id');
+        $this->assertNull($employee->fresh()->program_studi_id);
+    }
+
+    public function test_update_preserves_unreconciled_import_program_studi_snapshot(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'program_studi_id' => null,
+            'prodi_pendidikan_terakhir' => 'Program Studi Dari Import',
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Setelah Diperbarui',
+            'program_studi_id' => null,
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'program_studi_id' => null,
+            'prodi_pendidikan_terakhir' => 'Program Studi Dari Import',
+        ]);
+    }
+
+    public function test_update_requires_explicit_intent_to_clear_program_studi_snapshot(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Negara']);
+        $employee = Employee::factory()->create([
+            'program_studi_id' => $programStudi->id,
+            'prodi_pendidikan_terakhir' => $programStudi->nama,
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
+            // Browser form tetap mengirim nilai select yang aktif dan checkbox
+            // HTML sebagai string; flag clear harus tetap menang.
+            'program_studi_id' => $programStudi->id,
+            'clear_program_studi' => '1',
+        ]));
+
+        $response->assertOk();
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'program_studi_id' => null,
+            'prodi_pendidikan_terakhir' => null,
+        ]);
     }
 
     public function test_pppk_contract_dates_are_shown_saved_and_reset_active_contract_alerts(): void

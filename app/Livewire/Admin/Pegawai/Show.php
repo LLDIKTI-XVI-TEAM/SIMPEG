@@ -10,6 +10,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Employees\EmployeeProfilePresentation;
@@ -40,12 +41,14 @@ class Show extends Component
             'salaryHistories',
             'disciplineRecords',
             'educationHistories.jenjang',
+            'educationHistories.programStudi',
             'documents',
             'appointment',
             'agama',
             'statusKawin',
             'jenisPegawai',
             'statusPegawai',
+            'programStudi',
             'statusHistories' => fn ($query) => $query
                 ->orderByDesc('is_latest')
                 ->orderByDesc('tanggal_efektif')
@@ -60,6 +63,17 @@ class Show extends Component
         $unitKerjaOptions = RefUnitKerja::all();
         $eselonOptions = RefEselon::all();
         $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
+        $programStudiOptions = RefProgramStudi::query()
+            ->where('is_active', true)
+            ->orderBy('nama')
+            ->get();
+        $educationProgramStudiOptions = RefProgramStudi::query()
+            ->where(function ($query) use ($p): void {
+                $query->where('is_active', true)
+                    ->orWhereIn('id', $p->educationHistories->pluck('program_studi_id')->filter());
+            })
+            ->orderBy('nama')
+            ->get();
 
         $estimasiTanggalPensiun = EmployeeProfilePresentation::retirementDate($p);
 
@@ -90,7 +104,16 @@ class Show extends Component
             ?? $p->statusHistories->sortByDesc('tanggal_efektif')->first();
         $statusPresentation = EmployeeProfilePresentation::status($p, $latestStatusHistory);
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory'));
+        // Ikat cache browser pada master Program Studi dan riwayat pegawai agar
+        // perubahan nama maupun mutasi pendidikan memaksa pemuatan payload terbaru.
+        $pendidikanCacheVersion = md5(
+            (string) (RefProgramStudi::max('updated_at') ?? '0').'|'.
+            (string) ($p->updated_at ?? '0').'|'.
+            (string) ($p->educationHistories->max('updated_at') ?? '0').'|'.
+            (string) $p->educationHistories->count()
+        );
+
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory', 'pendidikanCacheVersion'));
     }
 
     /**

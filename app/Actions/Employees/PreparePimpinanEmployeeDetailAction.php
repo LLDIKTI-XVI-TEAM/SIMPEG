@@ -53,6 +53,7 @@ class PreparePimpinanEmployeeDetailAction
                 'kelas_jabatan_terakhir',
                 'pendidikan_terakhir',
                 'prodi_pendidikan_terakhir',
+                'program_studi_id',
                 'email',
                 'email_pribadi',
                 'no_hp',
@@ -72,6 +73,7 @@ class PreparePimpinanEmployeeDetailAction
                 'statusKawin:id,nama',
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,kode,nama,kelompok',
+                'programStudi:id,nama',
                 'statusHistories' => fn ($query) => $query
                     ->select([
                         'id',
@@ -99,7 +101,7 @@ class PreparePimpinanEmployeeDetailAction
                 'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
                 'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
                 'educationHistories' => fn ($query) => $query
-                    ->with('jenjang:id,nama,urutan')
+                    ->with(['jenjang:id,nama,urutan', 'programStudi:id,nama'])
                     ->orderByDesc('tahun_lulus'),
                 'documents' => fn ($query) => $query
                     // KTP/KK tidak masuk payload karena metadata dan file-nya memuat identitas sensitif.
@@ -137,6 +139,9 @@ class PreparePimpinanEmployeeDetailAction
                     ]),
             ])
             ->findOrFail($employeeId);
+
+        // Relasi referensi dimuat di action agar surface Pimpinan tetap read-only dan tidak memicu query dari Blade.
+        $employee->loadMissing(['programStudi', 'educationHistories.programStudi']);
 
         $this->prepareAttachmentDownloadUrls($employee);
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
