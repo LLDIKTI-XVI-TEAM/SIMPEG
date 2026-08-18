@@ -13,6 +13,7 @@ use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\SalaryHistory;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -184,6 +185,7 @@ class ProfileTest extends TestCase
         $employee = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
         $jenjang = RefJenjangPendidikan::where('nama', 'D4 / S1')->firstOrFail();
+        $programStudi = RefProgramStudi::create(['nama' => 'Program Studi Referensi Profil']);
 
         EmployeeFamily::create([
             'employee_id' => $employee->id,
@@ -196,8 +198,9 @@ class ProfileTest extends TestCase
         EducationHistory::create([
             'employee_id' => $employee->id,
             'jenjang_id' => $jenjang->id,
+            'program_studi_id' => $programStudi->id,
             'nama_institusi' => 'Universitas Profil Saya',
-            'jurusan' => 'Administrasi Publik',
+            'jurusan' => 'Snapshot Jurusan Lama',
             'tahun_lulus' => 2010,
             'no_ijazah' => 'IJZ-PROFIL-001',
         ]);
@@ -209,6 +212,8 @@ class ProfileTest extends TestCase
         $response->assertSee('Keluarga Profil Saya', false);
         $response->assertSee('Riwayat Pendidikan Formal', false);
         $response->assertSee('Universitas Profil Saya', false);
+        $response->assertSee('Program Studi Referensi Profil', false);
+        $response->assertDontSee('Snapshot Jurusan Lama', false);
         $response->assertDontSee('@click="openModal()"', false);
         $response->assertDontSee('@submit.prevent="submitForm()"', false);
         $response->assertDontSee("fetch('/api/v1/profil-saya/keluarga'", false);

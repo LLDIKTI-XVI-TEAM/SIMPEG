@@ -234,7 +234,7 @@
                             <tr class="transition-colors hover:bg-soft/30">
                                 <td class="px-4 py-3 font-bold">{{ $education->jenjang?->nama ?? '-' }}</td>
                                 <td class="px-4 py-3">{{ $education->nama_institusi ?: '-' }}</td>
-                                <td class="px-4 py-3">{{ $education->jurusan ?: '-' }}</td>
+                                <td class="px-4 py-3">{{ $education->programStudi?->nama ?? $education->jurusan ?? '-' }}</td>
                                 <td class="px-4 py-3">{{ $education->tahun_lulus ?: '-' }}</td>
                                 <td class="px-4 py-3">{{ $education->no_ijazah ?: '-' }}</td>
                                 <td class="px-4 py-3">

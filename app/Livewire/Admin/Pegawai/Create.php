@@ -8,6 +8,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -30,6 +31,7 @@ class Create extends Component
         $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
+        $programStudiOptions = RefProgramStudi::where('is_active', true)->orderBy('nama')->get();
 
         return view('admin.pegawai.create', compact(
             'jenisPegawai',
@@ -40,7 +42,8 @@ class Create extends Component
             'jenisJabatanOptions',
             'statusPegawai',
             'golonganRefOptions',
-            'eselonOptions'
+            'eselonOptions',
+            'programStudiOptions'
         ));
     }
 }

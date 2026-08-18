@@ -12,6 +12,7 @@
             'jenis_kelamin' => 'Jenis Kelamin',
             'status_perkawinan' => 'Status Perkawinan',
             'jenjang_pendidikan' => 'Jenjang Pendidikan',
+            'program_studi' => 'Program Studi',
             'unit_kerja' => 'Unit Kerja',
             'hari_libur' => 'Hari Libur / Cuti Bersama',
         ];
@@ -156,6 +157,9 @@
 
             {{-- TAB: STATUS PEGAWAI --}}
             @include('admin.data-master.partials.tab-status-pegawai')
+
+            {{-- TAB: PROGRAM STUDI --}}
+            @include('admin.data-master.partials.tab-program-studi')
 
             {{-- TAB: JENIS CUTI --}}
             <div x-show="activeTab === 'jenis_cuti'"

@@ -673,6 +673,8 @@ class PegawaiController extends Controller
             $action->execute($employee, $request);
 
             return response()->json(['success' => true, 'message' => 'Data riwayat berhasil disimpan.']);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }

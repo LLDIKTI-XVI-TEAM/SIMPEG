@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
@@ -296,6 +297,14 @@ class CreateEmployeeAction
         if (! empty($data['status_pegawai_id']) && empty($data['status_aktif'])) {
             $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
         }
+
+        if (! empty($data['program_studi_id'])) {
+            $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        } else {
+            unset($data['program_studi_id'], $data['prodi_pendidikan_terakhir']);
+        }
+
+        unset($data['clear_program_studi']);
 
         return $data;
     }

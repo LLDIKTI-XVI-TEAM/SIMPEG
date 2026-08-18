@@ -51,7 +51,7 @@
             isCheckingNik: false,
             kkError: '',
             fotoPreview: {{ json_encode($fotoUrl) }},
-            
+
             // File uploads state
             skPangkatName: {{ json_encode($latestRank?->admin_attachment_download_url ? basename($latestRank->file_sk) : "") }},
             skPangkatSize: '',
@@ -59,21 +59,18 @@
             skPangkatMode: 'upload', // 'upload' | 'arsip'
             selectedArsipPangkatId: '',
             arsipPangkatList: {{ json_encode($arsipPangkat) }},
-            
             skJabatanName: {{ json_encode($latestPosition?->admin_attachment_download_url ? basename($latestPosition->file_sk) : "") }},
             skJabatanSize: '',
             skJabatanError: '',
             skJabatanMode: 'upload',
             selectedArsipJabatanId: '',
             arsipJabatanList: {{ json_encode($arsipJabatan) }},
-            
             skKgbName: {{ json_encode($latestSalary?->admin_attachment_download_url ? basename($latestSalary->file_sk) : "") }},
             skKgbSize: '',
             skKgbError: '',
             skKgbMode: 'upload',
             selectedArsipKgbId: '',
             arsipKgbList: {{ json_encode($arsipKgb) }},
-            
             skPengangkatanName: {{ json_encode($p->appointment?->admin_attachment_download_url ? basename($p->appointment->file_sk) : "") }},
             skPengangkatanSize: '',
             skPengangkatanError: '',
@@ -153,16 +150,16 @@
             async checkIdentity(type) {
                 if (type === 'nip' && this.nip.length < 10) return;
                 if (type === 'nik' && this.nik.length !== 16) return;
-                
+
                 const value = type === 'nip' ? this.nip : this.nik;
                 const isCheckingVar = type === 'nip' ? 'isCheckingNip' : 'isCheckingNik';
                 const errorVar = type === 'nip' ? 'nipError' : 'nikError';
                 const successVar = type === 'nip' ? 'nipSuccess' : 'nikSuccess';
-                
+
                 this[isCheckingVar] = true;
                 this[errorVar] = '';
                 this[successVar] = '';
-                
+
                 try {
                     const response = await fetch('/api/v1/pegawai/check-identity', {
                         method: 'POST',
@@ -177,9 +174,9 @@
                             except_id: '{{ $p->id }}'
                         })
                     });
-                    
+
                     const data = await response.json();
-                    
+
                     if (data.is_unique) {
                         this[successVar] = data.message;
                     } else {
@@ -208,7 +205,7 @@
                 const allowedTypes = ['application/pdf', 'application/x-pdf', 'image/jpeg', 'image/png', 'image/jpg'];
                 const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
                 const sizeInMb = (file.size / (1024 * 1024)).toFixed(2);
-                
+
                 let isValidType = allowedTypes.includes(file.type);
                 if (!isValidType) {
                     const ext = file.name.split('.').pop().toLowerCase();
@@ -216,7 +213,7 @@
                         isValidType = true;
                     }
                 }
-                
+
                 if (!isValidType) {
                     return { name: '', size: '', error: 'Format berkas harus PDF, JPG, JPEG, atau PNG!' };
                 }
@@ -613,14 +610,18 @@
 
                         {{-- Program Studi --}}
                         <div class="space-y-1">
-                            <label for="prodi_pendidikan_terakhir"
-                                class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program
-                                Studi</label>
-                            <input id="prodi_pendidikan_terakhir" name="prodi_pendidikan_terakhir" type="text"
-                                placeholder="Teknik Informatika"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
-                                value="{{ $p->prodi_pendidikan_terakhir }}">
-                            <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
+                            <label for="program_studi_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
+                            <select id="program_studi_id" name="program_studi_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <option value="">-- Pilih Program Studi --</option>
+                                @foreach($programStudiOptions as $programStudi)
+                                    <option value="{{ $programStudi->id }}" @selected(old('program_studi_id', $p->program_studi_id) === $programStudi->id)>{{ $programStudi->nama }}{{ ! $programStudi->is_active ? ' (Nonaktif)' : '' }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-xs text-muted">Pilih dari Data Master Program Studi.</p>
+                            <label class="mt-2 flex items-center gap-2 text-xs text-muted">
+                                <input type="checkbox" name="clear_program_studi" value="1" @checked(old('clear_program_studi'))>
+                                Hapus relasi dan snapshot Program Studi secara eksplisit.
+                            </label>
                         </div>
 
 

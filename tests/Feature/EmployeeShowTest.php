@@ -24,6 +24,7 @@ use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
@@ -647,6 +648,137 @@ class EmployeeShowTest extends TestCase
         $this->assertStringNotContainsString('2026-09-22T00:00:00', $content);
     }
 
+    public function test_detail_page_preserves_initial_discipline_period_fields_for_table(): void
+    {
+        $employee = $this->employeeWithReferences();
+        DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Sedang',
+            'deskripsi' => 'Pelanggaran uji periode',
+            'tanggal_mulai' => '2026-02-01',
+            'tanggal_berakhir' => '2026-03-01',
+            'no_sk' => 'SK-DISIPLIN-PERIODE',
+            'tanggal_sk' => '2026-01-20',
+            'is_active' => false,
+        ]);
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/SK-DISIPLIN-PERIODE.{0,200}&quot;tgl_mulai&quot;:&quot;2026-02-01&quot;.{0,80}&quot;tgl_akhir&quot;:&quot;2026-03-01&quot;/s',
+            $content,
+        );
+    }
+
+    public function test_detail_page_versions_education_cache_after_program_studi_relation_is_added(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee("pendidikan_v2_{$employee->id}", false)
+            ->assertDontSee("pendidikan_{$employee->id}", false)
+            ->getContent();
+
+        $this->assertStringNotContainsString('Cache lama tanpa envelope', $content);
+        $this->assertStringNotContainsString('if (Array.isArray(this.pendidikanList)) return;', $content);
+    }
+
+    public function test_detail_page_changes_education_cache_version_after_program_studi_is_renamed(): void
+    {
+        Carbon::setTestNow('2026-08-17 10:00:00');
+
+        try {
+            $programStudi = RefProgramStudi::create(['nama' => 'Program Studi Cache Lama']);
+            $employee = $this->employeeWithReferences([
+                'program_studi_id' => $programStudi->id,
+                'prodi_pendidikan_terakhir' => $programStudi->nama,
+            ]);
+            $superAdmin = User::factory()->superAdmin()->create();
+
+            $initialContent = $this->actingAs($superAdmin)
+                ->get(route('pegawai.show', $employee))
+                ->assertOk()
+                ->getContent();
+            $initialVersion = $this->extractPendidikanCacheVersion($initialContent);
+
+            Carbon::setTestNow('2026-08-17 10:01:00');
+            $this->withSession(['_token' => 'test-token'])
+                ->post(
+                    route('data-master.program-studi.update', $programStudi),
+                    ['_token' => 'test-token', 'nama' => 'Program Studi Cache Baru'],
+                )
+                ->assertRedirect();
+
+            $renamedContent = $this->get(route('pegawai.show', $employee))
+                ->assertOk()
+                ->getContent();
+            $renamedVersion = $this->extractPendidikanCacheVersion($renamedContent);
+
+            $this->assertNotSame($initialVersion, $renamedVersion);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_education_summary_is_bound_to_alpine_state_after_mutations(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('pendidikanSummary:', $content);
+        $this->assertStringContainsString('applyEducationSummary(summary)', $content);
+        $this->assertStringContainsString('x-text="pendidikanSummary.pendidikan_terakhir ?? \'-\'"', $content);
+        $this->assertStringContainsString('x-text="pendidikanSummary.program_studi ?? \'-\'"', $content);
+        $this->assertSame(3, substr_count($content, 'this.applyEducationSummary(result.education_summary);'));
+    }
+
+    public function test_education_forms_exclude_inactive_choices_except_the_reference_stored_on_an_existing_history(): void
+    {
+        $activeProgramStudi = RefProgramStudi::create(['nama' => 'Program Studi Aktif Untuk Riwayat Baru']);
+        $inactiveProgramStudi = RefProgramStudi::create([
+            'nama' => 'Program Studi Nonaktif Yang Sedang Dipakai',
+            'is_active' => false,
+        ]);
+        $employee = $this->employeeWithReferences([
+            'program_studi_id' => $inactiveProgramStudi->id,
+            'prodi_pendidikan_terakhir' => $inactiveProgramStudi->nama,
+        ]);
+        EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => RefJenjangPendidikan::where('nama', 'D4 / S1')->firstOrFail()->id,
+            'program_studi_id' => $inactiveProgramStudi->id,
+            'nama_institusi' => 'Universitas Riwayat Lama',
+            'jurusan' => $inactiveProgramStudi->nama,
+            'tahun_lulus' => 2020,
+        ]);
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $createOptions = Str::of($content)
+            ->after('<select x-model="newPendidikan.program_studi_id"')
+            ->before('</select>')
+            ->toString();
+        $editOptions = Str::of($content)
+            ->after('<select x-model="editPendidikanForm.program_studi_id"')
+            ->before('</select>')
+            ->toString();
+
+        $this->assertStringContainsString($activeProgramStudi->nama, $createOptions);
+        $this->assertStringNotContainsString($inactiveProgramStudi->nama, $createOptions);
+        $this->assertStringContainsString($inactiveProgramStudi->nama.' (Nonaktif)', $editOptions);
+    }
+
     public function test_detail_page_disciplines_use_normalized_dates_and_protected_download_url(): void
     {
         Storage::fake(Document::STORAGE_DISK);
@@ -699,6 +831,39 @@ class EmployeeShowTest extends TestCase
         );
 
         $this->assertStringContainsString('download_url: h.download_url', $updateHandler);
+    }
+
+    public function test_detail_page_payload_program_studi_mempertahankan_url_unduh_privat(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = $this->employeeWithReferences();
+        $programStudi = RefProgramStudi::create(['nama' => 'Administrasi Publik Detail']);
+        $history = EducationHistory::create([
+            'employee_id' => $employee->id,
+            'jenjang_id' => RefJenjangPendidikan::where('nama', 'D4 / S1')->firstOrFail()->id,
+            'program_studi_id' => $programStudi->id,
+            'nama_institusi' => 'Universitas Detail',
+            'tahun_lulus' => 2024,
+            'no_ijazah' => 'IJAZAH-PRODI-DOWNLOAD',
+            'file_ijazah' => 'ijazah/program-studi-detail.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($history->file_ijazah, 'ijazah privat');
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->getContent();
+        $row = collect($this->extractAlpineList($content, 'pendidikanList', 'pendidikanLoading'))
+            ->firstWhere('no_ijazah', 'IJAZAH-PRODI-DOWNLOAD');
+
+        $this->assertIsArray($row);
+        $this->assertSame($programStudi->id, $row['program_studi_id']);
+        $this->assertSame($programStudi->nama, $row['prodi']);
+        $this->assertSame(route('pegawai.history-attachments.download', [
+            'employee' => $employee,
+            'type' => 'education',
+            'history' => $history,
+        ]), $row['download_url']);
     }
 
     public function test_detail_admin_tidak_merender_tautan_attachment_yang_file_privatnya_hilang(): void
@@ -985,6 +1150,19 @@ class EmployeeShowTest extends TestCase
         $json = rtrim(trim(substr($html, $start + strlen($startMarker), $end - $start - strlen($startMarker))), ',');
 
         return json_decode(html_entity_decode($json, ENT_QUOTES | ENT_HTML5), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    private function extractPendidikanCacheVersion(string $html): string
+    {
+        $matches = [];
+
+        $this->assertSame(
+            1,
+            preg_match('/_pendidikanCacheVersion:\s*([\'\"])([a-f0-9]{32})\1/', $html, $matches),
+            'Versi cache pendidikan harus dikirim sebagai hash nonkosong ke halaman detail pegawai.',
+        );
+
+        return $matches[2];
     }
 
     private function seedEmployeeDetail(Employee $employee, Employee $supervisor): void

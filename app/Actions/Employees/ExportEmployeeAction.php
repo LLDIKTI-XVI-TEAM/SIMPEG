@@ -28,7 +28,7 @@ class ExportEmployeeAction
             ->unique()
             ->values();
 
-        $query = Employee::query()->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama']);
+        $query = Employee::query()->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama', 'programStudi:id,nama']);
 
         if ($requestedIds->isNotEmpty()) {
             $query->whereIn('id', $requestedIds->all());
@@ -160,7 +160,7 @@ class ExportEmployeeAction
 
             $sheet->setCellValue('L'.$r, $employee->nama_lengkap);
             $sheet->setCellValue('M'.$r, $employee->nama_lengkap);
-            $sheet->setCellValue('N'.$r, $employee->prodi_pendidikan_terakhir ?? '');
+            $sheet->setCellValue('N'.$r, $employee->programStudi?->nama ?? $employee->prodi_pendidikan_terakhir ?? '');
             $sheet->setCellValue('O'.$r, $employee->statusPegawai?->nama ?? $employee->status_aktif ?? '');
 
             if ($employee->tanggal_lahir !== null) {

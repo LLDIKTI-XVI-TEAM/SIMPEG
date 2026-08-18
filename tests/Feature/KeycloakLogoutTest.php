@@ -51,6 +51,21 @@ class KeycloakLogoutTest extends TestCase
         $this->assertSame('Admin Kepegawaian', $audit->user_name);
     }
 
+    public function test_get_logout_is_not_allowed_and_rejects_session_mutation(): void
+    {
+        $user = User::factory()->pegawai()->create([
+            'name' => 'Budi Santoso',
+        ]);
+
+        $response = $this->actingAs($user)->get('/logout');
+
+        $response->assertMethodNotAllowed();
+        $this->assertAuthenticatedAs($user);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'LOGOUT',
+        ]);
+    }
+
     private function fakeKeycloakLogoutUrl(string $logoutUrl): void
     {
         $provider = new class($logoutUrl)

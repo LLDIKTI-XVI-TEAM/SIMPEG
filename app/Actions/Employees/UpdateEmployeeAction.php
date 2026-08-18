@@ -8,6 +8,7 @@ use App\Models\EwsAlert;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Services\AuditService;
@@ -35,7 +36,7 @@ class UpdateEmployeeAction
         $transaction = function () use ($employee, $validated, $request, &$storedEmployeeDocumentPaths) {
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
-            $validated = $this->normalizeEmployeeContract($validated);
+            $validated = $this->normalizeEmployeeContract($validated, $employee);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && $this->dateChanged($employee->tanggal_akhir_kontrak?->toDateString(), $validated['tanggal_akhir_kontrak']);
 
@@ -346,7 +347,7 @@ class UpdateEmployeeAction
         return $normalize($old) !== $normalize($new);
     }
 
-    private function normalizeEmployeeContract(array $data): array
+    private function normalizeEmployeeContract(array $data, ?Employee $employee = null): array
     {
         $email = $data['email_pribadi'] ?? $data['email'] ?? null;
         if ($email !== null) {
@@ -369,6 +370,21 @@ class UpdateEmployeeAction
         } elseif (empty($data['status_pegawai_id']) && ! empty($data['status_aktif'])) {
             $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $data['status_aktif'])->value('id');
         }
+
+        $clearProgramStudi = filter_var($data['clear_program_studi'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        if ($clearProgramStudi) {
+            $data['program_studi_id'] = null;
+            $data['prodi_pendidikan_terakhir'] = null;
+        } elseif (! empty($data['program_studi_id'])) {
+            $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
+        } elseif ($employee !== null) {
+            // Form edit selalu mengirim select kosong. Itu bukan intent untuk
+            // menghapus snapshot import yang belum memiliki relasi referensi.
+            unset($data['program_studi_id'], $data['prodi_pendidikan_terakhir']);
+        }
+
+        unset($data['clear_program_studi']);
 
         return $data;
     }

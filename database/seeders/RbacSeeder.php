@@ -42,6 +42,7 @@ class RbacSeeder extends Seeder
             'hari_libur.create' => ['module' => 'hari_libur', 'description' => 'Membuat hari libur dan cuti bersama'],
             'hari_libur.update' => ['module' => 'hari_libur', 'description' => 'Mengubah hari libur dan cuti bersama'],
             'hari_libur.delete' => ['module' => 'hari_libur', 'description' => 'Menghapus hari libur dan cuti bersama'],
+            'reference_tables.manage' => ['module' => 'reference_tables', 'description' => 'Mengelola data referensi SIMPEG'],
             'audit_logs.read' => ['module' => 'audit_logs', 'description' => 'Melihat audit log sistem'],
             'notifications.read' => ['module' => 'notifications', 'description' => 'Melihat notifikasi milik sendiri'],
             'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],

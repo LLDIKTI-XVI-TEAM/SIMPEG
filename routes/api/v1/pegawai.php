@@ -16,7 +16,7 @@ $disableEmployeeApiAuth = app()->environment('local')
 
 $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []
-    : ['web', 'keycloak.auth', 'role:super_admin,admin_kepegawaian,pimpinan'];
+    : ['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan'];
 $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
     ? []
     : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
