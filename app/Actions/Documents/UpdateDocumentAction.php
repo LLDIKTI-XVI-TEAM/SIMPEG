@@ -127,8 +127,9 @@ class UpdateDocumentAction
         ]);
 
         // Sinkronkan file_ijazah pada EducationHistory yang masih merujuk path file lama.
-        // Kategori ijazah memakai path file (bukan nomor SK) sebagai satu-satunya identifier.
-        if ($oldCategory === 'ijazah') {
+        // Hanya dilakukan selama kategori dokumen tetap ijazah; jangan menautkan berkas
+        // non-ijazah (ktp_kk/lainnya) ke riwayat pendidikan sebagai ijazah.
+        if ($oldCategory === 'ijazah' && $document->jenis_dokumen === 'ijazah') {
             EducationHistory::query()
                 ->where('employee_id', $document->employee_id)
                 ->where('file_ijazah', $oldFilePath)

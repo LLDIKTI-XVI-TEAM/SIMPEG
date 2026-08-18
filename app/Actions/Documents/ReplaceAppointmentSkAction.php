@@ -90,38 +90,10 @@ class ReplaceAppointmentSkAction
                     );
                 }
 
-                // Rekonsiliasi ke appointment kanonis setelah TMT pengganti berubah: koreksi
-                // TMT dapat membuat baris lain menjadi kanonis menurut aturan status dokumen.
-                // Dokumen arsip dan jenis_pegawai harus mengikuti baris yang benar-benar aktif
-                // agar snapshot pegawai, dokumen, dan status kelengkapan tidak saling bertentangan.
-                $canonicalAppointment = $employee->appointments()
-                    ->orderByDesc('tmt_pengangkatan')
-                    ->orderByDesc('created_at')
-                    ->orderByDesc('id')
-                    ->first();
-
-                if ($canonicalAppointment && $canonicalAppointment->isNot($appointment)) {
-                    // SK baru adalah milik appointment kanonis; pindahkan referensi file dan
-                    // kembalikan baris yang sedang diedit (kini non-kanonis) ke file sebelumnya,
-                    // lalu lanjutkan pemrosesan terhadap baris kanonis yang sesungguhnya.
-                    $revertedFile = $oldFilePath;
-                    $canonicalChanges = ['file_sk' => $newPath];
-                    $canonicalAppointment->update($canonicalChanges);
-                    AuditService::logOrFail('UPDATE', 'Appointment', $canonicalAppointment->id, null, $canonicalChanges, $request);
-
-                    $appointment->update(['file_sk' => $revertedFile]);
-                    AuditService::logOrFail(
-                        'UPDATE',
-                        'Appointment',
-                        $appointment->id,
-                        ['file_sk' => $newPath],
-                        ['file_sk' => $revertedFile],
-                        $request,
-                    );
-
-                    $appointment = $canonicalAppointment;
-                }
-
+                // Berkas SK baru tidak dipindah-pindahkan ke appointment lain: file selalu
+                // terkait dengan record yang metadata SK-nya (jenis/no/tanggal) berasal dari
+                // unggahan ini. Koreksi TMT yang merubah urutan kanonisitas dibiarkan apa
+                // adanya; pemilihan baris aktif adalah tanggung jawab status kelengkapan.
                 [$document, $oldDocumentPath] = $this->replaceDocument($employee, $appointment, $oldFilePath, $newPath);
 
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [

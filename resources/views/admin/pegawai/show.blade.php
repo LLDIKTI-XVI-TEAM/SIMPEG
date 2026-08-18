@@ -246,6 +246,14 @@
 
         // ===== Tambah riwayat SK baru dari tab Dokumen & SK =====
         resetSkTypeFields() {
+            // Bersihkan juga metadata bersama dan file agar perpindahan kategori tidak
+            // membawa nomor/tanggal/berkas dari pengisian sebelumnya ke riwayat baru.
+            this.newSk.no_sk = '';
+            this.newSk.tanggal_sk = '';
+            this.newSk.file_sk = null;
+            const skFileInput = document.getElementById('file_sk_tab');
+            if (skFileInput) skFileInput.value = '';
+
             this.newSk.golongan_id = '';
             this.newSk.tmt_pangkat = '';
             this.newSk.jabatan_id = '';

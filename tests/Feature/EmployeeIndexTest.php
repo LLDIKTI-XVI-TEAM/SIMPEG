@@ -206,21 +206,21 @@ class EmployeeIndexTest extends TestCase
         $this->assertEmployeeDocumentCompleteness($user, $employee, 'belum_ada');
     }
 
-    public function test_non_pns_employee_is_tidak_wajib_per_k_dok_02(): void
+    public function test_non_pns_employee_is_evaluated_against_four_sk_not_waived(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
         $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
 
-        // K-DOK-02: matriks 4 SK wajib hanya berlaku untuk PNS. CPNS/PPPK/jenis
-        // lain berstatus tidak_wajib dengan total_wajib = 0 dan is_lengkap = true.
-        $this->assertEmployeeDocumentCompleteness($user, $employee, 'tidak_wajib');
+        // Semua pegawai (termasuk CPNS/PPPK) dinilai terhadap empat SK wajib;
+        // tanpa data SK, pegawai non-PNS berstatus belum_ada (bukan tidak_wajib).
+        $this->assertEmployeeDocumentCompleteness($user, $employee, 'belum_ada');
         $this->actingAs($user)
             ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
             ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'tidak_wajib')
-            ->assertJsonPath('document_status.total_wajib', 0)
-            ->assertJsonPath('document_status.is_lengkap', true);
+            ->assertJsonPath('document_status.status_kelengkapan', 'belum_ada')
+            ->assertJsonPath('document_status.total_wajib', 4)
+            ->assertJsonPath('document_status.is_lengkap', false);
     }
 
     public function test_employee_index_renders_shared_document_status_mapping_for_admin_and_read_only(): void

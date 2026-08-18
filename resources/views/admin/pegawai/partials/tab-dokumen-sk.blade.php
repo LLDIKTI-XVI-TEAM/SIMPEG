@@ -276,6 +276,7 @@
                             </a>
                             @if($canManageDocuments)
                             <button type="button"
+                                x-show="['sk_pengangkatan','sk_pangkat','sk_jabatan','sk_kgb'].includes(doc.jenis_dokumen)"
                                 @click="openSkRiwayatForm(doc.jenis_dokumen)"
                                 class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
                                 title="Tambah / Ganti Berkas SK (riwayat baru, append-only)">
