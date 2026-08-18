@@ -6,12 +6,10 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
@@ -49,9 +47,7 @@ class HandleKeycloakCallbackAction
         $existingUser = User::where('keycloak_id', $keycloakId)->first();
 
         if ($existingUser) {
-            $verifiedEmailForExisting = $this->verifiedEmailClaim($keycloakUser);
-
-            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request, $verifiedEmailForExisting);
+            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request);
         }
 
         // Pegawai asli wajib cocok ke data employees; akun tanpa email hanya boleh lewat whitelist user lokal.
@@ -105,14 +101,13 @@ class HandleKeycloakCallbackAction
             ]);
 
             if (! $user->exists) {
-                // K-MTG-02 (addendum 15 Agu 2026): mapping pegawai valid + role internal belum
-                // diinisialisasi → default SSO Pegawai menginisialisasi role pegawai. Bootstrap
-                // pertama tetap super_admin agar sistem dapat dikonfigurasi sebelum ada admin.
+                // Mapping pegawai valid + role internal belum ada → default SSO Pegawai berperan
+                // sebagai Pegawai; akun pertama sistem diberi akses super_admin agar dapat dikonfigurasi.
                 $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
                 $user->password = Str::random(48);
             }
 
-            return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, $matchedEmail);
+            return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
         }
 
         // Akun development seperti demo-klabat harus sudah dibuat di SIMPEG, tidak dibuat otomatis dari Keycloak.
@@ -129,7 +124,7 @@ class HandleKeycloakCallbackAction
         return $this->loginMappedUser($devUser, $keycloakId, $username, $keycloakUser->getName(), $request);
     }
 
-    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request, ?string $verifiedEmail = null): RedirectResponse
+    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse
     {
         $user->fill([
             'name' => $name ?: $user->name,
@@ -138,73 +133,25 @@ class HandleKeycloakCallbackAction
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        // K-MTG-02 (addendum 15 Agu 2026): user lama dari perilaku pra-addendum — role internal
-        // kosong padahal mapping pegawai valid — diinisialisasi menjadi pegawai saat login.
-        // Role yang sudah ditetapkan admin tidak pernah dioverwrite.
+        // Role internal kosong pada mapping pegawai valid diinisialisasi sebagai Pegawai;
+        // role yang sudah ditetapkan tidak pernah dioverwrite.
         if ($user->employee_id !== null && $user->role === null) {
             $user->role = 'pegawai';
         }
 
-        $user->save();
+        // Inisialisasi role adalah mutasi penting: disimpan bersama jejak auditnya dalam satu
+        // transaksi (old role null → role baru) agar perubahan mapping/role selalu punya evidence.
+        $rawPreviousRole = $user->getRawOriginal('role');
+        $previousRole = is_string($rawPreviousRole) ? $rawPreviousRole : null;
+        $roleInitialized = $previousRole === null && $user->role !== null;
 
-        // Sync email Keycloak yang sudah diverifikasi ke kolom email_pribadi pegawai,
-        // agar email yang dipakai SSO selalu konsisten dengan data kepegawaian.
-        if ($verifiedEmail && $user->employee_id) {
-            // Pegawai nonaktif tetap pemilik email_pribadi-nya; temukan juga record yang dihapus
-            // agar tidak menyinkronkan email ke pegawai lain saat index unik masih mencadangkannya.
-            $employee = Employee::withTrashed()->find($user->employee_id);
-
-            // Nilai lama disimpan apa adanya (nullable): pegawai legacy bisa punya email_pribadi
-            // NULL, dan jejak audit harus merekam null, bukan string kosong (follow-up review PR #199).
-            $rawPreviousEmail = $employee?->getRawOriginal('email_pribadi');
-            $previousEmail = is_string($rawPreviousEmail) ? $rawPreviousEmail : null;
-
-            if ($employee
-                && strtolower(trim((string) $previousEmail)) !== $verifiedEmail) {
-                if ($this->emailIsOwnedByAnotherEmployee($employee, $verifiedEmail)) {
-                    // Jalur konflik paling umum terjadi SEBELUM penulisan: email sudah dimiliki
-                    // pegawai lain (termasuk yang dihapus sementara). Login tetap berhasil, tetapi
-                    // konflik dicatat ke audit + log agar Admin punya jejak remediasi.
-                    Log::warning('Sinkronisasi email canonical ditolak karena email sudah dimiliki pegawai lain', [
-                        'employee_id' => $employee->id,
-                        'user_id' => $user->id,
-                        'attempted_email' => $verifiedEmail,
-                    ]);
-                    $this->auditEmailSyncConflict($user, $employee, $previousEmail, $verifiedEmail, $request);
-                } else {
-                    try {
-                        // Penulisan diisolasi dalam transaksi (nested → savepoint di PostgreSQL) agar
-                        // pelanggaran index unik tidak menghentikan transaksi luar yang sedang berjalan
-                        // (25P02 current transaction is aborted). Mutasi + audit ditulis atomik lewat
-                        // logAsOrFail: email canonical tidak berubah tanpa jejak EMAIL_SYNCED.
-                        DB::transaction(function () use ($user, $employee, $previousEmail, $verifiedEmail, $request): void {
-                            $employee->email_pribadi = $verifiedEmail;
-                            $employee->saveQuietly();
-
-                            // Tindak lanjut review PR #199: mutasi persisted email canonical dicatat ke
-                            // audit dengan old/new value + aktor SSO. Tidak menyimpan raw claim/token Keycloak.
-                            $this->auditEmailSync($user, $employee, $previousEmail, $verifiedEmail, $request);
-                        });
-                    } catch (QueryException $exception) {
-                        // Dua callback untuk pegawai berbeda bisa membawa email yang sama secara bersamaan;
-                        // keduanya lolos pemeriksaan kepemilikan sebelum salah satu menulis. Penulisan kedua
-                        // melanggar index unik case-insensitive employees_email_pribadi_unique.
-                        if (! $this->isEmailPribadiConflict($exception)) {
-                            throw $exception;
-                        }
-
-                        // Setelah unit penulisan di-rollback ke savepoint, transaksi kembali sehat;
-                        // konflik dicatat ke audit + log agar Admin melihat email canonical yang belum
-                        // terselesaikan (follow-up review PR #199).
-                        Log::warning('Sinkronisasi email canonical gagal karena benturan index unik employees_email_pribadi_unique', [
-                            'employee_id' => $employee->id,
-                            'user_id' => $user->id,
-                            'attempted_email' => $verifiedEmail,
-                        ]);
-                        $this->auditEmailSyncConflict($user, $employee, $previousEmail, $verifiedEmail, $request);
-                    }
-                }
-            }
+        if ($roleInitialized) {
+            DB::transaction(function () use ($user, $previousRole, $request): void {
+                $user->save();
+                $this->auditRoleInitialization($user, $previousRole, $request);
+            });
+        } else {
+            $user->save();
         }
 
         Auth::login($user);
@@ -242,84 +189,24 @@ class HandleKeycloakCallbackAction
         return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
     }
 
-    private function emailIsOwnedByAnotherEmployee(Employee $employee, string $email): bool
-    {
-        return Employee::withTrashed()
-            ->whereKeyNot($employee->id)
-            ->where(function ($query) use ($email): void {
-                $query
-                    ->whereRaw('lower(email_pribadi) = ?', [$email])
-                    ->orWhereRaw('lower(email) = ?', [$email]);
-            })
-            ->exists();
-    }
-
     /**
-     * Mencatat perubahan email canonical (email_pribadi) hasil sinkronisasi Keycloak ke audit.
+     * Mencatat inisialisasi role internal hasil mapping SSO (role kosong → role baru).
      *
-     * Fail-closed (follow-up review PR #199): kegagalan menulis audit menggagalkan operasi lewat
-     * logAsOrFail, sehingga email canonical tidak pernah berubah tanpa jejak EMAIL_SYNCED. Nilai
-     * lama nullable (pegawai legacy bisa punya email_pribadi NULL); payload memakai kunci
-     * non-sensitif dan tidak pernah menyimpan raw claim/token Keycloak.
+     * Fail-closed: kegagalan menulis audit membatalkan perubahan role. Payload memuat old/new
+     * role, pegawai yang dipetakan, dan sumber perubahan yang aman (tanpa claim mentah).
      */
-    private function auditEmailSync(User $user, Employee $employee, ?string $previousEmail, string $verifiedEmail, Request $request): void
+    private function auditRoleInitialization(User $user, ?string $previousRole, Request $request): void
     {
         AuditService::logAsOrFail(
             $user->id,
             $user->name,
-            'EMAIL_SYNCED',
-            'Employee',
-            $employee->id,
-            ['email_pribadi' => $previousEmail],
-            ['email_pribadi' => $verifiedEmail, 'source' => 'keycloak'],
-            $request,
-        );
-    }
-
-    /**
-     * Mencatat konflik email canonical yang tidak dapat diselesaikan, baik karena benturan index
-     * unik saat penulisan maupun karena email sudah dimiliki pegawai lain sebelum penulisan.
-     *
-     * Login tetap berhasil (keputusan produk PR #199); email pegawai tidak berubah. Fail-closed:
-     * kegagalan menulis audit ikut menggagalkan operasi agar konflik tidak menguap tanpa jejak.
-     */
-    private function auditEmailSyncConflict(User $user, Employee $employee, ?string $previousEmail, string $attemptedEmail, Request $request): void
-    {
-        AuditService::logAsOrFail(
+            'UPDATE',
+            'User',
             $user->id,
-            $user->name,
-            'EMAIL_CONFLICT',
-            'Employee',
-            $employee->id,
-            ['email_pribadi' => $previousEmail],
-            ['email_pribadi' => $previousEmail, 'attempted_email' => $attemptedEmail, 'source' => 'keycloak'],
+            ['role' => $previousRole],
+            ['role' => $user->role, 'employee_id' => $user->employee_id, 'source' => 'sso_mapping'],
             $request,
         );
-    }
-
-    /**
-     * Memastikan unique violation berasal dari index email_pribadi (functional index
-     * case-insensitive), bukan constraint unik lain pada tabel pegawai.
-     *
-     * Deteksi portabel: PostgreSQL memakai SQLSTATE 23505 (unique_violation) dan SQLite
-     * memetakan semua pelanggaran integritas ke 23000 sehingga wajib menegaskan email_pribadi.
-     */
-    private function isEmailPribadiConflict(QueryException $exception): bool
-    {
-        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
-        $driverDiagnostic = (string) ($exception->errorInfo[2] ?? '');
-
-        if ($sqlState === '23505') {
-            preg_match('/unique constraint ["\']([^"\']+)["\']/i', $driverDiagnostic, $matches);
-
-            return ($matches[1] ?? null) === 'employees_email_pribadi_unique';
-        }
-
-        return $sqlState === '23000'
-            && preg_match(
-                '/unique constraint failed:\s*(?:employees\.email_pribadi\b|index ["\']employees_email_pribadi_unique["\'])/i',
-                $driverDiagnostic,
-            ) === 1;
     }
 
     /**

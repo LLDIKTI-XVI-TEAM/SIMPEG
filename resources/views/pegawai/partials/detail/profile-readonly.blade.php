@@ -151,7 +151,7 @@
                     Status Kepegawaian
                 </h3>
                 @if($isAdminSurface && $employee->statusHistories && $employee->statusHistories->count() > 0)
-                    <button type="button" @click="showRiwayatStatus = true" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-white px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 shadow-sm cursor-pointer font-sans">
+                    <button type="button" @click="showRiwayatStatus = true" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-surface px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/5 shadow-sm cursor-pointer font-sans">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>

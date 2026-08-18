@@ -2155,32 +2155,16 @@
     </div>
 
     {{-- Modal: Riwayat Perubahan Status --}}
-    <div
-        x-show="showRiwayatStatus"
-        x-transition.opacity
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-        style="display: none;"
-        @keydown.escape.window="showRiwayatStatus = false"
+    <x-ui.modal
+        show="showRiwayatStatus"
+        title="Riwayat Perubahan Status Kepegawaian"
+        closeAction="showRiwayatStatus = false"
+        maxWidth="4xl"
+        bodyClass="p-6"
     >
-        <div
-            @click.outside="showRiwayatStatus = false"
-            class="w-full max-w-5xl rounded-xl bg-surface shadow-2xl overflow-hidden"
-        >
-            {{-- Header --}}
-            <div class="flex items-center justify-between border-b border-border bg-soft/50 px-6 py-4">
-                <h3 class="text-base font-bold text-ink font-sans">Riwayat Perubahan Status Kepegawaian</h3>
-                <button type="button" @click="showRiwayatStatus = false" class="text-muted hover:text-ink transition cursor-pointer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            {{-- Content: Grid 2 Kolom dengan Scroll --}}
-            <div class="px-6 py-5">
-                @if($p->statusHistories && $p->statusHistories->count() > 0)
-                <div class="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-2">
-                    @foreach($p->statusHistories->sortByDesc('tanggal_efektif') as $history)
+        @if($p->statusHistories && $p->statusHistories->count() > 0)
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2">
+                @foreach($p->statusHistories->sortByDesc('tanggal_efektif') as $history)
                     <div class="rounded-lg border {{ $history->is_latest ? 'border-primary bg-primary/5' : 'border-border bg-soft/30' }} p-4">
                         <div class="space-y-2">
                             <div class="flex items-center gap-2">
@@ -2213,24 +2197,21 @@
                             </div>
                         </div>
                     </div>
-                    @endforeach
-                </div>
-                @else
-                <div class="rounded-lg border border-border bg-soft/30 p-8 text-center">
-                    <p class="text-sm text-muted font-sans">Belum ada riwayat perubahan status kepegawaian.</p>
-                </div>
-                @endif
+                @endforeach
             </div>
+        @else
+            <div class="rounded-lg border border-border bg-soft/30 p-8 text-center">
+                <p class="text-sm text-muted font-sans">Belum ada riwayat perubahan status kepegawaian.</p>
+            </div>
+        @endif
 
-            {{-- Footer --}}
-            <div class="flex justify-end border-t border-border bg-soft/50 px-6 py-4">
-                <button type="button" @click="showRiwayatStatus = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer">
-                    Tutup
-                </button>
-            </div>
-        </div>
-    </div>
+        <x-slot name="footer">
+            <button type="button" @click="showRiwayatStatus = false"
+                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
+                Tutup
+            </button>
+        </x-slot>
+    </x-ui.modal>
 
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
