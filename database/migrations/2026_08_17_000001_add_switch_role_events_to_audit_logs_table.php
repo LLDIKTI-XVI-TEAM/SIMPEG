@@ -92,38 +92,47 @@ return new class extends Migration
             return;
         }
 
-        // Rebuild tabel hanya didukung pada SQLite. Driver lain (MySQL/MariaDB/SQL Server)
-        // tidak menjalankan rebuild gaya ini; dijaga sebagai no-op yang disengaja karena
-        // sintaks di bawah tidak portabel dan aplikasi menyasar PostgreSQL + SQLite (test).
-        if (DB::getDriverName() !== 'sqlite') {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite: rebuild tabel karena tidak mendukung ALTER CHECK inline.
+            $quotedEvents = collect($this->eventsWithSwitchRole)
+                ->map(fn (string $event): string => "'{$event}'")->join(', ');
+
+            DB::statement('ALTER TABLE audit_logs RENAME TO audit_logs_old');
+            DB::statement("CREATE TABLE audit_logs (
+                id varchar primary key not null,
+                user_id varchar,
+                user_name varchar,
+                event varchar not null check (event in ({$quotedEvents})),
+                auditable_type varchar not null,
+                auditable_id varchar,
+                old_values text,
+                new_values text,
+                ip_address varchar,
+                user_agent varchar,
+                created_at datetime default CURRENT_TIMESTAMP not null
+            )");
+            DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
+            DB::statement('DROP TABLE audit_logs_old');
+            DB::statement('CREATE INDEX audit_logs_event_index ON audit_logs (event)');
+            DB::statement('CREATE INDEX audit_logs_user_id_index ON audit_logs (user_id)');
+            DB::statement('CREATE INDEX audit_logs_auditable_type_index ON audit_logs (auditable_type)');
+            DB::statement('CREATE INDEX audit_logs_created_at_index ON audit_logs (created_at)');
+            DB::statement('CREATE INDEX audit_logs_user_name_index ON audit_logs (user_name)');
+
             return;
         }
 
-        // SQLite: rebuild tabel karena tidak mendukung ALTER CHECK inline.
-        $quotedEvents = collect($this->eventsWithSwitchRole)
-            ->map(fn (string $event): string => "'{$event}'")->join(', ');
+        // MySQL/MariaDB memakai kolom ENUM (bukan CHECK seperti PostgreSQL, bukan rebuild
+        // seperti SQLite) sehingga kolom event harus diperluas agar memuat event baru;
+        // tanpa ini insert SWITCH_ROLE/REVERT_ROLE ditolak karena enum belum memuatnya
+        // dan koneksi memakai strict mode. Driver lain tanpa ENUM portabel (mis. SQL
+        // Server) sengaja dilewati sebagai no-op.
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            $quotedEvents = collect($this->eventsWithSwitchRole)
+                ->map(fn (string $event): string => "'{$event}'")->join(', ');
 
-        DB::statement('ALTER TABLE audit_logs RENAME TO audit_logs_old');
-        DB::statement("CREATE TABLE audit_logs (
-            id varchar primary key not null,
-            user_id varchar,
-            user_name varchar,
-            event varchar not null check (event in ({$quotedEvents})),
-            auditable_type varchar not null,
-            auditable_id varchar,
-            old_values text,
-            new_values text,
-            ip_address varchar,
-            user_agent varchar,
-            created_at datetime default CURRENT_TIMESTAMP not null
-        )");
-        DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
-        DB::statement('DROP TABLE audit_logs_old');
-        DB::statement('CREATE INDEX audit_logs_event_index ON audit_logs (event)');
-        DB::statement('CREATE INDEX audit_logs_user_id_index ON audit_logs (user_id)');
-        DB::statement('CREATE INDEX audit_logs_auditable_type_index ON audit_logs (auditable_type)');
-        DB::statement('CREATE INDEX audit_logs_created_at_index ON audit_logs (created_at)');
-        DB::statement('CREATE INDEX audit_logs_user_name_index ON audit_logs (user_name)');
+            DB::statement("ALTER TABLE audit_logs MODIFY COLUMN event ENUM({$quotedEvents}) NOT NULL");
+        }
     }
 
     public function down(): void
@@ -146,34 +155,41 @@ return new class extends Migration
             return;
         }
 
-        // Rebuild hanya untuk SQLite; driver lain no-op (aplikasi menyasar PostgreSQL + SQLite).
-        if (DB::getDriverName() !== 'sqlite') {
+        if (DB::getDriverName() === 'sqlite') {
+            $quotedEvents = collect($this->eventsWithoutSwitchRole)
+                ->map(fn (string $event): string => "'{$event}'")->join(', ');
+
+            DB::statement('ALTER TABLE audit_logs RENAME TO audit_logs_old');
+            DB::statement("CREATE TABLE audit_logs (
+                id varchar primary key not null,
+                user_id varchar,
+                user_name varchar,
+                event varchar not null check (event in ({$quotedEvents})),
+                auditable_type varchar not null,
+                auditable_id varchar,
+                old_values text,
+                new_values text,
+                ip_address varchar,
+                user_agent varchar,
+                created_at datetime default CURRENT_TIMESTAMP not null
+            )");
+            DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
+            DB::statement('DROP TABLE audit_logs_old');
+            DB::statement('CREATE INDEX audit_logs_event_index ON audit_logs (event)');
+            DB::statement('CREATE INDEX audit_logs_user_id_index ON audit_logs (user_id)');
+            DB::statement('CREATE INDEX audit_logs_auditable_type_index ON audit_logs (auditable_type)');
+            DB::statement('CREATE INDEX audit_logs_created_at_index ON audit_logs (created_at)');
+            DB::statement('CREATE INDEX audit_logs_user_name_index ON audit_logs (user_name)');
+
             return;
         }
 
-        $quotedEvents = collect($this->eventsWithoutSwitchRole)
-            ->map(fn (string $event): string => "'{$event}'")->join(', ');
+        // MySQL/MariaDB: kembalikan kolom ENUM tanpa event switch/revert (rollback).
+        if (in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
+            $quotedEvents = collect($this->eventsWithoutSwitchRole)
+                ->map(fn (string $event): string => "'{$event}'")->join(', ');
 
-        DB::statement('ALTER TABLE audit_logs RENAME TO audit_logs_old');
-        DB::statement("CREATE TABLE audit_logs (
-            id varchar primary key not null,
-            user_id varchar,
-            user_name varchar,
-            event varchar not null check (event in ({$quotedEvents})),
-            auditable_type varchar not null,
-            auditable_id varchar,
-            old_values text,
-            new_values text,
-            ip_address varchar,
-            user_agent varchar,
-            created_at datetime default CURRENT_TIMESTAMP not null
-        )");
-        DB::statement('INSERT INTO audit_logs SELECT * FROM audit_logs_old');
-        DB::statement('DROP TABLE audit_logs_old');
-        DB::statement('CREATE INDEX audit_logs_event_index ON audit_logs (event)');
-        DB::statement('CREATE INDEX audit_logs_user_id_index ON audit_logs (user_id)');
-        DB::statement('CREATE INDEX audit_logs_auditable_type_index ON audit_logs (auditable_type)');
-        DB::statement('CREATE INDEX audit_logs_created_at_index ON audit_logs (created_at)');
-        DB::statement('CREATE INDEX audit_logs_user_name_index ON audit_logs (user_name)');
+            DB::statement("ALTER TABLE audit_logs MODIFY COLUMN event ENUM({$quotedEvents}) NOT NULL");
+        }
     }
 };
