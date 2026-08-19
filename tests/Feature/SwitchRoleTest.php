@@ -710,4 +710,29 @@ class SwitchRoleTest extends TestCase
         $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
         $this->assertEquals('admin_kepegawaian', $audit->new_values['_effective_role'] ?? null);
     }
+
+    /** Submenu switch disembunyikan saat simulasi aktif agar UI tidak menyesatkan; revert tetap tampil. */
+    public function test_switch_menu_hidden_during_active_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        // Tanpa simulasi: Super Admin melihat submenu "Simulasi Role" + aksi switch.
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertSee('Simulasi Role')
+            ->assertSee('Switch ke Pegawai');
+
+        // Aktifkan simulasi role pegawai: role efektif menurun sehingga submenu switch
+        // tidak lagi dirender (guard eksplisit + permission efektif), hanya revert yang tampil.
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pegawai']);
+
+        $user->refresh();
+
+        $response = $this->actingAs($user)->get(route('cuti'));
+        $response->assertOk();
+        $response->assertDontSee('Simulasi Role');
+        $response->assertDontSee('Switch ke');
+        $response->assertSee('Kembalikan Role Asli');
+    }
 }

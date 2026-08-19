@@ -122,6 +122,12 @@ class User extends Authenticatable
      * Menentukan apakah user dapat switch ke target_role yang dipilih.
      * Switch role hanya diperbolehkan ke role dengan level hierarki lebih rendah.
      * Hierarki: super_admin (5) > admin_kepegawaian (4) > pimpinan (3) > kepala_bagian (2) > pegawai (1).
+     *
+     * Hierarki ketat ini adalah implementasi teknis dari matriks role tujuan Fase 1:
+     * Super Admin hanya dapat beralih ke Admin Kepegawaian, Pimpinan, Kepala Bagian, atau Pegawai,
+     * dan switch ke role yang sama atau role di luar matriks ditolak fail-closed. Karena otorisasi
+     * request sudah mengunci origin super_admin + permission khusus, hierarki lebih rendah selalu
+     * berimpit dengan allowlist matriks; batas hierarki di sini tidak membuka target di luar matriks.
      */
     public function canSwitchToRole(string $targetRole): bool
     {

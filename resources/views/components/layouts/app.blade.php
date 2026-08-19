@@ -546,7 +546,10 @@
                             {{-- Switch Role Menu (Hanya tampil jika user memiliki effective permission users.switch_role atau sedang dalam mode simulasi untuk revert) --}}
                             @if(auth()->check() && (auth()->user()->hasPermission('users.switch_role') || auth()->user()->temporary_role))
                                 <div class="border-t border-border/60 my-1 pt-1">
-                                    @if(auth()->user()->hasPermission('users.switch_role'))
+                                    {{-- Submenu switch hanya untuk user yang TIDAK sedang dalam simulasi: selama simulasi
+                                         role efektif sudah menurun, permission switch_role tidak dimiliki role tujuan dan
+                                         backend menolak switch beruntun; guard eksplisit ini mencegah UI yang menyesatkan. --}}
+                                    @if(auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
                                         <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
                                             Simulasi Role
                                         </div>
