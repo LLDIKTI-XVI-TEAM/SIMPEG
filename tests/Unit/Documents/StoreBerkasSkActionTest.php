@@ -337,4 +337,73 @@ class StoreBerkasSkActionTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->assertMissing($documentPath);
         Storage::disk(Document::STORAGE_DISK)->assertExists((string) $document->file_path);
     }
+
+    /**
+     * Setelah koreksi TMT mengubah urutan kanonis appointment, dokumen arsip dan
+     * jenis_pegawai harus mengikuti appointment kanonis FINAL (bukan appointment yang
+     * diunggah) agar snapshot, dokumen aktif, dan status kelengkapan berasal dari
+     * satu sumber. Berkas SK tetap terkait record yang metadata-nya berasal dari unggahan.
+     */
+    public function test_replace_pengangkatan_re_resolves_canonical_appointment_after_tmt_change(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
+        $employee->update(['jenis_pegawai_id' => $pns->id]);
+        $lama = $employee->appointments()->create([
+            'jenis_pengangkatan' => 'PPPK',
+            'tmt_pengangkatan' => '2023-01-01',
+            'no_sk' => 'SK/LAMA/2023',
+            'tanggal_sk' => '2022-12-15',
+            'file_sk' => 'appointments/lama.pdf',
+        ]);
+        $baru = $employee->appointments()->create([
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2024-06-01',
+            'no_sk' => 'SK/BARU/2024',
+            'tanggal_sk' => '2024-05-20',
+            'file_sk' => null,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put('appointments/lama.pdf', 'lama');
+
+        // Replace appointment BARU (2024) dengan TMT dikoreksi ke 2022 → appointment LAMA (2023)
+        // menjadi kanonis menurut aturan TMT (terbaru = 2023).
+        $response = $this->action->execute($employee, [
+            'kategori_dokumen' => 'sk_pengangkatan',
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2022-07-01',
+            'no_sk' => 'SK/KOREKSI/2022',
+            'tanggal_sk' => '2022-06-20',
+            'file_sk' => UploadedFile::fake()->create('sk-koreksi.pdf', 100, 'application/pdf'),
+        ], new Request);
+
+        $this->assertInstanceOf(Document::class, $response);
+        $this->assertSame(2, $employee->appointments()->count());
+
+        // Berkas SK baru tetap di appointment BARU (yang metadata-nya diunggah).
+        $baruFresh = $baru->fresh();
+        $this->assertSame('SK/KOREKSI/2022', $baruFresh->no_sk);
+        $this->assertSame('2022-07-01', $baruFresh->tmt_pengangkatan?->toDateString());
+        $this->assertNotNull($baruFresh->file_sk);
+
+        // Appointment LAMA (2023) kini kanonis; arsip mengikuti kanonis final.
+        $kanonis = $employee->appointments()
+            ->orderByDesc('tmt_pengangkatan')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+        $this->assertSame($lama->id, $kanonis->id);
+
+        $arsip = Document::query()
+            ->where('employee_id', $employee->id)
+            ->where('jenis_dokumen', 'sk_pengangkatan')
+            ->orderByDesc('tanggal_dokumen')
+            ->orderByDesc('created_at')
+            ->first();
+        $this->assertNotNull($arsip);
+
+        // jenis_pegawai mengikuti appointment kanonis FINAL (lama = PPPK).
+        $this->assertSame('PPPK', strtoupper((string) $employee->refresh()->jenisPegawai?->nama));
+    }
 }

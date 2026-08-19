@@ -91,14 +91,22 @@ class ReplaceAppointmentSkAction
                     );
                 }
 
-                // Berkas SK baru tidak dipindah-pindahkan ke appointment lain: file selalu
-                // terkait dengan record yang metadata SK-nya (jenis/no/tanggal) berasal dari
-                // unggahan ini. Koreksi TMT yang merubah urutan kanonisitas dibiarkan apa
-                // adanya; pemilihan baris aktif adalah tanggung jawab status kelengkapan.
-                [$document, $oldDocumentPath] = $this->replaceDocument($employee, $appointment, $oldFilePath, $newPath);
+                // Berkas SK baru tidak dipindahkan ke appointment lain: file tetap terkait
+                // dengan record yang metadata SK-nya (jenis/no/tanggal) berasal dari unggahan
+                // ini. Namun setelah koreksi TMT, appointment kanonis dapat berpindah; dokumen
+                // arsip dan jenis_pegawai harus mengikuti appointment kanonis FINAL agar
+                // snapshot, dokumen aktif, dan status kelengkapan berasal dari satu sumber.
+                $canonicalAppointment = $employee->appointments()
+                    ->orderByDesc('tmt_pengangkatan')
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->first();
+                $sourceAppointment = $canonicalAppointment ?? $appointment;
+
+                [$document, $oldDocumentPath] = $this->replaceDocument($employee, $sourceAppointment, $oldFilePath, $newPath);
 
                 $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [
-                    strtoupper((string) $appointment->jenis_pengangkatan),
+                    strtoupper((string) $sourceAppointment->jenis_pengangkatan),
                 ])->first();
                 if ($jenisPegawai) {
                     $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);

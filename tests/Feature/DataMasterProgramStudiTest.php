@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\EducationHistory;
 use App\Models\Employee;
+use App\Models\Permission;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,8 +47,8 @@ class DataMasterProgramStudiTest extends TestCase
 
     public function test_program_studi_mutation_is_restricted_to_super_admin_role(): void
     {
-        // Program Studi mengikuti pola referensi Data Master lain: hanya peran super_admin
-        // yang boleh memutasinya, tidak bergantung pada pivot permission database.
+        // Hanya Super Admin yang juga memiliki permission reference_tables.manage yang boleh
+        // memutasi Program Studi; role lain ditolak (US-8.5 AC-8 dual gate role + permission).
         $nonAdmin = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($nonAdmin)
@@ -55,6 +57,22 @@ class DataMasterProgramStudiTest extends TestCase
 
         $this->assertDatabaseCount('ref_program_studi', 0);
         $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_super_admin_without_reference_tables_manage_permission_is_denied(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $role = Role::where('name', 'super_admin')->firstOrFail();
+        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
+        $role->permissions()->detach($permission);
+
+        // Pencabutan permission tetap fail-closed: Super Admin tanpa reference_tables.manage
+        // tidak boleh memutasi Program Studi (US-8.5 AC-8).
+        $this->actingAs($user)
+            ->postWithCsrf(route('data-master.program-studi.store'), ['nama' => 'Teknik Informatika'])
+            ->assertForbidden();
+
+        $this->assertDatabaseCount('ref_program_studi', 0);
     }
 
     public function test_program_studi_used_by_employee_cannot_be_deleted(): void
