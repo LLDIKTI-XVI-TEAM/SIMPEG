@@ -736,7 +736,7 @@ class SwitchRoleTest extends TestCase
         $response->assertSee('Kembalikan Role Asli');
     }
 
-    /** Aktor fallback 'system' (bukan UUID) tidak boleh dikuerikan sebagai primary key (22P02 di PostgreSQL). */
+    /** Aktor fallback 'system' (bukan UUID) tidak boleh dikuerikan/disimpan sebagai uuid (22P02 di PostgreSQL). */
     public function test_audit_explicit_path_accepts_system_actor_without_uuid_lookup(): void
     {
         AuditService::logAsOrFail(
@@ -749,10 +749,11 @@ class SwitchRoleTest extends TestCase
             ['batch' => 'system-actor'],
         );
 
-        $this->assertDatabaseHas('audit_logs', [
-            'user_id' => 'system',
-            'event' => 'IMPORT',
-        ]);
+        // Nilai non-UUID dikoersi ke null pada kolom uuid; identitas aktor tersimpan via user_name.
+        $audit = AuditLog::where('event', 'IMPORT')->latest('created_at')->first();
+        $this->assertNotNull($audit);
+        $this->assertNull($audit->user_id);
+        $this->assertSame('System Queue', $audit->user_name);
     }
 
     /** Konteks simulasi yang dibekukan saat enqueue menang atas lookup user live saat audit ditulis. */

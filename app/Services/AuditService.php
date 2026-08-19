@@ -226,10 +226,18 @@ class AuditService
         //    tidak memiliki session terautentikasi padahal state temporary_role-nya persisten.
         //    Lookup hanya dilakukan bila $userId berbentuk UUID — nilai fallback seperti 'system'
         //    bukan UUID dan tidak boleh dikuerikan sebagai primary key (error 22P02 di PostgreSQL).
+        // Kolom audit_logs.user_id bertipe uuid di PostgreSQL; nilai fallback non-UUID seperti
+        // 'system' (dipakai jalur queue saat user_id null) tidak valid untuk penyimpanan maupun
+        // lookup primary key (error 22P02). Nilai non-UUID dikoersi ke null; identitas aktor
+        // sistem tetap terbaca lewat user_name (mis. "System Queue").
+        $storedUserId = filled($userId) && Str::isUuid($userId) ? $userId : null;
         $user = null;
 
-        if ($simulationContext === null && filled($userId) && Str::isUuid($userId)) {
-            $user = User::query()->find($userId);
+        // Prioritas konteks: $simulationContext eksplisit (dibekukan saat enqueue) dipakai apa
+        // adanya; selain itu aktor di-resolve dari $userId (bukan facade Auth) karena worker
+        // queue tidak memiliki session terautentikasi padahal state temporary_role-nya persisten.
+        if ($simulationContext === null && $storedUserId !== null) {
+            $user = User::query()->find($storedUserId);
         }
 
         if ($simulationContext !== null) {
@@ -249,7 +257,7 @@ class AuditService
         }
 
         return [
-            'user_id' => $userId,
+            'user_id' => $storedUserId,
             'user_name' => $userName,
             'event' => $event,
             'auditable_type' => $auditableType,
