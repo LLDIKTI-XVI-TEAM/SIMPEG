@@ -833,6 +833,7 @@ class PimpinanEmployeeDetailTest extends TestCase
                 'employee' => $employee,
                 'history' => $statusHistory,
             ]), false)
+            ->assertDontSee('Lihat Riwayat')
             ->assertDontSee('Toggle Kelayakan Satyalancana')
             ->assertDontSee('Simpan Satyalancana');
     }

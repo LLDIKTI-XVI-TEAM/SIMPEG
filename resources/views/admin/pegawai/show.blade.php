@@ -2153,7 +2153,6 @@
         </div>
     </div>
 
-
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
         <div class="space-y-4">

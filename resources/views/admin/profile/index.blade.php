@@ -265,12 +265,8 @@
                             <h3 class="text-xs font-bold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5">Kontak & Rumah</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                                 <div class="space-y-0.5">
-                                    <span class="font-semibold text-muted font-sans">Email Dinas</span>
-                                    <p class="text-ink font-sans">-</p>
-                                </div>
-                                <div class="space-y-0.5">
-                                    <span class="font-semibold text-muted font-sans">Email Pribadi</span>
-                                    <p class="text-ink font-sans">{{ $p->email ?? '-' }}</p>
+                                    <span class="font-semibold text-muted font-sans">Email</span>
+                                    <p class="text-ink font-sans">{{ $p->email_pribadi ?? '-' }}</p>
                                 </div>
                                 <div class="space-y-0.5">
                                     <span class="font-semibold text-muted font-sans">Nomor HP</span>
