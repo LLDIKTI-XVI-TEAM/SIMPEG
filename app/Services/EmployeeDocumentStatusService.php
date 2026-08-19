@@ -82,6 +82,35 @@ class EmployeeDocumentStatusService
      */
     public function summarize(Employee $employee): array
     {
+        // Matriks kelengkapan 4 SK wajib hanya berlaku untuk pegawai berjenis PNS;
+        // jenis lain (CPNS/PPPK/dll) berstatus tidak_wajib.
+        $isPns = strtolower((string) $employee->jenisPegawai?->nama) === 'pns';
+
+        if (! $isPns) {
+            return [
+                'status_kelengkapan' => 'tidak_wajib',
+                'is_lengkap' => true,
+                'total_wajib' => 0,
+                'tersedia_count' => 0,
+                'belum_ada_count' => 0,
+                'perlu_perbaikan_count' => 0,
+                'required_sks' => collect(self::REQUIRED_SK)
+                    ->map(fn (string $label, string $key): array => [
+                        'jenis' => $key,
+                        'label' => $label,
+                        'status' => 'tidak_wajib',
+                        'status_label' => 'Tidak Wajib',
+                        'file_path' => null,
+                        'file_url' => null,
+                        'nomor_sk' => null,
+                        'tanggal_sk' => null,
+                        'sources_count' => 0,
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
         // Riwayat dikirim dalam urutan kanonis: terbaru di depan. Evaluasi status
         // selalu mengacu pada riwayat paling mutakhir sehingga kerusakan pada
         // riwayat terbaru tidak tertutup oleh riwayat lama yang masih valid.

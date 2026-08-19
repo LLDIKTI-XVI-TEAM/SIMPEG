@@ -350,24 +350,23 @@ class EmployeeDocumentStatusServiceTest extends TestCase
     }
 
     /**
-     * Evaluasi kelengkapan SK berlaku untuk semua pegawai (termasuk CPNS/PPPK).
-     * Pegawai non-PNS tetap dinilai terhadap empat SK wajib, bukan serta-merta
-     * tidak_wajib; tanpa data SK statusnya belum_ada.
+     * Matriks kelengkapan 4 SK hanya berlaku untuk PNS; CPNS/PPPK/jenis lain
+     * berstatus tidak_wajib dengan total_wajib = 0 dan is_lengkap = true.
      */
-    public function test_non_pns_employee_is_still_evaluated_against_four_sk(): void
+    public function test_non_pns_employee_is_tidak_wajib(): void
     {
         $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
         $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
 
         $result = $this->service->summarize($employee->fresh());
 
-        $this->assertSame('belum_ada', $result['status_kelengkapan']);
-        $this->assertFalse($result['is_lengkap']);
-        $this->assertSame(4, $result['total_wajib']);
+        $this->assertSame('tidak_wajib', $result['status_kelengkapan']);
+        $this->assertTrue($result['is_lengkap']);
+        $this->assertSame(0, $result['total_wajib']);
         $this->assertSame(0, $result['tersedia_count']);
         $this->assertCount(4, $result['required_sks']);
         foreach ($result['required_sks'] as $sk) {
-            $this->assertSame('belum_ada', $sk['status']);
+            $this->assertSame('tidak_wajib', $sk['status']);
         }
     }
 
