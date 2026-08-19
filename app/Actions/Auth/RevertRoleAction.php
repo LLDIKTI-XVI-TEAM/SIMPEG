@@ -14,36 +14,40 @@ class RevertRoleAction
      */
     public function execute(User $user, Request $request): void
     {
-        // Jika tidak sedang dalam mode simulasi, tidak perlu lakukan apa-apa
-        if ($user->temporary_role === null) {
-            return;
-        }
+        // Serialisasikan revert terhadap row users agar dua request paralel tidak
+        // sama-sama membaca state sebelum revert dan menulis audit yang menduplikasi.
+        DB::transaction(function () use ($user, $request): void {
+            $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
-        $oldValues = [
-            'role' => $user->role,
-            'temporary_role' => $user->temporary_role,
-            'temporary_permission' => $user->temporary_permission,
-            'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
-            'temporary_role_switched_by' => $user->temporary_role_switched_by,
-        ];
+            // Jika tidak sedang dalam mode simulasi, tidak perlu lakukan apa-apa
+            if ($locked->temporary_role === null) {
+                return;
+            }
 
-        $user->forceFill([
-            'temporary_role' => null,
-            'temporary_permission' => null,
-            'temporary_role_started_at' => null,
-            'temporary_role_switched_by' => null,
-        ]);
+            $oldValues = [
+                'role' => $locked->role,
+                'temporary_role' => $locked->temporary_role,
+                'temporary_permission' => $locked->temporary_permission,
+                'temporary_role_started_at' => $locked->temporary_role_started_at?->toIso8601String(),
+                'temporary_role_switched_by' => $locked->temporary_role_switched_by,
+            ];
 
-        DB::transaction(function () use ($user, $oldValues, $request): void {
-            $user->save();
+            $locked->forceFill([
+                'temporary_role' => null,
+                'temporary_permission' => null,
+                'temporary_role_started_at' => null,
+                'temporary_role_switched_by' => null,
+            ]);
+
+            $locked->save();
 
             AuditService::logOrFail(
                 'REVERT_ROLE',
                 'User',
-                $user->id,
+                $locked->id,
                 $oldValues,
                 [
-                    'role' => $user->role,
+                    'role' => $locked->role,
                     'temporary_role' => null,
                     'temporary_permission' => null,
                     'temporary_role_started_at' => null,

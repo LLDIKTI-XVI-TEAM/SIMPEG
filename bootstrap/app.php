@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuditRoleSimulationUsage;
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
@@ -21,6 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,
             'session.timeout' => SessionTimeoutMessage::class,
+        ]);
+
+        // Catat pemakaian role sementara (simulasi) pada request baca agar jejak
+        // audit AC-6 (switch, penggunaan, revert) selalu lengkap.
+        $middleware->web(append: [
+            AuditRoleSimulationUsage::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

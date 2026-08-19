@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Auth\RevertRoleAction;
 use App\Actions\Auth\SwitchRoleAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\RevertRoleRequest;
 use App\Http\Requests\Auth\SwitchRoleRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 
 class SwitchRoleController extends Controller
 {
@@ -40,7 +40,7 @@ class SwitchRoleController extends Controller
     /**
      * Mengembalikan role pengguna ke role aslinya.
      */
-    public function revertRole(Request $request, RevertRoleAction $action): RedirectResponse
+    public function revertRole(RevertRoleRequest $request, RevertRoleAction $action): RedirectResponse
     {
         $user = $request->user();
 

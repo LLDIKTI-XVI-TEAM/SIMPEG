@@ -120,34 +120,30 @@ class User extends Authenticatable
 
     /**
      * Menentukan apakah user dapat switch ke target_role yang dipilih.
-     * Switch role hanya diperbolehkan ke role dengan level hierarki lebih rendah.
-     * Hierarki: super_admin (5) > admin_kepegawaian (4) > pimpinan (3) > kepala_bagian (2) > pegawai (1).
      *
-     * Hierarki ketat ini adalah implementasi teknis dari matriks role tujuan Fase 1:
-     * Super Admin hanya dapat beralih ke Admin Kepegawaian, Pimpinan, Kepala Bagian, atau Pegawai,
-     * dan switch ke role yang sama atau role di luar matriks ditolak fail-closed. Karena otorisasi
-     * request sudah mengunci origin super_admin + permission khusus, hierarki lebih rendah selalu
-     * berimpit dengan allowlist matriks; batas hierarki di sini tidak membuka target di luar matriks.
+     * Switch hanya diperbolehkan dari role asli super_admin menuju role tujuan yang diizinkan
+     * (Admin Kepegawaian, Pimpinan, Kepala Bagian, atau Pegawai). Target bukan allowlist atau
+     * switch ke role yang sama ditolak fail-closed. Allowlist eksplisit dipakai sebagai aturan
+     * domain (bukan perhitungan level numerik) agar batas target selalu jelas dan stabil.
      */
     public function canSwitchToRole(string $targetRole): bool
     {
-        // Tidak boleh switch ke role yang sama dengan role asli
+        // Switch ke role yang sama dengan role asli tidak pernah diizinkan.
         if ($targetRole === $this->role) {
             return false;
         }
 
-        $hierarchy = [
-            'super_admin' => 5,
-            'admin_kepegawaian' => 4,
-            'pimpinan' => 3,
-            'kepala_bagian' => 2,
-            'pegawai' => 1,
-        ];
+        // Hanya role asli super_admin yang boleh melakukan simulasi; invite asal role lain
+        // (miskonfigurasi) tidak boleh dianggap sebagai origin yang sah.
+        if ($this->role !== 'super_admin') {
+            return false;
+        }
 
-        $currentLevel = $hierarchy[$this->role] ?? 0;
-        $targetLevel = $hierarchy[$targetRole] ?? 0;
-
-        // Target harus ada di hierarki dan levelnya lebih rendah
-        return $targetLevel > 0 && $targetLevel < $currentLevel;
+        return in_array($targetRole, [
+            'admin_kepegawaian',
+            'pimpinan',
+            'kepala_bagian',
+            'pegawai',
+        ], true);
     }
 }

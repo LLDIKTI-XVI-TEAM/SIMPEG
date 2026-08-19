@@ -16,46 +16,49 @@ class SwitchRoleAction
      */
     public function execute(User $user, string $targetRole, Request $request, ?string $temporaryPermission = null): void
     {
-        // Validasi: tidak boleh switch ke role yang sama
-        if ($targetRole === $user->role) {
-            throw new \InvalidArgumentException('Tidak dapat switch ke role yang sama dengan role asli.');
-        }
+        // Serialisasikan transisi terhadap row users agar dua request paralel tidak
+        // sama-sama membaca state lama dan menghasilkan jejak audit SWITCH_ROLE ganda
+        // yang mengklaim transisi dari state yang sama.
+        DB::transaction(function () use ($user, $targetRole, $temporaryPermission, $request): void {
+            $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
-        // Validasi: hanya boleh switch ke role yang lebih rendah
-        if (! $user->canSwitchToRole($targetRole)) {
-            throw new \InvalidArgumentException("Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli.");
-        }
+            // Validasi ulang dari state terkunci (bukan instance request) agar fail-closed.
+            if ($targetRole === $locked->role) {
+                throw new \InvalidArgumentException('Tidak dapat switch ke role yang sama dengan role asli.');
+            }
 
-        // Simpan state lama untuk audit
-        $oldValues = [
-            'role' => $user->role,
-            'temporary_role' => $user->temporary_role,
-            'temporary_permission' => $user->temporary_permission,
-        ];
+            if (! $locked->canSwitchToRole($targetRole)) {
+                throw new \InvalidArgumentException("Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli.");
+            }
 
-        // Update temporary_role dan metadata
-        $user->forceFill([
-            'temporary_role' => $targetRole,
-            'temporary_permission' => $temporaryPermission,
-            'temporary_role_started_at' => now(),
-            'temporary_role_switched_by' => $user->id,
-        ]);
+            // Simpan state lama untuk audit dari row yang dikunci.
+            $oldValues = [
+                'role' => $locked->role,
+                'temporary_role' => $locked->temporary_role,
+                'temporary_permission' => $locked->temporary_permission,
+            ];
 
-        // Simpan dengan transaksi untuk memastikan atomicity antara state dan audit
-        DB::transaction(function () use ($user, $targetRole, $temporaryPermission, $oldValues, $request): void {
-            $user->save();
+            // Update temporary_role dan metadata
+            $locked->forceFill([
+                'temporary_role' => $targetRole,
+                'temporary_permission' => $temporaryPermission,
+                'temporary_role_started_at' => now(),
+                'temporary_role_switched_by' => $locked->id,
+            ]);
+
+            $locked->save();
 
             AuditService::logOrFail(
                 'SWITCH_ROLE',
                 'User',
-                $user->id,
+                $locked->id,
                 $oldValues,
                 [
-                    'role' => $user->role,
+                    'role' => $locked->role,
                     'temporary_role' => $targetRole,
                     'temporary_permission' => $temporaryPermission,
-                    'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
-                    'temporary_role_switched_by' => $user->id,
+                    'temporary_role_started_at' => $locked->temporary_role_started_at?->toIso8601String(),
+                    'temporary_role_switched_by' => $locked->id,
                 ],
                 $request,
             );

@@ -790,4 +790,61 @@ class SwitchRoleTest extends TestCase
         $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
         $this->assertEquals('admin_kepegawaian', $audit->new_values['_effective_role'] ?? null);
     }
+
+    /**
+     * Penggunaan role sementara pada request baca (GET) wajib meninggalkan jejak audit
+     * (AC-6), tidak hanya switch dan revert. Measured dari audit_logs event ROLE_SIMULATION_USAGE.
+     */
+    public function test_role_simulation_usage_is_audited_during_read_only_requests(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $this->assertEquals('admin_kepegawaian', $user->getEffectiveRole());
+
+        // Request baca saat simulasi aktif harus tercatat usage audit.
+        $this->actingAs($user)->get(route('cuti'))->assertOk();
+
+        $audit = AuditLog::where('event', 'ROLE_SIMULATION_USAGE')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit, 'Penggunaan role sementara pada request baca wajib tercatat audit.');
+        $this->assertEquals('admin_kepegawaian', $audit->new_values['effective_role'] ?? null);
+        $this->assertEquals('super_admin', $audit->new_values['original_role'] ?? null);
+
+        // Revert tetap meninggalkan jejak; seluruh tahap (switch, usage, revert) tercatat.
+        $this->actingAs($user)->post(route('revert-role'));
+        $this->assertDatabaseHas('audit_logs', ['event' => 'REVERT_ROLE', 'auditable_id' => $user->id]);
+    }
+
+    /**
+     * UI submenu switch hanya boleh tampil untuk Super Admin asli (AC-1). Role non-Super-Admin
+     * yang salah konfigurasi mendapat users.switch_role tetap tidak melihat menu, dan backend
+     * tetap menolaknya (403).
+     */
+    public function test_switch_menu_hidden_for_non_super_admin_even_with_permission(): void
+    {
+        $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        $adminRole->permissions()->syncWithoutDetaching([$switchPermission->id]);
+
+        $admin = $this->createUserWithRole('admin_kepegawaian');
+        $this->assertTrue($admin->hasPermission('users.switch_role'));
+
+        // UI tidak menampilkan Simulasi Role bagi non Super Admin meski ber-permission.
+        $this->actingAs($admin)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('Simulasi Role')
+            ->assertDontSee('Switch ke');
+
+        // Backend tetap menolak (invariant source role super_admin).
+        $response = $this->actingAs($admin)->post(route('switch-role'), ['target_role' => 'pegawai']);
+        $response->assertForbidden();
+        $admin->refresh();
+        $this->assertNull($admin->temporary_role);
+    }
 }

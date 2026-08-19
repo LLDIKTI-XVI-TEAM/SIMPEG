@@ -27,7 +27,7 @@ class SwitchRoleRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * target_role dibatasi fail-closed ke matrix role tujuan Fase 1.
+     * target_role dibatasi fail-closed ke role tujuan yang diizinkan.
      * temporary_permission hanyalah metadata simulasi (opsional) dan tidak pernah
      * menjadi sumber otorisasi; batas panjang sekadar pengaman penyimpanan.
      */
