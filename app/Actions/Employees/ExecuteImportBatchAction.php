@@ -192,7 +192,8 @@ class ExecuteImportBatchAction
                     ],
                     null,
                     $ipAddress,
-                    $userAgent
+                    $userAgent,
+                    $this->simulationContextFromBatch($batch),
                 );
 
                 $batch->forceFill([
@@ -316,6 +317,7 @@ class ExecuteImportBatchAction
                     null,
                     $ipAddress,
                     $userAgent,
+                    $this->simulationContextFromBatch($batch),
                 );
             } elseif ($outcome['status'] === 'skipped') {
                 $skippedCount++;
@@ -579,5 +581,30 @@ class ExecuteImportBatchAction
         if (Storage::disk('local')->exists(UploadImportBatchAction::STORAGE_DIR.'/'.$storedName)) {
             Storage::disk('local')->delete(UploadImportBatchAction::STORAGE_DIR.'/'.$storedName);
         }
+    }
+
+    /**
+     * Konteks simulasi role yang dibekukan saat batch diantrekan (kolom queued_*_role).
+     *
+     * Audit import ditulis oleh worker (async); memakai snapshot ini, bukan record user live,
+     * agar jejak konsisten dengan waktu operasi diotorisasi. Mengembalikan null bila batch
+     * tidak dibuat dalam simulasi (role asli == role efektif) atau snapshot tidak tersedia.
+     *
+     * @return array{_simulation: true, _original_role: string, _effective_role: string}|null
+     */
+    private function simulationContextFromBatch(ImportBatch $batch): ?array
+    {
+        $originalRole = $batch->queued_original_role;
+        $effectiveRole = $batch->queued_effective_role;
+
+        if ($originalRole === null || $effectiveRole === null || $originalRole === $effectiveRole) {
+            return null;
+        }
+
+        return [
+            '_simulation' => true,
+            '_original_role' => $originalRole,
+            '_effective_role' => $effectiveRole,
+        ];
     }
 }

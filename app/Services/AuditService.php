@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AuditService
 {
@@ -93,6 +94,7 @@ class AuditService
         ?Request $request = null,
         ?string $ipAddress = null,
         ?string $userAgent = null,
+        ?array $simulationContext = null,
     ): void {
         try {
             AuditLog::create(self::explicitPayload(
@@ -106,6 +108,7 @@ class AuditService
                 $request,
                 $ipAddress,
                 $userAgent,
+                $simulationContext,
             ));
         } catch (\Throwable $e) {
             Log::warning('Audit log gagal ditulis', [
@@ -118,6 +121,9 @@ class AuditService
 
     /**
      * Menulis audit dengan aktor eksplisit tanpa menelan kegagalan agar mutasi kritis dapat di-rollback.
+     *
+     * @param  array<string, mixed>|null  $simulationContext  Konteks simulasi role yang dibekukan saat
+     *                                                        operasi diotorisasi (jalur async/queue).
      */
     public static function logAsOrFail(
         string $userId,
@@ -130,6 +136,7 @@ class AuditService
         ?Request $request = null,
         ?string $ipAddress = null,
         ?string $userAgent = null,
+        ?array $simulationContext = null,
     ): void {
         AuditLog::create(self::explicitPayload(
             $userId,
@@ -142,6 +149,7 @@ class AuditService
             $request,
             $ipAddress,
             $userAgent,
+            $simulationContext,
         ));
     }
 
@@ -191,6 +199,8 @@ class AuditService
     /**
      * @param  array<string, mixed>|null  $oldValues
      * @param  array<string, mixed>|null  $newValues
+     * @param  array<string, mixed>|null  $simulationContext  Konteks simulasi yang dibekukan saat operasi
+     *                                                        diotorisasi; mengalahkan lookup user live.
      * @return array<string, mixed>
      */
     private static function explicitPayload(
@@ -204,15 +214,29 @@ class AuditService
         ?Request $request,
         ?string $ipAddress,
         ?string $userAgent,
+        ?array $simulationContext = null,
     ): array {
         // Sertakan konteks simulasi role pada jalur aktor eksplisit (LOGIN/LOGOUT/
         // SESSION_TIMEOUT, dan jalur async/queue seperti import) agar jejak audit
         // selama simulasi tetap dapat ditelusuri ke role asli dan role efektif.
-        // Aktor di-resolve dari $userId (bukan facade Auth) karena worker queue tidak
-        // memiliki session terautentikasi padahal state temporary_role-nya persisten.
-        $user = filled($userId) ? User::query()->find($userId) : null;
+        //
+        // Prioritas konteks:
+        // 1. $simulationContext eksplisit (dibekukan saat enqueue) dipakai apa adanya;
+        // 2. selain itu, aktor di-resolve dari $userId (bukan facade Auth) karena worker queue
+        //    tidak memiliki session terautentikasi padahal state temporary_role-nya persisten.
+        //    Lookup hanya dilakukan bila $userId berbentuk UUID — nilai fallback seperti 'system'
+        //    bukan UUID dan tidak boleh dikuerikan sebagai primary key (error 22P02 di PostgreSQL).
+        $user = null;
 
-        if ($user && $user->temporary_role) {
+        if ($simulationContext === null && filled($userId) && Str::isUuid($userId)) {
+            $user = User::query()->find($userId);
+        }
+
+        if ($simulationContext !== null) {
+            $newValues = is_array($newValues)
+                ? array_merge($newValues, $simulationContext)
+                : $simulationContext;
+        } elseif ($user && $user->temporary_role) {
             $simulationMeta = [
                 '_simulation' => true,
                 '_original_role' => $user->role,

@@ -735,4 +735,58 @@ class SwitchRoleTest extends TestCase
         $response->assertDontSee('Switch ke');
         $response->assertSee('Kembalikan Role Asli');
     }
+
+    /** Aktor fallback 'system' (bukan UUID) tidak boleh dikuerikan sebagai primary key (22P02 di PostgreSQL). */
+    public function test_audit_explicit_path_accepts_system_actor_without_uuid_lookup(): void
+    {
+        AuditService::logAsOrFail(
+            'system',
+            'System Queue',
+            'IMPORT',
+            'Employee',
+            null,
+            null,
+            ['batch' => 'system-actor'],
+        );
+
+        $this->assertDatabaseHas('audit_logs', [
+            'user_id' => 'system',
+            'event' => 'IMPORT',
+        ]);
+    }
+
+    /** Konteks simulasi yang dibekukan saat enqueue menang atas lookup user live saat audit ditulis. */
+    public function test_audit_explicit_path_uses_frozen_simulation_context(): void
+    {
+        // Aktor TIDAK sedang dalam simulasi saat audit ditulis; konteks hanya berasal dari snapshot.
+        $user = $this->createUserWithRole('super_admin');
+
+        AuditService::logAsOrFail(
+            $user->id,
+            $user->name,
+            'IMPORT',
+            'User',
+            $user->id,
+            null,
+            ['batch' => 'frozen'],
+            null,
+            null,
+            null,
+            [
+                '_simulation' => true,
+                '_original_role' => 'super_admin',
+                '_effective_role' => 'admin_kepegawaian',
+            ],
+        );
+
+        $audit = AuditLog::where('event', 'IMPORT')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertTrue($audit->new_values['_simulation'] ?? false);
+        $this->assertEquals('super_admin', $audit->new_values['_original_role'] ?? null);
+        $this->assertEquals('admin_kepegawaian', $audit->new_values['_effective_role'] ?? null);
+    }
 }

@@ -86,6 +86,11 @@ class QueueImportBatchAction
                     $importBatch = new ImportBatch([
                         'id' => $batchId,
                         'user_id' => $user?->id,
+                        // Snapshot role dibekukan saat diantrekan agar audit async (worker) mencatat
+                        // konteks simulasi sesuai waktu operasi diotorisasi, bukan state user yang
+                        // bisa berubah sebelum worker berjalan (mis. switch/revert role di sela-sela).
+                        'queued_original_role' => $user?->role,
+                        'queued_effective_role' => $user?->getEffectiveRole(),
                         'filename' => $batch['filename'],
                         'type' => $batch['type'] ?? 'utama',
                         'status' => 'queued',

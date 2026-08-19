@@ -19,6 +19,8 @@ class ImportBatch extends Model
     protected $fillable = [
         'id',
         'user_id',
+        'queued_original_role',
+        'queued_effective_role',
         'filename',
         'type',
         'status',
