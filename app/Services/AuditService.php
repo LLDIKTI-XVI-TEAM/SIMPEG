@@ -234,16 +234,20 @@ class AuditService
         $user = null;
 
         // Prioritas konteks: $simulationContext eksplisit (dibekukan saat enqueue) dipakai apa
-        // adanya; selain itu aktor di-resolve dari $userId (bukan facade Auth) karena worker
-        // queue tidak memiliki session terautentikasi padahal state temporary_role-nya persisten.
+        // adanya — array kosong adalah sentinel "eksplisit non-simulasi" dan TIDAK memicu lookup
+        // user live. Tanpa snapshot ($simulationContext null), aktor di-resolve dari $userId
+        // (bukan facade Auth) karena worker queue tidak memiliki session terautentikasi padahal
+        // state temporary_role-nya persisten.
         if ($simulationContext === null && $storedUserId !== null) {
             $user = User::query()->find($storedUserId);
         }
 
         if ($simulationContext !== null) {
-            $newValues = is_array($newValues)
-                ? array_merge($newValues, $simulationContext)
-                : $simulationContext;
+            if (is_array($newValues)) {
+                $newValues = array_merge($newValues, $simulationContext);
+            } elseif ($simulationContext !== []) {
+                $newValues = $simulationContext;
+            }
         } elseif ($user && $user->temporary_role) {
             $simulationMeta = [
                 '_simulation' => true,

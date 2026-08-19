@@ -587,24 +587,28 @@ class ExecuteImportBatchAction
      * Konteks simulasi role yang dibekukan saat batch diantrekan (kolom queued_*_role).
      *
      * Audit import ditulis oleh worker (async); memakai snapshot ini, bukan record user live,
-     * agar jejak konsisten dengan waktu operasi diotorisasi. Mengembalikan null bila batch
-     * tidak dibuat dalam simulasi (role asli == role efektif) atau snapshot tidak tersedia.
+     * agar jejak konsisten dengan waktu operasi diotorisasi. Mengembalikan array kosong untuk
+     * batch yang diantrekan TANPA simulasi (role asli == role efektif, atau snapshot tidak
+     * tersedia) sebagai sentinel "eksplisit non-simulasi", sehingga AuditService tidak kembali
+     * membaca state user live yang bisa berubah (mis. user beralih role setelah enqueue).
      *
-     * @return array{_simulation: true, _original_role: string, _effective_role: string}|null
+     * @return array<string, mixed>
      */
-    private function simulationContextFromBatch(ImportBatch $batch): ?array
+    private function simulationContextFromBatch(ImportBatch $batch): array
     {
         $originalRole = $batch->queued_original_role;
         $effectiveRole = $batch->queued_effective_role;
 
-        if ($originalRole === null || $effectiveRole === null || $originalRole === $effectiveRole) {
-            return null;
+        if ($originalRole !== null && $effectiveRole !== null && $originalRole !== $effectiveRole) {
+            return [
+                '_simulation' => true,
+                '_original_role' => $originalRole,
+                '_effective_role' => $effectiveRole,
+            ];
         }
 
-        return [
-            '_simulation' => true,
-            '_original_role' => $originalRole,
-            '_effective_role' => $effectiveRole,
-        ];
+        // Sentinel non-simulasi: tanda bahwa snapshot sudah dipertimbangkan dan operasi ini
+        // bukan hasil simulasi; tidak menambah metadata maupun memicu lookup user live.
+        return [];
     }
 }

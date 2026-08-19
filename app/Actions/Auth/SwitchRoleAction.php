@@ -2,6 +2,7 @@
 
 namespace App\Actions\Auth;
 
+use App\Exceptions\SwitchRoleConflictException;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
@@ -23,12 +24,15 @@ class SwitchRoleAction
             $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
             // Validasi ulang dari state terkunci (bukan instance request) agar fail-closed.
+            // Kegagalan ini adalah konflik otorisasi akibat state berubah di antara validasi
+            // request dan lock (mis. demosi paralel); dilempar sebagai exception khusus agar
+            // direspons 403/konflik, bukan 500.
             if ($targetRole === $locked->role) {
-                throw new \InvalidArgumentException('Tidak dapat switch ke role yang sama dengan role asli.');
+                throw new SwitchRoleConflictException('Tidak dapat switch ke role yang sama dengan role asli.');
             }
 
             if (! $locked->canSwitchToRole($targetRole)) {
-                throw new \InvalidArgumentException("Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli.");
+                throw new SwitchRoleConflictException("Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli.");
             }
 
             // Simpan state lama untuk audit dari row yang dikunci.

@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Auth\SwitchRoleAction;
+use App\Exceptions\SwitchRoleConflictException;
 use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Employee;
@@ -868,5 +870,90 @@ class SwitchRoleTest extends TestCase
             'event' => 'ROLE_SIMULATION_USAGE',
             'user_id' => $user->id,
         ]);
+    }
+
+    /** Penggunaan role sementara pada mutasi (POST/PUT/PATCH) yang berhasil juga wajib diaudit (AC-6). */
+    public function test_role_simulation_usage_is_audited_during_successful_mutation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+
+        // Mutasi berhasil sebagai role efektif admin_kepegawaian (PATCH notifikasi tandai-semua-dibaca).
+        $this->actingAs($user)->patchJson(route('api.v1.notifikasi.tandai-semua-dibaca'));
+
+        $audit = AuditLog::where('event', 'ROLE_SIMULATION_USAGE')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit, 'Penggunaan role sementara pada mutasi berhasil wajib tercatat audit.');
+        $this->assertEquals('PATCH', $audit->new_values['http_method'] ?? null);
+        $this->assertEquals('admin_kepegawaian', $audit->new_values['effective_role'] ?? null);
+    }
+
+    /** Polling notifikasi otomatis (bukan interaksi user) tidak boleh tercatat sebagai penggunaan role sementara. */
+    public function test_role_simulation_usage_not_recorded_for_notification_polling(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pegawai']);
+        $user->refresh();
+
+        $this->actingAs($user)->getJson(route('api.v1.notifikasi.index'))->assertOk();
+        $this->actingAs($user)->getJson(route('api.v1.notifikasi.jumlah-belum-dibaca'))->assertOk();
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'ROLE_SIMULATION_USAGE',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /** Kegagalan revalidasi role (state berubah) pada switch dikonversi menjadi 403, bukan 500. */
+    public function test_switch_role_revalidation_conflict_returns_403(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->mock(SwitchRoleAction::class, function ($mock): void {
+            $mock->shouldReceive('execute')
+                ->andThrow(new SwitchRoleConflictException('Tidak dapat switch ke role yang sama dengan role asli.'));
+        });
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pegawai'])->assertForbidden();
+    }
+
+    /** Sentinel konteks kosong (eksplisit non-simulasi) mencegah lookup user live saat audit ditulis. */
+    public function test_audit_explicit_path_uses_empty_context_to_skip_live_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $user->forceFill([
+            'temporary_role' => 'admin_kepegawaian',
+            'temporary_role_started_at' => now(),
+        ])->save();
+
+        // Snapshot EKSPLISIT non-simulasi ([]) dikirim: lookup user live TIDAK boleh dijalankan,
+        // sehingga jejak tidak diberi _simulation walau state user saat ini sedang simulasi.
+        AuditService::logAsOrFail(
+            $user->id,
+            $user->name,
+            'IMPORT',
+            'User',
+            $user->id,
+            null,
+            ['batch' => 'non-sim'],
+            null,
+            null,
+            null,
+            [],
+        );
+
+        $audit = AuditLog::where('event', 'IMPORT')
+            ->where('user_id', $user->id)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertArrayNotHasKey('_simulation', $audit->new_values ?? []);
     }
 }

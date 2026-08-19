@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Auth\RevertRoleAction;
 use App\Actions\Auth\SwitchRoleAction;
+use App\Exceptions\SwitchRoleConflictException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RevertRoleRequest;
 use App\Http\Requests\Auth\SwitchRoleRequest;
@@ -21,7 +22,13 @@ class SwitchRoleController extends Controller
         $targetRole = $validated['target_role'];
         $temporaryPermission = $validated['temporary_permission'] ?? null;
 
-        $action->execute($user, $targetRole, $request, $temporaryPermission);
+        try {
+            $action->execute($user, $targetRole, $request, $temporaryPermission);
+        } catch (SwitchRoleConflictException $exception) {
+            // State akun berubah di antara validasi dan lock (mis. demosi paralel): konflik
+            // otorisasi, bukan 500. Rollback tetap fail-closed di dalam action.
+            abort(403, $exception->getMessage());
+        }
 
         $roleLabels = [
             'admin_kepegawaian' => 'Admin Kepegawaian',
