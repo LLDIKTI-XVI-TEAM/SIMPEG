@@ -847,4 +847,26 @@ class SwitchRoleTest extends TestCase
         $admin->refresh();
         $this->assertNull($admin->temporary_role);
     }
+
+    /**
+     * Usage audit (AC-6) hanya boleh tercatat untuk request read yang benar-benar
+     * berhasil diotorisasi. Request yang ditolak role efektif (403) tidak boleh
+     * diklaim sebagai penggunaan role sementara.
+     */
+    public function test_usage_audit_not_recorded_for_denied_request(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pimpinan']);
+        $user->refresh();
+        $this->assertEquals('pimpinan', $user->getEffectiveRole());
+
+        // Route user-management hanya untuk super_admin; role efektif pimpinan ditolak.
+        $this->actingAs($user)->get(route('user-management'))->assertForbidden();
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'ROLE_SIMULATION_USAGE',
+            'user_id' => $user->id,
+        ]);
+    }
 }
