@@ -419,4 +419,57 @@ class StoreBerkasSkActionTest extends TestCase
         // jenis_pegawai mengikuti appointment kanonis FINAL (lama = PPPK).
         $this->assertSame('PPPK', strtoupper((string) $employee->refresh()->jenisPegawai?->nama));
     }
+
+    /**
+     * Edge case P1: canonical appointment final TIDAK punya file. Invariant provenance
+     * tetap dijaga — metadata dan file_path harus berasal dari appointment yang SAMA.
+     * Saat kanonis final tanpa file, sumber dokumen adalah appointment yang diunggah
+     * (file $newPath), sehingga tidak terbentuk metadata A + file B.
+     */
+    public function test_replace_pengangkatan_uses_uploaded_appointment_when_canonical_final_has_no_file(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+
+        // Appointment A menjadi kanonis (TMT 2023 lebih baru) TANPA file.
+        $employee->appointments()->create([
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2023-01-01',
+            'no_sk' => 'SK/A/2023',
+            'tanggal_sk' => '2022-12-15',
+            'file_sk' => null,
+        ]);
+        // Appointment B (2024) diunggah lalu TMT dikoreksi ke 2022 → A tetap kanonis, A tanpa file.
+        $employee->update(['jenis_pegawai_id' => $pns->id]);
+
+        $response = $this->action->execute($employee, [
+            'kategori_dokumen' => 'sk_pengangkatan',
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2022-07-01',
+            'no_sk' => 'SK/B/DI-UNGGAH',
+            'tanggal_sk' => '2022-06-20',
+            'file_sk' => UploadedFile::fake()->create('sk-b.pdf', 100, 'application/pdf'),
+        ], new Request);
+
+        $this->assertInstanceOf(Document::class, $response);
+
+        $arsip = Document::query()
+            ->where('employee_id', $employee->id)
+            ->where('jenis_dokumen', 'sk_pengangkatan')
+            ->latest('created_at')
+            ->first();
+        $this->assertNotNull($arsip);
+
+        // Sumber dokumen adalah appointment B (yang menyumbang file), sehingga metadata
+        // dan file_path konsisten — bukan metadata A + file B.
+        $this->assertSame('SK Pengangkatan PNS', $arsip->nama_dokumen);
+        $this->assertSame('SK/B/DI-UNGGAH', $arsip->nomor_dokumen);
+        $this->assertSame((string) $arsip->file_path, (string) $response->file_path);
+        $this->assertNotNull($arsip->file_path);
+
+        // Nomor SK yang ditulis ke arsip harus dari B, dan file B yang tertaut bukan file A.
+        $this->assertSame('SK/B/DI-UNGGAH', $arsip->nomor_dokumen);
+        Storage::disk(Document::STORAGE_DISK)->assertExists((string) $arsip->file_path);
+    }
 }

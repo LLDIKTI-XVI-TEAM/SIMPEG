@@ -91,17 +91,23 @@ class ReplaceAppointmentSkAction
                     );
                 }
 
-                // Berkas SK baru tidak dipindahkan ke appointment lain: file tetap terkait
-                // dengan record yang metadata SK-nya (jenis/no/tanggal) berasal dari unggahan
-                // ini. Namun setelah koreksi TMT, appointment kanonis dapat berpindah; dokumen
-                // arsip dan jenis_pegawai harus mengikuti appointment kanonis FINAL agar
-                // snapshot, dokumen aktif, dan status kelengkapan berasal dari satu sumber.
+                // Satu Document harus memuat metadata DAN file dari appointment yang SAMA
+                // (provenance). Setelah koreksi TMT, appointment kanonis final dapat
+                // berpindah; pilih sumber dokumen yang konsisten: canonical final bila ia
+                // sudah punya file sendiri, jika tidak gunakan appointment yang diunggah
+                // (yang menyumbang file baru $newPath) agar metadata tidak memadukan record
+                // dengan file dari record lain.
                 $canonicalAppointment = $employee->appointments()
                     ->orderByDesc('tmt_pengangkatan')
                     ->orderByDesc('created_at')
                     ->orderByDesc('id')
                     ->first();
-                $sourceAppointment = $canonicalAppointment ?? $appointment;
+
+                $sourceAppointment = ($canonicalAppointment
+                    && filled($canonicalAppointment->file_sk)
+                    && $canonicalAppointment->file_sk !== $newPath)
+                    ? $canonicalAppointment
+                    : $appointment;
 
                 [$document, $oldDocumentPath] = $this->replaceDocument($employee, $sourceAppointment, $oldFilePath, $newPath);
 
@@ -172,12 +178,12 @@ class ReplaceAppointmentSkAction
         // (path appointment) bila fallback ke latest dokumen sk_pengangkatan.
         $oldDocumentPath = $document?->file_path;
 
-        // Satu Document harus memuat metadata DAN file dari appointment yang sama.
-        // Saat appointment kanonis final ($appointment) berbeda dari appointment yang
-        // diunggah (kanonis bergeser akibat koreksi TMT) dan sudah punya file sendiri,
-        // arsip mengikuti appointment kanonis final secara utuh (metadata + file-nya),
-        // bukan menautkan file baru ke metadata record lain.
-        $filePath = $appointment->file_sk && $appointment->file_sk !== $newPath
+        // Satu Document harus memuat metadata DAN file dari appointment yang SAMA
+        // (provenance). Parameter $appointment adalah sumber yang sudah dipilih
+        // (canonical final yang punya file, atau appointment yang diunggah) sehingga
+        // file_path selalu milik appointment tersebut, bukan menautkan file baru ke
+        // metadata record lain.
+        $filePath = $appointment->file_sk
             ? (string) $appointment->file_sk
             : $newPath;
 
