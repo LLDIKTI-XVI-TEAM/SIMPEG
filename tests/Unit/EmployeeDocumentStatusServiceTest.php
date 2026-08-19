@@ -350,24 +350,40 @@ class EmployeeDocumentStatusServiceTest extends TestCase
     }
 
     /**
-     * Matriks kelengkapan 4 SK hanya berlaku untuk PNS; CPNS/PPPK/jenis lain
-     * berstatus tidak_wajib dengan total_wajib = 0 dan is_lengkap = true.
+     * Evaluasi kelengkapan SK berlaku untuk semua pegawai (termasuk CPNS/PPPK/jenis
+     * tanpa relasi jenisPegawai): empat kategori tetap dinilai agar kerusakan berkas
+     * (kosong/hilang/konflik) tidak tersembunyi; tanpa data SK statusnya belum_ada.
      */
-    public function test_non_pns_employee_is_tidak_wajib(): void
+    public function test_non_pns_employee_is_still_evaluated_against_four_sk(): void
     {
         $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
         $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
 
         $result = $this->service->summarize($employee->fresh());
 
-        $this->assertSame('tidak_wajib', $result['status_kelengkapan']);
-        $this->assertTrue($result['is_lengkap']);
-        $this->assertSame(0, $result['total_wajib']);
+        $this->assertSame('belum_ada', $result['status_kelengkapan']);
+        $this->assertFalse($result['is_lengkap']);
+        $this->assertSame(4, $result['total_wajib']);
         $this->assertSame(0, $result['tersedia_count']);
         $this->assertCount(4, $result['required_sks']);
         foreach ($result['required_sks'] as $sk) {
-            $this->assertSame('tidak_wajib', $sk['status']);
+            $this->assertSame('belum_ada', $sk['status']);
         }
+    }
+
+    /**
+     * Pegawai tanpa relasi jenis pegawai tetap dievaluasi terhadap empat SK
+     * (bukan serta-merta tidak_wajib); tanpa data SK statusnya belum_ada.
+     */
+    public function test_employee_without_jenis_pegawai_is_still_evaluated_against_four_sk(): void
+    {
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => null]);
+
+        $result = $this->service->summarize($employee->fresh());
+
+        $this->assertSame('belum_ada', $result['status_kelengkapan']);
+        $this->assertFalse($result['is_lengkap']);
+        $this->assertSame(4, $result['total_wajib']);
     }
 
     /**
