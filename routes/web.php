@@ -551,7 +551,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     });
 
     Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('dokumen');
     Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
@@ -561,11 +561,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('dokumen.update')
         ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('dokumen.show')
         ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('dokumen.download')
         ->whereUuid('id');
     Route::delete('/dashboard/dokumen/{id}', [DokumenController::class, 'destroy'])

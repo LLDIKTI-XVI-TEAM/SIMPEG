@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Documents;
 
+use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\Permission;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -126,6 +129,50 @@ class EmployeeDocumentBackendAccessTest extends TestCase
             'kategori_dokumen' => 'ktp_kk',
             'berkas' => $this->fakeFile(),
         ], ['Accept' => 'application/json'])->assertForbidden();
+    }
+
+    public function test_admin_without_employees_read_cannot_access_central_archive(): void
+    {
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.read')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $this->actingAsRole('admin_kepegawaian');
+        $document = $this->createBerkas();
+
+        $this->get(route('dokumen'))->assertForbidden();
+        $this->get(route('dokumen.show', $document->id))->assertForbidden();
+        $this->get(route('dokumen.download', $document->id))->assertForbidden();
+        $this->getJson('/api/v1/dokumen')->assertForbidden();
+    }
+
+    public function test_berkas_lainnya_upload_rolls_back_when_audit_fails(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+        $employee = Employee::factory()->create();
+
+        $dispatcher = AuditLog::getEventDispatcher();
+        AuditLog::creating(function (): void {
+            throw new \RuntimeException('Simulasi kegagalan audit berkas.');
+        });
+        $exceptionObserved = false;
+
+        try {
+            $this->withoutExceptionHandling()->post("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
+                'nama_dokumen' => 'KTP Pegawai',
+                'kategori_dokumen' => 'ktp_kk',
+                'berkas' => $this->fakeFile(),
+            ], ['Accept' => 'application/json']);
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulasi kegagalan audit berkas.', $exception->getMessage());
+            $exceptionObserved = true;
+        } finally {
+            AuditLog::setEventDispatcher($dispatcher);
+        }
+
+        $this->assertTrue($exceptionObserved, 'Upload berkas wajib meneruskan kegagalan audit.');
+        $this->assertDatabaseCount('documents', 0);
+        $this->assertEmpty(Storage::disk(Document::STORAGE_DISK)->allFiles());
     }
 
     private function createBerkas(): Document

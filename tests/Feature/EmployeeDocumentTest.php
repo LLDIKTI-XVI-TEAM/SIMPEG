@@ -38,7 +38,7 @@ class EmployeeDocumentTest extends TestCase
     }
 
     /**
-     * Pegawai PNS — satu-satunya jenis yang dievaluasi pada 4 SK wajib (K-DOK-02).
+     * Buat pegawai berjenis PNS agar evaluasi kelengkapan empat SK punya data deterministik.
      *
      * @param  array<string, mixed>  $attributes
      */

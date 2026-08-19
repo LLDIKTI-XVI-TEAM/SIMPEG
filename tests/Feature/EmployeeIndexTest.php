@@ -35,7 +35,7 @@ class EmployeeIndexTest extends TestCase
     }
 
     /**
-     * Pegawai PNS — satu-satunya jenis yang dievaluasi pada 4 SK wajib (K-DOK-02).
+     * Buat pegawai berjenis PNS agar evaluasi kelengkapan empat SK punya data deterministik.
      * Factory default acak PNS/PPPK sehingga test kelengkapan wajib memakai helper ini.
      *
      * @param  array<string, mixed>  $attributes

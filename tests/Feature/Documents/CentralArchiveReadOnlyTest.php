@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 /**
- * Arsip dokumen terpusat bersifat baca-saja (K-MTG-04): seluruh mutasi web
+ * Arsip dokumen terpusat bersifat baca-saja: seluruh mutasi web
  * ditolak untuk kedua role pengelola dan halaman tidak menawarkan aksi mutasi.
  */
 class CentralArchiveReadOnlyTest extends TestCase

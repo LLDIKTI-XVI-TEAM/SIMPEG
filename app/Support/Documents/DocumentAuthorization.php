@@ -21,7 +21,11 @@ class DocumentAuthorization
 
     public static function canViewArchive(?User $user): bool
     {
-        return self::hasManagerRole($user);
+        // Arsip dokumen berisi data pegawai lintas unit: selain role pengelola,
+        // akses baca tetap mensyaratkan izin employees.read agar pencabutan izin
+        // baca pegawai tidak meninggalkan celah akses ke arsip terpusat.
+        return self::hasManagerRole($user)
+            && $user->hasPermission('employees.read');
     }
 
     public static function canManage(?User $user): bool

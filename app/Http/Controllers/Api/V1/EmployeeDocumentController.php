@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Documents\DeleteDocumentAction;
+use App\Actions\Documents\StoreBerkasLainnyaAction;
 use App\Actions\Documents\StoreBerkasSkAction;
 use App\Actions\Documents\StoreDocumentAction;
 use App\Actions\Documents\UpdateDocumentAction;
@@ -15,14 +16,9 @@ use App\Http\Requests\Documents\StoreDocumentRequest;
 use App\Http\Requests\Documents\UpdateDocumentRequest;
 use App\Models\Document;
 use App\Models\Employee;
-use App\Services\AuditService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Throwable;
 
 class EmployeeDocumentController extends Controller
 {
@@ -84,34 +80,14 @@ class EmployeeDocumentController extends Controller
     public function storeBerkasLainnya(
         StoreBerkasLainnyaRequest $request,
         Employee $employee,
+        StoreBerkasLainnyaAction $action,
     ): JsonResponse {
-        $file = $request->file('berkas');
-        $category = $request->input('kategori_dokumen');
-        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-        $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
-        $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
-
-        try {
-            $document = DB::transaction(function () use ($employee, $request, $filePath, $category): Document {
-                $doc = Document::create([
-                    'employee_id' => $employee->id,
-                    'jenis_dokumen' => $category,
-                    'nama_dokumen' => $request->input('nama_dokumen'),
-                    'nomor_dokumen' => $request->input('nomor_dokumen'),
-                    'tanggal_dokumen' => $request->input('tanggal_terbit'),
-                    'file_path' => $filePath,
-                    'keterangan' => $request->input('keterangan'),
-                ]);
-
-                AuditService::log('CREATE', 'Document', $doc->id, null, $doc->toArray(), $request);
-
-                return $doc;
-            });
-        } catch (Throwable $e) {
-            // Rollback file fisik jika transaksi database gagal.
-            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
-            throw $e;
-        }
+        $document = $action->execute(
+            $employee,
+            $request->validated(),
+            $request->file('berkas'),
+            $request,
+        );
 
         return response()->json([
             'message' => 'Berkas berhasil diunggah.',

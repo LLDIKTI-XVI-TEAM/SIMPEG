@@ -39,7 +39,7 @@ class UpdateEmployeeRequest extends FormRequest
 
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
-            // Riwayat kepegawaian bersifat append-only (US-2.6): id riwayat lama ditolak agar record tidak dapat diedit.
+            // Riwayat kepegawaian bersifat append-only: id riwayat lama ditolak agar record tidak dapat diedit.
             $rules['pangkat_history_id'] = ['nullable', 'in:new'];
             $rules['jabatan_history_id'] = ['nullable', 'in:new'];
             $rules['kgb_history_id'] = ['nullable', 'in:new'];

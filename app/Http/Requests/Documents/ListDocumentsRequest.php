@@ -2,21 +2,18 @@
 
 namespace App\Http\Requests\Documents;
 
+use App\Support\Documents\DocumentAuthorization;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ListDocumentsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if (app()->environment('local')
-            && config('services.simpeg.disable_employee_api_auth')) {
+        if (DocumentAuthorization::allowsLocalApiBypass()) {
             return true;
         }
 
-        $user = $this->user();
-
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return DocumentAuthorization::canViewArchive($this->user());
     }
 
     public function rules(): array
