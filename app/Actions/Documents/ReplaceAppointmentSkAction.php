@@ -172,12 +172,21 @@ class ReplaceAppointmentSkAction
         // (path appointment) bila fallback ke latest dokumen sk_pengangkatan.
         $oldDocumentPath = $document?->file_path;
 
+        // Satu Document harus memuat metadata DAN file dari appointment yang sama.
+        // Saat appointment kanonis final ($appointment) berbeda dari appointment yang
+        // diunggah (kanonis bergeser akibat koreksi TMT) dan sudah punya file sendiri,
+        // arsip mengikuti appointment kanonis final secara utuh (metadata + file-nya),
+        // bukan menautkan file baru ke metadata record lain.
+        $filePath = $appointment->file_sk && $appointment->file_sk !== $newPath
+            ? (string) $appointment->file_sk
+            : $newPath;
+
         $payload = [
             'jenis_dokumen' => 'sk_pengangkatan',
             'nama_dokumen' => 'SK Pengangkatan '.$appointment->jenis_pengangkatan,
             'nomor_dokumen' => $appointment->no_sk,
             'tanggal_dokumen' => $appointment->tanggal_sk,
-            'file_path' => $newPath,
+            'file_path' => $filePath,
             'keterangan' => 'Diganti dari tab Dokumen SK.',
         ];
 

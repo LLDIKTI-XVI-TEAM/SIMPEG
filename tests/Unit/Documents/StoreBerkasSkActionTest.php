@@ -403,6 +403,19 @@ class StoreBerkasSkActionTest extends TestCase
             ->first();
         $this->assertNotNull($arsip);
 
+        // P1 provenance: metadata (nama/nomor/tanggal) dan file_path pada satu Document
+        // harus berasal dari appointment yang SAMA (kanonis final = LAMA/PPPK/file lama),
+        // bukan memadukan metadata LAMA dengan file baru appointment lain.
+        $lamaFresh = $lama->fresh();
+        $this->assertSame('SK Pengangkatan PPPK', $arsip->nama_dokumen);
+        $this->assertSame('SK/LAMA/2023', $arsip->nomor_dokumen);
+        $this->assertSame('2022-12-15', $arsip->tanggal_dokumen?->toDateString());
+        $this->assertSame($lamaFresh->file_sk, $arsip->file_path);
+        $this->assertSame('appointments/lama.pdf', $arsip->file_path);
+
+        // File yang ditaut arsip benar-benar milik appointment lama (bukan file baru B).
+        Storage::disk(Document::STORAGE_DISK)->assertExists('appointments/lama.pdf');
+
         // jenis_pegawai mengikuti appointment kanonis FINAL (lama = PPPK).
         $this->assertSame('PPPK', strtoupper((string) $employee->refresh()->jenisPegawai?->nama));
     }
