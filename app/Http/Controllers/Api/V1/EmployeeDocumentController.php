@@ -10,6 +10,7 @@ use App\Actions\Documents\UpdateDocumentAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\CheckEmployeeDocumentImpactRequest;
 use App\Http\Requests\Documents\DeleteEmployeeDocumentRequest;
+use App\Http\Requests\Documents\ReplaceBerkasSkRequest;
 use App\Http\Requests\Documents\StoreBerkasLainnyaRequest;
 use App\Http\Requests\Documents\StoreBerkasSkRequest;
 use App\Http\Requests\Documents\StoreDocumentRequest;
@@ -142,6 +143,45 @@ class EmployeeDocumentController extends Controller
 
         return response()->json([
             'message' => 'Dokumen berhasil diperbarui.',
+            'document' => $this->documentPayload($document),
+        ]);
+    }
+
+    /**
+     * Mengganti berkas fisik SK yang sudah ada tanpa mengubah metadata resminya.
+     *
+     * Metadata SK (nomor, tanggal, kategori) bersifat read-only karena milik
+     * riwayat; hanya isi berkas yang boleh diganti. Berkas lama dihapus permanen
+     * setelah file baru tersimpan dan riwayat ter-sinkronisasi.
+     */
+    public function replaceBerkasSk(
+        ReplaceBerkasSkRequest $request,
+        Employee $employee,
+        Document $document,
+        UpdateDocumentAction $action,
+    ): JsonResponse {
+        $this->ensureOwned($employee, $document);
+
+        abort_unless(
+            DocumentCategory::isTabSk($document->jenis_dokumen),
+            404,
+            'Hanya berkas SK yang dapat diganti melalui jalur ini.',
+        );
+
+        // Salin metadata eksisting sebagai payload read-only agar hanya file_path
+        // yang berubah; kategori tetap sama (tidak ada reklasifikasi).
+        $payload = [
+            'kategori_dokumen' => $document->jenis_dokumen,
+            'nama_dokumen' => $document->nama_dokumen,
+            'nomor_dokumen' => $document->nomor_dokumen,
+            'tanggal_terbit' => $document->tanggal_dokumen?->format('Y-m-d'),
+            'deskripsi' => $document->keterangan,
+        ];
+
+        $document = $action->execute($document, $payload, $request->file('berkas'));
+
+        return response()->json([
+            'message' => 'Berkas SK berhasil diganti; berkas lama dihapus.',
             'document' => $this->documentPayload($document),
         ]);
     }

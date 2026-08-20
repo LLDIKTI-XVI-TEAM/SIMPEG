@@ -101,6 +101,14 @@ class DocumentCategory
         return in_array($category, self::otherUploadKeys(), true);
     }
 
+    /**
+     * SK yang dikelola di tab Dokumen & SK (pangkat, jabatan, KGB, pengangkatan).
+     */
+    public static function isTabSk(?string $category): bool
+    {
+        return in_array($category, self::tabSkKeys(), true);
+    }
+
     public static function isProtectedSk(?string $category): bool
     {
         return in_array($category, [

@@ -198,21 +198,21 @@ class EmployeeDocumentTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->assertExists($appointment->file_sk);
     }
 
-    public function test_sk_management_button_opens_append_only_history_form(): void
+    public function test_sk_row_edit_button_opens_file_replace_modal(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
-        // Temuan 2: tombol kelola SK di baris membuka form "Tambah Berkas SK"
-        // (riwayat baru → /berkas-sk) alih-alih modal repair yang memutasi
-        // existing history. Jalur mutasi existing (skFileForm/submitSkFile)
-        // tidak boleh lagi dirender di view.
+        // Keputusan produk terbaru: tombol edit SK di baris membuka modal "Ganti
+        // Berkas SK" untuk mengganti file in-place (metadata read-only, file lama
+        // dihapus), bukan membuka form tambah riwayat append-only lagi.
         $this->actingAs($user)
             ->get("/pegawai/{$employee->id}")
             ->assertOk()
-            ->assertSee('openSkRiwayatForm(doc.jenis_dokumen)', false)
-            ->assertSee('this.resetSkTypeFields();', false)
-            ->assertSee('this.showUploadSkForm = true;', false)
+            ->assertSee('@click="openEditSk(doc)"', false)
+            ->assertSee('showEditSkModal', false)
+            ->assertSee('submitReplaceSk()', false)
+            ->assertDontSee('openSkRiwayatForm(doc.jenis_dokumen)', false)
             ->assertDontSee('submitSkFile()', false)
             ->assertDontSee('this.skFileForm', false);
     }
@@ -380,6 +380,84 @@ class EmployeeDocumentTest extends TestCase
 
         Storage::disk(Document::STORAGE_DISK)->assertExists($oldFilePath);
         Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
+    }
+
+    public function test_replace_sk_file_deletes_old_file_preserves_metadata_and_syncs_history(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->createPnsEmployee();
+
+        $oldFilePath = $employee->id.'/sk_pangkat/sk-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldFilePath, 'sk lama');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'sk_pangkat',
+            'nama_dokumen' => 'SK Pangkat',
+            'nomor_dokumen' => 'SK-PKT-001',
+            'tanggal_dokumen' => '2025-01-10',
+            'file_path' => $oldFilePath,
+        ]);
+
+        $gol = RefGolongan::firstOrFail();
+        $history = RankHistory::create([
+            'employee_id' => $employee->id,
+            'golongan_id' => $gol->id,
+            'tmt_pangkat' => '2025-01-10',
+            'no_sk' => 'SK-PKT-001',
+            'tanggal_sk' => '2025-01-10',
+            'file_sk' => $oldFilePath,
+            'is_latest' => true,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(
+                "/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}/ganti-berkas",
+                ['berkas' => UploadedFile::fake()->create('sk-baru.pdf', 120, 'application/pdf')],
+                ['Accept' => 'application/json'],
+            )
+            ->assertOk()
+            ->assertJsonPath('document.id', $document->id);
+
+        $document->refresh();
+        $history->refresh();
+
+        $this->assertNotSame($oldFilePath, $document->file_path);
+        // Metadata bersifat read-only: tidak berubah walaupun file diganti.
+        $this->assertSame('sk_pangkat', $document->jenis_dokumen);
+        $this->assertSame('SK Pangkat', $document->nama_dokumen);
+        $this->assertSame('SK-PKT-001', $document->nomor_dokumen);
+        $this->assertSame('2025-01-10', $document->tanggal_dokumen?->format('Y-m-d'));
+        // File lama dihapus permanen, file baru tersimpan.
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldFilePath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        // Riwayat ter-sinkronisasi ke path file baru agar is_latest/unduh tetap benar.
+        $this->assertSame($document->file_path, $history->file_sk);
+    }
+
+    public function test_replace_sk_rejects_non_sk_document(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $path = $employee->id.'/lainnya/berkas-lain.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($path, 'berkas lain');
+
+        $document = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Berkas Lainnya',
+            'file_path' => $path,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(
+                "/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}/ganti-berkas",
+                ['berkas' => UploadedFile::fake()->create('baru.pdf', 10, 'application/pdf')],
+                ['Accept' => 'application/json'],
+            )
+            ->assertNotFound();
     }
 
     public function test_document_list_api_rechecks_storage_file_status_on_every_request(): void

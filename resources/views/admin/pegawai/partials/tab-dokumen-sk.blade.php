@@ -221,6 +221,77 @@
         </x-ui.modal>
         @endif
 
+        {{-- Modal ganti berkas SK (metadata read-only, hanya file yang bisa diganti) --}}
+        @if($canManageDocuments)
+        <x-ui.modal
+            show="showEditSkModal"
+            title="Ganti Berkas SK"
+            closeAction="showEditSkModal = false; editSkError = ''; editSkFile = null;"
+            maxWidth="lg"
+            bodyClass="p-5 space-y-4"
+        >
+            <p x-show="editSkError" x-text="editSkError"
+               class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans"></p>
+
+            <div class="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <p class="text-[11px] text-muted font-sans">Metadata SK bersifat read-only. Hanya berkas yang dapat diganti — berkas SK lama akan dihapus permanen dari penyimpanan & riwayat.</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis SK</label>
+                    <div class="rounded-lg border border-border bg-soft/50 px-3 py-2 text-sm text-ink font-sans cursor-not-allowed"
+                        x-text="editSkDoc?.kategori_label || '-'"></div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK</label>
+                    <div class="rounded-lg border border-border bg-soft/50 px-3 py-2 text-sm text-ink font-sans cursor-not-allowed"
+                        x-text="editSkDoc?.nomor_dokumen || '-'"></div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK</label>
+                    <div class="rounded-lg border border-border bg-soft/50 px-3 py-2 text-sm text-ink font-sans cursor-not-allowed"
+                        x-text="editSkDoc?.tanggal_dokumen || '-'"></div>
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Berkas Saat Ini</label>
+                    <div class="rounded-lg border border-border bg-soft/50 px-3 py-2 text-sm text-ink font-sans truncate cursor-not-allowed"
+                        :class="editSkDoc?.file_tersedia ? 'text-ink' : 'text-danger'"
+                        x-text="editSkDoc?.file_path ? (editSkDoc.file_path.split('/').pop() + (editSkDoc.file_size ? ' · ' + editSkDoc.file_size : '')) : '-'"></div>
+                </div>
+            </div>
+
+            <div class="space-y-1">
+                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Ganti Berkas SK <span class="text-danger">*</span></label>
+                <div class="flex items-center gap-2">
+                    <label for="edit_sk_file"
+                        class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft font-sans">Pilih File</label>
+                    <input type="file" id="edit_sk_file" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
+                        @change="editSkFile = $event.target.files[0] || null">
+                    <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="editSkFile ? 'text-ink' : 'text-muted'"
+                        x-text="editSkFile ? editSkFile.name : 'Belum ada file dipilih'"></span>
+                    <button x-show="editSkFile" type="button"
+                        @click="editSkFile = null; document.getElementById('edit_sk_file').value = ''"
+                        class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
+                </div>
+                <p class="text-[10px] text-muted italic font-sans">PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
+            </div>
+
+            <x-slot:footer>
+                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @click="showEditSkModal = false; editSkError = ''; editSkFile = null;"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted transition hover:bg-soft font-sans">
+                        Batal
+                    </button>
+                    <button type="button" @click="submitReplaceSk()" :disabled="isUpdatingSkFile"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60 font-sans">
+                        <span x-text="isUpdatingSkFile ? 'Menyimpan...' : 'Ganti & Hapus Berkas Lama'"></span>
+                    </button>
+                </div>
+            </x-slot:footer>
+        </x-ui.modal>
+        @endif
+
         {{-- Tabel Dokumen SK --}}
         <x-pegawai.detail.table
             name="sk"
@@ -281,13 +352,12 @@
                             </a>
                             @if($canManageDocuments)
                             <button type="button"
-                                x-show="doc.jenis_dokumen === 'sk_pengangkatan' || (['sk_pangkat','sk_jabatan','sk_kgb'].includes(doc.jenis_dokumen) && {{ $canCreateEmployeeHistory ? 'true' : 'false' }})"
-                                @click="openSkRiwayatForm(doc.jenis_dokumen)"
+                                @click="openEditSk(doc)"
                                 class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                aria-label="Tambah atau ganti berkas SK"
-                                title="Tambah / Ganti Berkas SK (riwayat baru, append-only)">
+                                aria-label="Ganti berkas SK"
+                                title="Ganti Berkas SK (metadata read-only, file lama dihapus)">
                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
                                 </svg>
                             </button>
                             @endif

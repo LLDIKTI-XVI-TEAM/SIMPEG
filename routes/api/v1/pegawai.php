@@ -122,6 +122,11 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminEmployeeMutationMiddleware('employees.update'))
             ->whereUuid(['employee', 'document'])
             ->name('dokumen.update');
+        // Mengganti berkas fisik SK yang sudah ada (read-only metadata, file lama dihapus).
+        Route::post('/{employee}/dokumen/{document}/ganti-berkas', [EmployeeDocumentController::class, 'replaceBerkasSk'])
+            ->middleware($adminEmployeeMutationMiddleware('employees.update'))
+            ->whereUuid(['employee', 'document'])
+            ->name('dokumen.ganti-berkas');
         Route::get('/{employee}/dokumen/{document}/check-impact', [EmployeeDocumentController::class, 'checkImpact'])
             ->middleware($disableEmployeeApiAuth ? [] : ['role:super_admin'])
             ->whereUuid(['employee', 'document'])

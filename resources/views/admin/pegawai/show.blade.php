@@ -173,6 +173,56 @@
         skUploadErrors: {},
         newSk: { kategori_dokumen: '{{ $canCreateEmployeeHistory ? 'sk_pangkat' : 'sk_pengangkatan' }}', no_sk: '', tanggal_sk: '', file_sk: null, golongan_id: '', tmt_pangkat: '', jabatan_id: '', jenis_jabatan_id: '', unit_kerja_id: '', kelas_jabatan: '', tmt_jabatan: '', gaji_pokok: '', tmt_kgb: '', jenis_pengangkatan: 'CPNS', tmt_pengangkatan: '' },
 
+        // Ganti berkas SK yang sudah ada (metadata read-only, hanya file yang diganti)
+        showEditSkModal: false,
+        editSkDoc: null,
+        editSkFile: null,
+        editSkError: '',
+        isUpdatingSkFile: false,
+
+        openEditSk(doc) {
+            this.editSkDoc = doc;
+            this.editSkFile = null;
+            this.editSkError = '';
+            this.showEditSkModal = true;
+        },
+        async submitReplaceSk() {
+            if (!this.editSkDoc) return;
+            if (!this.editSkFile) {
+                this.editSkError = 'Pilih berkas SK pengganti terlebih dahulu.';
+                return;
+            }
+            this.editSkError = '';
+            this.isUpdatingSkFile = true;
+            try {
+                const fd = new FormData();
+                fd.append('berkas', this.editSkFile);
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.editSkDoc.id}/ganti-berkas`, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+                    body: fd,
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const msg = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Gagal mengganti berkas SK.');
+                    this.editSkError = msg;
+                    return;
+                }
+                // Reload agar status is_latest, file_tersedia, dan ukuran berkas
+                // selalu akurat dari server (serupa alur submitUploadSk). Cache
+                // arsip dibuang agar tidak menampilkan data lama.
+                this.invalidateDokumenCache();
+                this.showEditSkModal = false;
+                this.editSkDoc = null;
+                this.editSkFile = null;
+                window.location.reload();
+            } catch (e) {
+                this.editSkError = 'Terjadi kesalahan jaringan. Silakan coba lagi.';
+            } finally {
+                this.isUpdatingSkFile = false;
+            }
+        },
+
         // Edit metadata berkas lainnya
         showEditBerkasModal: false,
         isUpdatingBerkas: false,
@@ -328,19 +378,6 @@
             } finally {
                 this.isUploadingSk = false;
             }
-        },
-
-        // ===== Tambah / ganti SK via riwayat baru (append-only) =====
-        // Tombol kelola SK di tabel membuka form 'Tambah Berkas SK' dengan kategori
-        // ter-prefill. Jalur ini menuju /berkas-sk dan selalu membuat riwayat baru,
-        // tidak pernah memutasi record yang sudah ada.
-        openSkRiwayatForm(kategori = 'sk_pangkat') {
-            this.resetSkTypeFields();
-            this.newSk.kategori_dokumen = kategori;
-            this.skUploadError = '';
-            this.skUploadErrors = {};
-            this.showUploadSkForm = true;
-            this.showUploadBerkas = false;
         },
 
         // ===== Edit metadata berkas lainnya =====
