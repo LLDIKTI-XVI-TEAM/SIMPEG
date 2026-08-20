@@ -5,6 +5,7 @@ namespace App\Actions\Employees;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
+use App\Services\TransactionSideEffectManager;
 use App\Support\EmployeeImport\EmployeeRowMapper;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use App\Support\EmployeeValidationRules;
@@ -18,6 +19,8 @@ use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 class ValidateImportBatchAction
 {
     private ?array $jenisPegawaiCache = null;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Memvalidasi seluruh baris batch import sesuai pemetaan aktif dan aturan identitas pegawai.
@@ -46,10 +49,13 @@ class ValidateImportBatchAction
                 abort(403, 'Anda tidak memiliki akses ke batch import ini.');
             }
 
+            $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+            $this->restoreCacheAfterRollback($cacheKey, $batch);
+
             if ($updatedRows !== null) {
                 $batch['rows'] = $this->mergeEditedRows($batch['rows'], $updatedRows);
                 $batch['total_rows'] = count($batch['rows']);
-                Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+                Cache::put($cacheKey, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
             }
 
             // Pemetaan aktif batch adalah sumber kebenaran tafsir kolom. Field wajib yang belum
@@ -138,7 +144,7 @@ class ValidateImportBatchAction
                 'skip_count' => $skipCount,
                 'results' => $results,
             ];
-            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+            Cache::put($cacheKey, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
 
             return [
                 'batch_id' => $batchId,
@@ -153,6 +159,14 @@ class ValidateImportBatchAction
         } finally {
             $lifecycleLock->release();
         }
+    }
+
+    /** Baris dan hasil validasi lama dipulihkan bila audit request tidak dapat disimpan. */
+    private function restoreCacheAfterRollback(string $cacheKey, array $snapshot): void
+    {
+        $this->sideEffects->afterRollbackOnce("cache:{$cacheKey}", static function () use ($cacheKey, $snapshot): void {
+            Cache::put($cacheKey, $snapshot, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+        });
     }
 
     /**

@@ -36,32 +36,28 @@ class AuditRoleSimulationUsage
 
             try {
                 $response = DB::transaction(function () use ($request, $next): Response {
+                    // Callback pertama menjadi penanda batas durable. Callback Laravel lain
+                    // dapat gagal setelah PDO commit dan tidak boleh memicu cleanup rollback.
+                    DB::afterCommit(fn () => $this->sideEffects->markDatabaseCommitted());
+
                     $response = $next($request);
                     $this->auditSuccessfulUsage($request, $response);
 
                     return $response;
                 });
             } catch (Throwable $exception) {
-                // Rollback database tidak dapat membatalkan storage; callback Action
-                // membersihkan file baru yang belum memiliki record sah.
-                try {
-                    $this->sideEffects->rollback();
-                } catch (Throwable $cleanupException) {
-                    // Kegagalan cleanup perlu dilaporkan tanpa menutupi penyebab rollback asli.
-                    report($cleanupException);
+                if ($this->sideEffects->databaseWasCommitted()) {
+                    // Exception callback pasca-commit tidak dapat membatalkan record sah.
+                    $this->commitSideEffects();
+                } else {
+                    $this->rollbackSideEffects();
                 }
 
                 throw $exception;
             }
 
             // Penghapusan file lama baru aman setelah audit penggunaan ikut commit.
-            try {
-                $this->sideEffects->commit();
-            } catch (Throwable $cleanupException) {
-                // Record dan audit sudah sah; kegagalan membersihkan file lama tidak boleh
-                // mengubah respons menjadi gagal setelah database terlanjur commit.
-                report($cleanupException);
-            }
+            $this->commitSideEffects();
 
             return $response;
         }
@@ -76,6 +72,7 @@ class AuditRoleSimulationUsage
     private function requiresAtomicMutationAudit(Request $request): bool
     {
         return $this->hasActiveSimulation($request)
+            && $this->usesEffectiveRole($request)
             && $this->isMutationRequest($request)
             && ! $this->isExcludedRoute($request);
     }
@@ -113,6 +110,10 @@ class AuditRoleSimulationUsage
             return false;
         }
 
+        if (! $this->usesEffectiveRole($request)) {
+            return false;
+        }
+
         if ($this->isExcludedRoute($request)) {
             return false;
         }
@@ -125,6 +126,27 @@ class AuditRoleSimulationUsage
         $user = $request->user();
 
         return $user instanceof User && filled($user->temporary_role);
+    }
+
+    /**
+     * Usage hanya bermakna ketika route mengevaluasi role atau permission internal.
+     * Route publik dan callback autentikasi tetap melewati grup web, tetapi tidak memakai
+     * role efektif sehingga tidak boleh menghasilkan jejak penggunaan semu.
+     */
+    private function usesEffectiveRole(Request $request): bool
+    {
+        $middleware = $request->route()?->gatherMiddleware() ?? [];
+
+        foreach ($middleware as $name) {
+            if (str_starts_with($name, 'role:')
+                || str_starts_with($name, 'permission:')
+                || str_starts_with($name, EnsureRole::class.':')
+                || str_starts_with($name, EnsurePermission::class.':')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Route otomatis dan pemulihan tidak merepresentasikan penggunaan role tujuan. */
@@ -141,5 +163,25 @@ class AuditRoleSimulationUsage
     private function isMutationRequest(Request $request): bool
     {
         return in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true);
+    }
+
+    /** Efek commit bersifat cleanup; kegagalannya dilaporkan tanpa membatalkan respons sah. */
+    private function commitSideEffects(): void
+    {
+        try {
+            $this->sideEffects->commit();
+        } catch (Throwable $cleanupException) {
+            report($cleanupException);
+        }
+    }
+
+    /** Jalankan semua kompensasi rollback tanpa menutupi exception transaksi utama. */
+    private function rollbackSideEffects(): void
+    {
+        try {
+            $this->sideEffects->rollback();
+        } catch (Throwable $cleanupException) {
+            report($cleanupException);
+        }
     }
 }

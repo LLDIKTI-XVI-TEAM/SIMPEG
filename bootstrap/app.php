@@ -24,8 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'session.timeout' => SessionTimeoutMessage::class,
         ]);
 
-        // Catat pemakaian role sementara pada request sukses agar aktor asli dan role
-        // efektif tetap dapat ditelusuri tanpa mengandalkan kontrol yang terlihat di UI.
+        // Middleware global hanya mengamati route web; kelasnya sendiri membatasi audit
+        // pada route yang benar-benar memiliki gate role atau permission internal.
         $middleware->web(append: [
             AuditRoleSimulationUsage::class,
         ]);

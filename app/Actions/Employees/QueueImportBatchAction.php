@@ -7,6 +7,7 @@ use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\Import\ImportBatchJobPublisher;
 use App\Services\Import\ImportBatchSchemaReadiness;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +18,7 @@ class QueueImportBatchAction
     public function __construct(
         private readonly ImportBatchJobPublisher $publisher,
         private readonly ImportBatchSchemaReadiness $schemaReadiness,
+        private readonly TransactionSideEffectManager $sideEffects,
     ) {}
 
     /**
@@ -70,6 +72,7 @@ class QueueImportBatchAction
             }
 
             $originalBatch = $batch;
+            $this->restoreCacheAfterRollback($cacheKey, $originalBatch);
             $claimed = false;
             $processingToken = (string) Str::uuid();
 
@@ -153,6 +156,14 @@ class QueueImportBatchAction
         } finally {
             $lifecycleLock->release();
         }
+    }
+
+    /** Status cache queued hanya boleh terbit bersama claim database dan audit usage. */
+    private function restoreCacheAfterRollback(string $cacheKey, array $snapshot): void
+    {
+        $this->sideEffects->afterRollbackOnce("cache:{$cacheKey}", static function () use ($cacheKey, $snapshot): void {
+            Cache::put($cacheKey, $snapshot, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+        });
     }
 
     /**

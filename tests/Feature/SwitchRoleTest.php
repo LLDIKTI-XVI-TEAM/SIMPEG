@@ -7,6 +7,7 @@ use App\Exceptions\SwitchRoleConflictException;
 use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\ImportBatch;
 use App\Models\Permission;
 use App\Models\RefUnitKerja;
 use App\Models\Role;
@@ -14,11 +15,14 @@ use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -1050,6 +1054,157 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
+    /** Exception callback pasca-commit tidak boleh menjalankan kompensasi rollback berkas. */
+    public function test_after_commit_failure_keeps_committed_document_and_new_file_consistent(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $user = $this->createUserWithRole('super_admin');
+        $employee = Employee::factory()->create();
+        $oldPath = $employee->id.'/lainnya/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'dokumen lama');
+        $document = Document::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Lama',
+            'nomor_dokumen' => 'DOC-LAMA',
+            'file_path' => $oldPath,
+        ]);
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+
+        $eventName = 'eloquent.created: '.AuditLog::class;
+        Event::listen($eventName, function (AuditLog $audit): void {
+            if ($audit->event === 'ROLE_SIMULATION_USAGE') {
+                DB::afterCommit(static function (): never {
+                    throw new \RuntimeException('Paksa kegagalan callback setelah commit database.');
+                });
+            }
+        });
+
+        try {
+            $response = $this->actingAs($user)->post(route('dokumen.update', $document->id), [
+                'kategori_dokumen' => 'lainnya',
+                'nama_dokumen' => 'Dokumen Setelah Commit',
+                'nomor_dokumen' => 'DOC-COMMITTED',
+                'tanggal_terbit' => '2026-08-20',
+                'deskripsi' => 'Database sudah commit sebelum callback queue gagal.',
+                'berkas' => UploadedFile::fake()->create('dokumen-committed.pdf', 64, 'application/pdf'),
+            ]);
+
+            $response->assertServerError();
+        } finally {
+            Event::forget($eventName);
+        }
+
+        $document->refresh();
+        $this->assertSame('Dokumen Setelah Commit', $document->nama_dokumen);
+        $this->assertSame('DOC-COMMITTED', $document->nomor_dokumen);
+        $this->assertNotSame($oldPath, $document->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'ROLE_SIMULATION_USAGE',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /** Mapping cache harus kembali ke snapshot lama ketika audit usage gagal. */
+    public function test_import_mapping_cache_is_restored_when_usage_audit_fails(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $batchId = $this->uploadImportBatch($user);
+        $cacheKey = "import_batch:{$batchId}";
+        $before = Cache::get($cacheKey);
+        $this->assertNotSame('tidak_dipakai', $before['mapping']['Pangkat'] ?? null);
+
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $this->actingAs($user)->postJson(route('pegawai.import.mapping', $batchId), [
+                'mapping' => ['Pangkat' => 'tidak_dipakai'],
+            ])->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $this->assertSame($before, Cache::get($cacheKey));
+    }
+
+    /** Hasil validasi cache tidak boleh bertahan jika audit usage membatalkan request. */
+    public function test_import_validation_cache_is_restored_when_usage_audit_fails(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+        $user = $this->createUserWithRole('super_admin');
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $batchId = $this->uploadImportBatch($user);
+        $cacheKey = "import_batch:{$batchId}";
+        $before = Cache::get($cacheKey);
+        $this->assertNull($before['validation']);
+
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $this->actingAs($user)
+                ->postJson(route('pegawai.import.validate', $batchId), [])
+                ->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $this->assertSame($before, Cache::get($cacheKey));
+    }
+
+    /** Status queued di cache harus dikembalikan jika claim database batal bersama audit usage. */
+    public function test_import_queue_cache_is_restored_when_usage_audit_fails(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+        Queue::fake();
+        $user = $this->createUserWithRole('super_admin');
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $batchId = $this->uploadImportBatch($user);
+
+        $this->actingAs($user)
+            ->postJson(route('pegawai.import.validate', $batchId), [])
+            ->assertOk();
+
+        $cacheKey = "import_batch:{$batchId}";
+        $before = Cache::get($cacheKey);
+        $this->assertArrayNotHasKey('status', $before);
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $this->actingAs($user)
+                ->postJson(route('pegawai.import.execute', $batchId), [])
+                ->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $this->assertSame($before, Cache::get($cacheKey));
+        $this->assertNull(ImportBatch::query()->find($batchId));
+    }
+
+    /** Route web publik tidak menggunakan role efektif sehingga tidak boleh membuat usage audit. */
+    public function test_role_simulation_usage_not_recorded_for_public_home_route(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pegawai']);
+        $user->refresh();
+
+        $this->actingAs($user)->get(route('home'))->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'ROLE_SIMULATION_USAGE',
+            'user_id' => $user->id,
+        ]);
+    }
+
     /** Polling notifikasi otomatis (bukan interaksi user) tidak boleh tercatat sebagai penggunaan role sementara. */
     public function test_role_simulation_usage_not_recorded_for_notification_polling(): void
     {
@@ -1225,5 +1380,27 @@ class SwitchRoleTest extends TestCase
         }
 
         DB::unprepared('DROP TRIGGER IF EXISTS fail_role_simulation_usage_audit');
+    }
+
+    /** Upload satu batch valid melalui route aktual agar cache mengikuti kontrak wizard. */
+    private function uploadImportBatch(User $user): string
+    {
+        Storage::fake('local');
+        $csv = implode(',', [
+            'Nama Pegawai', 'Email Pegawai', 'Golongan', 'Jabatan', 'Kelas Jabatan', 'NIP',
+            'Nomor Telepon', 'Pangkat', 'Pendidikan Terakhir', 'Pensiun', 'Person', 'Person Formula',
+            'Prodi Pendidikan Terakhir', 'Status Kepegawaian', 'Tanggal Lahir',
+        ])."\n".implode(',', [
+            'Budi Santoso', 'budi@example.com', 'III/a', 'Analis Kepegawaian', '7',
+            '198001012006041001', '081234567890', 'Penata Muda', 'S1', '2038-01-01',
+            'Budi Santoso', 'Budi Santoso', 'Manajemen', 'PNS', '1980-01-01',
+        ])."\n";
+
+        $response = $this->actingAs($user)->postJson(route('pegawai.import.upload'), [
+            'file' => UploadedFile::fake()->createWithContent('pegawai.csv', $csv),
+            'type' => 'utama',
+        ])->assertOk();
+
+        return (string) $response->json('batch_id');
     }
 }

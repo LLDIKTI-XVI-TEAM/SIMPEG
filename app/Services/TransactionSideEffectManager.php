@@ -16,11 +16,16 @@ class TransactionSideEffectManager
 {
     private bool $active = false;
 
+    private bool $databaseCommitted = false;
+
     /** @var list<Closure(): void> */
     private array $afterCommitCallbacks = [];
 
     /** @var list<Closure(): void> */
     private array $afterRollbackCallbacks = [];
+
+    /** @var array<string, true> */
+    private array $afterRollbackKeys = [];
 
     /** Mulai satu scope transaksi request dan buang callback usang dari request sebelumnya. */
     public function begin(): void
@@ -51,6 +56,40 @@ class TransactionSideEffectManager
         $this->afterRollbackCallbacks[] = $callback;
 
         return true;
+    }
+
+    /**
+     * Daftarkan satu kompensasi unik per resource agar beberapa perubahan dalam request
+     * tetap kembali ke snapshot pertama, bukan ke state antara yang sudah dimutasi.
+     */
+    public function afterRollbackOnce(string $key, Closure $callback): bool
+    {
+        if (! $this->active) {
+            return false;
+        }
+
+        if (isset($this->afterRollbackKeys[$key])) {
+            return true;
+        }
+
+        $this->afterRollbackKeys[$key] = true;
+        $this->afterRollbackCallbacks[] = $callback;
+
+        return true;
+    }
+
+    /** Tandai bahwa PDO sudah commit sebelum callback pasca-commit lain dijalankan. */
+    public function markDatabaseCommitted(): void
+    {
+        if ($this->active) {
+            $this->databaseCommitted = true;
+        }
+    }
+
+    /** Bedakan exception pasca-commit dari kegagalan yang masih dapat di-rollback. */
+    public function databaseWasCommitted(): bool
+    {
+        return $this->databaseCommitted;
     }
 
     /** Jalankan efek samping commit setelah transaksi pemilik request benar-benar selesai. */
@@ -96,7 +135,9 @@ class TransactionSideEffectManager
     private function reset(): void
     {
         $this->active = false;
+        $this->databaseCommitted = false;
         $this->afterCommitCallbacks = [];
         $this->afterRollbackCallbacks = [];
+        $this->afterRollbackKeys = [];
     }
 }
