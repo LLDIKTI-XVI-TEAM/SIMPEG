@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Laravel\Socialite\Facades\Socialite;
@@ -100,8 +101,9 @@ class HandleKeycloakCallbackAction
             ]);
 
             if (! $user->exists) {
-                // Bootstrap pertama memberi akses super_admin; setelah itu role wajib ditetapkan admin SIMPEG.
-                $user->role = User::query()->exists() ? null : 'super_admin';
+                // Mapping pegawai valid + role internal belum ada → default SSO Pegawai berperan
+                // sebagai Pegawai; akun pertama sistem diberi akses super_admin agar dapat dikonfigurasi.
+                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
                 $user->password = Str::random(48);
             }
 
@@ -131,7 +133,34 @@ class HandleKeycloakCallbackAction
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        $user->save();
+        // Role internal kosong (null atau string kosong) pada mapping pegawai valid
+        // diinisialisasi sebagai Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
+        // Inisialisasi hanya untuk pegawai yang masih aktif: pegawai yang sudah dinonaktifkan
+        // (soft-delete) tidak layak menerima role baru, agar akses yang dicabut lewat deaktivasi
+        // tidak pulih hanya karena role account lama masih kosong.
+        if ($user->employee_id !== null
+            && is_string($user->employee_id)
+            && ! $this->employeeIsSoftDeleted($user->employee_id)
+            && in_array($user->role, [null, ''], true)) {
+            $user->role = 'pegawai';
+        }
+
+        // Inisialisasi role adalah mutasi penting: disimpan bersama jejak auditnya dalam satu
+        // transaksi (old role null/kosong → role baru) agar perubahan mapping/role selalu punya evidence.
+        $rawPreviousRole = $user->getRawOriginal('role');
+        $previousRole = is_string($rawPreviousRole) ? $rawPreviousRole : null;
+        $roleInitialized = in_array($previousRole, [null, ''], true)
+            && $user->role !== null
+            && $user->role !== '';
+
+        if ($roleInitialized) {
+            DB::transaction(function () use ($user, $previousRole, $request): void {
+                $user->save();
+                $this->auditRoleInitialization($user, $previousRole, $request);
+            });
+        } else {
+            $user->save();
+        }
 
         Auth::login($user);
         $request->session()->regenerate();
@@ -159,11 +188,50 @@ class HandleKeycloakCallbackAction
             return Employee::where(function ($query) use ($matchedEmail): void {
                 $query
                     ->whereRaw('lower(email_pribadi) = ?', [$matchedEmail])
+                    // Kolom email legacy (tanpa index unik) dicocokkan pada pegawai aktif;
+                    // pegawai nonaktif hanya memegang email_pribadi kanonisnya.
                     ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
-            })->limit(2)->get();
+            })
+                // Permukaan autentikasi hanya memetakan pegawai aktif; pegawai yang sudah
+                // di-soft-delete tidak boleh menjadi pintu masuk akun SSO baru.
+                ->whereNull('deleted_at')
+                ->limit(2)
+                ->get();
         }
 
-        return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])->limit(2)->get();
+        return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])
+            ->whereNull('deleted_at')
+            ->limit(2)
+            ->get();
+    }
+
+    /**
+     * Mencatat inisialisasi role internal hasil mapping SSO (role kosong → role baru).
+     *
+     * Fail-closed: kegagalan menulis audit membatalkan perubahan role. Payload memuat old/new
+     * role, pegawai yang dipetakan, dan sumber perubahan yang aman (tanpa claim mentah).
+     */
+    private function auditRoleInitialization(User $user, ?string $previousRole, Request $request): void
+    {
+        AuditService::logAsOrFail(
+            $user->id,
+            $user->name,
+            'UPDATE',
+            'User',
+            $user->id,
+            ['role' => $previousRole],
+            ['role' => $user->role, 'employee_id' => $user->employee_id, 'source' => 'sso_mapping'],
+            $request,
+        );
+    }
+
+    /**
+     * Apakah pegawai terpeta sudah dinonaktifkan (soft-delete). Pegawai nonaktif tidak berhak
+     * atas inisialisasi role baru lewat SSO.
+     */
+    private function employeeIsSoftDeleted(string $employeeId): bool
+    {
+        return (bool) Employee::withTrashed()->whereKey($employeeId)->value('deleted_at');
     }
 
     /**

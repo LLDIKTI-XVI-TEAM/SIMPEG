@@ -146,9 +146,11 @@
         </div>
 
         <div class="space-y-4 rounded-lg border border-border bg-soft/30 p-4">
-            <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
-                Status Kepegawaian
-            </h3>
+            <div class="flex items-center justify-between">
+                <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
+                    Status Kepegawaian
+                </h3>
+            </div>
             <dl class="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2">
                 <div class="space-y-0.5">
                     <dt class="font-semibold text-muted font-sans">Status Saat Ini</dt>
@@ -179,7 +181,6 @@
             </h3>
             <dl class="grid grid-cols-1 gap-4 text-xs sm:grid-cols-2 lg:grid-cols-4">
                 @foreach([
-                    'Email Dinas' => $employee->getRawOriginal('email'),
                     'Email' => $employee->email_pribadi,
                     'Nomor HP' => $employee->no_hp,
                     'Telepon Rumah' => $employee->no_telepon_rumah,

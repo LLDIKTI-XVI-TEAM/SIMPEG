@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -47,21 +48,22 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_new_sso_matched_user_after_bootstrap_gets_null_role(): void
+    /** User baru ter-map valid setelah bootstrap langsung mendapat role pegawai, dan inisialisasi role diaudit. */
+    public function test_new_sso_matched_user_after_bootstrap_defaults_to_pegawai_role(): void
     {
         User::factory()->superAdmin()->create();
 
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Budi Santoso',
-            'email' => 'budi-null-role@example.com',
+            'email' => 'budi-mapped@example.com',
         ]);
 
         $this->fakeKeycloakUser([
-            'id' => 'kc-pegawai-null-role',
-            'nickname' => 'budi-null-role',
+            'id' => 'kc-pegawai-baru',
+            'nickname' => 'budi-baru',
             'name' => 'Budi SSO',
-            'email' => 'budi-null-role@example.com',
-            'raw' => ['email' => 'budi-null-role@example.com', 'email_verified' => true, 'preferred_username' => 'budi-null-role'],
+            'email' => 'budi-mapped@example.com',
+            'raw' => ['email' => 'budi-mapped@example.com', 'email_verified' => true, 'preferred_username' => 'budi-baru'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -69,10 +71,158 @@ class KeycloakCallbackMappingTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticated();
         $this->assertDatabaseHas('users', [
-            'email' => 'budi-null-role@example.com',
-            'keycloak_id' => 'kc-pegawai-null-role',
+            'email' => 'budi-mapped@example.com',
+            'keycloak_id' => 'kc-pegawai-baru',
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        // Inisialisasi role adalah mutasi penting: tercatat di audit dengan old role null.
+        $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_type', 'User')->sole();
+        $this->assertSame(['role' => null], $audit->old_values);
+        $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
+        $this->assertSame($employee->id, $audit->new_values['employee_id'] ?? null);
+        $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
+    }
+
+    /** User lama ber-role kosong dengan mapping valid diinisialisasi menjadi pegawai saat login; inisialisasi diaudit. */
+    public function test_existing_mapped_user_with_blank_role_is_initialized_to_pegawai_on_login(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Siti Lama',
+            'email' => 'siti-lama@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'siti-lama@example.com',
+            'keycloak_id' => 'kc-siti-lama',
             'employee_id' => $employee->id,
             'role' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-siti-lama',
+            'nickname' => 'siti-lama',
+            'name' => 'Siti Lama',
+            'email' => 'siti-lama@example.com',
+            'raw' => ['email' => 'siti-lama@example.com', 'email_verified' => true, 'preferred_username' => 'siti-lama'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'User',
+            'auditable_id' => $user->id,
+        ]);
+        $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_id', $user->id)->sole();
+        $this->assertSame(['role' => null], $audit->old_values);
+        $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
+    }
+
+    /** Role string kosong diperlakukan sama seperti role null: diinisialisasi menjadi pegawai dan diaudit. */
+    public function test_existing_mapped_user_with_empty_role_is_initialized_to_pegawai_on_login(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kadir Kosong',
+            'email' => 'kadir-empty@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'kadir-empty@example.com',
+            'keycloak_id' => 'kc-empty-role',
+            'employee_id' => $employee->id,
+            'role' => '',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-empty-role',
+            'nickname' => 'kadir-empty',
+            'name' => 'Kadir Kosong',
+            'email' => 'kadir-empty@example.com',
+            'raw' => ['email' => 'kadir-empty@example.com', 'email_verified' => true, 'preferred_username' => 'kadir-empty'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_id', $user->id)->sole();
+        $this->assertSame(['role' => ''], $audit->old_values);
+        $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
+    }
+
+    /** Pegawai yang sudah di-soft-delete tidak boleh dipetakan menjadi akun SSO baru. */
+    public function test_soft_deleted_employee_cannot_match_keycloak_login(): void
+    {
+        $trashed = Employee::factory()->create([
+            'nama_lengkap' => 'Nonaktif',
+            'email' => 'nonaktif@example.com',
+        ]);
+        $trashed->delete();
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-nonaktif',
+            'nickname' => 'nonaktif',
+            'name' => 'Nonaktif',
+            'email' => 'nonaktif@example.com',
+            'raw' => ['email' => 'nonaktif@example.com', 'email_verified' => true, 'preferred_username' => 'nonaktif'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Akun Keycloak belum terdaftar');
+        $this->assertGuest();
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    /** Akun yang sudah ada tetap tidak mendapat role baru apabila pegawai terkait sudah dinonaktifkan. */
+    public function test_role_not_initialized_for_account_of_soft_deleted_employee(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Nonaktif Terpeta',
+            'email' => 'softdel-account@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'softdel-account@example.com',
+            'keycloak_id' => 'kc-softdel-account',
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+        $employee->delete();
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-softdel-account',
+            'nickname' => 'softdel-account',
+            'name' => 'Nonaktif Terpeta',
+            'email' => 'softdel-account@example.com',
+            'raw' => ['email' => 'softdel-account@example.com', 'email_verified' => true, 'preferred_username' => 'softdel-account'],
+        ]);
+
+        $this->get('/auth/keycloak/callback');
+
+        // Role tetap kosong (akses yang dicabut lewat deaktivasi tidak pulih) dan tidak ada
+        // audit inisialisasi role untuk akun ini.
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'User',
+            'auditable_id' => $user->id,
         ]);
     }
 
@@ -192,7 +342,18 @@ class KeycloakCallbackMappingTest extends TestCase
             'employee_id' => $firstEmployee->id,
             'role' => 'admin_kepegawaian',
         ]);
+        $this->assertDatabaseHas('employees', [
+            'id' => $firstEmployee->id,
+            'email_pribadi' => 'lama@example.com',
+        ]);
         $this->assertDatabaseMissing('users', ['employee_id' => $secondEmployee->id]);
+
+        // Role existing tidak dioverwrite, sehingga tidak ada audit inisialisasi role untuk user ini.
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'User',
+            'auditable_id' => $user->id,
+        ]);
     }
 
     public function test_missing_email_without_whitelist_is_denied_and_does_not_create_user(): void
@@ -385,7 +546,8 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_keycloak_role_claim_does_not_assign_role_to_new_non_bootstrap_user(): void
+    /** Claim role Keycloak tidak pernah menjadi sumber RBAC; user baru non-bootstrap tetap mendapat default pegawai. */
+    public function test_keycloak_role_claim_does_not_override_pegawai_default_for_new_mapped_user(): void
     {
         User::factory()->superAdmin()->create();
 
@@ -413,7 +575,7 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'siti@example.com',
             'employee_id' => $employee->id,
-            'role' => null,
+            'role' => 'pegawai',
         ]);
     }
 
@@ -472,6 +634,37 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->expectException(UniqueConstraintViolationException::class);
 
         User::factory()->create(['employee_id' => $employee->id]);
+    }
+
+    /**
+     * Email Keycloak terverifikasi hanya dipakai untuk mapping akun; callback tidak menimpa
+     * email kontak pegawai (email_pribadi) yang merupakan Data Utama kelolaan Admin Kepegawaian.
+     */
+    public function test_callback_does_not_overwrite_employee_email_pribadi(): void
+    {
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'kontak@example.com',
+        ]);
+        User::factory()->create([
+            'email' => 'kontak@example.com',
+            'keycloak_id' => 'kc-no-overwrite',
+            'employee_id' => $employee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-no-overwrite',
+            'nickname' => 'no-overwrite',
+            'name' => 'No Overwrite',
+            'email' => 'sso@example.com',
+            'raw' => ['email' => 'sso@example.com', 'email_verified' => true, 'preferred_username' => 'no-overwrite'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('employees', [
+            'id' => $employee->id,
+            'email_pribadi' => 'kontak@example.com',
+        ]);
     }
 
     /**
