@@ -2,7 +2,7 @@
 
 namespace App\Actions\Employees;
 
-use App\Http\Requests\UpdateSkRequirementMatrixRequest;
+use App\Http\Requests\SkRequirement\UpdateSkRequirementMatrixRequest;
 use App\Models\RefJenisPegawai;
 use App\Models\SkRequirement;
 use App\Services\AuditService;

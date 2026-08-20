@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\SkRequirement;
 
 use App\Support\Documents\SkCompleteness;
 use Illuminate\Foundation\Http\FormRequest;

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Actions\Employees\UpdateSkRequirementMatrixAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\UpdateSkRequirementMatrixRequest;
+use App\Http\Requests\SkRequirement\UpdateSkRequirementMatrixRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
