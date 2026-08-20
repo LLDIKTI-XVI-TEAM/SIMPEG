@@ -54,7 +54,7 @@
         this.skMatrixBusy = true;
         this.skMatrixMsg = '';
         const matrix = {};
-        document.querySelectorAll('#sk-requirement-modal input[type="checkbox"]').forEach((cb) => {
+        document.querySelectorAll('#sk-requirement-modal input[type=checkbox]').forEach((cb) => {
             if (cb.checked) {
                 const typeId = cb.dataset.type;
                 (matrix[typeId] = matrix[typeId] || []).push(cb.value);
