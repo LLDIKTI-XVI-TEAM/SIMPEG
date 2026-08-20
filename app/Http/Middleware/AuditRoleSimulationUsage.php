@@ -16,11 +16,15 @@ use Symfony\Component\HttpFoundation\Response;
  * ini menutup celah "penggunaan":
  *
  * - Pencatatan dijalankan SETELAH request diotorisasi dan hanya untuk respons sukses
- *   (2xx/3xx) sehingga 401/403/404/500 tidak diklaim sebagai penggunaan. Berlaku untuk
- *   request baca (GET/HEAD) maupun mutasi (POST/PUT/PATCH/DELETE) yang berhasil.
- * - Penulisan memakai logOrFail() (fail-closed): bila jejak usage gagal ditulis, request
- *   tidak disajikan sebagai penggunaan simulasi yang sah.
- * - Rute polling notifikasi otomatis (bukan interaksi user) dikecualikan dari pencatatan.
+ *   (2xx/3xx) sehingga 401/403/404/500 tidak diklaim sebagai penggunaan.
+ * - Rute kontrol/otomatis (revert-role, polling notifikasi, polling status impor) bukan
+ *   interaksi pengguna sah dan tidak dicatat.
+ * - Request baca (GET/HEAD): logOrFail() fail-closed, karena membaca belum melakukan mutasi
+ *   domain yang perlu di-rollback; pemakaian tanpa jejak dianggap tidak sah.
+ * - Request mutasi (POST/PUT/PATCH/DELETE): log() fail-open. Efek domain mutasi sudah dicatat
+ *   di dalam transaksi oleh Action masing-masing (dengan konteks _simulation); pencatatan
+ *   usage tambahan di sini tidak boleh mengubah mutasi yang sudah berhasil menjadi 500
+ *   (yang membuat klien mengulang operasi) ketika penulisan audit pasca-respons gagal.
  */
 class AuditRoleSimulationUsage
 {
@@ -35,21 +39,20 @@ class AuditRoleSimulationUsage
         /** @var User $user */
         $user = $request->user();
 
-        AuditService::logOrFail(
-            'ROLE_SIMULATION_USAGE',
-            'User',
-            $user->id,
-            null,
-            [
-                'original_role' => $user->role,
-                'effective_role' => $user->getEffectiveRole(),
-                'route' => $request->route()?->getName() ?? $request->path(),
-                'http_method' => $request->method(),
-                'path' => $request->path(),
-                'status' => $response->getStatusCode(),
-            ],
-            $request,
-        );
+        $payload = [
+            'original_role' => $user->role,
+            'effective_role' => $user->getEffectiveRole(),
+            'route' => $request->route()?->getName() ?? $request->path(),
+            'http_method' => $request->method(),
+            'path' => $request->path(),
+            'status' => $response->getStatusCode(),
+        ];
+
+        if ($this->isReadRequest($request)) {
+            AuditService::logOrFail('ROLE_SIMULATION_USAGE', 'User', $user->id, null, $payload, $request);
+        } else {
+            AuditService::log('ROLE_SIMULATION_USAGE', 'User', $user->id, null, $payload, $request);
+        }
 
         return $response;
     }
@@ -62,15 +65,24 @@ class AuditRoleSimulationUsage
             return false;
         }
 
-        // Polling notifikasi otomatis (notification bell) bukan interaksi pengguna yang sah;
-        // sama seperti SessionTimeoutMessage, dikecualikan agar tab yang dibiarkan terbuka
-        // tidak membanjiri audit log dengan klaim penggunaan role sementara tanpa interaksi.
-        if ($request->routeIs('api.v1.notifikasi.index', 'api.v1.notifikasi.jumlah-belum-dibaca')) {
+        // Rute kontrol/otomatis yang bukan interaksi pengguna sah — dikecualikan dari klaim
+        // penggunaan role sementara agar jejak tidak membanjiri audit_log maupun menyatakan
+        // simulasi masih aktif setelah revert/laporan status timer.
+        if ($request->routeIs(
+            'revert-role',
+            'api.v1.notifikasi.index',
+            'api.v1.notifikasi.jumlah-belum-dibaca',
+            'pegawai.import.status',
+        )) {
             return false;
         }
 
-        // Setelah request diotorisasi dan merespons sukses (2xx/3xx), baik baca (GET/HEAD) maupun
-        // mutasi (POST/PUT/PATCH/DELETE) dianggap sebagai penggunaan role sementara yang sah (AC-6).
+        // Setelah request diotorisasi dan merespons sukses (2xx/3xx).
         return $response->getStatusCode() < 400;
+    }
+
+    private function isReadRequest(Request $request): bool
+    {
+        return in_array($request->method(), ['GET', 'HEAD'], true);
     }
 }

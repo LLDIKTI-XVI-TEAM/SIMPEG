@@ -14,6 +14,9 @@ use App\Models\User;
 use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class SwitchRoleTest extends TestCase
@@ -903,6 +906,71 @@ class SwitchRoleTest extends TestCase
 
         $this->actingAs($user)->getJson(route('api.v1.notifikasi.index'))->assertOk();
         $this->actingAs($user)->getJson(route('api.v1.notifikasi.jumlah-belum-dibaca'))->assertOk();
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'ROLE_SIMULATION_USAGE',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /**
+     * Route revert tidak boleh menulis ROLE_SIMULATION_USAGE setelah REVERT_ROLE.
+     * Instance autentikasi pada request masih membawa temporary_role lama setelah
+     * action membersihkannya dari state terkunci, sehingga route dikunci eksplisit.
+     */
+    public function test_usage_audit_not_recorded_during_revert(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+
+        // Satu kali penggunaan baca tercatat sebagai baseline.
+        $this->actingAs($user)->get(route('cuti'))->assertOk();
+        $this->assertSame(1, AuditLog::where('event', 'ROLE_SIMULATION_USAGE')->where('user_id', $user->id)->count());
+
+        // Revert tidak boleh menambah usage audit walau instance request masih membawa
+        // temporary_role lama (route di-exclude).
+        $this->actingAs($user)->post(route('revert-role'))->assertRedirect();
+
+        $this->assertSame(1, AuditLog::where('event', 'ROLE_SIMULATION_USAGE')->where('user_id', $user->id)->count());
+        $this->assertDatabaseHas('audit_logs', ['event' => 'REVERT_ROLE', 'auditable_id' => $user->id]);
+    }
+
+    /** Switch kedua saat simulasi sudah aktif ditolak (konflik), bukan menimpa simulasi berjalan. */
+    public function test_switch_role_rejected_when_simulation_already_active(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $user->forceFill([
+            'temporary_role' => 'admin_kepegawaian',
+            'temporary_role_started_at' => now(),
+        ])->save();
+
+        $action = app(SwitchRoleAction::class);
+        $request = Request::create(route('switch-role'), 'POST');
+
+        $this->expectException(SwitchRoleConflictException::class);
+        $this->expectExceptionMessage('sudah aktif');
+
+        $action->execute($user, 'pegawai', $request);
+    }
+
+    /** Polling status impor (activity timer) tidak boleh dicatat sebagai penggunaan role sementara. */
+    public function test_usage_audit_not_recorded_for_import_status_polling(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+
+        $batchId = (string) Str::uuid();
+        Cache::put("import_batch:{$batchId}", [
+            'user_id' => $user->id,
+            'status' => 'processing',
+            'progress' => 50,
+            'processed_count' => 10,
+            'total_rows' => 20,
+        ]);
+
+        $this->actingAs($user)->getJson(route('pegawai.import.status', $batchId))->assertOk();
 
         $this->assertDatabaseMissing('audit_logs', [
             'event' => 'ROLE_SIMULATION_USAGE',

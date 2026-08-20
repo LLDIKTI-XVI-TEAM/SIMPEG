@@ -23,6 +23,14 @@ class SwitchRoleAction
         DB::transaction(function () use ($user, $targetRole, $temporaryPermission, $request): void {
             $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
+            // Simulasi sudah aktif: tolak switch kedua. Dua request switch yang lolos middleware
+            // secara bersamaan bisa menunggu lock; setelah memperolehnya, state terkunci sudah
+            // menampilkan simulasi berjalan sehingga switch ulang harus ditolak agar otorisasi
+            // konsisten dengan role efektif saat itu (bukan hanya role asli).
+            if ($locked->temporary_role !== null) {
+                throw new SwitchRoleConflictException('Simulasi role sudah aktif. Lakukan revert terlebih dahulu sebelum switch kembali.');
+            }
+
             // Validasi ulang dari state terkunci (bukan instance request) agar fail-closed.
             // Kegagalan ini adalah konflik otorisasi akibat state berubah di antara validasi
             // request dan lock (mis. demosi paralel); dilempar sebagai exception khusus agar
