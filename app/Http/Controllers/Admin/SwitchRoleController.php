@@ -9,9 +9,34 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RevertRoleRequest;
 use App\Http\Requests\Auth\SwitchRoleRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class SwitchRoleController extends Controller
 {
+    /**
+     * Menampilkan jalur pemulihan ketika role efektif tidak lagi valid untuk membuka layout aplikasi.
+     *
+     * Halaman ini hanya memerlukan sesi Keycloak yang sah. Ia tidak mengubah state dan tidak memakai
+     * role efektif, sehingga Super Admin tetap dapat membatalkan simulasi yang target role-nya dihapus.
+     */
+    public function showRecovery(Request $request): View|RedirectResponse
+    {
+        $user = $request->user();
+
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        if (! filled($user->temporary_role)) {
+            return redirect()->route('dashboard');
+        }
+
+        return view('auth.revert-role', [
+            'temporaryRole' => $user->temporary_role,
+        ]);
+    }
+
     /**
      * Melakukan switch role ke role yang lebih rendah.
      */

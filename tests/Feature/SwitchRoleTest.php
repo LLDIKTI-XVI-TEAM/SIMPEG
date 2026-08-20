@@ -641,6 +641,61 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
+    /** Role target yang invalid tetap harus menyediakan form revert di luar gate role efektif. */
+    public function test_recovery_page_is_available_when_temporary_role_is_not_registered(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        Role::where('name', 'pimpinan')->delete();
+
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'pimpinan',
+        ])->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+
+        $this->actingAs($user)
+            ->get(route('revert-role.recovery'))
+            ->assertOk()
+            ->assertSee('Pemulihan Mode Simulasi')
+            ->assertSee('Pimpinan')
+            ->assertSee('Kembalikan Role Asli')
+            ->assertSee(route('revert-role'), false);
+    }
+
+    /** Kontrol dokumen harus mengikuti role efektif seperti middleware route, bukan role asli. */
+    public function test_document_controls_follow_effective_role_during_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $document = Document::query()->create([
+            'employee_id' => $user->employee_id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Simulasi',
+            'file_path' => 'dokumen-simulasi.pdf',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('dokumen'))
+            ->assertOk()
+            ->assertSee('title="Edit"', false)
+            ->assertSee('title="Hapus"', false);
+
+        $this->actingAs($user)->post(route('switch-role'), [
+            'target_role' => 'admin_kepegawaian',
+        ])->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+
+        $this->actingAs($user)
+            ->get(route('dokumen'))
+            ->assertOk()
+            ->assertSee('title="Edit"', false)
+            ->assertDontSee('title="Hapus"', false);
+
+        $this->actingAs($user)
+            ->delete(route('dokumen.destroy', $document))
+            ->assertForbidden();
+    }
+
     public function test_global_search_uses_effective_role_for_pimpinan_simulation(): void
     {
         $haystack = 'xXSearchTargetXx';
@@ -1054,8 +1109,8 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
-    /** Exception callback pasca-commit tidak boleh menjalankan kompensasi rollback berkas. */
-    public function test_after_commit_failure_keeps_committed_document_and_new_file_consistent(): void
+    /** Callback pasca-commit gagal tidak boleh mengubah mutasi yang sudah durable menjadi respons 500. */
+    public function test_after_commit_failure_keeps_committed_document_and_success_response_consistent(): void
     {
         Storage::fake(Document::STORAGE_DISK);
 
@@ -1093,7 +1148,7 @@ class SwitchRoleTest extends TestCase
                 'berkas' => UploadedFile::fake()->create('dokumen-committed.pdf', 64, 'application/pdf'),
             ]);
 
-            $response->assertServerError();
+            $response->assertRedirect(route('dokumen'));
         } finally {
             Event::forget($eventName);
         }

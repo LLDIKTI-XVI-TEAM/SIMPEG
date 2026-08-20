@@ -33,9 +33,10 @@ class AuditRoleSimulationUsage
     {
         if ($this->requiresAtomicMutationAudit($request)) {
             $this->sideEffects->begin();
+            $response = null;
 
             try {
-                $response = DB::transaction(function () use ($request, $next): Response {
+                DB::transaction(function () use ($request, $next, &$response): Response {
                     // Callback pertama menjadi penanda batas durable. Callback Laravel lain
                     // dapat gagal setelah PDO commit dan tidak boleh memicu cleanup rollback.
                     DB::afterCommit(fn () => $this->sideEffects->markDatabaseCommitted());
@@ -47,8 +48,14 @@ class AuditRoleSimulationUsage
                 });
             } catch (Throwable $exception) {
                 if ($this->sideEffects->databaseWasCommitted()) {
-                    // Exception callback pasca-commit tidak dapat membatalkan record sah.
+                    // Callback pasca-commit tidak dapat membatalkan record sah. Laporkan kegagalan
+                    // operasionalnya, tetapi pertahankan respons sukses agar klien tidak me-retry mutasi.
                     $this->commitSideEffects();
+                    report($exception);
+
+                    if ($response instanceof Response) {
+                        return $response;
+                    }
                 } else {
                     $this->rollbackSideEffects();
                 }
@@ -59,6 +66,7 @@ class AuditRoleSimulationUsage
             // Penghapusan file lama baru aman setelah audit penggunaan ikut commit.
             $this->commitSideEffects();
 
+            /** @var Response $response */
             return $response;
         }
 
