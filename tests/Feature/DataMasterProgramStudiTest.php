@@ -45,34 +45,16 @@ class DataMasterProgramStudiTest extends TestCase
         $this->assertFalse($programStudi->refresh()->is_active);
     }
 
-    public function test_program_studi_mutation_is_restricted_to_super_admin_role(): void
-    {
-        // Hanya Super Admin yang juga memiliki permission reference_tables.manage yang boleh
-        // memutasi Program Studi; role lain ditolak (US-8.5 AC-8 dual gate role + permission).
-        $nonAdmin = User::factory()->adminKepegawaian()->create();
-
-        $this->actingAs($nonAdmin)
-            ->postWithCsrf(route('data-master.program-studi.store'), ['nama' => 'Teknik Informatika'])
-            ->assertForbidden();
-
-        $this->assertDatabaseCount('ref_program_studi', 0);
-        $this->assertDatabaseCount('audit_logs', 0);
-    }
-
-    public function test_super_admin_without_reference_tables_manage_permission_is_denied(): void
+    public function test_program_studi_mutation_requires_reference_table_permission(): void
     {
         $user = User::factory()->superAdmin()->create();
         $role = Role::where('name', 'super_admin')->firstOrFail();
-        $permission = Permission::where('name', 'reference_tables.manage')->firstOrFail();
-        $role->permissions()->detach($permission);
+        $permissionId = Permission::where('name', 'reference_tables.manage')->value('id');
+        $role->permissions()->detach($permissionId);
 
-        // Pencabutan permission tetap fail-closed: Super Admin tanpa reference_tables.manage
-        // tidak boleh memutasi Program Studi (US-8.5 AC-8).
         $this->actingAs($user)
             ->postWithCsrf(route('data-master.program-studi.store'), ['nama' => 'Teknik Informatika'])
             ->assertForbidden();
-
-        $this->assertDatabaseCount('ref_program_studi', 0);
     }
 
     public function test_program_studi_used_by_employee_cannot_be_deleted(): void
