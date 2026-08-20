@@ -43,6 +43,7 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SkRequirementController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
@@ -622,6 +623,13 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard/Pengaturan', function () {
         return redirect()->route('pengaturan');
     });
+
+    Route::get('/dashboard/sk-requirements', [SkRequirementController::class, 'index'])
+        ->middleware(['role:super_admin'])
+        ->name('sk-requirements.config');
+    Route::post('/dashboard/sk-requirements', [SkRequirementController::class, 'update'])
+        ->middleware(['role:super_admin'])
+        ->name('sk-requirements.update');
 
     Route::get('/notifications', [NotificationController::class, 'index'])
         ->middleware('permission:notifications.read')

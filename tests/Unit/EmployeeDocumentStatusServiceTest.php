@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
 use App\Services\EmployeeDocumentStatusService;
+use Database\Seeders\SkRequirementSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -339,6 +340,9 @@ class EmployeeDocumentStatusServiceTest extends TestCase
         // pre-load relations
         $employee->load(['appointments', 'rankHistories', 'positionHistories', 'salaryHistories', 'documents', 'jenisPegawai']);
 
+        // Panaskan cache matriks SK (dimuat sekali per service, bukan per pegawai).
+        $this->service->summarize($employee->fresh());
+
         DB::enableQueryLog();
 
         $this->service->summarize($employee);
@@ -350,25 +354,58 @@ class EmployeeDocumentStatusServiceTest extends TestCase
     }
 
     /**
-     * Evaluasi kelengkapan SK berlaku untuk semua pegawai (termasuk CPNS/PPPK/jenis
-     * tanpa relasi jenisPegawai): empat kategori tetap dinilai agar kerusakan berkas
-     * (kosong/hilang/konflik) tidak tersembunyi; tanpa data SK statusnya belum_ada.
+     * Matriks default: PPPK wajib 2 SK (pengangkatan, kgb) — bukan empat.
      */
-    public function test_non_pns_employee_is_still_evaluated_against_four_sk(): void
+    public function test_pppk_dikonfigurasi_wajib_dua_sk(): void
     {
         $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
+        $this->seed(SkRequirementSeeder::class);
         $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
 
         $result = $this->service->summarize($employee->fresh());
 
         $this->assertSame('belum_ada', $result['status_kelengkapan']);
         $this->assertFalse($result['is_lengkap']);
-        $this->assertSame(4, $result['total_wajib']);
+        $this->assertSame(2, $result['total_wajib']);
         $this->assertSame(0, $result['tersedia_count']);
-        $this->assertCount(4, $result['required_sks']);
+        $this->assertCount(2, $result['required_sks']);
+        $wajibKeys = collect($result['required_sks'])->pluck('jenis')->all();
+        sort($wajibKeys);
+        $this->assertSame(['sk_kgb', 'sk_pengangkatan'], $wajibKeys);
         foreach ($result['required_sks'] as $sk) {
             $this->assertSame('belum_ada', $sk['status']);
         }
+    }
+
+    /**
+     * Matriks default: PNS wajib 4 SK (pengangkatan, pangkat, jabatan, kgb).
+     */
+    public function test_pns_dikonfigurasi_wajib_empat_sk(): void
+    {
+        RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $this->seed(SkRequirementSeeder::class);
+        $employee = $this->createPnsEmployee();
+
+        $result = $this->service->summarize($employee->fresh());
+
+        $this->assertSame(0, $result['tersedia_count']);
+        $this->assertSame(4, $result['total_wajib']);
+        $this->assertCount(4, $result['required_sks']);
+    }
+
+    /**
+     * Jenis pegawai yang belum dikonfigurasi (tidak ada baris di matriks) memakai
+     * fallback: seluruh SK wajib (kompatibel dengan perilaku lama).
+     */
+    public function test_jenis_belum_dikonfigurasi_memakai_fallback_semua_sk(): void
+    {
+        $honorer = RefJenisPegawai::firstOrCreate(['nama' => 'Honorarium']);
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $honorer->id]);
+
+        $result = $this->service->summarize($employee->fresh());
+
+        $this->assertSame(4, $result['total_wajib']);
+        $this->assertCount(4, $result['required_sks']);
     }
 
     /**

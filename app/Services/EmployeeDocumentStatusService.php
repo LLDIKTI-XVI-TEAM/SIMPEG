@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\SkRequirement;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
+use App\Support\Documents\SkCompleteness;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 
@@ -20,12 +22,7 @@ use Illuminate\Support\Facades\Storage;
 class EmployeeDocumentStatusService
 {
     /** @var array<string, string> */
-    private const REQUIRED_SK = [
-        'sk_pengangkatan' => 'SK Pengangkatan',
-        'sk_pangkat' => 'SK Pangkat',
-        'sk_jabatan' => 'SK Jabatan',
-        'sk_kgb' => 'SK KGB',
-    ];
+    private const REQUIRED_SK = SkCompleteness::POOL;
 
     /** @var array<string, string> */
     private const ATTACHMENT_TYPES = [
@@ -34,6 +31,14 @@ class EmployeeDocumentStatusService
         'sk_jabatan' => 'position',
         'sk_kgb' => 'salary',
     ];
+
+    /**
+     * Matriks SK wajib per jenis_pegawai_id yang dimuat sekali per pemanggilan
+     * service, agar penilaian banyak pegawai (daftar) tidak memicu N+1 query.
+     *
+     * @var array<string, list<string>>|null
+     */
+    private ?array $requirementMapByType = null;
 
     public function __construct(
         private readonly EmployeeHistoryAttachmentService $attachments,
@@ -189,7 +194,9 @@ class EmployeeDocumentStatusService
         $belumAdaCount = 0;
         $perluPerbaikanCount = 0;
 
-        foreach (self::REQUIRED_SK as $key => $label) {
+        $requiredSksMap = $this->requiredSkFor($employee);
+
+        foreach ($requiredSksMap as $key => $label) {
             $candidates = collect($sources[$key]);
 
             // Kandidat pertama dari riwayat adalah kandidat kanonis. Jika file-nya
@@ -239,7 +246,7 @@ class EmployeeDocumentStatusService
             ];
         }
 
-        $totalWajib = count(self::REQUIRED_SK);
+        $totalWajib = count($requiredSksMap);
         $statusKelengkapan = match (true) {
             $perluPerbaikanCount > 0 => 'perlu_perbaikan',
             $tersediaCount === $totalWajib => 'lengkap',
@@ -256,6 +263,48 @@ class EmployeeDocumentStatusService
             'perlu_perbaikan_count' => $perluPerbaikanCount,
             'required_sks' => $requiredSks,
         ];
+    }
+
+    /**
+     * SK wajib untuk jenis pegawai sang pegawai.
+     *
+     * Matriks dikonfigurasi super admin pada tabel sk_requirements. Jenis
+     * pegawai yang belum memiliki baris sama sekali (belum dikonfigurasi) memakai
+     * seluruh SK sebagai fallback (perilaku lama); jenis yang sudah dikonfigurasi
+     * memakai is_wajib apa adanya (boleh kosong).
+     *
+     * @return array<string, string> peta sk_key => label
+     */
+    private function requiredSkFor(Employee $employee): array
+    {
+        $typeId = $employee->jenis_pegawai_id;
+
+        if ($typeId !== null) {
+            $keys = $this->requirementMapByType()[$typeId] ?? null;
+            if ($keys !== null) {
+                return array_intersect_key(self::REQUIRED_SK, array_flip($keys));
+            }
+        }
+
+        return self::REQUIRED_SK;
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function requirementMapByType(): array
+    {
+        if ($this->requirementMapByType !== null) {
+            return $this->requirementMapByType;
+        }
+
+        return $this->requirementMapByType = SkRequirement::query()
+            ->where('is_wajib', true)
+            ->select('jenis_pegawai_id', 'sk_key')
+            ->get()
+            ->groupBy('jenis_pegawai_id')
+            ->map(fn (Collection $rows): array => $rows->pluck('sk_key')->all())
+            ->all();
     }
 
     /**
