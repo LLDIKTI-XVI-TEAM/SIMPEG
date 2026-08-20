@@ -331,7 +331,7 @@
         },
 
         // ===== Tambah / ganti SK via riwayat baru (append-only) =====
-        // Tombol kelola SK di tabel membuka form "Tambah Berkas SK" dengan kategori
+        // Tombol kelola SK di tabel membuka form 'Tambah Berkas SK' dengan kategori
         // ter-prefill. Jalur ini menuju /berkas-sk dan selalu membuat riwayat baru,
         // tidak pernah memutasi record yang sudah ada.
         openSkRiwayatForm(kategori = 'sk_pangkat') {
