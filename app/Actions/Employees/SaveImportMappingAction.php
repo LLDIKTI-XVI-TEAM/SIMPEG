@@ -4,6 +4,7 @@ namespace App\Actions\Employees;
 
 use App\Models\User;
 use App\Services\TransactionSideEffectManager;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +38,10 @@ class SaveImportMappingAction
             ]);
         }
 
+        // Lock tetap dimiliki sampai audit request selesai agar kompensasi tidak berlomba
+        // dengan mutasi batch lain. Di luar scope audit, perilaku release langsung dipertahankan.
+        $releaseAfterScope = $this->sideEffects->afterCompletion(static fn () => $lifecycleLock->release());
+
         try {
             $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
 
@@ -49,7 +54,8 @@ class SaveImportMappingAction
             }
 
             $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
-            $snapshot = $batch;
+            $cacheMutation = new ImportBatchCacheMutation($cacheKey, $batch);
+            $this->sideEffects->afterRollback(static fn () => $cacheMutation->restoreIfUnchanged());
 
             $unknownSources = array_diff(array_keys($mapping), $batch['headers']);
 
@@ -94,8 +100,7 @@ class SaveImportMappingAction
 
             $batch['mapping'] = $merged;
             $batch['warnings'] = ImportColumnMapping::warnings($merged);
-            $this->restoreCacheAfterRollback($cacheKey, $snapshot);
-            Cache::put($cacheKey, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+            $cacheMutation->put($batch);
 
             return [
                 'batch_id' => $batchId,
@@ -103,15 +108,9 @@ class SaveImportMappingAction
                 'warnings' => $batch['warnings'],
             ];
         } finally {
-            $lifecycleLock->release();
+            if (! $releaseAfterScope) {
+                $lifecycleLock->release();
+            }
         }
-    }
-
-    /** Mapping lama tetap menjadi sumber kebenaran bila audit request gagal. */
-    private function restoreCacheAfterRollback(string $cacheKey, array $snapshot): void
-    {
-        $this->sideEffects->afterRollbackOnce("cache:{$cacheKey}", static function () use ($cacheKey, $snapshot): void {
-            Cache::put($cacheKey, $snapshot, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
-        });
     }
 }

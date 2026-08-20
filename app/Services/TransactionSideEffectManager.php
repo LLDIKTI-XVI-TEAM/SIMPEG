@@ -59,6 +59,22 @@ class TransactionSideEffectManager
     }
 
     /**
+     * Tunda finalizer resource sampai hasil transaksi pasti. Urutan rollback dibalik,
+     * sehingga kompensasi yang didaftarkan setelah finalizer selesai lebih dahulu.
+     */
+    public function afterCompletion(Closure $callback): bool
+    {
+        if (! $this->active) {
+            return false;
+        }
+
+        $this->afterCommitCallbacks[] = $callback;
+        $this->afterRollbackCallbacks[] = $callback;
+
+        return true;
+    }
+
+    /**
      * Daftarkan satu kompensasi unik per resource agar beberapa perubahan dalam request
      * tetap kembali ke snapshot pertama, bukan ke state antara yang sudah dimutasi.
      */

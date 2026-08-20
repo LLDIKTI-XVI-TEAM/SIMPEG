@@ -15,6 +15,8 @@ use App\Models\ImportBatch;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\TransactionSideEffectManager;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -960,6 +962,73 @@ class EmployeeImportExecutionRaceTest extends TestCase
         } finally {
             $lock->release();
         }
+    }
+
+    /** Lock batch tetap dimiliki sampai scope audit terluar menentukan commit atau rollback. */
+    public function test_mapping_lifecycle_lock_is_held_until_outer_transaction_scope_finishes(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->validCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+        $mapping = Cache::get($cacheKey)['mapping'];
+        $mapping['Pangkat'] = 'tidak_dipakai';
+        $sideEffects = app(TransactionSideEffectManager::class);
+        $sideEffects->begin();
+
+        app(SaveImportMappingAction::class)->execute($batchId, $mapping, $user);
+
+        $competingLock = Cache::lock(
+            UploadImportBatchAction::LIFECYCLE_LOCK_PREFIX.$batchId,
+            UploadImportBatchAction::LIFECYCLE_LOCK_SECONDS,
+        );
+        $competingRequestEntered = $competingLock->get();
+
+        if ($competingRequestEntered) {
+            $competingLock->release();
+        }
+
+        $sideEffects->rollback();
+
+        $this->assertFalse($competingRequestEntered, 'Request lain tidak boleh masuk sebelum audit request pertama selesai.');
+
+        $lockAfterRollback = Cache::lock(
+            UploadImportBatchAction::LIFECYCLE_LOCK_PREFIX.$batchId,
+            UploadImportBatchAction::LIFECYCLE_LOCK_SECONDS,
+        );
+        $this->assertTrue($lockAfterRollback->get(), 'Lock wajib dilepas setelah seluruh kompensasi rollback selesai.');
+        $lockAfterRollback->release();
+    }
+
+    /** Kompensasi request lama tidak boleh menimpa state cache dari mutasi yang lebih baru. */
+    public function test_mapping_rollback_does_not_overwrite_newer_batch_state(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->validCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+        $mapping = Cache::get($cacheKey)['mapping'];
+        $mapping['Pangkat'] = 'tidak_dipakai';
+        $sideEffects = app(TransactionSideEffectManager::class);
+        $sideEffects->begin();
+
+        app(SaveImportMappingAction::class)->execute($batchId, $mapping, $user);
+
+        $newerBatch = Cache::get($cacheKey);
+        $newerMutation = new ImportBatchCacheMutation($cacheKey, $newerBatch);
+        $newerMutation->put($newerBatch);
+
+        $sideEffects->rollback();
+
+        $this->assertSame($newerBatch, Cache::get($cacheKey));
     }
 
     /** Redelivery completed memulihkan file/cache dan hanya membuat satu notifikasi. */
