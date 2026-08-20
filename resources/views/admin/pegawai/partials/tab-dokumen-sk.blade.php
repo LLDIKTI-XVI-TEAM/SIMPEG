@@ -10,26 +10,29 @@
             </div>
             @if($canManageDocuments)
             <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <button type="button" @click="showUploadSkForm = !showUploadSkForm; showUploadBerkas = false"
+                <button type="button" @click="showUploadSkForm = true; showUploadBerkas = false"
                     class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 font-sans">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                     </svg>
-                    <span x-text="showUploadSkForm ? 'Tutup Form SK' : 'Tambah Berkas SK'"></span>
+                    <span>Tambah Berkas SK</span>
                 </button>
             </div>
             @endif
         </div>
 
-        {{-- Form tambah riwayat SK --}}
+        {{-- Modal tambah riwayat SK --}}
         @if($canManageDocuments)
-        <div x-show="showUploadSkForm" x-transition class="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
-            <div>
-                <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tambah Berkas SK</h4>
-                <p class="text-[11px] text-muted font-sans mt-0.5" x-text="skUploadHint"></p>
-            </div>
+        <x-ui.modal
+            show="showUploadSkForm"
+            title="Tambah Berkas SK"
+            closeAction="showUploadSkForm = false; skUploadError = ''; skUploadErrors = {};"
+            maxWidth="2xl"
+            bodyClass="p-5 space-y-4"
+        >
+            <p class="text-[11px] text-muted font-sans" x-text="skUploadHint"></p>
 
-            <p x-show="skUploadError" x-text="skUploadError" class="text-xs text-danger font-semibold font-sans"></p>
+            <p x-show="skUploadError" x-text="skUploadError" class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans"></p>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="space-y-1">
@@ -203,17 +206,19 @@
                 </div>
             </div>
 
-            <div class="flex items-center gap-2 pt-1">
-                <button type="button" @click="submitUploadSk()" :disabled="isUploadingSk"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60 font-sans">
-                    <span x-text="isUploadingSk ? 'Menyimpan...' : (newSk.kategori_dokumen === 'sk_pengangkatan' ? 'Ganti SK Pengangkatan' : 'Tambah ke Riwayat')"></span>
-                </button>
-                <button type="button" @click="showUploadSkForm = false; skUploadError = ''; skUploadErrors = {};"
-                    class="inline-flex items-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted transition hover:bg-soft font-sans">
-                    Batal
-                </button>
-            </div>
-        </div>
+            <x-slot:footer>
+                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @click="showUploadSkForm = false; skUploadError = ''; skUploadErrors = {};"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted transition hover:bg-soft font-sans">
+                        Batal
+                    </button>
+                    <button type="button" @click="submitUploadSk()" :disabled="isUploadingSk"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60 font-sans">
+                        <span x-text="isUploadingSk ? 'Menyimpan...' : (newSk.kategori_dokumen === 'sk_pengangkatan' ? 'Ganti SK Pengangkatan' : 'Tambah ke Riwayat')"></span>
+                    </button>
+                </div>
+            </x-slot:footer>
+        </x-ui.modal>
         @endif
 
         {{-- Tabel Dokumen SK --}}
