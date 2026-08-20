@@ -9,6 +9,7 @@ use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\NotificationService;
+use App\Services\TransactionSideEffectManager;
 use App\Services\WorkdayCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -26,6 +27,7 @@ class ResubmitLeaveRequestAction
         private readonly LeaveBalanceReservationService $reservations,
         private readonly LeaveEligibilityService $eligibility,
         private readonly NotificationService $notifications,
+        private readonly TransactionSideEffectManager $sideEffects,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -116,7 +118,13 @@ class ResubmitLeaveRequestAction
 
         // File lama baru dihapus setelah commit berhasil agar rollback selalu menyisakan path yang masih valid.
         if ($newLampiranPath !== null && $newLampiranPath !== $oldLampiranPath) {
-            $this->files->deletePublicFile($oldLampiranPath);
+            $deleteOldFile = function () use ($oldLampiranPath): void {
+                $this->files->deletePublicFile($oldLampiranPath);
+            };
+
+            if (! $this->sideEffects->afterCommit($deleteOldFile)) {
+                $deleteOldFile();
+            }
         }
 
         // Audit mencatat perubahan kontak sebagai penanda boolean tanpa menyimpan nilai kontak yang bersifat PII.

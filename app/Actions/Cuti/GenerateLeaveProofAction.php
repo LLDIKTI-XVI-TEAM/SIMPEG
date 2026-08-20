@@ -5,13 +5,17 @@ namespace App\Actions\Cuti;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\TransactionSideEffectManager;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class GenerateLeaveProofAction
 {
-    public function __construct(private readonly DownloadOfficialLeavePdfAction $officialPdf) {}
+    public function __construct(
+        private readonly DownloadOfficialLeavePdfAction $officialPdf,
+        private readonly TransactionSideEffectManager $sideEffects,
+    ) {}
 
     public function execute(LeaveRequest $leaveRequest, ?User $generatedBy): LeaveProof
     {
@@ -35,13 +39,25 @@ class GenerateLeaveProofAction
         // unduhan pada halaman pegawai, sehingga seluruh permukaan (pegawai, kepala
         // bagian, pimpinan) menerima dokumen yang identik.
         $path = 'leave-proofs/'.$leaveRequest->id.'.pdf';
+        $disk = Storage::disk('local');
+        $hadExistingDocument = $disk->exists($path);
+        $previousDocument = $hadExistingDocument ? $disk->get($path) : null;
 
-        Storage::disk('local')->put(
+        $disk->put(
             $path,
             Pdf::loadView('admin.cuti.pdf.formulir-cuti', $this->officialPdf->viewData($leaveRequest))
                 ->setPaper([0, 0, 612, 1008], 'portrait')
                 ->output(),
         );
+        $this->sideEffects->afterRollback(function () use ($disk, $path, $hadExistingDocument, $previousDocument): void {
+            if ($hadExistingDocument && $previousDocument !== null) {
+                $disk->put($path, $previousDocument);
+
+                return;
+            }
+
+            $disk->delete($path);
+        });
 
         $proof->forceFill([
             'document_path' => $path,

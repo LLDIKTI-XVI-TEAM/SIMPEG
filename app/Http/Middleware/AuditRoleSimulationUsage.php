@@ -4,10 +4,12 @@ namespace App\Http\Middleware;
 
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 /**
  * Mencatat jejak audit ketika role sementara (simulasi) benar-benar digunakan.
@@ -25,15 +27,43 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class AuditRoleSimulationUsage
 {
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         if ($this->requiresAtomicMutationAudit($request)) {
-            return DB::transaction(function () use ($request, $next): Response {
-                $response = $next($request);
-                $this->auditSuccessfulUsage($request, $response);
+            $this->sideEffects->begin();
 
-                return $response;
-            });
+            try {
+                $response = DB::transaction(function () use ($request, $next): Response {
+                    $response = $next($request);
+                    $this->auditSuccessfulUsage($request, $response);
+
+                    return $response;
+                });
+            } catch (Throwable $exception) {
+                // Rollback database tidak dapat membatalkan storage; callback Action
+                // membersihkan file baru yang belum memiliki record sah.
+                try {
+                    $this->sideEffects->rollback();
+                } catch (Throwable $cleanupException) {
+                    // Kegagalan cleanup perlu dilaporkan tanpa menutupi penyebab rollback asli.
+                    report($cleanupException);
+                }
+
+                throw $exception;
+            }
+
+            // Penghapusan file lama baru aman setelah audit penggunaan ikut commit.
+            try {
+                $this->sideEffects->commit();
+            } catch (Throwable $cleanupException) {
+                // Record dan audit sudah sah; kegagalan membersihkan file lama tidak boleh
+                // mengubah respons menjadi gagal setelah database terlanjur commit.
+                report($cleanupException);
+            }
+
+            return $response;
         }
 
         $response = $next($request);

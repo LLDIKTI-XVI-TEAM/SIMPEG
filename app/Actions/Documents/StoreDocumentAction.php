@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,8 @@ use Throwable;
 class StoreDocumentAction
 {
     use BuildsDocumentAuditPayload;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Categories that should also create a history record.
@@ -37,6 +40,12 @@ class StoreDocumentAction
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
         $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
         $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
+
+        // Jika transaksi request terluar gagal sesudah Action selesai, hapus file yang
+        // belum memiliki record dokumen sah agar tidak menjadi orphan.
+        $this->sideEffects->afterRollback(function () use ($filePath): void {
+            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+        });
 
         try {
             return DB::transaction(function () use ($employee, $category, $payload, $filePath): Document {

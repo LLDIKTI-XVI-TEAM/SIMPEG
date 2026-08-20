@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 class EmployeeFileStorageService
 {
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+
     public function storePhoto(UploadedFile $file): string
     {
         return $this->store($file, 'employees/photos');
@@ -96,6 +98,18 @@ class EmployeeFileStorageService
         if ($path === false) {
             throw new \RuntimeException('Gagal menyimpan file upload pegawai.');
         }
+
+        // Seluruh upload melalui service ini mendapat kompensasi ketika transaksi
+        // request simulasi gagal sesudah Action selesai.
+        $this->sideEffects->afterRollback(function () use ($disk, $path): void {
+            if ($disk === 'public') {
+                $this->deletePublicFile($path);
+
+                return;
+            }
+
+            $this->deleteEmployeeDocumentFile($path);
+        });
 
         return $path;
     }

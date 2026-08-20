@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\KepalaLembagaSupportingDocument;
 use App\Models\User;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +18,8 @@ use Illuminate\Validation\ValidationException;
  */
 class StoreKepalaLembagaSupportingDocumentAction
 {
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+
     public function execute(Employee $employee, UploadedFile $file, User $actor): KepalaLembagaSupportingDocument
     {
         // Penanda eksplisit mencegah dokumen kementerian dikaitkan ke pegawai biasa karena teks jabatan.
@@ -45,6 +48,10 @@ class StoreKepalaLembagaSupportingDocumentAction
                 'berkas' => 'Gagal menyimpan berkas dokumen pendukung. Coba lagi.',
             ]);
         }
+
+        $this->sideEffects->afterRollback(function () use ($storedPath): void {
+            Storage::disk(KepalaLembagaSupportingDocument::STORAGE_DISK)->delete($storedPath);
+        });
 
         try {
             return DB::transaction(function () use ($employee, $storedPath, $originalName, $detectedMime, $sizeBytes, $actor): KepalaLembagaSupportingDocument {

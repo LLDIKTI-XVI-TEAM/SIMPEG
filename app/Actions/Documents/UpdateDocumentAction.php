@@ -12,6 +12,7 @@ use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -23,6 +24,8 @@ use Throwable;
 class UpdateDocumentAction
 {
     use BuildsDocumentAuditPayload;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Ganti metadata dokumen dan, jika ada, file fisiknya.
@@ -41,6 +44,10 @@ class UpdateDocumentAction
         try {
             if ($file !== null) {
                 $replacementPath = $this->storeReplacementFile($document, $payload['kategori_dokumen'], $file);
+                $pathForRollback = $replacementPath;
+                $this->sideEffects->afterRollback(function () use ($disk, $pathForRollback): void {
+                    $disk->delete($pathForRollback);
+                });
             }
 
             [$updatedDocument, $oldFilePath] = DB::transaction(function () use ($document, $payload, $replacementPath): array {
@@ -89,7 +96,17 @@ class UpdateDocumentAction
         if ($replacementPath !== null
             && $oldFilePath !== $replacementPath
             && ! $this->fileIsStillReferenced($oldFilePath)) {
-            $disk->delete($oldFilePath);
+            $deleteOldFile = function () use ($disk, $oldFilePath): void {
+                if (! $this->fileIsStillReferenced($oldFilePath)) {
+                    $disk->delete($oldFilePath);
+                }
+            };
+
+            // Saat dipanggil di bawah transaksi middleware, transaksi Action hanyalah
+            // savepoint. File lama baru boleh dihapus setelah transaksi terluar commit.
+            if (! $this->sideEffects->afterCommit($deleteOldFile)) {
+                $deleteOldFile();
+            }
         }
 
         return $updatedDocument;
