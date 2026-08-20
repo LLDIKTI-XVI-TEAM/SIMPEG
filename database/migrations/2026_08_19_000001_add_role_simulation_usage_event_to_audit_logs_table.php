@@ -41,8 +41,8 @@ return new class extends Migration
         'NOT_APPROVED',
         'SWITCH_ROLE',
         'REVERT_ROLE',
-        // Pemakaian role sementara pada request baca (AC-6): bukti penggunaan yang
-        // tidak hilang dari audit trail meski tidak ada mutasi domain.
+        // Pemakaian role sementara tetap perlu ditelusuri meski request tidak memiliki
+        // event domain lain, khususnya pada akses data read-only.
         'ROLE_SIMULATION_USAGE',
     ];
 

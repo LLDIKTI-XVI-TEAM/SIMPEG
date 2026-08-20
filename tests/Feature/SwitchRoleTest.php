@@ -10,12 +10,14 @@ use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\RefUnitKerja;
 use App\Models\Role;
+use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -796,10 +798,7 @@ class SwitchRoleTest extends TestCase
         $this->assertEquals('admin_kepegawaian', $audit->new_values['_effective_role'] ?? null);
     }
 
-    /**
-     * Penggunaan role sementara pada request baca (GET) wajib meninggalkan jejak audit
-     * (AC-6), tidak hanya switch dan revert. Measured dari audit_logs event ROLE_SIMULATION_USAGE.
-     */
+    /** Penggunaan role sementara pada request baca wajib meninggalkan jejak audit tersendiri. */
     public function test_role_simulation_usage_is_audited_during_read_only_requests(): void
     {
         $user = $this->createUserWithRole('super_admin');
@@ -825,11 +824,7 @@ class SwitchRoleTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'REVERT_ROLE', 'auditable_id' => $user->id]);
     }
 
-    /**
-     * UI submenu switch hanya boleh tampil untuk Super Admin asli (AC-1). Role non-Super-Admin
-     * yang salah konfigurasi mendapat users.switch_role tetap tidak melihat menu, dan backend
-     * tetap menolaknya (403).
-     */
+    /** UI switch tetap tersembunyi bagi non-Super-Admin meski permission salah dikonfigurasi. */
     public function test_switch_menu_hidden_for_non_super_admin_even_with_permission(): void
     {
         $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
@@ -853,11 +848,7 @@ class SwitchRoleTest extends TestCase
         $this->assertNull($admin->temporary_role);
     }
 
-    /**
-     * Usage audit (AC-6) hanya boleh tercatat untuk request read yang benar-benar
-     * berhasil diotorisasi. Request yang ditolak role efektif (403) tidak boleh
-     * diklaim sebagai penggunaan role sementara.
-     */
+    /** Request yang ditolak role efektif tidak boleh diklaim sebagai penggunaan yang berhasil. */
     public function test_usage_audit_not_recorded_for_denied_request(): void
     {
         $user = $this->createUserWithRole('super_admin');
@@ -875,7 +866,7 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
-    /** Penggunaan role sementara pada mutasi (POST/PUT/PATCH) yang berhasil juga wajib diaudit (AC-6). */
+    /** Penggunaan role sementara pada mutasi yang berhasil juga wajib diaudit. */
     public function test_role_simulation_usage_is_audited_during_successful_mutation(): void
     {
         $user = $this->createUserWithRole('super_admin');
@@ -894,6 +885,39 @@ class SwitchRoleTest extends TestCase
         $this->assertNotNull($audit, 'Penggunaan role sementara pada mutasi berhasil wajib tercatat audit.');
         $this->assertEquals('PATCH', $audit->new_values['http_method'] ?? null);
         $this->assertEquals('admin_kepegawaian', $audit->new_values['effective_role'] ?? null);
+    }
+
+    /** Kegagalan audit penggunaan tidak boleh meninggalkan mutasi yang sudah terlanjur commit. */
+    public function test_simulated_mutation_rolls_back_when_usage_audit_fails(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $notification = SimpegNotification::query()->create([
+            'user_id' => $user->employee_id,
+            'type' => 'cuti.diajukan',
+            'title' => 'Pengajuan cuti',
+            'body' => 'Ada pengajuan cuti yang perlu ditinjau.',
+            'is_read' => false,
+        ]);
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $response = $this->actingAs($user)
+                ->patchJson(route('api.v1.notifikasi.tandai-semua-dibaca'));
+
+            $response->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $this->assertFalse($notification->refresh()->is_read);
+        $this->assertNull($notification->read_at);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'ROLE_SIMULATION_USAGE',
+            'user_id' => $user->id,
+        ]);
     }
 
     /** Polling notifikasi otomatis (bukan interaksi user) tidak boleh tercatat sebagai penggunaan role sementara. */
@@ -1023,5 +1047,53 @@ class SwitchRoleTest extends TestCase
 
         $this->assertNotNull($audit);
         $this->assertArrayNotHasKey('_simulation', $audit->new_values ?? []);
+    }
+
+    /** Memasang kegagalan database terarah agar jalur rollback audit dapat diuji secara nyata. */
+    private function installUsageAuditFailureTrigger(): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::unprepared(<<<'SQL'
+                CREATE OR REPLACE FUNCTION fail_role_simulation_usage_audit()
+                RETURNS trigger AS $$
+                BEGIN
+                    IF NEW.event = 'ROLE_SIMULATION_USAGE' THEN
+                        RAISE EXCEPTION 'forced role simulation usage audit failure';
+                    END IF;
+
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql
+                SQL);
+            DB::unprepared(<<<'SQL'
+                CREATE TRIGGER fail_role_simulation_usage_audit
+                BEFORE INSERT ON audit_logs
+                FOR EACH ROW EXECUTE FUNCTION fail_role_simulation_usage_audit()
+                SQL);
+
+            return;
+        }
+
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER fail_role_simulation_usage_audit
+            BEFORE INSERT ON audit_logs
+            WHEN NEW.event = 'ROLE_SIMULATION_USAGE'
+            BEGIN
+                SELECT RAISE(ABORT, 'forced role simulation usage audit failure');
+            END
+            SQL);
+    }
+
+    /** Membersihkan trigger failure-injection agar test lain tetap memakai audit normal. */
+    private function removeUsageAuditFailureTrigger(): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS fail_role_simulation_usage_audit ON audit_logs');
+            DB::unprepared('DROP FUNCTION IF EXISTS fail_role_simulation_usage_audit()');
+
+            return;
+        }
+
+        DB::unprepared('DROP TRIGGER IF EXISTS fail_role_simulation_usage_audit');
     }
 }

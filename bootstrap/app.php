@@ -24,8 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'session.timeout' => SessionTimeoutMessage::class,
         ]);
 
-        // Catat pemakaian role sementara (simulasi) pada request baca maupun mutasi yang
-        // berhasil agar jejak audit AC-6 (switch, penggunaan, revert) selalu lengkap.
+        // Catat pemakaian role sementara pada request sukses agar aktor asli dan role
+        // efektif tetap dapat ditelusuri tanpa mengandalkan kontrol yang terlihat di UI.
         $middleware->web(append: [
             AuditRoleSimulationUsage::class,
         ]);

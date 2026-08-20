@@ -6,83 +6,110 @@ use App\Models\User;
 use App\Services\AuditService;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Mencatat jejak audit ketika role sementara (simulasi) benar-benar digunakan.
  *
- * AC-6 mensyaratkan switch, penggunaan role sementara, dan revert seluruhnya meninggalkan
- * jejak audit. Switch/revert sudah dicatat oleh SwitchRoleAction/RevertRoleAction; middleware
- * ini menutup celah "penggunaan":
+ * Switch dan revert dicatat oleh Action masing-masing. Middleware ini melengkapi jejak
+ * penggunaan tanpa mengubah identitas atau scope kepemilikan aktor asli:
  *
  * - Pencatatan dijalankan SETELAH request diotorisasi dan hanya untuk respons sukses
  *   (2xx/3xx) sehingga 401/403/404/500 tidak diklaim sebagai penggunaan.
  * - Rute kontrol/otomatis (revert-role, polling notifikasi, polling status impor) bukan
  *   interaksi pengguna sah dan tidak dicatat.
- * - Request baca (GET/HEAD): logOrFail() fail-closed, karena membaca belum melakukan mutasi
- *   domain yang perlu di-rollback; pemakaian tanpa jejak dianggap tidak sah.
- * - Request mutasi (POST/PUT/PATCH/DELETE): log() fail-open. Efek domain mutasi sudah dicatat
- *   di dalam transaksi oleh Action masing-masing (dengan konteks _simulation); pencatatan
- *   usage tambahan di sini tidak boleh mengubah mutasi yang sudah berhasil menjadi 500
- *   (yang membuat klien mengulang operasi) ketika penulisan audit pasca-respons gagal.
+ * - Request baca dicatat fail-closed setelah response sukses.
+ * - Request mutasi dibungkus transaksi database; perubahan domain dan audit penggunaan baru
+ *   commit bersama sehingga kegagalan audit tidak meninggalkan mutasi tanpa jejak.
  */
 class AuditRoleSimulationUsage
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $response = $next($request);
+        if ($this->requiresAtomicMutationAudit($request)) {
+            return DB::transaction(function () use ($request, $next): Response {
+                $response = $next($request);
+                $this->auditSuccessfulUsage($request, $response);
 
+                return $response;
+            });
+        }
+
+        $response = $next($request);
+        $this->auditSuccessfulUsage($request, $response);
+
+        return $response;
+    }
+
+    /** Mutation selama simulasi harus commit bersama audit penggunaannya. */
+    private function requiresAtomicMutationAudit(Request $request): bool
+    {
+        return $this->hasActiveSimulation($request)
+            && $this->isMutationRequest($request)
+            && ! $this->isExcludedRoute($request);
+    }
+
+    /** Menulis audit hanya untuk penggunaan yang lolos authorization dan menghasilkan response sukses. */
+    private function auditSuccessfulUsage(Request $request, Response $response): void
+    {
         if (! $this->shouldAuditUsage($request, $response)) {
-            return $response;
+            return;
         }
 
         /** @var User $user */
         $user = $request->user();
 
-        $payload = [
-            'original_role' => $user->role,
-            'effective_role' => $user->getEffectiveRole(),
-            'route' => $request->route()?->getName() ?? $request->path(),
-            'http_method' => $request->method(),
-            'path' => $request->path(),
-            'status' => $response->getStatusCode(),
-        ];
-
-        if ($this->isReadRequest($request)) {
-            AuditService::logOrFail('ROLE_SIMULATION_USAGE', 'User', $user->id, null, $payload, $request);
-        } else {
-            AuditService::log('ROLE_SIMULATION_USAGE', 'User', $user->id, null, $payload, $request);
-        }
-
-        return $response;
+        AuditService::logOrFail(
+            'ROLE_SIMULATION_USAGE',
+            'User',
+            $user->id,
+            null,
+            [
+                'original_role' => $user->role,
+                'effective_role' => $user->getEffectiveRole(),
+                'route' => $request->route()?->getName() ?? $request->path(),
+                'http_method' => $request->method(),
+                'path' => $request->path(),
+                'status' => $response->getStatusCode(),
+            ],
+            $request,
+        );
     }
 
     private function shouldAuditUsage(Request $request, Response $response): bool
     {
-        $user = $request->user();
-
-        if (! $user instanceof User || ! filled($user->temporary_role)) {
+        if (! $this->hasActiveSimulation($request)) {
             return false;
         }
 
-        // Rute kontrol/otomatis yang bukan interaksi pengguna sah — dikecualikan dari klaim
-        // penggunaan role sementara agar jejak tidak membanjiri audit_log maupun menyatakan
-        // simulasi masih aktif setelah revert/laporan status timer.
-        if ($request->routeIs(
+        if ($this->isExcludedRoute($request)) {
+            return false;
+        }
+
+        return $response->getStatusCode() < 400;
+    }
+
+    private function hasActiveSimulation(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user instanceof User && filled($user->temporary_role);
+    }
+
+    /** Route otomatis dan pemulihan tidak merepresentasikan penggunaan role tujuan. */
+    private function isExcludedRoute(Request $request): bool
+    {
+        return $request->routeIs(
             'revert-role',
             'api.v1.notifikasi.index',
             'api.v1.notifikasi.jumlah-belum-dibaca',
             'pegawai.import.status',
-        )) {
-            return false;
-        }
-
-        // Setelah request diotorisasi dan merespons sukses (2xx/3xx).
-        return $response->getStatusCode() < 400;
+        );
     }
 
-    private function isReadRequest(Request $request): bool
+    private function isMutationRequest(Request $request): bool
     {
-        return in_array($request->method(), ['GET', 'HEAD'], true);
+        return in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true);
     }
 }
