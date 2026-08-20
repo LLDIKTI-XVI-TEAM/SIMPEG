@@ -173,15 +173,14 @@
                 ],
                 [
                     'group' => 'Administrasi Sistem',
-                    'items' => array_filter([
+                    'items' => [
                         ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
                         ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
-                        $activeRole === 'super_admin' ? ['label' => 'SK Wajib per Jenis', 'route' => 'sk-requirements.config', 'icon' => 'document-text'] : null,
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
                         ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
-                    ])
+                    ]
                 ]
             ];
 

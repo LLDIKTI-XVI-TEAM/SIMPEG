@@ -41,6 +41,41 @@
     documentStatus: { status_kelengkapan: 'belum_ada', is_lengkap: false, total_wajib: 0, tersedia_count: 0, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
+
+    // ===== State Modal SK Wajib per Jenis Pegawai =====
+    showSkRequirementModal: false,
+    skMatrix: @js($skRequirementMatrix['current'] ?? []),
+    skTypeNames: @js($skRequirementMatrix['namesByType'] ?? []),
+    skSkLabels: @js($skRequirementMatrix['skPool'] ?? []),
+    skMatrixBusy: false,
+    skMatrixMsg: '',
+    openSkRequirementModal() { this.skMatrixMsg = ''; this.showSkRequirementModal = true; },
+    async saveSkRequirementMatrix() {
+        this.skMatrixBusy = true;
+        this.skMatrixMsg = '';
+        const matrix = {};
+        document.querySelectorAll('#sk-requirement-modal input[type="checkbox"]').forEach((cb) => {
+            if (cb.checked) {
+                const typeId = cb.dataset.type;
+                (matrix[typeId] = matrix[typeId] || []).push(cb.value);
+            }
+        });
+        try {
+            const res = await fetch(@js(route('sk-requirements.update')), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token()) },
+                body: JSON.stringify({ matrix }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) { this.skMatrixMsg = data.message || 'Gagal menyimpan matriks SK.'; return; }
+            this.skMatrix = matrix;
+            this.skMatrixMsg = 'Matriks SK wajib per jenis pegawai berhasil disimpan.';
+        } catch (e) {
+            this.skMatrixMsg = 'Terjadi kesalahan jaringan. Silakan coba lagi.';
+        } finally {
+            this.skMatrixBusy = false;
+        }
+    },
     @endif
 
     // ===== Modal Ubah Status Pegawai =====
@@ -564,6 +599,17 @@
                     </svg>
                     Export PDF
                 </button>
+                @if(auth()->user()?->role === 'super_admin')
+                <button type="button" id="sk-requirement-btn" @click="openSkRequirementModal()"
+                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-3 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
+                    title="Atur SK Wajib per Jenis Pegawai" aria-label="Atur SK Wajib per Jenis Pegawai">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                    </svg>
+                    <span>SK Wajib</span>
+                </button>
+                @endif
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
@@ -1068,6 +1114,63 @@
                 </template>
             </div>
         </x-ui.modal>
+
+
+        {{-- ============================================================ --}}
+        {{-- MODAL ATUR SK WAJIB PER JENIS PEGAWAI (super admin) --}}
+        {{-- ============================================================ --}}
+        @if(auth()->user()?->role === 'super_admin')
+        <x-ui.modal id="sk-requirement-modal" show="showSkRequirementModal" title="SK Wajib per Jenis Pegawai"
+            closeAction="showSkRequirementModal = false; skMatrixMsg = '';" maxWidth="3xl" bodyClass="p-5 space-y-4">
+            <p x-show="skMatrixMsg" x-text="skMatrixMsg" class="rounded-lg bg-success/10 p-3 text-xs font-bold text-success font-sans"></p>
+
+            <div class="overflow-x-auto rounded-lg border border-border bg-surface">
+                <table class="w-full text-left text-sm font-sans">
+                    <thead>
+                        <tr class="border-b border-border bg-soft/60">
+                            <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">Jenis Pegawai</th>
+                            <template x-for="(label, key) in skSkLabels" :key="key">
+                                <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-muted" x-text="label"></th>
+                            </template>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border">
+                        <template x-for="(typeId) in Object.keys(skTypeNames)" :key="typeId">
+                            <tr class="transition-colors hover:bg-soft/30">
+                                <td class="px-4 py-3 font-semibold text-ink" x-text="skTypeNames[typeId]"></td>
+                                <template x-for="(label, key) in skSkLabels" :key="key">
+                                    <td class="px-4 py-3 text-center">
+                                        <input type="checkbox"
+                                            :data-type="typeId"
+                                            :value="key"
+                                            :checked="(skMatrix[typeId] || []).includes(key)"
+                                            class="h-4 w-4 rounded border-border text-primary focus:ring-primary/30">
+                                    </td>
+                                </template>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="rounded-lg border border-primary/15 bg-primary/5 p-3 text-[11px] text-muted font-sans">
+                Centang SK yang wajib dimiliki tiap jenis pegawai. Default tampilan: PNS &amp; CPNS = 4 SK; PPPK = 2 SK (Pengangkatan, KGB).
+            </div>
+
+            <x-slot:footer>
+                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @click="showSkRequirementModal = false; skMatrixMsg = '';"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:bg-soft font-sans">
+                        Batal
+                    </button>
+                    <button type="button" @click="saveSkRequirementMatrix()" :disabled="skMatrixBusy"
+                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary/90 disabled:opacity-60 font-sans">
+                        <span x-text="skMatrixBusy ? 'Menyimpan...' : 'Simpan Matriks'"></span>
+                    </button>
+                </div>
+            </x-slot:footer>
+        </x-ui.modal>
+        @endif
 
 
         {{-- ============================================================ --}}

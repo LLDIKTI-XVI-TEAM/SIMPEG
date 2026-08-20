@@ -22,25 +22,25 @@ class SkRequirementMatrixTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_super_admin_can_view_matrix_page(): void
+    public function test_super_admin_sees_gear_button_on_pegawai_index(): void
     {
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user)
-            ->get(route('sk-requirements.config'))
+            ->get('/pegawai')
             ->assertOk()
-            ->assertSee('SK Wajib per Jenis Pegawai')
-            ->assertSee('PPPK')
-            ->assertSee('SK Pangkat');
+            ->assertSee('id="sk-requirement-btn"', false)
+            ->assertSee('showSkRequirementModal', false);
     }
 
-    public function test_non_super_admin_cannot_access_matrix_page(): void
+    public function test_non_super_admin_does_not_see_gear_button(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user)
-            ->get(route('sk-requirements.config'))
-            ->assertForbidden();
+            ->get('/pegawai')
+            ->assertOk()
+            ->assertDontSee('sk-requirement-btn');
     }
 
     public function test_super_admin_can_update_matrix(): void
@@ -53,9 +53,9 @@ class SkRequirementMatrixTest extends TestCase
                 'matrix' => [
                     $pppk->id => ['sk_pengangkatan', 'sk_kgb'],
                 ],
-                'reason' => 'PPPK hanya wajib 2 SK',
             ])
-            ->assertRedirect(route('sk-requirements.config'));
+            ->assertOk()
+            ->assertJsonPath('message', 'Matriks SK wajib per jenis pegawai berhasil diperbarui.');
 
         // PPPK: pengangkatan & kgb wajib, pangkat/jabatan tidak.
         $wajib = SkRequirement::query()
@@ -72,5 +72,17 @@ class SkRequirementMatrixTest extends TestCase
         $this->assertSame(count(SkCompleteness::poolKeys()), SkRequirement::query()
             ->where('jenis_pegawai_id', $pppk->id)
             ->count());
+    }
+
+    public function test_non_super_admin_cannot_save_matrix(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $pppk = RefJenisPegawai::query()->where('nama', 'PPPK')->firstOrFail();
+
+        $this->actingAs($user)
+            ->post(route('sk-requirements.update'), [
+                'matrix' => [$pppk->id => ['sk_pengangkatan']],
+            ])
+            ->assertForbidden();
     }
 }

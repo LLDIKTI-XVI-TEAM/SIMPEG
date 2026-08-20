@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pegawai;
 
+use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -157,6 +158,8 @@ class Index extends Component
         $openStatusModal = session('open_status_modal', false)
             || ($statusErrorBag !== null && $statusErrorBag->hasAny($statusFormErrors));
 
+        $skRequirementMatrix = app(ShowSkRequirementMatrixAction::class)->execute();
+
         return view('admin.pegawai.index', compact(
             'perPage',
             'sort',
@@ -175,7 +178,8 @@ class Index extends Component
             'canChangeStatus',
             'statusChangeOptions',
             'statusFormEmployee',
-            'openStatusModal'
+            'openStatusModal',
+            'skRequirementMatrix'
         ));
     }
 }

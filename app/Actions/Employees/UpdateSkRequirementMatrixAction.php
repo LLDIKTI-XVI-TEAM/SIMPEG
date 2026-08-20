@@ -60,7 +60,7 @@ class UpdateSkRequirementMatrixAction
                     'SkRequirement',
                     null,
                     ['matrix' => $old],
-                    ['matrix' => $new, 'reason' => $request->input('reason')],
+                    ['matrix' => $new],
                     $request,
                 );
             }

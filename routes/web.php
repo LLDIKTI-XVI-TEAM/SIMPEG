@@ -624,9 +624,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return redirect()->route('pengaturan');
     });
 
-    Route::get('/dashboard/sk-requirements', [SkRequirementController::class, 'index'])
-        ->middleware(['role:super_admin'])
-        ->name('sk-requirements.config');
+    Route::get('/dashboard/sk-requirements', function () {
+        return redirect()->route('data-pegawai');
+    })->name('sk-requirements.config');
     Route::post('/dashboard/sk-requirements', [SkRequirementController::class, 'update'])
         ->middleware(['role:super_admin'])
         ->name('sk-requirements.update');

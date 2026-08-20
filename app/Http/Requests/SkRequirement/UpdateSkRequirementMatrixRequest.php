@@ -22,7 +22,6 @@ class UpdateSkRequirementMatrixRequest extends FormRequest
             'matrix' => ['required', 'array'],
             'matrix.*' => ['array'],
             'matrix.*.*' => ['string', Rule::in(SkCompleteness::poolKeys())],
-            'reason' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -30,7 +29,6 @@ class UpdateSkRequirementMatrixRequest extends FormRequest
     {
         return [
             'matrix' => 'matriks SK wajib',
-            'reason' => 'alasan perubahan',
         ];
     }
 }
