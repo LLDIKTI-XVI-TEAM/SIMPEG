@@ -2,7 +2,7 @@
 
 **Lampiran PR #218** · Cabang `feat/switch-role`
 
-Checklist uji manual berbasis browser untuk melengkapi bukti penyelesaian US-1.6 (butir **QA browser** pada definisi penyelesaian story). **Status eksekusi:** menunggu pelaksanaan oleh tim QA/demo di environment yang tersedia — langkah di bawah adalah prosedur resmi yang harus dijalankan dan hasilnya dilampirkan sebagai bukti sebelum US-1.6 ditandai selesai.
+Checklist uji manual berbasis browser untuk melengkapi bukti penyelesaian US-1.6 (butir **QA browser** pada definisi penyelesaian story). **Status eksekusi:** selesai pada 20 Agustus 2026 terhadap source `9f32882aa0dc46f8c98fb34348477b7e577cc4e2`.
 
 ## Prasyarat
 - Akun Super Admin dengan permission `users.switch_role` (seeded/migrated).
@@ -38,4 +38,25 @@ Checklist uji manual berbasis browser untuk melengkapi bukti penyelesaian US-1.6
 
 ## Catatan
 - Hasil pelaksanaan (tanggal, environment/browser, screenshot bila perlu, dan siapa yang menjalankan) dilampirkan sebagai bukti QA browser US-1.6.
-- QA browser tidak dapat dieksekusi dari environment pengembangan otomatis ini (tidak ada browser/UI runner); checklist ini adalah prosedur resmi untuk tim.
+
+## Bukti Eksekusi 20 Agustus 2026
+
+- Pelaksana: Codex, pada environment pengembangan lokal Podman SIMPEG.
+- Browser: Codex In-app Browser berbasis Chromium 151 pada Windows 10.
+- Database aplikasi: PostgreSQL 17 pada container lokal; tidak menggunakan data produksi.
+- Source: `feat/switch-role` setelah rebase ke `development`, commit implementasi `9f32882aa0dc46f8c98fb34348477b7e577cc4e2`.
+- S1 lulus: switch ke Pegawai menampilkan indikator `Simulasi: Pegawai`, tombol `Revert`, dan menyembunyikan submenu switch lanjutan.
+- S2 lulus: menu serta dashboard mengikuti empat role tujuan (`admin_kepegawaian`, `pimpinan`, `kepala_bagian`, dan `pegawai`). Identitas yang tampil tetap akun Super Admin asli. Akses langsung `/user-management` saat simulasi Pegawai menghasilkan 403.
+- S3 lulus: simulasi Pegawai tetap aktif setelah logout dan login ulang melalui mode demo lokal.
+- S4 lulus: revert menghapus indikator simulasi dan memulihkan menu serta akses Super Admin.
+- S5 lulus: halaman Audit menampilkan urutan `SWITCH_ROLE`, `ROLE_SIMULATION_USAGE`, dan `REVERT_ROLE` dengan aktor Super Admin asli. Detail switch menyimpan role asal, role tujuan, waktu mulai, dan pelaku switch.
+- S6 lulus melalui regression test backend: target role sama, `super_admin`, role di luar allowlist, payload tidak valid, dan switch kedua saat simulasi aktif ditolak tanpa perubahan state yang tidak sah.
+- Responsive smoke lulus pada viewport 375 × 812: tombol menu, notifikasi, dan `Revert` tetap dapat digunakan; tidak ada overflow horizontal (`scrollWidth` tetap 375 piksel).
+- Console smoke lulus: tidak ditemukan error atau warning selama alur switch, logout/login, akses terlarang, audit, dan revert.
+- Performance smoke dashboard: DOM siap sekitar 3,3 detik pada pemuatan dingin dan 2,1 detik pada cache hangat; tidak ditemukan lag interaksi atau polling baru dari fitur switch role.
+
+Verifikasi otomatis pendamping:
+
+- `composer qa`: 2.072 test lulus, 42 skip PostgreSQL-khusus, 11.148 assertion; Pint dan PHPStan lulus.
+- `SwitchRoleTest` pada PostgreSQL 17: 43 test lulus, 184 assertion.
+- Regression audit durability membuktikan mutasi di-rollback ketika penulisan `ROLE_SIMULATION_USAGE` sengaja digagalkan oleh trigger database.
