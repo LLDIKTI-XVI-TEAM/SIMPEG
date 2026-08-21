@@ -7,7 +7,7 @@ use DateTimeInterface;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
-/** Menjaga kompensasi cache batch agar tidak menimpa mutasi request yang lebih baru. */
+/** Menjaga kompensasi cache batch agar tidak menimpa mutasi request atau proyeksi worker yang lebih baru. */
 final class ImportBatchCacheMutation
 {
     private readonly string $guardKey;
@@ -20,10 +20,31 @@ final class ImportBatchCacheMutation
         private readonly string $cacheKey,
         private readonly array $snapshot,
     ) {
-        $this->guardKey = "{$cacheKey}:mutation";
+        $this->guardKey = self::guardKeyFor($cacheKey);
         $this->mutationToken = (string) Str::uuid();
         $previousToken = Cache::get($this->guardKey);
         $this->previousToken = is_string($previousToken) ? $previousToken : null;
+    }
+
+    /** Mendapatkan guard key untuk key cache batch tertentu. */
+    public static function guardKeyFor(string $cacheKey): string
+    {
+        return "{$cacheKey}:mutation";
+    }
+
+    /**
+     * Memperbarui cache batch secara langsung (misal dari worker) sekaligus memutakhirkan
+     * guard token agar kompensasi snapshot request terdahulu tidak menimpa state terbaru.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    public static function putDirect(string $cacheKey, array $state, ?DateTimeInterface $expiresAt = null): void
+    {
+        $expiration = $expiresAt ?? now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES);
+        $token = (string) Str::uuid();
+
+        Cache::put(self::guardKeyFor($cacheKey), $token, $expiration);
+        Cache::put($cacheKey, $state, $expiration);
     }
 
     /** Simpan state dan token pemilik agar kompensasi dapat mengenali mutasi yang lebih baru. */
@@ -41,7 +62,7 @@ final class ImportBatchCacheMutation
         }
     }
 
-    /** Pulihkan snapshot hanya jika belum ada request lain yang mengganti state batch. */
+    /** Pulihkan snapshot hanya jika belum ada request atau worker lain yang mengganti state batch. */
     public function restoreIfUnchanged(): void
     {
         if (Cache::get($this->guardKey) !== $this->mutationToken) {

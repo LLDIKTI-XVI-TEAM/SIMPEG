@@ -1031,6 +1031,33 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame($newerBatch, Cache::get($cacheKey));
     }
 
+    /** Rollback snapshot queued pada outer transaction tidak boleh menimpa status completed yang diproyeksikan worker. */
+    public function test_worker_completion_projection_is_not_overwritten_by_queued_snapshot_rollback(): void
+    {
+        $user = $this->notifiableAdmin();
+        $batchId = $this->validatedBatchId($user);
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+
+        $sideEffects = app(TransactionSideEffectManager::class);
+        $sideEffects->begin();
+
+        // Simulasikan request HTTP yang mengantrekan batch dan menyiapkan snapshot kompensasi rollback
+        app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+        // Simulasikan worker yang berjalan asinkron dan menyelesaikan batch serta memproyeksikan status completed
+        app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertSame('completed', Cache::get($cacheKey)['status']);
+
+        // Simulasikan kegagalan transaksi luar (misal audit logging request HTTP gagal) yang memicu rollback
+        $sideEffects->rollback();
+
+        // Status cache harus tetap completed dengan hasil hitungan worker, bukan tertimpa snapshot queued
+        $currentCache = Cache::get($cacheKey);
+        $this->assertSame('completed', $currentCache['status']);
+        $this->assertSame(1, $currentCache['result']['inserted']);
+    }
+
     /** Redelivery completed memulihkan file/cache dan hanya membuat satu notifikasi. */
     public function test_completed_redelivery_recovers_cleanup_cache_and_notifies_once(): void
     {

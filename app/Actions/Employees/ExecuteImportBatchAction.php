@@ -8,6 +8,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Employees\TmtCalculatorService;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
@@ -403,7 +404,11 @@ class ExecuteImportBatchAction
             ];
         }
 
-        Cache::put($cacheKey, $cached, now()->addMinutes($batch->status === 'completed' ? 10 : UploadImportBatchAction::CACHE_TTL_MINUTES));
+        ImportBatchCacheMutation::putDirect(
+            $cacheKey,
+            $cached,
+            now()->addMinutes($batch->status === 'completed' ? 10 : UploadImportBatchAction::CACHE_TTL_MINUTES),
+        );
     }
 
     /** Memulihkan cleanup file dan cache jika worker crash setelah commit status completed. */
