@@ -154,9 +154,13 @@ class AdminKepegawaianAccessTest extends TestCase
     {
         $admin = User::factory()->adminKepegawaian()->create();
 
+        // Jalur change-role legacy sudah dihapus: satu-satunya sumber role efektif adalah
+        // temporary_role pada users, sehingga manipulasi session tidak pernah menaikkan role.
         $this->actingAs($admin)
-            ->withSession(['active_role' => 'admin_kepegawaian'])
+            ->withSession(['active_role' => 'super_admin'])
             ->get('/change-role/super_admin')
-            ->assertForbidden();
+            ->assertNotFound();
+
+        $this->assertSame('admin_kepegawaian', $admin->fresh()->getEffectiveRole());
     }
 }

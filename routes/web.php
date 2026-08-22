@@ -55,7 +55,6 @@ use App\Livewire\Admin\Pegawai\Show;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -125,15 +124,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
         ->middleware('role:super_admin,admin_kepegawaian,pimpinan')
         ->name('global.search');
-
-    Route::get('/change-role/{role}', function (Request $request, string $role) {
-        abort_unless($request->user()?->role === $role, 403, 'Role aktif harus sesuai dengan role akun.');
-
-        session(['active_role' => $role]);
-
-        return back();
-    })->whereIn('role', ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'])
-        ->name('change-role');
 
     Route::get('/pegawai/import-data', function () {
         return view('admin.pegawai.import');
