@@ -20,6 +20,8 @@ use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Queue\Job as QueueJobContract;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Database\QueryException;
@@ -1029,6 +1031,85 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $sideEffects->rollback();
 
         $this->assertSame($newerBatch, Cache::get($cacheKey));
+    }
+
+    /**
+     * Guard rollback dan proyeksi worker memakai lock yang sama, sehingga worker tidak dapat
+     * masuk di sela antara pemeriksaan guard dan penulisan snapshot rollback.
+     */
+    public function test_rollback_guard_check_and_worker_projection_cannot_interleave(): void
+    {
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.(string) Str::uuid();
+        $guardKey = ImportBatchCacheMutation::guardKeyFor($cacheKey);
+        $lockKey = ImportBatchCacheMutation::lockKeyFor($cacheKey);
+        $workerCouldEnterCriticalSection = null;
+
+        $store = new class($guardKey) extends ArrayStore
+        {
+            public ?\Closure $afterGuardRead = null;
+
+            public bool $shouldObserveGuardRead = false;
+
+            private bool $hasObservedGuardRead = false;
+
+            public function __construct(private readonly string $guardKey)
+            {
+                parent::__construct();
+            }
+
+            public function get($key)
+            {
+                $value = parent::get($key);
+
+                if ($this->shouldObserveGuardRead && $key === $this->guardKey && ! $this->hasObservedGuardRead) {
+                    $this->hasObservedGuardRead = true;
+                    $afterGuardRead = $this->afterGuardRead;
+
+                    if ($afterGuardRead !== null) {
+                        $afterGuardRead();
+                    }
+                }
+
+                return $value;
+            }
+        };
+        $originalCache = app('cache');
+
+        app()->instance('cache', new Repository($store));
+        Cache::clearResolvedInstance('cache');
+
+        try {
+            $snapshot = ['status' => 'valid'];
+            $queuedState = ['status' => 'queued'];
+            $completedState = ['status' => 'completed', 'result' => ['inserted' => 1]];
+            $rollback = new ImportBatchCacheMutation($cacheKey, $snapshot);
+
+            $rollback->put($queuedState);
+            $store->shouldObserveGuardRead = true;
+            $store->afterGuardRead = function () use ($lockKey, &$workerCouldEnterCriticalSection): void {
+                $workerLock = Cache::lock($lockKey, 10);
+                $workerCouldEnterCriticalSection = $workerLock->get();
+
+                if ($workerCouldEnterCriticalSection) {
+                    $workerLock->release();
+                }
+            };
+
+            $rollback->restoreIfUnchanged();
+
+            $this->assertFalse(
+                $workerCouldEnterCriticalSection,
+                'Proyeksi worker wajib menunggu hingga rollback selesai menulis snapshot cache.',
+            );
+            $this->assertSame($snapshot, Cache::get($cacheKey));
+
+            ImportBatchCacheMutation::putDirect($cacheKey, $completedState);
+
+            $this->assertSame($completedState, Cache::get($cacheKey));
+        } finally {
+            app()->instance('cache', $originalCache);
+            Cache::clearResolvedInstance('cache');
+        }
     }
 
     /** Rollback snapshot queued pada outer transaction tidak boleh menimpa status completed yang diproyeksikan worker. */
