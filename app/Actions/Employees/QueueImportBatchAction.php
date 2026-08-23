@@ -7,6 +7,8 @@ use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\Import\ImportBatchJobPublisher;
 use App\Services\Import\ImportBatchSchemaReadiness;
+use App\Services\TransactionSideEffectManager;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +19,7 @@ class QueueImportBatchAction
     public function __construct(
         private readonly ImportBatchJobPublisher $publisher,
         private readonly ImportBatchSchemaReadiness $schemaReadiness,
+        private readonly TransactionSideEffectManager $sideEffects,
     ) {}
 
     /**
@@ -41,6 +44,8 @@ class QueueImportBatchAction
                 'message' => ['Batch import sedang diproses oleh permintaan lain. Silakan coba kembali.'],
             ]);
         }
+
+        $releaseAfterScope = $this->sideEffects->afterCompletion(static fn () => $lifecycleLock->release());
 
         try {
             $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
@@ -70,6 +75,8 @@ class QueueImportBatchAction
             }
 
             $originalBatch = $batch;
+            $cacheMutation = new ImportBatchCacheMutation($cacheKey, $originalBatch);
+            $this->sideEffects->afterRollback(static fn () => $cacheMutation->restoreIfUnchanged());
             $claimed = false;
             $processingToken = (string) Str::uuid();
 
@@ -77,8 +84,8 @@ class QueueImportBatchAction
                 DB::transaction(function () use (
                     $batchId,
                     $user,
-                    $cacheKey,
                     $batch,
+                    $cacheMutation,
                     $processingToken,
                     &$claimed,
                 ): void {
@@ -86,6 +93,11 @@ class QueueImportBatchAction
                     $importBatch = new ImportBatch([
                         'id' => $batchId,
                         'user_id' => $user?->id,
+                        // Snapshot role dibekukan saat diantrekan agar audit async (worker) mencatat
+                        // konteks simulasi sesuai waktu operasi diotorisasi, bukan state user yang
+                        // bisa berubah sebelum worker berjalan (mis. switch/revert role di sela-sela).
+                        'queued_original_role' => $user?->role,
+                        'queued_effective_role' => $user?->getEffectiveRole(),
                         'filename' => $batch['filename'],
                         'type' => $batch['type'] ?? 'utama',
                         'status' => 'queued',
@@ -118,7 +130,7 @@ class QueueImportBatchAction
                     $queuedBatch['status'] = 'queued';
                     $queuedBatch['progress'] = 0;
                     $queuedBatch['processed_count'] = 0;
-                    Cache::put($cacheKey, $queuedBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+                    $cacheMutation->put($queuedBatch);
                 });
 
                 if ($claimed) {
@@ -126,14 +138,14 @@ class QueueImportBatchAction
                 }
             } catch (\Throwable $exception) {
                 if ($claimed) {
-                    Cache::put($cacheKey, $originalBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+                    $cacheMutation->put($originalBatch);
                 }
 
                 throw $exception;
             }
 
             if (! $claimed) {
-                $result = $this->existingStatus($batchId, $cacheKey, $batch);
+                $result = $this->existingStatus($batchId, $batch, $cacheMutation);
 
                 // Retry request juga boleh memulihkan claim queued yang belum memiliki marker publish.
                 $this->publisher->dispatchAfterCommit($batchId, $ipAddress, $userAgent);
@@ -146,7 +158,9 @@ class QueueImportBatchAction
                 'message' => 'Proses impor telah dimasukkan ke dalam antrean. Anda dapat meninggalkan halaman ini.',
             ];
         } finally {
-            $lifecycleLock->release();
+            if (! $releaseAfterScope) {
+                $lifecycleLock->release();
+            }
         }
     }
 
@@ -169,8 +183,11 @@ class QueueImportBatchAction
     }
 
     /** @param array<string, mixed> $cachedBatch */
-    private function existingStatus(string $batchId, string $cacheKey, array $cachedBatch): array
-    {
+    private function existingStatus(
+        string $batchId,
+        array $cachedBatch,
+        ImportBatchCacheMutation $cacheMutation,
+    ): array {
         $persistedBatch = ImportBatch::query()->findOrFail($batchId);
         $cachedBatch['status'] = $persistedBatch->status;
 
@@ -184,7 +201,7 @@ class QueueImportBatchAction
             $cachedBatch['row_issues'] = $persistedBatch->row_issues;
         }
 
-        Cache::put($cacheKey, $cachedBatch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+        $cacheMutation->put($cachedBatch);
 
         return [
             'status' => $persistedBatch->status,

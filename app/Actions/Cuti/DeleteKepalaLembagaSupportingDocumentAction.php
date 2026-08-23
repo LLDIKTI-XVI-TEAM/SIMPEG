@@ -5,6 +5,7 @@ namespace App\Actions\Cuti;
 use App\Models\AuditLog;
 use App\Models\KepalaLembagaSupportingDocument;
 use App\Models\User;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class DeleteKepalaLembagaSupportingDocumentAction
 {
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+
     public function execute(KepalaLembagaSupportingDocument $document, User $actor): void
     {
         $document->loadMissing('employee');
@@ -48,19 +51,25 @@ class DeleteKepalaLembagaSupportingDocumentAction
             ]);
         });
 
-        try {
-            /** @var Filesystem $disk */
-            $disk = Storage::disk(KepalaLembagaSupportingDocument::STORAGE_DISK);
+        $deleteStoredFile = function () use ($document, $storedPath): void {
+            try {
+                /** @var Filesystem $disk */
+                $disk = Storage::disk(KepalaLembagaSupportingDocument::STORAGE_DISK);
 
-            if ($disk->exists($storedPath)) {
-                $disk->delete($storedPath);
+                if ($disk->exists($storedPath)) {
+                    $disk->delete($storedPath);
+                }
+            } catch (\Throwable $exception) {
+                // Tombstone menyimpan path untuk retry operasional; audit durable tidak boleh dibatalkan.
+                Log::warning('Gagal menghapus file fisik dokumen pendukung Kepala Lembaga; tombstone dipertahankan untuk retry.', [
+                    'document_id' => $document->id,
+                    'error' => $exception->getMessage(),
+                ]);
             }
-        } catch (\Throwable $exception) {
-            // Tombstone menyimpan path untuk retry operasional; audit durable tidak boleh dibatalkan.
-            Log::warning('Gagal menghapus file fisik dokumen pendukung Kepala Lembaga; tombstone dipertahankan untuk retry.', [
-                'document_id' => $document->id,
-                'error' => $exception->getMessage(),
-            ]);
+        };
+
+        if (! $this->sideEffects->afterCommit($deleteStoredFile)) {
+            $deleteStoredFile();
         }
     }
 }

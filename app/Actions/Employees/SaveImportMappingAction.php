@@ -3,12 +3,16 @@
 namespace App\Actions\Employees;
 
 use App\Models\User;
+use App\Services\TransactionSideEffectManager;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 class SaveImportMappingAction
 {
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+
     /**
      * Menyimpan pemetaan kolom pilihan admin sebagai state batch import.
      *
@@ -34,6 +38,10 @@ class SaveImportMappingAction
             ]);
         }
 
+        // Lock tetap dimiliki sampai audit request selesai agar kompensasi tidak berlomba
+        // dengan mutasi batch lain. Di luar scope audit, perilaku release langsung dipertahankan.
+        $releaseAfterScope = $this->sideEffects->afterCompletion(static fn () => $lifecycleLock->release());
+
         try {
             $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$batchId);
 
@@ -44,6 +52,10 @@ class SaveImportMappingAction
             if ($batch['user_id'] !== null && ($user === null || $batch['user_id'] !== $user->id)) {
                 abort(403, 'Anda tidak memiliki akses ke batch import ini.');
             }
+
+            $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+            $cacheMutation = new ImportBatchCacheMutation($cacheKey, $batch);
+            $this->sideEffects->afterRollback(static fn () => $cacheMutation->restoreIfUnchanged());
 
             $unknownSources = array_diff(array_keys($mapping), $batch['headers']);
 
@@ -88,7 +100,7 @@ class SaveImportMappingAction
 
             $batch['mapping'] = $merged;
             $batch['warnings'] = ImportColumnMapping::warnings($merged);
-            Cache::put(UploadImportBatchAction::CACHE_PREFIX.$batchId, $batch, now()->addMinutes(UploadImportBatchAction::CACHE_TTL_MINUTES));
+            $cacheMutation->put($batch);
 
             return [
                 'batch_id' => $batchId,
@@ -96,7 +108,9 @@ class SaveImportMappingAction
                 'warnings' => $batch['warnings'],
             ];
         } finally {
-            $lifecycleLock->release();
+            if (! $releaseAfterScope) {
+                $lifecycleLock->release();
+            }
         }
     }
 }

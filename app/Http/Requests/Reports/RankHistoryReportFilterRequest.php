@@ -8,7 +8,7 @@ class RankHistoryReportFilterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'pimpinan';
+        return $this->user()?->getEffectiveRole() === 'pimpinan';
     }
 
     public function rules(): array

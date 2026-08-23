@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -15,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Satu request harus berbagi daftar kompensasi yang sama antara middleware dan Action.
+        $this->app->singleton(TransactionSideEffectManager::class);
     }
 
     /**

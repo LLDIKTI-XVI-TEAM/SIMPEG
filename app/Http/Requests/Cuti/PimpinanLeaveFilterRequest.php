@@ -10,7 +10,7 @@ class PimpinanLeaveFilterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'pimpinan';
+        return $this->user()?->getEffectiveRole() === 'pimpinan';
     }
 
     protected function prepareForValidation(): void

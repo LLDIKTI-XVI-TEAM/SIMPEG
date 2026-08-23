@@ -591,7 +591,8 @@
                     </div>
                     <div class="border-t border-border/80 pt-3 space-y-1 text-muted text-[11px]">
                         <span class="font-bold text-ink uppercase tracking-wider block text-[9px] mb-1">📝 Audit Log</span>
-                        <p>• Operator: <span class="font-semibold text-ink">{{ session('active_role') ?? 'admin_kepegawaian' }}</span></p>
+                        {{-- Label operator memakai role efektif agar konsisten dengan otorisasi saat simulasi role aktif. --}}
+                        <p>• Operator: <span class="font-semibold text-ink">{{ auth()->user()?->getEffectiveRole() ?? 'admin_kepegawaian' }}</span></p>
                         <p>• Timestamp: <span class="text-ink">{{ date('Y-m-d H:i:s') }} WITA</span></p>
                         <p>• Berkas: <span class="text-ink" x-text="fileName"></span></p>
                     </div>

@@ -3,11 +3,13 @@
 namespace App\Actions\Employees;
 
 use App\Models\User;
+use App\Services\TransactionSideEffectManager;
 use App\Support\EmployeeImport\CsvEmployeeReader;
 use App\Support\EmployeeImport\EmployeeRowMapper;
 use App\Support\EmployeeImport\ImportColumnMapping;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -33,7 +35,10 @@ class UploadImportBatchAction
         'utama' => 'Data Utama',
     ];
 
-    public function __construct(private readonly CsvEmployeeReader $reader) {}
+    public function __construct(
+        private readonly CsvEmployeeReader $reader,
+        private readonly TransactionSideEffectManager $sideEffects,
+    ) {}
 
     /**
      * Mengunggah dan membaca file import, menyimpan baris mentah di cache, lalu mengembalikan metadata batch.
@@ -69,7 +74,12 @@ class UploadImportBatchAction
         $mapping = ImportColumnMapping::autoMap($headers);
         $warnings = ImportColumnMapping::warnings($mapping);
 
-        $file->storeAs(self::STORAGE_DIR, $batchId.'_'.$file->getClientOriginalName(), 'local');
+        $storedName = $batchId.'_'.$file->getClientOriginalName();
+        $file->storeAs(self::STORAGE_DIR, $storedName, 'local');
+        $this->sideEffects->afterRollback(function () use ($batchId, $storedName): void {
+            Storage::disk('local')->delete(self::STORAGE_DIR.'/'.$storedName);
+            Cache::forget(self::CACHE_PREFIX.$batchId);
+        });
 
         Cache::put(self::CACHE_PREFIX.$batchId, [
             'filename' => $file->getClientOriginalName(),

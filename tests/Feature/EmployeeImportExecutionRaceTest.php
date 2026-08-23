@@ -15,9 +15,13 @@ use App\Models\ImportBatch;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\TransactionSideEffectManager;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Queue\Job as QueueJobContract;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Database\QueryException;
@@ -960,6 +964,179 @@ class EmployeeImportExecutionRaceTest extends TestCase
         } finally {
             $lock->release();
         }
+    }
+
+    /** Lock batch tetap dimiliki sampai scope audit terluar menentukan commit atau rollback. */
+    public function test_mapping_lifecycle_lock_is_held_until_outer_transaction_scope_finishes(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->validCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+        $mapping = Cache::get($cacheKey)['mapping'];
+        $mapping['Pangkat'] = 'tidak_dipakai';
+        $sideEffects = app(TransactionSideEffectManager::class);
+        $sideEffects->begin();
+
+        app(SaveImportMappingAction::class)->execute($batchId, $mapping, $user);
+
+        $competingLock = Cache::lock(
+            UploadImportBatchAction::LIFECYCLE_LOCK_PREFIX.$batchId,
+            UploadImportBatchAction::LIFECYCLE_LOCK_SECONDS,
+        );
+        $competingRequestEntered = $competingLock->get();
+
+        if ($competingRequestEntered) {
+            $competingLock->release();
+        }
+
+        $sideEffects->rollback();
+
+        $this->assertFalse($competingRequestEntered, 'Request lain tidak boleh masuk sebelum audit request pertama selesai.');
+
+        $lockAfterRollback = Cache::lock(
+            UploadImportBatchAction::LIFECYCLE_LOCK_PREFIX.$batchId,
+            UploadImportBatchAction::LIFECYCLE_LOCK_SECONDS,
+        );
+        $this->assertTrue($lockAfterRollback->get(), 'Lock wajib dilepas setelah seluruh kompensasi rollback selesai.');
+        $lockAfterRollback->release();
+    }
+
+    /** Kompensasi request lama tidak boleh menimpa state cache dari mutasi yang lebih baru. */
+    public function test_mapping_rollback_does_not_overwrite_newer_batch_state(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $batch = app(UploadImportBatchAction::class)->execute(
+            $this->csvFile($this->validCsv()),
+            'utama',
+            $user,
+        );
+        $batchId = $batch['batch_id'];
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+        $mapping = Cache::get($cacheKey)['mapping'];
+        $mapping['Pangkat'] = 'tidak_dipakai';
+        $sideEffects = app(TransactionSideEffectManager::class);
+        $sideEffects->begin();
+
+        app(SaveImportMappingAction::class)->execute($batchId, $mapping, $user);
+
+        $newerBatch = Cache::get($cacheKey);
+        $newerMutation = new ImportBatchCacheMutation($cacheKey, $newerBatch);
+        $newerMutation->put($newerBatch);
+
+        $sideEffects->rollback();
+
+        $this->assertSame($newerBatch, Cache::get($cacheKey));
+    }
+
+    /**
+     * Guard rollback dan proyeksi worker memakai lock yang sama, sehingga worker tidak dapat
+     * masuk di sela antara pemeriksaan guard dan penulisan snapshot rollback.
+     */
+    public function test_rollback_guard_check_and_worker_projection_cannot_interleave(): void
+    {
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.(string) Str::uuid();
+        $guardKey = ImportBatchCacheMutation::guardKeyFor($cacheKey);
+        $lockKey = ImportBatchCacheMutation::lockKeyFor($cacheKey);
+        $workerCouldEnterCriticalSection = null;
+
+        $store = new class($guardKey) extends ArrayStore
+        {
+            public ?\Closure $afterGuardRead = null;
+
+            public bool $shouldObserveGuardRead = false;
+
+            private bool $hasObservedGuardRead = false;
+
+            public function __construct(private readonly string $guardKey)
+            {
+                parent::__construct();
+            }
+
+            public function get($key)
+            {
+                $value = parent::get($key);
+
+                if ($this->shouldObserveGuardRead && $key === $this->guardKey && ! $this->hasObservedGuardRead) {
+                    $this->hasObservedGuardRead = true;
+                    $afterGuardRead = $this->afterGuardRead;
+
+                    if ($afterGuardRead !== null) {
+                        $afterGuardRead();
+                    }
+                }
+
+                return $value;
+            }
+        };
+        $originalCache = app('cache');
+
+        app()->instance('cache', new Repository($store));
+        Cache::clearResolvedInstance('cache');
+
+        try {
+            $snapshot = ['status' => 'valid'];
+            $queuedState = ['status' => 'queued'];
+            $completedState = ['status' => 'completed', 'result' => ['inserted' => 1]];
+            $rollback = new ImportBatchCacheMutation($cacheKey, $snapshot);
+
+            $rollback->put($queuedState);
+            $store->shouldObserveGuardRead = true;
+            $store->afterGuardRead = function () use ($lockKey, &$workerCouldEnterCriticalSection): void {
+                $workerLock = Cache::lock($lockKey, 10);
+                $workerCouldEnterCriticalSection = $workerLock->get();
+
+                if ($workerCouldEnterCriticalSection) {
+                    $workerLock->release();
+                }
+            };
+
+            $rollback->restoreIfUnchanged();
+
+            $this->assertFalse(
+                $workerCouldEnterCriticalSection,
+                'Proyeksi worker wajib menunggu hingga rollback selesai menulis snapshot cache.',
+            );
+            $this->assertSame($snapshot, Cache::get($cacheKey));
+
+            ImportBatchCacheMutation::putDirect($cacheKey, $completedState);
+
+            $this->assertSame($completedState, Cache::get($cacheKey));
+        } finally {
+            app()->instance('cache', $originalCache);
+            Cache::clearResolvedInstance('cache');
+        }
+    }
+
+    /** Rollback snapshot queued pada outer transaction tidak boleh menimpa status completed yang diproyeksikan worker. */
+    public function test_worker_completion_projection_is_not_overwritten_by_queued_snapshot_rollback(): void
+    {
+        $user = $this->notifiableAdmin();
+        $batchId = $this->validatedBatchId($user);
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$batchId;
+
+        $sideEffects = app(TransactionSideEffectManager::class);
+        $sideEffects->begin();
+
+        // Simulasikan request HTTP yang mengantrekan batch dan menyiapkan snapshot kompensasi rollback
+        app(QueueImportBatchAction::class)->execute($batchId, $user);
+
+        // Simulasikan worker yang berjalan asinkron dan menyelesaikan batch serta memproyeksikan status completed
+        app(ExecuteImportBatchAction::class)->execute($batchId, $user);
+
+        $this->assertSame('completed', Cache::get($cacheKey)['status']);
+
+        // Simulasikan kegagalan transaksi luar (misal audit logging request HTTP gagal) yang memicu rollback
+        $sideEffects->rollback();
+
+        // Status cache harus tetap completed dengan hasil hitungan worker, bukan tertimpa snapshot queued
+        $currentCache = Cache::get($cacheKey);
+        $this->assertSame('completed', $currentCache['status']);
+        $this->assertSame(1, $currentCache['result']['inserted']);
     }
 
     /** Redelivery completed memulihkan file/cache dan hanya membuat satu notifikasi. */

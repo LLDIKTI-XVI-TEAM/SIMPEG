@@ -37,6 +37,8 @@ class ImportBatchSchemaReadiness
         'job_publish_attempts',
         'processing_delivery_id',
         'processing_attempt',
+        'queued_original_role',
+        'queued_effective_role',
     ];
 
     /**

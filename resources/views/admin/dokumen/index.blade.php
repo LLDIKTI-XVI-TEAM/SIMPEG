@@ -333,7 +333,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                     </svg>
                                 </a>
-                                @if(auth()->user()->role === 'super_admin' || auth()->user()->role === 'admin_kepegawaian')
+                                @if(in_array(auth()->user()->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true))
                                 <button type="button" @click="
                                         editDoc.id = doc.id;
                                         editDoc.pegawai_id = doc.employee_id;
@@ -352,7 +352,7 @@
                                     </svg>
                                 </button>
                                 @endif
-                                @if(auth()->user()->role === 'super_admin')
+                                @if(auth()->user()->getEffectiveRole() === 'super_admin')
                                 <button type="button" @click="deleteDocId = doc.id; deleteDocName = doc.nama_dokumen || doc.nama; showDeleteModal = true"
                                     x-show="doc.jenis_dokumen !== 'sk_mutasi' && doc.jenis_dokumen !== 'sk_pensiun' && doc.jenis_dokumen !== 'sk_status_pegawai'"
                                     class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger transition hover:bg-red-50 shadow-sm"

@@ -242,4 +242,21 @@ class EwsActivePageTest extends TestCase
             'is_processed' => false,
         ]);
     }
+
+    public function test_ews_controls_follow_effective_role_during_simulation(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create(['employee_id' => Employee::factory()->create()->id]);
+
+        // Simulasi admin_kepegawaian: halaman EWS terbuka, followup tampil (effective
+        // role admin_kepegawaian), tetapi tombol Konfigurasi EWS khusus Super Admin
+        // harus disembunyikan mengikuti role efektif.
+        $this->actingAs($superAdmin)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $superAdmin->refresh();
+        $this->assertEquals('admin_kepegawaian', $superAdmin->getEffectiveRole());
+
+        $response = $this->actingAs($superAdmin)->get(route('ews'));
+        $response->assertOk();
+        $response->assertSee('Daftar EWS Aktif');
+        $response->assertDontSee('Konfigurasi EWS');
+    }
 }

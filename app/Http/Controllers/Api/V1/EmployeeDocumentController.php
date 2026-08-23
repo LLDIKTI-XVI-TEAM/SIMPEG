@@ -7,6 +7,7 @@ use App\Http\Requests\Documents\StoreBerkasLainnyaRequest;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,8 @@ use Throwable;
 
 class EmployeeDocumentController extends Controller
 {
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+
     /**
      * Mengembalikan daftar dokumen arsip milik pegawai, bisa difilter per kategori.
      * Digunakan oleh dropdown "Pilih dari Arsip" di form tambah riwayat.
@@ -63,6 +66,9 @@ class EmployeeDocumentController extends Controller
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
         $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
         $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
+        $this->sideEffects->afterRollback(function () use ($filePath): void {
+            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+        });
 
         try {
             $document = DB::transaction(function () use ($employee, $request, $filePath, $category): Document {

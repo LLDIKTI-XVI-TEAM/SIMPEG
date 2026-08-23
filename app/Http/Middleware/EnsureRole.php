@@ -17,11 +17,13 @@ class EnsureRole
             abort(403, 'Anda tidak memiliki hak akses untuk fitur ini.');
         }
 
-        if ($user->role === null || $user->role === '' || ! Role::where('name', $user->role)->exists()) {
+        $effectiveRole = $user->getEffectiveRole();
+
+        if ($effectiveRole === null || $effectiveRole === '' || ! Role::where('name', $effectiveRole)->exists()) {
             abort(403, 'Akun Anda belum memiliki role SIMPEG. Hubungi Admin.');
         }
 
-        if (! in_array($user->role, $roles, true)) {
+        if (! in_array($effectiveRole, $roles, true)) {
             abort(403, 'Anda tidak memiliki hak akses untuk fitur ini.');
         }
 
