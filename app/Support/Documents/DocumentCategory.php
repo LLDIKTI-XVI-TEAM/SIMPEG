@@ -66,6 +66,11 @@ class DocumentCategory
         return ['ijazah', 'ktp_kk', 'lainnya'];
     }
 
+    public static function isOtherUpload(?string $category): bool
+    {
+        return in_array($category, self::otherUploadKeys(), true);
+    }
+
     public static function isProtectedSk(?string $category): bool
     {
         return in_array($category, [

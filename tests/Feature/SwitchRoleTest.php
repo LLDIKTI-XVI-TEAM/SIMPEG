@@ -1056,6 +1056,93 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
+    /** Update profil harus mengembalikan metadata dan file ketika audit penggunaan membatalkan request. */
+    public function test_simulated_additional_document_update_rolls_back_file_when_usage_audit_fails(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $user = $this->createUserWithRole('super_admin');
+        $employee = Employee::factory()->create();
+        $oldPath = $employee->id.'/lainnya/dokumen-lama.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'dokumen lama');
+        $document = Document::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Lama',
+            'nomor_dokumen' => 'DOC-LAMA',
+            'file_path' => $oldPath,
+        ]);
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $response = $this->actingAs($user)->post(route('api.v1.pegawai.berkas-lainnya.update', [$employee, $document]), [
+                '_method' => 'PUT',
+                'kategori_dokumen' => 'lainnya',
+                'nama_dokumen' => 'Dokumen Baru',
+                'nomor_dokumen' => 'DOC-BARU',
+                'berkas' => UploadedFile::fake()->create('dokumen-baru.pdf', 64, 'application/pdf'),
+            ], ['Accept' => 'application/json']);
+
+            $response->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $document->refresh();
+        $this->assertSame('Dokumen Lama', $document->nama_dokumen);
+        $this->assertSame('DOC-LAMA', $document->nomor_dokumen);
+        $this->assertSame($oldPath, $document->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
+        $this->assertSame([$oldPath], Storage::disk(Document::STORAGE_DISK)->allFiles());
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'Document',
+            'auditable_id' => $document->id,
+        ]);
+    }
+
+    /** Delete profil tidak boleh menghapus metadata atau file ketika transaksi penggunaan role rollback. */
+    public function test_simulated_additional_document_delete_rolls_back_when_usage_audit_fails(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $user = $this->createUserWithRole('super_admin');
+        $employee = Employee::factory()->create();
+        $path = $employee->id.'/lainnya/dokumen-hapus.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($path, 'dokumen tetap ada');
+        $document = Document::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Hapus',
+            'file_path' => $path,
+        ]);
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $response = $this->actingAs($user)->deleteJson(
+                route('api.v1.pegawai.berkas-lainnya.destroy', [$employee, $document]),
+            );
+
+            $response->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $this->assertDatabaseHas('documents', ['id' => $document->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($path);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'DELETE',
+            'auditable_type' => 'Document',
+            'auditable_id' => $document->id,
+        ]);
+    }
+
     /** Unggahan profil dan audit penggunaan role simulasi harus commit bersama. */
     public function test_simulated_additional_document_upload_commits_with_usage_audit(): void
     {

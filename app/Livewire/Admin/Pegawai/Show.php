@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pegawai;
 
+use App\Actions\Documents\PrepareEmployeeDocumentRowsAction;
 use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
@@ -31,8 +32,10 @@ class Show extends Component
         $this->pegawaiId = $id;
     }
 
-    public function render(EmployeeHistoryAttachmentService $attachments)
-    {
+    public function render(
+        EmployeeHistoryAttachmentService $attachments,
+        PrepareEmployeeDocumentRowsAction $prepareDocuments,
+    ) {
         $p = Employee::with([
             'families',
             'rankHistories.golongan',
@@ -97,6 +100,9 @@ class Show extends Component
         $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
 
         $this->prepareHistoryAttachmentDownloadUrls($p, $attachments);
+        $documentRows = $prepareDocuments->execute($p);
+        $documentSkRows = $documentRows['sk'];
+        $otherDocumentRows = $documentRows['others'];
 
         // Snapshot status adalah sumber utama. Riwayat latest hanya menjadi fallback
         // untuk data lama yang belum memiliki status_tanggal tersinkron.
@@ -113,7 +119,7 @@ class Show extends Component
             (string) $p->educationHistories->count()
         );
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory', 'pendidikanCacheVersion'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory', 'pendidikanCacheVersion', 'documentSkRows', 'otherDocumentRows'));
     }
 
     /**

@@ -42,6 +42,10 @@ class EmployeeDocumentUiAccessTest extends TestCase
             ->assertSee('Dokumen SK')
             ->assertSee('Berkas Lainnya')
             ->assertSee('Unggah Berkas Lainnya')
+            ->assertSee('Ubah Berkas Lainnya')
+            ->assertSee('Hapus Berkas Lainnya')
+            ->assertSee('Simpan Perubahan')
+            ->assertSee('Hapus Berkas')
             ->assertSee('Form ini hanya untuk dokumen tambahan')
             ->assertDontSee('Tambah Berkas SK')
             ->assertDontSee('Ganti Berkas SK');

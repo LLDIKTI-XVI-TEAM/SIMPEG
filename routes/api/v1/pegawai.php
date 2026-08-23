@@ -108,6 +108,16 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminEmployeeMutationMiddleware('employees.update'))
             ->whereUuid('employee')
             ->name('berkas-lainnya.store');
+        Route::put('/{employee}/berkas-lainnya/{document}', [EmployeeDocumentController::class, 'updateBerkasLainnya'])
+            ->middleware($adminEmployeeMutationMiddleware('employees.update'))
+            ->whereUuid(['employee', 'document'])
+            ->scopeBindings()
+            ->name('berkas-lainnya.update');
+        Route::delete('/{employee}/berkas-lainnya/{document}', [EmployeeDocumentController::class, 'destroyBerkasLainnya'])
+            ->middleware($adminEmployeeMutationMiddleware('employees.update'))
+            ->whereUuid(['employee', 'document'])
+            ->scopeBindings()
+            ->name('berkas-lainnya.destroy');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
             ->middleware($adminEmployeeReadMiddleware())
             ->whereUuid('employee')

@@ -1,30 +1,7 @@
 <div>
 
     @php
-        $allDocuments = collect($p->documents ?? []);
         $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
-
-        // Pemisahan kategori hanya untuk presentasi. Lifecycle dan penilaian
-        // kewajiban SK tetap berada pada alur domain masing-masing.
-        $mapDokumenRow = fn ($document): array => [
-            'id' => $document->id,
-            'nama_dokumen' => $document->nama_dokumen,
-            'kategori_label' => \App\Support\Documents\DocumentCategory::label($document->jenis_dokumen),
-            'nomor_dokumen' => $document->nomor_dokumen,
-            'tanggal_dokumen' => $document->tanggal_dokumen?->format('d-m-Y'),
-            'file_size' => $document->fileSizeLabel(),
-            'file_tersedia' => $document->fileExists(),
-            'keterangan' => $document->keterangan,
-            'detail_url' => route('dokumen.show', $document->id),
-            'download_url' => route('dokumen.download', $document->id),
-        ];
-
-        $riwayatSk = $allDocuments
-            ->filter(fn ($document): bool => \App\Support\Documents\DocumentCategory::isProtectedSk($document->jenis_dokumen))
-            ->values();
-        $riwayatBerkas = $allDocuments
-            ->reject(fn ($document): bool => \App\Support\Documents\DocumentCategory::isProtectedSk($document->jenis_dokumen))
-            ->values();
 
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
@@ -131,8 +108,18 @@
         uploadBerkasError: '',
         uploadBerkasErrors: {},
         newBerkas: { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null },
-        skList: {{ $riwayatSk->map($mapDokumenRow)->toJson() }},
-        berkasList: {{ $riwayatBerkas->map($mapDokumenRow)->toJson() }},
+        showEditBerkas: false,
+        isUpdatingBerkas: false,
+        editBerkasError: '',
+        editBerkasErrors: {},
+        editingBerkas: null,
+        editBerkas: { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null },
+        showDeleteBerkas: false,
+        isDeletingBerkas: false,
+        deleteBerkasError: '',
+        deletingBerkas: null,
+        skList: {{ \Illuminate\Support\Js::from($documentSkRows) }},
+        berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
 
         async submitUploadBerkas() {
             if (!this.newBerkas.file) {
@@ -182,6 +169,104 @@
                 this.uploadBerkasError = 'Gagal mengunggah berkas. Periksa koneksi internet Anda.';
             } finally {
                 this.isUploadingBerkas = false;
+            }
+        },
+        openEditBerkas(doc) {
+            if (!doc.can_mutate) return;
+            this.editingBerkas = doc;
+            this.editBerkas = {
+                nama_dokumen: doc.nama_dokumen ?? '',
+                kategori_dokumen: doc.jenis_dokumen ?? 'lainnya',
+                nomor_dokumen: doc.nomor_dokumen ?? '',
+                tanggal_terbit: doc.tanggal_input ?? '',
+                keterangan: doc.keterangan ?? '',
+                file: null,
+            };
+            this.editBerkasError = '';
+            this.editBerkasErrors = {};
+            this.showEditBerkas = true;
+        },
+        async submitUpdateBerkas() {
+            if (!this.editingBerkas) return;
+            this.isUpdatingBerkas = true;
+            this.editBerkasError = '';
+            this.editBerkasErrors = {};
+
+            const fd = new FormData();
+            fd.append('_method', 'PUT');
+            fd.append('nama_dokumen', this.editBerkas.nama_dokumen);
+            fd.append('kategori_dokumen', this.editBerkas.kategori_dokumen);
+            fd.append('nomor_dokumen', this.editBerkas.nomor_dokumen);
+            fd.append('tanggal_terbit', this.editBerkas.tanggal_terbit);
+            fd.append('keterangan', this.editBerkas.keterangan);
+            if (this.editBerkas.file) fd.append('berkas', this.editBerkas.file);
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya/${this.editingBerkas.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: fd,
+                });
+                const json = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    this.berkasList = this.berkasList.map((doc) => doc.id === json.document.id ? json.document : doc);
+                    this.showEditBerkas = false;
+                    this.editingBerkas = null;
+                    const fileInput = document.getElementById('edit_berkas_upload_input');
+                    if (fileInput) fileInput.value = '';
+                    this.toast = { show: true, message: 'Berkas berhasil diperbarui.', type: 'success' };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                } else if (res.status === 422) {
+                    this.editBerkasErrors = json.errors ?? {};
+                    this.editBerkasError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
+                } else {
+                    this.editBerkasError = json.message ?? 'Gagal memperbarui berkas. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.editBerkasError = 'Gagal memperbarui berkas. Periksa koneksi internet Anda.';
+            } finally {
+                this.isUpdatingBerkas = false;
+            }
+        },
+        openDeleteBerkas(doc) {
+            if (!doc.can_mutate) return;
+            this.deletingBerkas = doc;
+            this.deleteBerkasError = '';
+            this.showDeleteBerkas = true;
+        },
+        async submitDeleteBerkas() {
+            if (!this.deletingBerkas) return;
+            this.isDeletingBerkas = true;
+            this.deleteBerkasError = '';
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya/${this.deletingBerkas.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                });
+                const json = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    const deletedId = this.deletingBerkas.id;
+                    this.berkasList = this.berkasList.filter((doc) => doc.id !== deletedId);
+                    this.showDeleteBerkas = false;
+                    this.deletingBerkas = null;
+                    this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                } else {
+                    this.deleteBerkasError = json.errors?.document?.[0] ?? json.message ?? 'Gagal menghapus berkas. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.deleteBerkasError = 'Gagal menghapus berkas. Periksa koneksi internet Anda.';
+            } finally {
+                this.isDeletingBerkas = false;
             }
         },
         async updateKinerjaBaik(value) {
