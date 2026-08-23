@@ -345,9 +345,12 @@ class PegawaiController extends Controller
             'per_page' => $paginator->perPage(),
         ];
 
-        // Pemulihan massal masih dibatasi Super Admin pada route, sehingga kontrol seleksi
-        // disembunyikan bagi role lain agar tombol tidak menjanjikan aksi yang akan ditolak backend.
-        $canBulkRestore = $request->user()?->role === 'super_admin';
+        $user = $request->user();
+
+        // Kontrol mengikuti role efektif agar simulasi role tidak menampilkan aksi Super Admin
+        // yang tetap akan ditolak oleh middleware saat formulir dikirim.
+        $canBulkRestore = $user?->getEffectiveRole() === 'super_admin'
+            && $user->hasPermission('employees.restore');
 
         return view('admin.pegawai.backup', compact(
             'perPage',
@@ -385,7 +388,6 @@ class PegawaiController extends Controller
             'positionHistories.jabatan',
             'positionHistories.unitKerja',
             'salaryHistories',
-            'appointments',
             'statusHistories.document',
             'disciplineRecords',
             'educationHistories',
@@ -449,23 +451,17 @@ class PegawaiController extends Controller
             $employee->load([
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,nama',
-                'rankHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_pangkat', 'created_at'])
-                    ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_pangkat'),
+                'rankHistories:id,employee_id,file_sk',
                 'positionHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])
+                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
-                'salaryHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_kgb', 'created_at'])
-                    ->orderByDesc('is_latest')
-                    ->orderByDesc('tmt_kgb'),
+                'salaryHistories:id,employee_id,file_sk',
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
                     ->orderByDesc('tmt_pengangkatan'),
-                'documents:id,employee_id,jenis_dokumen,file_path,nomor_dokumen,tanggal_dokumen,created_at',
+                'documents:id,employee_id,file_path',
             ]);
 
             $tableRow = app(ListEmployeesAction::class)->toTableRow($employee);

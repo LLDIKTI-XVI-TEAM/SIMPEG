@@ -52,8 +52,8 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
         $this->seed(RbacSeeder::class);
 
-        // 24 permission non-cuti + 13 permission modul cuti + 1 permission data referensi.
-        $this->assertSame(38, Permission::count());
+        // Seeder gabungan mencakup permission operasional, cuti, data referensi, dan simulasi role.
+        $this->assertSame(39, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -118,6 +118,27 @@ class RbacPermissionMiddlewareTest extends TestCase
             'role_id' => $adminKepegawaian->id,
             'permission_id' => $permission->id,
         ]);
+    }
+
+    public function test_switch_role_permission_migration_backfills_existing_database_without_running_seeder(): void
+    {
+        // Simulasikan instalasi existing yang belum pernah menjalankan seeder: permission hilang.
+        Permission::where('name', 'users.switch_role')->delete();
+
+        $migration = require database_path('migrations/2026_08_18_000000_add_switch_role_permission.php');
+        $migration->up();
+        $migration->up();
+
+        $permission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        $superAdmin = Role::where('name', 'super_admin')->firstOrFail();
+
+        $this->assertSame('users', $permission->module);
+        $this->assertSame('Melakukan simulasi beralih ke role yang lebih rendah untuk demo/testing/support', $permission->description);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $superAdmin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
     }
 
     public function test_permission_middleware_allows_user_with_permission(): void

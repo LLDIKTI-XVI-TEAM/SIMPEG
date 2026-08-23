@@ -93,6 +93,46 @@ class CentralArchiveReadOnlyTest extends TestCase
         $this->get(route('dokumen.download', $document->id))->assertOk();
     }
 
+    public function test_archive_searches_across_employees_by_name_and_nip_with_correct_pagination(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+
+        $target = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Sasaran Arsip',
+            'nip' => '198801012010011001',
+        ]);
+        $other = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Pembanding',
+            'nip' => '199901012020012002',
+        ]);
+
+        $targetDocument = Document::create([
+            'employee_id' => $target->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'Identitas Sasaran',
+            'file_path' => $target->id.'/ktp_kk/target.pdf',
+        ]);
+        Document::create([
+            'employee_id' => $other->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Ijazah Pembanding',
+            'file_path' => $other->id.'/ijazah/pembanding.pdf',
+        ]);
+
+        $this->getJson('/api/v1/dokumen?search=Sasaran&per_page=5')
+            ->assertOk()
+            ->assertJsonCount(1, 'documents.data')
+            ->assertJsonPath('documents.total', 1)
+            ->assertJsonPath('documents.data.0.id', $targetDocument->id)
+            ->assertJsonPath('documents.data.0.nama_pegawai', 'Pegawai Sasaran Arsip');
+
+        $this->getJson('/api/v1/dokumen?search=198801012010011001&per_page=5')
+            ->assertOk()
+            ->assertJsonCount(1, 'documents.data')
+            ->assertJsonPath('documents.total', 1)
+            ->assertJsonPath('documents.data.0.id', $targetDocument->id);
+    }
+
     private function createBerkas(): Document
     {
         $employee = Employee::factory()->create();

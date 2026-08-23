@@ -298,6 +298,37 @@ class EmployeeDeactivateRestoreTest extends TestCase
             ->assertSee('type="checkbox" class="backup-check', false);
     }
 
+    public function test_super_admin_yang_bersimulasi_admin_kepegawaian_tidak_melihat_kontrol_pulihkan_massal(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $trashed = Employee::factory()->create(['nama_lengkap' => 'Pegawai Bulk Simulasi']);
+        $trashed->delete();
+
+        $this->actingAs($superAdmin)
+            ->post(route('switch-role'), ['target_role' => 'admin_kepegawaian'])
+            ->assertRedirect(route('dashboard'));
+
+        $superAdmin->refresh();
+        $this->assertSame('super_admin', $superAdmin->role);
+        $this->assertSame('admin_kepegawaian', $superAdmin->getEffectiveRole());
+
+        // Role asli tetap Super Admin, tetapi tampilan dan akses harus mengikuti role efektif.
+        $this->actingAs($superAdmin)
+            ->get(route('data-backup'))
+            ->assertOk()
+            ->assertDontSeeText('Pilih satu atau lebih untuk dipulihkan sekaligus.')
+            ->assertSeeText('satu per satu sesuai permission Anda')
+            ->assertDontSeeText('Pulihkan Pilihan')
+            ->assertDontSee('type="checkbox" class="backup-check', false)
+            ->assertDontSee(route('pegawai.bulkRestore'), false);
+
+        $this->actingAs($superAdmin)
+            ->postWithCsrf(route('pegawai.bulkRestore'), ['ids' => [$trashed->id]])
+            ->assertForbidden();
+
+        $this->assertSoftDeleted('employees', ['id' => $trashed->id]);
+    }
+
     public function test_nonaktif_filter_returns_trashed_employees_of_every_lifecycle_status(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

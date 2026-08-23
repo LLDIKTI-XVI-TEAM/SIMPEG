@@ -2,6 +2,29 @@
 
     @php
         $allDocuments = collect($p->documents ?? []);
+        $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
+
+        // Pemisahan kategori hanya untuk presentasi. Lifecycle dan penilaian
+        // kewajiban SK tetap berada pada alur domain masing-masing.
+        $mapDokumenRow = fn ($document): array => [
+            'id' => $document->id,
+            'nama_dokumen' => $document->nama_dokumen,
+            'kategori_label' => \App\Support\Documents\DocumentCategory::label($document->jenis_dokumen),
+            'nomor_dokumen' => $document->nomor_dokumen,
+            'tanggal_dokumen' => $document->tanggal_dokumen?->format('d-m-Y'),
+            'file_size' => $document->fileSizeLabel(),
+            'file_tersedia' => $document->fileExists(),
+            'keterangan' => $document->keterangan,
+            'detail_url' => route('dokumen.show', $document->id),
+            'download_url' => route('dokumen.download', $document->id),
+        ];
+
+        $riwayatSk = $allDocuments
+            ->filter(fn ($document): bool => \App\Support\Documents\DocumentCategory::isProtectedSk($document->jenis_dokumen))
+            ->values();
+        $riwayatBerkas = $allDocuments
+            ->reject(fn ($document): bool => \App\Support\Documents\DocumentCategory::isProtectedSk($document->jenis_dokumen))
+            ->values();
 
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
@@ -12,47 +35,6 @@
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
 
-        // Tab Dokumen & SK menjadi satu-satunya tempat aksi kelola dokumen; arsip
-        // terpusat dibuat baca-saja.
-        $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
-        $canDeleteBerkas = \App\Support\Documents\DocumentAuthorization::canDelete(auth()->user());
-
-        // Berkas SK kanonis per kategori: riwayat is_latest lebih dulu, lalu TMT terbaru.
-        $canonicalSkFiles = [
-            'sk_pangkat' => $p->rankHistories->sortByDesc('tmt_pangkat')->sortByDesc('is_latest')->first()?->file_sk,
-            'sk_jabatan' => $p->positionHistories->sortByDesc('tmt_jabatan')->sortByDesc('is_latest')->first()?->file_sk,
-            'sk_kgb' => $p->salaryHistories->sortByDesc('tmt_kgb')->sortByDesc('is_latest')->first()?->file_sk,
-            'sk_pengangkatan' => $p->appointments->sortByDesc('tmt_pengangkatan')->first()?->file_sk,
-        ];
-
-        $mapDokumenRow = function ($d) use ($canonicalSkFiles) {
-            return [
-                'id'             => $d->id,
-                'nama_dokumen'   => $d->nama_dokumen,
-                'jenis_dokumen'  => $d->jenis_dokumen,
-                'kategori_label' => \App\Support\Documents\DocumentCategory::label($d->jenis_dokumen),
-                'nomor_dokumen'  => $d->nomor_dokumen,
-                'tanggal_dokumen'=> $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('d-m-Y') : null,
-                'tanggal_dokumen_raw' => $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('Y-m-d') : null,
-                'file_size'      => $d->fileSizeLabel(),
-                'file_path'      => $d->file_path,
-                'file_tersedia'  => $d->fileExists(),
-                'keterangan'     => $d->keterangan,
-                'is_latest'      => filled($d->file_path)
-                    && ($canonicalSkFiles[$d->jenis_dokumen] ?? null) === $d->file_path,
-                'is_deletable'   => \App\Support\Documents\DocumentCategory::isDeletable($d->jenis_dokumen),
-                'detail_url'     => route('dokumen.show', $d->id),
-                'download_url'   => route('dokumen.download', $d->id),
-            ];
-        };
-
-        $riwayatSk = $allDocuments
-            ->filter(fn ($d) => \App\Support\Documents\DocumentCategory::isProtectedSk($d->jenis_dokumen))
-            ->values();
-        $riwayatBerkas = $allDocuments
-            ->filter(fn ($d) => ! \App\Support\Documents\DocumentCategory::isProtectedSk($d->jenis_dokumen))
-            ->values();
-
         $detailTabs = [
             'profile' => 'Profil',
             'keluarga' => 'Keluarga',
@@ -62,7 +44,7 @@
             'disiplin' => 'Hukuman Disiplin',
             'pendidikan' => 'Pendidikan',
             'pengangkatan' => 'Pengangkatan',
-            'docs' => 'Dokumen & SK',
+            'docs' => 'Dokumen',
         ];
         $requestedDetailTab = request()->query('tab');
 
@@ -143,109 +125,14 @@
         newDisiplin: { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' },
         newPendidikan: { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' },
 
-        // ===== Tab Dokumen & SK =====
-        skList: {{ $riwayatSk->map($mapDokumenRow)->toJson() }},
-        berkasList: {{ $riwayatBerkas->map($mapDokumenRow)->toJson() }},
-
-        // Arsip terpusat & daftar pegawai menyimpan hasil fetch di sessionStorage tanpa TTL;
-        // setelah mutasi dari tab ini cache-nya wajib dibuang agar navigasi kembali tidak
-        // menampilkan data lama.
-        invalidateDokumenCache() {
-            const toDelete = [];
-            for (let i = 0; i < sessionStorage.length; i++) {
-                const key = sessionStorage.key(i);
-                if (key && (key.startsWith('dokumen_') || key.startsWith('pegawai_'))) toDelete.push(key);
-            }
-            toDelete.forEach(k => sessionStorage.removeItem(k));
-        },
-
-        // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen & SK
+        // Upload berkas lainnya (KTP/KK, Ijazah, Lainnya) langsung dari tab Dokumen.
         showUploadBerkas: false,
         isUploadingBerkas: false,
         uploadBerkasError: '',
         uploadBerkasErrors: {},
         newBerkas: { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null },
-
-        // Tambah riwayat SK baru (pangkat/jabatan/KGB append; pengangkatan replace)
-        showUploadSkForm: false,
-        isUploadingSk: false,
-        skUploadError: '',
-        skUploadErrors: {},
-        newSk: { kategori_dokumen: '{{ $canCreateEmployeeHistory ? 'sk_pangkat' : 'sk_pengangkatan' }}', no_sk: '', tanggal_sk: '', file_sk: null, golongan_id: '', tmt_pangkat: '', jabatan_id: '', jenis_jabatan_id: '', unit_kerja_id: '', kelas_jabatan: '', tmt_jabatan: '', gaji_pokok: '', tmt_kgb: '', jenis_pengangkatan: 'CPNS', tmt_pengangkatan: '' },
-
-        // Ganti berkas SK yang sudah ada (metadata read-only, hanya file yang diganti)
-        showEditSkModal: false,
-        editSkDoc: null,
-        editSkFile: null,
-        editSkError: '',
-        isUpdatingSkFile: false,
-
-        openEditSk(doc) {
-            this.editSkDoc = doc;
-            this.editSkFile = null;
-            this.editSkError = '';
-            this.showEditSkModal = true;
-        },
-        async submitReplaceSk() {
-            if (!this.editSkDoc) return;
-            if (!this.editSkFile) {
-                this.editSkError = 'Pilih berkas SK pengganti terlebih dahulu.';
-                return;
-            }
-            this.editSkError = '';
-            this.isUpdatingSkFile = true;
-            try {
-                const fd = new FormData();
-                fd.append('berkas', this.editSkFile);
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.editSkDoc.id}/ganti-berkas`, {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: fd,
-                });
-                const json = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    const msg = json.errors ? Object.values(json.errors).flat().join(' ') : (json.message ?? 'Gagal mengganti berkas SK.');
-                    this.editSkError = msg;
-                    return;
-                }
-                // Reload agar status is_latest, file_tersedia, dan ukuran berkas
-                // selalu akurat dari server (serupa alur submitUploadSk). Cache
-                // arsip dibuang agar tidak menampilkan data lama.
-                this.invalidateDokumenCache();
-                this.showEditSkModal = false;
-                this.editSkDoc = null;
-                this.editSkFile = null;
-                window.location.reload();
-            } catch (e) {
-                this.editSkError = 'Terjadi kesalahan jaringan. Silakan coba lagi.';
-            } finally {
-                this.isUpdatingSkFile = false;
-            }
-        },
-
-        // Edit metadata berkas lainnya
-        showEditBerkasModal: false,
-        isUpdatingBerkas: false,
-        editBerkasError: '',
-        editBerkasErrors: {},
-        editBerkasId: '',
-        editBerkasForm: { kategori_dokumen: 'lainnya', nama_dokumen: '', nomor_dokumen: '', tanggal_terbit: '', deskripsi: '', file: null },
-
-        // Hapus berkas lainnya (2-step dengan check-impact)
-        showDeleteBerkasModal: false,
-        deleteBerkasId: '',
-        deleteBerkasName: '',
-        deleteBerkasStep: 'confirm',
-        deleteBerkasLoading: false,
-        deleteBerkasHasBlocked: false,
-        deleteBerkasBlockedImpacts: {},
-        isDeletingBerkas: false,
-
-        get skUploadHint() {
-            return this.newSk.kategori_dokumen === 'sk_pengangkatan'
-                ? 'SK Pengangkatan akan menggantikan data pengangkatan aktif beserta berkasnya.'
-                : 'SK ditambahkan sebagai riwayat baru (append-only); riwayat lama tetap tersimpan.';
-        },
+        skList: {{ $riwayatSk->map($mapDokumenRow)->toJson() }},
+        berkasList: {{ $riwayatBerkas->map($mapDokumenRow)->toJson() }},
 
         async submitUploadBerkas() {
             if (!this.newBerkas.file) {
@@ -278,7 +165,6 @@
                     const json = await res.json();
                     // Tambahkan dokumen baru ke daftar secara reaktif (tanpa reload)
                     this.berkasList.unshift(json.document);
-                    this.invalidateDokumenCache();
                     this.showUploadBerkas = false;
                     this.newBerkas = { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null };
                     const fileInput = document.getElementById('berkas_upload_input');
@@ -296,199 +182,6 @@
                 this.uploadBerkasError = 'Gagal mengunggah berkas. Periksa koneksi internet Anda.';
             } finally {
                 this.isUploadingBerkas = false;
-            }
-        },
-
-        // ===== Tambah riwayat SK baru dari tab Dokumen & SK =====
-        resetSkTypeFields() {
-            // Bersihkan juga metadata bersama dan file agar perpindahan kategori tidak
-            // membawa nomor/tanggal/berkas dari pengisian sebelumnya ke riwayat baru.
-            this.newSk.no_sk = '';
-            this.newSk.tanggal_sk = '';
-            this.newSk.file_sk = null;
-            const skFileInput = document.getElementById('file_sk_tab');
-            if (skFileInput) skFileInput.value = '';
-
-            this.newSk.golongan_id = '';
-            this.newSk.tmt_pangkat = '';
-            this.newSk.jabatan_id = '';
-            this.newSk.jenis_jabatan_id = '';
-            this.newSk.unit_kerja_id = '';
-            this.newSk.kelas_jabatan = '';
-            this.newSk.tmt_jabatan = '';
-            this.newSk.gaji_pokok = '';
-            this.newSk.tmt_kgb = '';
-            this.newSk.jenis_pengangkatan = 'CPNS';
-            this.newSk.tmt_pengangkatan = '';
-        },
-        async submitUploadSk() {
-            if (!this.newSk.file_sk) {
-                this.skUploadError = 'Berkas SK wajib dipilih.';
-                return;
-            }
-            this.isUploadingSk = true;
-            this.skUploadError = '';
-            this.skUploadErrors = {};
-
-            const fd = new FormData();
-            fd.append('kategori_dokumen', this.newSk.kategori_dokumen);
-            fd.append('no_sk', this.newSk.no_sk);
-            fd.append('tanggal_sk', this.newSk.tanggal_sk);
-            fd.append('file_sk', this.newSk.file_sk);
-
-            if (this.newSk.kategori_dokumen === 'sk_pangkat') {
-                fd.append('golongan_id', this.newSk.golongan_id);
-                fd.append('tmt_pangkat', this.newSk.tmt_pangkat);
-            } else if (this.newSk.kategori_dokumen === 'sk_jabatan') {
-                fd.append('jabatan_id', this.newSk.jabatan_id);
-                if (this.newSk.jenis_jabatan_id) fd.append('jenis_jabatan_id', this.newSk.jenis_jabatan_id);
-                if (this.newSk.unit_kerja_id) fd.append('unit_kerja_id', this.newSk.unit_kerja_id);
-                if (this.newSk.kelas_jabatan) fd.append('kelas_jabatan', this.newSk.kelas_jabatan);
-                fd.append('tmt_jabatan', this.newSk.tmt_jabatan);
-            } else if (this.newSk.kategori_dokumen === 'sk_kgb') {
-                fd.append('gaji_pokok', this.newSk.gaji_pokok);
-                fd.append('tmt_kgb', this.newSk.tmt_kgb);
-            } else if (this.newSk.kategori_dokumen === 'sk_pengangkatan') {
-                fd.append('jenis_pengangkatan', this.newSk.jenis_pengangkatan);
-                fd.append('tmt_pengangkatan', this.newSk.tmt_pengangkatan);
-            }
-
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-sk`, {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: fd,
-                });
-
-                if (res.ok) {
-                    this.invalidateDokumenCache();
-                    this.showUploadSkForm = false;
-                    // Riwayat/dokumen paling relevan dimuat ulang agar tabel, status
-                    // kelengkapan, dan tab riwayat lain sinkron dengan data baru.
-                    window.location.reload();
-                } else if (res.status === 422) {
-                    const json = await res.json();
-                    this.skUploadErrors = json.errors ?? {};
-                    this.skUploadError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
-                } else {
-                    this.skUploadError = 'Gagal menyimpan SK. Silakan coba lagi.';
-                }
-            } catch (e) {
-                this.skUploadError = 'Gagal menyimpan SK. Periksa koneksi internet Anda.';
-            } finally {
-                this.isUploadingSk = false;
-            }
-        },
-
-        // ===== Edit metadata berkas lainnya =====
-        openEditBerkas(doc) {
-            this.editBerkasId = doc.id;
-            this.editBerkasForm = {
-                kategori_dokumen: doc.jenis_dokumen,
-                nama_dokumen: doc.nama_dokumen ?? '',
-                nomor_dokumen: doc.nomor_dokumen ?? '',
-                tanggal_terbit: doc.tanggal_dokumen ? doc.tanggal_dokumen.split('-').reverse().join('-') : '',
-                deskripsi: doc.keterangan ?? '',
-                file: null,
-            };
-            this.editBerkasError = '';
-            this.editBerkasErrors = {};
-            this.showEditBerkasModal = true;
-        },
-        async submitEditBerkas() {
-            this.isUpdatingBerkas = true;
-            this.editBerkasError = '';
-            this.editBerkasErrors = {};
-
-            const fd = new FormData();
-            fd.append('kategori_dokumen', this.editBerkasForm.kategori_dokumen);
-            fd.append('nama_dokumen', this.editBerkasForm.nama_dokumen);
-            fd.append('nomor_dokumen', this.editBerkasForm.nomor_dokumen);
-            fd.append('tanggal_terbit', this.editBerkasForm.tanggal_terbit);
-            fd.append('deskripsi', this.editBerkasForm.deskripsi);
-            if (this.editBerkasForm.file) fd.append('berkas', this.editBerkasForm.file);
-
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.editBerkasId}`, {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                    body: fd,
-                });
-
-                if (res.ok) {
-                    const json = await res.json();
-                    const index = this.berkasList.findIndex(item => item.id === this.editBerkasId);
-                    if (index !== -1) this.berkasList.splice(index, 1, json.document);
-                    this.invalidateDokumenCache();
-                    this.showEditBerkasModal = false;
-                    this.toast = { show: true, message: 'Dokumen berhasil diperbarui.', type: 'success' };
-                    setTimeout(() => { this.toast.show = false; }, 3500);
-                } else if (res.status === 422) {
-                    const json = await res.json();
-                    this.editBerkasErrors = json.errors ?? {};
-                    this.editBerkasError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
-                } else {
-                    this.editBerkasError = 'Gagal memperbarui dokumen. Silakan coba lagi.';
-                }
-            } catch (e) {
-                this.editBerkasError = 'Gagal memperbarui dokumen. Periksa koneksi internet Anda.';
-            } finally {
-                this.isUpdatingBerkas = false;
-            }
-        },
-
-        // ===== Hapus berkas lainnya (check-impact → konfirmasi) =====
-        openDeleteBerkas(doc) {
-            this.deleteBerkasId = doc.id;
-            this.deleteBerkasName = doc.nama_dokumen;
-            this.deleteBerkasStep = 'confirm';
-            this.deleteBerkasHasBlocked = false;
-            this.deleteBerkasBlockedImpacts = {};
-            this.showDeleteBerkasModal = true;
-        },
-        async checkDeleteBerkasImpact() {
-            this.deleteBerkasLoading = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.deleteBerkasId}/check-impact`, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                });
-                if (!res.ok) throw new Error('Gagal memeriksa dampak penghapusan.');
-                const json = await res.json();
-                this.deleteBerkasHasBlocked = Boolean(json.has_blocked);
-                this.deleteBerkasBlockedImpacts = json.blocked_impacts ?? {};
-                this.deleteBerkasStep = 'impact';
-            } catch (e) {
-                this.deleteBerkasStep = 'impact';
-                this.deleteBerkasHasBlocked = true;
-                this.deleteBerkasBlockedImpacts = { Error: [{ id: '', label: e.message }] };
-            } finally {
-                this.deleteBerkasLoading = false;
-            }
-        },
-        async submitDeleteBerkas() {
-            this.isDeletingBerkas = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/dokumen/${this.deleteBerkasId}`, {
-                    method: 'DELETE',
-                    headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                });
-
-                if (res.ok) {
-                    this.berkasList = this.berkasList.filter(item => item.id !== this.deleteBerkasId);
-                    this.invalidateDokumenCache();
-                    this.showDeleteBerkasModal = false;
-                    this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
-                    setTimeout(() => { this.toast.show = false; }, 3500);
-                } else {
-                    const json = await res.json().catch(() => null);
-                    this.toast = { show: true, message: json?.message ?? 'Gagal menghapus berkas.', type: 'error' };
-                    setTimeout(() => { this.toast.show = false; }, 5000);
-                }
-            } catch (e) {
-                this.toast = { show: true, message: 'Gagal menghapus berkas. Periksa koneksi internet Anda.', type: 'error' };
-                setTimeout(() => { this.toast.show = false; }, 5000);
-            } finally {
-                this.isDeletingBerkas = false;
             }
         },
         async updateKinerjaBaik(value) {
@@ -1721,10 +1414,7 @@
                 ])
             </x-pegawai.detail.panel>
 
-            {{-- TAB 9: DOKUMEN & SK --}}
-            <x-pegawai.detail.panel tab="docs" id-prefix="admin">
-                @include('admin.pegawai.partials.tab-dokumen-sk')
-            </x-pegawai.detail.panel>
+            @include('admin.pegawai.partials.tab-dokumen-sk')
 
         </x-pegawai.detail.shell>
 
@@ -2069,7 +1759,7 @@
                                                 </x-form.select>
                                                 <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
                                                     Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
-                                                    <button type="button" @click="selectTab('docs')" class="text-primary underline cursor-pointer">Unggah dari bagian Dokumen &amp; SK</button>.
+                                                    <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
                                                 </p>
                                             </div>
                                         </template>

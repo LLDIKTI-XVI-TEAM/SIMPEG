@@ -65,7 +65,10 @@
         {{-- Navigation --}}
         <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
-            $activeRole = auth()->user()?->role ?? 'pegawai';
+            $authUser = auth()->user();
+            $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
+                ? ($authUser->getEffectiveRole() ?? 'pegawai')
+                : ($authUser?->role ?? 'pegawai');
 
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
@@ -470,6 +473,22 @@
 
                 <div class="h-6 w-px bg-border"></div>
 
+                {{-- Indikator Simulasi Role aktif (tampil di desktop dan mobile) --}}
+                @if(auth()->check() && auth()->user()->temporary_role)
+                    <div class="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-warning/40 bg-warning/10 px-2 sm:px-3 py-1 text-xs font-semibold text-warning">
+                        <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                        <span class="hidden sm:inline">Simulasi: <strong>{{ ucwords(str_replace('_', ' ', auth()->user()->temporary_role)) }}</strong></span>
+                        <form method="POST" action="{{ route('revert-role') }}" class="ml-0.5 sm:ml-1">
+                            @csrf
+                            <button type="submit" class="rounded-md bg-warning/20 px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs font-semibold text-warning hover:bg-warning/30 transition-colors">
+                                Revert
+                            </button>
+                        </form>
+                    </div>
+                @endif
+
                 {{-- Profile Dropdown --}}
                 <div class="relative" x-data="{ open: false }">
                     <button
@@ -522,6 +541,47 @@
                                     </svg>
                                     Pengaturan
                                 </a>
+                            @endif
+
+                            {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
+                                 switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
+                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
+                                <div class="border-t border-border/60 my-1 pt-1">
+                                    {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
+                                         selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
+                                         role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
+                                         yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
+                                    @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
+                                        <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
+                                            Simulasi Role
+                                        </div>
+                                        @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
+                                            @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
+                                                <form method="POST" action="{{ route('switch-role') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="target_role" value="{{ $roleKey }}">
+                                                    <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-4 py-1.5 text-xs text-ink hover:bg-soft transition-colors font-sans">
+                                                        <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                                        </svg>
+                                                        Switch ke {{ $roleLabel }}
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        @endforeach
+                                    @endif
+                                    @if(auth()->user()->temporary_role)
+                                        <form method="POST" action="{{ route('revert-role') }}" class="mt-1">
+                                            @csrf
+                                            <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-4 py-1.5 text-xs font-semibold text-warning hover:bg-warning/10 transition-colors font-sans">
+                                                <svg class="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                                </svg>
+                                                Kembalikan Role Asli
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             @endif
                         </div>
                         <div class="border-t border-border p-1.5">

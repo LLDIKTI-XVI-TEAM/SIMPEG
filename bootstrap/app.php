@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AuditRoleSimulationUsage;
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
@@ -21,6 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,
             'session.timeout' => SessionTimeoutMessage::class,
+        ]);
+
+        // Middleware global hanya mengamati route web; kelasnya sendiri membatasi audit
+        // pada route yang benar-benar memiliki gate role atau permission internal.
+        $middleware->web(append: [
+            AuditRoleSimulationUsage::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

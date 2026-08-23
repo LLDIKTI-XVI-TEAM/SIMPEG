@@ -4,7 +4,6 @@ namespace App\Actions\Employees;
 
 use App\Models\Document;
 use App\Models\Employee;
-use App\Services\EmployeeDocumentStatusService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Contracts\Filesystem\Filesystem;
@@ -13,57 +12,35 @@ use Illuminate\Support\Facades\Storage;
 
 class ShowEmployeeDocumentStatusAction
 {
-    public function __construct(
-        private readonly EmployeeHistoryAttachmentService $attachments,
-        private readonly EmployeeDocumentStatusService $employeeDocumentStatusService,
-    ) {}
+    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
 
     /**
      * Menyusun rincian status SK setiap riwayat pegawai berdasarkan file aktual.
      *
-     * @return array{
-     *     status_kelengkapan: string,
-     *     is_lengkap: bool,
-     *     total_wajib: int,
-     *     tersedia_count: int,
-     *     belum_ada_count: int,
-     *     perlu_perbaikan_count: int,
-     *     required_sks: list<array<string, mixed>>,
-     *     total_riwayat: int,
-     *     file_tersedia: int,
-     *     records: list<array<string, mixed>>,
-     *     total_dokumen: int,
-     *     dokumen_tersedia: int,
-     *     documents: list<array<string, mixed>>
-     * }
+     * @return array{status_kelengkapan: string, is_lengkap: bool, total_riwayat: int, file_tersedia: int, records: list<array<string, mixed>>}
      */
     public function execute(Employee $employee): array
     {
         $employee->load([
-            'jenisPegawai:id,nama',
             'rankHistories' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'golongan_id', 'no_sk', 'tanggal_sk', 'tmt_pangkat', 'file_sk', 'is_latest', 'created_at'])
+                ->select(['id', 'employee_id', 'golongan_id', 'no_sk', 'tanggal_sk', 'tmt_pangkat', 'file_sk'])
                 ->with('golongan:id,kode,nama')
-                ->orderByDesc('is_latest')
                 ->orderByDesc('tmt_pangkat'),
             'positionHistories' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'nama_jabatan', 'no_sk', 'tanggal_sk', 'tmt_jabatan', 'file_sk', 'is_latest', 'created_at'])
-                ->orderByDesc('is_latest')
+                ->select(['id', 'employee_id', 'nama_jabatan', 'no_sk', 'tanggal_sk', 'tmt_jabatan', 'file_sk'])
                 ->orderByDesc('tmt_jabatan'),
             'salaryHistories' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'gaji_pokok', 'no_sk', 'tanggal_sk', 'tmt_kgb', 'file_sk', 'is_latest', 'created_at'])
-                ->orderByDesc('is_latest')
+                ->select(['id', 'employee_id', 'gaji_pokok', 'no_sk', 'tanggal_sk', 'tmt_kgb', 'file_sk'])
                 ->orderByDesc('tmt_kgb'),
             'appointments' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'tmt_pengangkatan', 'file_sk', 'created_at'])
+                ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'tmt_pengangkatan', 'file_sk'])
                 ->orderByDesc('tmt_pengangkatan'),
             'documents' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'jenis_dokumen', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'keterangan', 'created_at'])
+                ->select(['id', 'employee_id', 'jenis_dokumen', 'nama_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'file_path', 'keterangan'])
                 ->orderByDesc('tanggal_dokumen')
                 ->orderByDesc('created_at'),
         ]);
 
-        $requiredSkSummary = $this->employeeDocumentStatusService->summarize($employee);
         $disk = Storage::disk(Document::STORAGE_DISK);
         $records = collect();
         $this->attachments->primeDocumentReferences(collect()
@@ -142,7 +119,17 @@ class ShowEmployeeDocumentStatusAction
         $totalRiwayat = $records->count();
         $fileTersediaCount = $records->where('file_tersedia', true)->count();
 
-        return $requiredSkSummary + [
+        if ($totalRiwayat === 0) {
+            $statusKelengkapan = 'kosong';
+        } elseif ($fileTersediaCount === $totalRiwayat) {
+            $statusKelengkapan = 'lengkap';
+        } else {
+            $statusKelengkapan = 'tidak_lengkap';
+        }
+
+        return [
+            'status_kelengkapan' => $statusKelengkapan,
+            'is_lengkap' => $statusKelengkapan === 'lengkap', // backward-compat
             'total_riwayat' => $totalRiwayat,
             'file_tersedia' => $fileTersediaCount,
             'records' => $records->values()->all(),

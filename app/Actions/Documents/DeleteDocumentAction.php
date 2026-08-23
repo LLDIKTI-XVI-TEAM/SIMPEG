@@ -12,7 +12,7 @@ use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
 use App\Services\AuditService;
-use App\Support\Documents\DocumentCategory;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +22,8 @@ use Illuminate\Validation\ValidationException;
 class DeleteDocumentAction
 {
     use BuildsDocumentAuditPayload;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Periksa seluruh riwayat pegawai yang menggunakan file dokumen.
@@ -107,13 +109,6 @@ class DeleteDocumentAction
         $filePath = DB::transaction(function () use ($document): string {
             /** @var Document $lockedDocument */
             $lockedDocument = Document::query()->lockForUpdate()->findOrFail($document->id);
-
-            if (! DocumentCategory::isDeletable($lockedDocument->jenis_dokumen)) {
-                throw ValidationException::withMessages([
-                    'document' => 'Dokumen SK tidak dapat dihapus. Unggah SK baru untuk menambah riwayat, atau ganti SK Pengangkatan.',
-                ]);
-            }
-
             $impact = $this->checkImpact($lockedDocument);
 
             if ($impact['has_blocked']) {
@@ -141,7 +136,15 @@ class DeleteDocumentAction
 
         // File dihapus setelah transaksi sukses dan hanya bila tidak dipakai referensi lain.
         if ($filePath !== null && ! $this->fileIsStillReferenced($filePath)) {
-            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+            $deleteFile = function () use ($filePath): void {
+                if (! $this->fileIsStillReferenced($filePath)) {
+                    Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+                }
+            };
+
+            if (! $this->sideEffects->afterCommit($deleteFile)) {
+                $deleteFile();
+            }
         }
     }
 

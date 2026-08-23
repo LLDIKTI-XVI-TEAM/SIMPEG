@@ -8,6 +8,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Employees\TmtCalculatorService;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
@@ -192,7 +193,8 @@ class ExecuteImportBatchAction
                     ],
                     null,
                     $ipAddress,
-                    $userAgent
+                    $userAgent,
+                    $this->simulationContextFromBatch($batch),
                 );
 
                 $batch->forceFill([
@@ -316,6 +318,7 @@ class ExecuteImportBatchAction
                     null,
                     $ipAddress,
                     $userAgent,
+                    $this->simulationContextFromBatch($batch),
                 );
             } elseif ($outcome['status'] === 'skipped') {
                 $skippedCount++;
@@ -401,7 +404,11 @@ class ExecuteImportBatchAction
             ];
         }
 
-        Cache::put($cacheKey, $cached, now()->addMinutes($batch->status === 'completed' ? 10 : UploadImportBatchAction::CACHE_TTL_MINUTES));
+        ImportBatchCacheMutation::putDirect(
+            $cacheKey,
+            $cached,
+            now()->addMinutes($batch->status === 'completed' ? 10 : UploadImportBatchAction::CACHE_TTL_MINUTES),
+        );
     }
 
     /** Memulihkan cleanup file dan cache jika worker crash setelah commit status completed. */
@@ -579,5 +586,34 @@ class ExecuteImportBatchAction
         if (Storage::disk('local')->exists(UploadImportBatchAction::STORAGE_DIR.'/'.$storedName)) {
             Storage::disk('local')->delete(UploadImportBatchAction::STORAGE_DIR.'/'.$storedName);
         }
+    }
+
+    /**
+     * Konteks simulasi role yang dibekukan saat batch diantrekan (kolom queued_*_role).
+     *
+     * Audit import ditulis oleh worker (async); memakai snapshot ini, bukan record user live,
+     * agar jejak konsisten dengan waktu operasi diotorisasi. Mengembalikan array kosong untuk
+     * batch yang diantrekan TANPA simulasi (role asli == role efektif, atau snapshot tidak
+     * tersedia) sebagai sentinel "eksplisit non-simulasi", sehingga AuditService tidak kembali
+     * membaca state user live yang bisa berubah (mis. user beralih role setelah enqueue).
+     *
+     * @return array<string, mixed>
+     */
+    private function simulationContextFromBatch(ImportBatch $batch): array
+    {
+        $originalRole = $batch->queued_original_role;
+        $effectiveRole = $batch->queued_effective_role;
+
+        if ($originalRole !== null && $effectiveRole !== null && $originalRole !== $effectiveRole) {
+            return [
+                '_simulation' => true,
+                '_original_role' => $originalRole,
+                '_effective_role' => $effectiveRole,
+            ];
+        }
+
+        // Sentinel non-simulasi: tanda bahwa snapshot sudah dipertimbangkan dan operasi ini
+        // bukan hasil simulasi; tidak menambah metadata maupun memicu lookup user live.
+        return [];
     }
 }

@@ -38,44 +38,9 @@
     // ===== State Modal Rincian Dokumen =====
     showDocumentStatusModal: false,
     documentStatusEmployee: null,
-    documentStatus: { status_kelengkapan: 'belum_ada', is_lengkap: false, total_wajib: 0, tersedia_count: 0, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
+    documentStatus: { status_kelengkapan: 'kosong', is_lengkap: false, total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] },
     isLoadingDocumentStatus: false,
     documentStatusError: '',
-
-    // ===== State Modal SK Wajib per Jenis Pegawai =====
-    showSkRequirementModal: false,
-    skMatrix: @js($skRequirementMatrix['current'] ?? []),
-    skTypeNames: @js($skRequirementMatrix['namesByType'] ?? []),
-    skSkLabels: @js($skRequirementMatrix['skPool'] ?? []),
-    skMatrixBusy: false,
-    skMatrixMsg: '',
-    openSkRequirementModal() { this.skMatrixMsg = ''; this.showSkRequirementModal = true; },
-    async saveSkRequirementMatrix() {
-        this.skMatrixBusy = true;
-        this.skMatrixMsg = '';
-        const matrix = {};
-        document.querySelectorAll('#sk-requirement-modal input[type=checkbox]').forEach((cb) => {
-            if (cb.checked) {
-                const typeId = cb.dataset.type;
-                (matrix[typeId] = matrix[typeId] || []).push(cb.value);
-            }
-        });
-        try {
-            const res = await fetch(@js(route('sk-requirements.update')), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': @js(csrf_token()) },
-                body: JSON.stringify({ matrix }),
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) { this.skMatrixMsg = data.message || 'Gagal menyimpan matriks SK.'; return; }
-            this.skMatrix = matrix;
-            this.skMatrixMsg = 'Matriks SK wajib per jenis pegawai berhasil disimpan.';
-        } catch (e) {
-            this.skMatrixMsg = 'Terjadi kesalahan jaringan. Silakan coba lagi.';
-        } finally {
-            this.skMatrixBusy = false;
-        }
-    },
     @endif
 
     // ===== Modal Ubah Status Pegawai =====
@@ -111,48 +76,6 @@
 
     detailUrl(employee) {
         return `${this.employeeShowUrlPrefix}/${employee.id}`;
-    },
-
-    // Mapping status kelengkapan dokumen dipakai bersama oleh tampilan admin dan
-    // read-only agar badge tidak berbeda label/warna untuk status yang sama.
-    docStatusLabel(state) {
-        return {
-            lengkap: 'Lengkap',
-            belum_lengkap: 'Belum Lengkap',
-            perlu_perbaikan: 'Perlu Perbaikan',
-            belum_ada: 'Belum Ada',
-            tidak_wajib: 'Tidak Wajib',
-        }[state] ?? 'Belum Ada';
-    },
-
-    docBadgeClass(state, withHover) {
-        const base = {
-            lengkap: 'bg-success/10 text-success',
-            belum_lengkap: 'bg-warning/10 text-warning',
-            perlu_perbaikan: 'bg-danger/10 text-danger',
-            belum_ada: 'bg-muted/20 text-muted',
-            tidak_wajib: 'bg-soft text-muted',
-        }[state] ?? 'bg-muted/20 text-muted';
-
-        const hover = {
-            lengkap: 'hover:bg-success/15',
-            belum_lengkap: 'hover:bg-warning/15',
-            perlu_perbaikan: 'hover:bg-danger/15',
-            belum_ada: 'hover:bg-muted/30',
-            tidak_wajib: 'hover:bg-soft/80',
-        }[state] ?? 'hover:bg-muted/30';
-
-        return withHover ? `${base} ${hover}` : base;
-    },
-
-    docDotClass(state) {
-        return {
-            lengkap: 'bg-success',
-            belum_lengkap: 'bg-warning',
-            perlu_perbaikan: 'bg-danger',
-            belum_ada: 'bg-muted',
-            tidak_wajib: 'bg-muted/50',
-        }[state] ?? 'bg-muted';
     },
 
     openStatusModal(employee) {
@@ -303,7 +226,7 @@
 
     async openDocumentStatus(employee) {
         this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
-        this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_lengkap: employee.is_lengkap === 'lengkap', total_wajib: 0, tersedia_count: 0, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
+        this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_lengkap: employee.is_lengkap === 'lengkap', total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
         this.documentStatusError = '';
         this.showDocumentStatusModal = true;
         this.isLoadingDocumentStatus = true;
@@ -599,17 +522,6 @@
                     </svg>
                     Export PDF
                 </button>
-                @if(auth()->user()?->role === 'super_admin')
-                <button type="button" id="sk-requirement-btn" @click="openSkRequirementModal()"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-3 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
-                    title="Atur SK Wajib per Jenis Pegawai" aria-label="Atur SK Wajib per Jenis Pegawai">
-                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                    </svg>
-                    <span>SK Wajib</span>
-                </button>
-                @endif
                 <div class="relative" x-data="{ open: false }">
                     <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
@@ -833,16 +745,46 @@
                             @if ($isReadOnly)
                             <span x-show="!filters.show_nonaktif"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
-                                :class="docBadgeClass(p.is_lengkap)" title="Status kelengkapan dokumen">
-                                <span class="h-1.5 w-1.5 rounded-full" :class="docDotClass(p.is_lengkap)"></span>
-                                <span x-text="docStatusLabel(p.is_lengkap)"></span>
+                                :class="{
+                                'bg-success/10 text-success': p.is_lengkap === 'lengkap',
+                                'bg-warning/10 text-warning': p.is_lengkap === 'tidak_lengkap',
+                                'bg-primary/10 text-primary': p.is_lengkap === 'tersedia',
+                                'bg-muted/20 text-muted': p.is_lengkap === 'kosong',
+                            }" title="Status kelengkapan dokumen">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="{
+                                    'bg-success': p.is_lengkap === 'lengkap',
+                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
+                                    'bg-primary': p.is_lengkap === 'tersedia',
+                                    'bg-muted': p.is_lengkap === 'kosong',
+                                }"></span>
+                                <span x-text="
+                                    p.is_lengkap === 'lengkap'       ? 'Lengkap' :
+                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
+                                                                       'Belum Ada'
+                                "></span>
                             </span>
                             @else
                             <button x-show="!filters.show_nonaktif" type="button" @click="openDocumentStatus(p)"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                :class="docBadgeClass(p.is_lengkap, true)" title="Klik untuk melihat rincian status dokumen">
-                                <span class="h-1.5 w-1.5 rounded-full" :class="docDotClass(p.is_lengkap)"></span>
-                                <span x-text="docStatusLabel(p.is_lengkap)"></span>
+                                :class="{
+                                'bg-success/10 text-success hover:bg-success/15': p.is_lengkap === 'lengkap',
+                                'bg-warning/10 text-warning hover:bg-warning/15': p.is_lengkap === 'tidak_lengkap',
+                                'bg-primary/10 text-primary hover:bg-primary/15': p.is_lengkap === 'tersedia',
+                                'bg-muted/20 text-muted hover:bg-muted/30':       p.is_lengkap === 'kosong',
+                            }" title="Klik untuk melihat rincian status dokumen">
+                                <span class="h-1.5 w-1.5 rounded-full" :class="{
+                                    'bg-success': p.is_lengkap === 'lengkap',
+                                    'bg-warning': p.is_lengkap === 'tidak_lengkap',
+                                    'bg-primary': p.is_lengkap === 'tersedia',
+                                    'bg-muted':   p.is_lengkap === 'kosong',
+                                }"></span>
+                                <span x-text="
+                                    p.is_lengkap === 'lengkap'       ? 'Lengkap' :
+                                    p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                                    p.is_lengkap === 'tersedia'      ? 'Tersedia' :
+                                                                       'Belum Ada'
+                                "></span>
                                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
@@ -993,10 +935,24 @@
                         <p class="text-xs text-muted" x-text="'NIP. ' + (documentStatusEmployee?.nip ?? '-')"></p>
                     </div>
                     <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
-                        :class="docBadgeClass(documentStatus.status_kelengkapan || 'belum_ada')">
-                        <span class="h-1.5 w-1.5 rounded-full"
-                            :class="docDotClass(documentStatus.status_kelengkapan || 'belum_ada')"></span>
-                        <span x-text="docStatusLabel(documentStatus.status_kelengkapan || 'belum_ada')"></span>
+                        :class="{
+                        'bg-success/10 text-success': documentStatus.status_kelengkapan === 'lengkap',
+                        'bg-warning/10 text-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
+                        'bg-primary/10 text-primary': documentStatus.status_kelengkapan === 'tersedia',
+                        'bg-muted/20 text-muted':     documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                    }">
+                        <span class="h-1.5 w-1.5 rounded-full" :class="{
+                            'bg-success': documentStatus.status_kelengkapan === 'lengkap',
+                            'bg-warning': documentStatus.status_kelengkapan === 'tidak_lengkap',
+                            'bg-primary': documentStatus.status_kelengkapan === 'tersedia',
+                            'bg-muted':   documentStatus.status_kelengkapan === 'kosong' || !documentStatus.status_kelengkapan,
+                        }"></span>
+                        <span x-text="
+                            documentStatus.status_kelengkapan === 'lengkap'       ? 'Lengkap' :
+                            documentStatus.status_kelengkapan === 'tidak_lengkap' ? 'Tidak Lengkap' :
+                            documentStatus.status_kelengkapan === 'tersedia'      ? 'Tersedia' :
+                                                                                    'Belum Ada'
+                        "></span>
                     </span>
                 </div>
 
@@ -1016,48 +972,12 @@
                         x-text="documentStatusError"></div>
                 </template>
 
-                <template x-if="!isLoadingDocumentStatus && !documentStatusError">
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <p class="text-sm font-bold text-ink">Kelengkapan Dokumen SK</p>
-                                <p class="text-xs text-muted"
-                                    x-text="`${documentStatus.tersedia_count} dari ${documentStatus.total_wajib} SK tersedia dan valid.`">
-                                </p>
-                            </div>
-                        </div>
-                        <div class="grid gap-2 sm:grid-cols-2">
-                            <template x-for="sk in documentStatus.required_sks" :key="sk.jenis">
-                                <div class="rounded-lg border p-3" :class="{
-                                    'border-success/30 bg-success/5': sk.status === 'tersedia',
-                                    'border-danger/30 bg-danger/5': sk.status === 'perlu_perbaikan',
-                                    'border-border bg-soft/40': sk.status === 'belum_ada',
-                                }">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-semibold text-ink" x-text="sk.label"></p>
-                                            <p class="mt-0.5 text-xs" :class="{
-                                                'text-success': sk.status === 'tersedia',
-                                                'text-danger': sk.status === 'perlu_perbaikan',
-                                                'text-muted': sk.status === 'belum_ada',
-                                            }" x-text="sk.status_label"></p>
-                                        </div>
-                                        <span class="h-2 w-2 shrink-0 rounded-full" :class="{
-                                            'bg-success': sk.status === 'tersedia',
-                                            'bg-danger': sk.status === 'perlu_perbaikan',
-                                            'bg-muted': sk.status === 'belum_ada',
-                                        }"></span>
-                                    </div>
-                                    <a x-show="sk.status === 'tersedia'" :href="sk.file_url" target="_blank" rel="noopener"
-                                        class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                                        Buka file
-                                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H19.5m0 0v6m0-6L10.5 15m-3 3h-3a1.5 1.5 0 0 1-1.5-1.5v-12A1.5 1.5 0 0 1 4.5 3h12A1.5 1.5 0 0 1 18 4.5v3" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            </template>
-                        </div>
+                <template
+                    x-if="!isLoadingDocumentStatus && !documentStatusError && documentStatus.total_riwayat === 0 && documentStatus.total_dokumen === 0">
+                    <div class="rounded-lg border border-border bg-soft/40 p-5 text-center">
+                        <p class="text-sm font-semibold text-ink">Belum ada dokumen pegawai</p>
+                        <p class="mt-1 text-xs text-muted">Arsip dokumen dan riwayat yang memiliki file akan tampil di
+                            sini.</p>
                     </div>
                 </template>
 
@@ -1114,63 +1034,6 @@
                 </template>
             </div>
         </x-ui.modal>
-
-
-        {{-- ============================================================ --}}
-        {{-- MODAL ATUR SK WAJIB PER JENIS PEGAWAI (super admin) --}}
-        {{-- ============================================================ --}}
-        @if(auth()->user()?->role === 'super_admin')
-        <x-ui.modal id="sk-requirement-modal" show="showSkRequirementModal" title="SK Wajib per Jenis Pegawai"
-            closeAction="showSkRequirementModal = false; skMatrixMsg = '';" maxWidth="3xl" bodyClass="p-5 space-y-4">
-            <p x-show="skMatrixMsg" x-text="skMatrixMsg" class="rounded-lg bg-success/10 p-3 text-xs font-bold text-success font-sans"></p>
-
-            <div class="overflow-x-auto rounded-lg border border-border bg-surface">
-                <table class="w-full text-left text-sm font-sans">
-                    <thead>
-                        <tr class="border-b border-border bg-soft/60">
-                            <th class="px-4 py-3 text-xs font-bold uppercase tracking-wider text-muted">Jenis Pegawai</th>
-                            <template x-for="(label, key) in skSkLabels" :key="key">
-                                <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-muted" x-text="label"></th>
-                            </template>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-border">
-                        <template x-for="(typeId) in Object.keys(skTypeNames)" :key="typeId">
-                            <tr class="transition-colors hover:bg-soft/30">
-                                <td class="px-4 py-3 font-semibold text-ink" x-text="skTypeNames[typeId]"></td>
-                                <template x-for="(label, key) in skSkLabels" :key="key">
-                                    <td class="px-4 py-3 text-center">
-                                        <input type="checkbox"
-                                            :data-type="typeId"
-                                            :value="key"
-                                            :checked="(skMatrix[typeId] || []).includes(key)"
-                                            class="h-4 w-4 rounded border-border text-primary focus:ring-primary/30">
-                                    </td>
-                                </template>
-                            </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="rounded-lg border border-primary/15 bg-primary/5 p-3 text-[11px] text-muted font-sans">
-                Centang SK yang wajib dimiliki tiap jenis pegawai. Default tampilan: PNS &amp; CPNS = 4 SK; PPPK = 2 SK (Pengangkatan, KGB).
-            </div>
-
-            <x-slot:footer>
-                <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <button type="button" @click="showSkRequirementModal = false; skMatrixMsg = '';"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:bg-soft font-sans">
-                        Batal
-                    </button>
-                    <button type="button" @click="saveSkRequirementMatrix()" :disabled="skMatrixBusy"
-                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-primary/90 disabled:opacity-60 font-sans">
-                        <span x-text="skMatrixBusy ? 'Menyimpan...' : 'Simpan Matriks'"></span>
-                    </button>
-                </div>
-            </x-slot:footer>
-        </x-ui.modal>
-        @endif
 
 
         {{-- ============================================================ --}}

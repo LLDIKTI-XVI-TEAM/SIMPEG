@@ -57,37 +57,7 @@ class DocumentCategory
     }
 
     /**
-     * SK yang hanya boleh ditambah sebagai riwayat baru. File lama tetap arsip.
-     *
-     * @return list<string>
-     */
-    public static function appendOnlySkKeys(): array
-    {
-        return ['sk_pangkat', 'sk_jabatan', 'sk_kgb'];
-    }
-
-    /**
-     * SK yang mengganti data pengangkatan dan satu dokumen aktif.
-     *
-     * @return list<string>
-     */
-    public static function replaceSkKeys(): array
-    {
-        return ['sk_pengangkatan'];
-    }
-
-    /**
-     * Kategori yang boleh diunggah dari section Dokumen SK di detail pegawai.
-     *
-     * @return list<string>
-     */
-    public static function tabSkKeys(): array
-    {
-        return [...self::appendOnlySkKeys(), ...self::replaceSkKeys()];
-    }
-
-    /**
-     * Berkas non-SK yang boleh diunggah/dihapus dari section Berkas Lainnya.
+     * Berkas non-SK yang boleh diunggah dari modal profil pegawai.
      *
      * @return list<string>
      */
@@ -96,23 +66,13 @@ class DocumentCategory
         return ['ijazah', 'ktp_kk', 'lainnya'];
     }
 
-    public static function isDeletable(?string $category): bool
-    {
-        return in_array($category, self::otherUploadKeys(), true);
-    }
-
-    /**
-     * SK yang dikelola di tab Dokumen & SK (pangkat, jabatan, KGB, pengangkatan).
-     */
-    public static function isTabSk(?string $category): bool
-    {
-        return in_array($category, self::tabSkKeys(), true);
-    }
-
     public static function isProtectedSk(?string $category): bool
     {
         return in_array($category, [
-            ...self::tabSkKeys(),
+            'sk_pengangkatan',
+            'sk_pangkat',
+            'sk_jabatan',
+            'sk_kgb',
             'sk_hukuman_disiplin',
             'sk_mutasi',
             'sk_pensiun',

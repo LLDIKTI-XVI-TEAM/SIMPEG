@@ -43,7 +43,7 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
-use App\Http\Controllers\Admin\SkRequirementController;
+use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
@@ -55,7 +55,6 @@ use App\Livewire\Admin\Pegawai\Show;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -125,15 +124,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
         ->middleware('role:super_admin,admin_kepegawaian,pimpinan')
         ->name('global.search');
-
-    Route::get('/change-role/{role}', function (Request $request, string $role) {
-        abort_unless($request->user()?->role === $role, 403, 'Role aktif harus sesuai dengan role akun.');
-
-        session(['active_role' => $role]);
-
-        return back();
-    })->whereIn('role', ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'])
-        ->name('change-role');
 
     Route::get('/pegawai/import-data', function () {
         return view('admin.pegawai.import');
@@ -624,12 +614,26 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return redirect()->route('pengaturan');
     });
 
-    Route::get('/dashboard/sk-requirements', function () {
-        return redirect()->route('data-pegawai');
-    })->name('sk-requirements.config');
-    Route::post('/dashboard/sk-requirements', [SkRequirementController::class, 'update'])
-        ->middleware(['role:super_admin'])
-        ->name('sk-requirements.update');
+    // =========================================================================
+    // SWITCH & REVERT ROLE
+    // =========================================================================
+
+    // Coarse gate route dibuat eksplisit: aksi switch hanya untuk Super Admin yang
+    // memiliki users.switch_role. FormRequest tetap menjadi mutation boundary dengan
+    // invariant yang sama (role asli super_admin + permission khusus).
+    Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
+        ->middleware(['role:super_admin', 'permission:users.switch_role'])
+        ->name('switch-role');
+
+    // Jalur pemulihan hanya memerlukan autentikasi. Ia sengaja dikecualikan dari role efektif agar
+    // pengguna tetap mendapatkan form revert ketika record role target sudah tidak terdaftar.
+    Route::get('/revert-role', [SwitchRoleController::class, 'showRecovery'])
+        ->withoutMiddleware('role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai')
+        ->name('revert-role.recovery');
+
+    Route::post('/revert-role', [SwitchRoleController::class, 'revertRole'])
+        ->withoutMiddleware('role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai')
+        ->name('revert-role');
 
     Route::get('/notifications', [NotificationController::class, 'index'])
         ->middleware('permission:notifications.read')

@@ -4,8 +4,6 @@
         filters: {
             search: '',
             kategori: '',
-            unit_kerja: '',
-            status: '',
         },
         documentsRows: [],
         meta: { current_page: 1, last_page: 1, total: 0, from: 0, to: 0 },
@@ -16,7 +14,7 @@
 
         get cacheKey() {
             const f = this.filters;
-            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}_u${f.unit_kerja}_st${f.status}`;
+            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}`;
         },
 
         clearCache() {
@@ -123,8 +121,6 @@
                 this.searchTimer = setTimeout(() => this.applyFilter(), 300);
             });
             this.$watch('filters.kategori', () => this.applyFilter());
-            this.$watch('filters.unit_kerja', () => this.applyFilter());
-            this.$watch('filters.status', () => this.applyFilter());
             this.$watch('perPage', () => this.applyFilter());
         },
     }" class="space-y-6">
@@ -174,25 +170,13 @@
             perPage="perPage"
             setPerPage="perPage = parseInt($event.target.value)"
             searchModel="filters.search"
-            searchPlaceholder="Cari nama, nomor, jenis..."
+            searchPlaceholder="Cari dokumen, nama, atau NIP pegawai..."
             emptyTitle="Tidak ada dokumen ditemukan"
             emptyIcon="document"
             :colspanCount="7"
         >
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
-                {{-- Filter Unit Kerja --}}
-                <div class="relative col-span-1">
-                    <x-form.select x-model="filters.unit_kerja"
-                       >
-                        <option value="">Semua Unit Kerja</option>
-                        <option>Bag. Umum</option>
-                        <option>Bag. Keuangan</option>
-                        <option>Bag. SDM</option>
-                        <option>Bag. IT</option>
-                    </x-form.select>
-                </div>
-
                 {{-- Filter Kategori Dokumen --}}
                 <div class="relative col-span-1">
                     <x-form.select x-model="filters.kategori"
@@ -201,16 +185,6 @@
                         @foreach ($categoryLabels as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
-                    </x-form.select>
-                </div>
-
-                {{-- Filter Status --}}
-                <div class="relative col-span-1">
-                    <x-form.select x-model="filters.status"
-                       >
-                        <option value="">Semua Status</option>
-                        <option value="tersedia">File tersedia</option>
-                        <option value="file_tidak_ditemukan">File tidak ditemukan</option>
                     </x-form.select>
                 </div>
             </x-slot:filters>

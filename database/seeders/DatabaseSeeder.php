@@ -16,7 +16,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ReferenceSeeder::class,
-            SkRequirementSeeder::class,
             RbacSeeder::class,
             ApprovalConfigSeeder::class,
             EwsConfigSeeder::class,

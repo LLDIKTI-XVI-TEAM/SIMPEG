@@ -9,11 +9,9 @@ use App\Models\DisciplineRecord;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
-use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
-use App\Models\RefJenisPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -35,18 +33,7 @@ class EmployeeDocumentTest extends TestCase
 
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
-    }
 
-    /**
-     * Buat pegawai berjenis PNS agar evaluasi kelengkapan empat SK punya data deterministik.
-     *
-     * @param  array<string, mixed>  $attributes
-     */
-    private function createPnsEmployee(array $attributes = []): Employee
-    {
-        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
-
-        return Employee::factory()->create(array_merge(['jenis_pegawai_id' => $pns->id], $attributes));
     }
 
     public function test_rank_history_creation_syncs_to_documents_table(): void
@@ -73,148 +60,6 @@ class EmployeeDocumentTest extends TestCase
             'nama_dokumen' => 'SK Kenaikan Pangkat III/b',
             'nomor_dokumen' => 'SK-RANK-SYNC',
         ]);
-    }
-
-    public function test_uploading_sk_when_history_file_reference_is_missing_keeps_history_append_only(): void
-    {
-        Storage::fake(Document::STORAGE_DISK);
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = $this->createPnsEmployee();
-        $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
-
-        $filePathHilang = 'riwayat/'.$employee->id.'/file-yang-hilang.pdf';
-        $rankHistory = RankHistory::create([
-            'employee_id' => $employee->id,
-            'golongan_id' => $golongan->id,
-            'tmt_pangkat' => '2026-01-01',
-            'no_sk' => 'SK-PANGKAT-RESMI',
-            'tanggal_sk' => '2025-12-20',
-            'file_sk' => $filePathHilang,
-            'is_latest' => true,
-        ]);
-
-        foreach (['sk_pengangkatan', 'sk_jabatan', 'sk_kgb'] as $category) {
-            $path = "{$employee->id}/{$category}.pdf";
-            Storage::disk(Document::STORAGE_DISK)->put($path, 'SK tersedia');
-            Document::create([
-                'employee_id' => $employee->id,
-                'jenis_dokumen' => $category,
-                'nama_dokumen' => $category,
-                'file_path' => $path,
-            ]);
-        }
-
-        $this->actingAs($user)
-            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
-            ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan');
-
-        $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
-            'nama_dokumen' => 'SK Pangkat Arsip',
-            'nomor_dokumen' => 'NOMOR-FORM-ULANG',
-            'tanggal_terbit' => '2020-01-01',
-            'kategori_dokumen' => 'sk_pangkat',
-            'pegawai_id' => $employee->id,
-            'berkas' => UploadedFile::fake()->create('sk-pangkat-arsip.pdf', 100, 'application/pdf'),
-        ])->assertUnprocessable();
-    }
-
-    public function test_uploading_sk_backfills_empty_history_file_and_updates_document_status(): void
-    {
-        Storage::fake(Document::STORAGE_DISK);
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = $this->createPnsEmployee();
-        $golongan = RefGolongan::where('kode', 'III/a')->firstOrFail();
-
-        $rankHistory = RankHistory::create([
-            'employee_id' => $employee->id,
-            'golongan_id' => $golongan->id,
-            'tmt_pangkat' => '2026-01-01',
-            'no_sk' => null,
-            'tanggal_sk' => null,
-            'file_sk' => null,
-            'is_latest' => true,
-        ]);
-
-        foreach (['sk_pengangkatan', 'sk_jabatan', 'sk_kgb'] as $category) {
-            $path = "{$employee->id}/{$category}.pdf";
-            Storage::disk(Document::STORAGE_DISK)->put($path, 'SK tersedia');
-            Document::create([
-                'employee_id' => $employee->id,
-                'jenis_dokumen' => $category,
-                'nama_dokumen' => $category,
-                'file_path' => $path,
-            ]);
-        }
-
-        $this->actingAs($user)
-            ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
-                'nama_dokumen' => 'SK Pangkat Backfill',
-                'nomor_dokumen' => 'SK-BACKFILL-001',
-                'tanggal_terbit' => '2025-12-20',
-                'kategori_dokumen' => 'sk_pangkat',
-                'pegawai_id' => $employee->id,
-                'berkas' => UploadedFile::fake()->create('sk-pangkat-backfill.pdf', 100, 'application/pdf'),
-            ])->assertUnprocessable();
-    }
-
-    public function test_uploading_appointment_sk_syncs_stale_jenis_pegawai_even_when_file_already_valid(): void
-    {
-        Storage::fake(Document::STORAGE_DISK);
-        $user = User::factory()->adminKepegawaian()->create();
-        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
-        $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
-        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
-
-        $filePath = 'appointments/sk/sudah-valid.pdf';
-        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'SK pengangkatan valid');
-        Appointment::create([
-            'employee_id' => $employee->id,
-            'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan' => '2020-01-01',
-            'no_sk' => 'SK-APPOINTMENT-001',
-            'tanggal_sk' => '2019-12-20',
-            'file_sk' => $filePath,
-        ]);
-
-        // Sinkronisasi jenis pegawai tidak boleh terikat pada keadaan berkas:
-        // penggantian SK Pengangkatan tetap memperbaiki jenis pegawai yang stale
-        // meskipun berkas pengangkatan sebelumnya sudah valid.
-        $this->actingAs($user)
-            ->postJson("/api/v1/pegawai/{$employee->id}/berkas-sk", [
-                'kategori_dokumen' => 'sk_pengangkatan',
-                'jenis_pengangkatan' => 'PNS',
-                'tmt_pengangkatan' => '2020-01-01',
-                'no_sk' => 'SK-APPOINTMENT-BARU',
-                'tanggal_sk' => '2025-12-20',
-                'file_sk' => UploadedFile::fake()->create('sk-pengangkatan-baru.pdf', 100, 'application/pdf'),
-            ], ['Accept' => 'application/json'])
-            ->assertCreated();
-
-        $this->assertSame($pns->id, $employee->refresh()->jenis_pegawai_id);
-        $appointment = $employee->appointment()->first();
-        $this->assertSame('SK-APPOINTMENT-BARU', $appointment->no_sk);
-        $this->assertNotSame($filePath, $appointment->file_sk);
-        Storage::disk(Document::STORAGE_DISK)->assertExists($appointment->file_sk);
-    }
-
-    public function test_sk_row_edit_button_opens_file_replace_modal(): void
-    {
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-
-        // Keputusan produk terbaru: tombol edit SK di baris membuka modal "Ganti
-        // Berkas SK" untuk mengganti file in-place (metadata read-only, file lama
-        // dihapus), bukan membuka form tambah riwayat append-only lagi.
-        $this->actingAs($user)
-            ->get("/pegawai/{$employee->id}")
-            ->assertOk()
-            ->assertSee('@click="openEditSk(doc)"', false)
-            ->assertSee('showEditSkModal', false)
-            ->assertSee('submitReplaceSk()', false)
-            ->assertDontSee('openSkRiwayatForm(doc.jenis_dokumen)', false)
-            ->assertDontSee('submitSkFile()', false)
-            ->assertDontSee('this.skFileForm', false);
     }
 
     public function test_position_history_creation_syncs_to_documents_table(): void
@@ -382,84 +227,6 @@ class EmployeeDocumentTest extends TestCase
         Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
     }
 
-    public function test_replace_sk_file_deletes_old_file_preserves_metadata_and_syncs_history(): void
-    {
-        Storage::fake(Document::STORAGE_DISK);
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = $this->createPnsEmployee();
-
-        $oldFilePath = $employee->id.'/sk_pangkat/sk-lama.pdf';
-        Storage::disk(Document::STORAGE_DISK)->put($oldFilePath, 'sk lama');
-
-        $document = Document::create([
-            'employee_id' => $employee->id,
-            'jenis_dokumen' => 'sk_pangkat',
-            'nama_dokumen' => 'SK Pangkat',
-            'nomor_dokumen' => 'SK-PKT-001',
-            'tanggal_dokumen' => '2025-01-10',
-            'file_path' => $oldFilePath,
-        ]);
-
-        $gol = RefGolongan::firstOrFail();
-        $history = RankHistory::create([
-            'employee_id' => $employee->id,
-            'golongan_id' => $gol->id,
-            'tmt_pangkat' => '2025-01-10',
-            'no_sk' => 'SK-PKT-001',
-            'tanggal_sk' => '2025-01-10',
-            'file_sk' => $oldFilePath,
-            'is_latest' => true,
-        ]);
-
-        $this->actingAs($user)
-            ->postJson(
-                "/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}/ganti-berkas",
-                ['berkas' => UploadedFile::fake()->create('sk-baru.pdf', 120, 'application/pdf')],
-                ['Accept' => 'application/json'],
-            )
-            ->assertOk()
-            ->assertJsonPath('document.id', $document->id);
-
-        $document->refresh();
-        $history->refresh();
-
-        $this->assertNotSame($oldFilePath, $document->file_path);
-        // Metadata bersifat read-only: tidak berubah walaupun file diganti.
-        $this->assertSame('sk_pangkat', $document->jenis_dokumen);
-        $this->assertSame('SK Pangkat', $document->nama_dokumen);
-        $this->assertSame('SK-PKT-001', $document->nomor_dokumen);
-        $this->assertSame('2025-01-10', $document->tanggal_dokumen?->format('Y-m-d'));
-        // File lama dihapus permanen, file baru tersimpan.
-        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldFilePath);
-        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
-        // Riwayat ter-sinkronisasi ke path file baru agar is_latest/unduh tetap benar.
-        $this->assertSame($document->file_path, $history->file_sk);
-    }
-
-    public function test_replace_sk_rejects_non_sk_document(): void
-    {
-        Storage::fake(Document::STORAGE_DISK);
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-        $path = $employee->id.'/lainnya/berkas-lain.pdf';
-        Storage::disk(Document::STORAGE_DISK)->put($path, 'berkas lain');
-
-        $document = Document::create([
-            'employee_id' => $employee->id,
-            'jenis_dokumen' => 'lainnya',
-            'nama_dokumen' => 'Berkas Lainnya',
-            'file_path' => $path,
-        ]);
-
-        $this->actingAs($user)
-            ->postJson(
-                "/api/v1/pegawai/{$employee->id}/dokumen/{$document->id}/ganti-berkas",
-                ['berkas' => UploadedFile::fake()->create('baru.pdf', 10, 'application/pdf')],
-                ['Accept' => 'application/json'],
-            )
-            ->assertNotFound();
-    }
-
     public function test_document_list_api_rechecks_storage_file_status_on_every_request(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -507,11 +274,11 @@ class EmployeeDocumentTest extends TestCase
         $response = $this->get('/dashboard/dokumen');
 
         $response->assertOk();
-        $response->assertViewHas('pegawaiList');
         $response->assertViewHas('categoryLabels');
+        $response->assertViewMissing('pegawaiList');
     }
 
-    public function test_admin_can_upload_document_via_controller(): void
+    public function test_admin_can_upload_additional_document_from_employee_profile(): void
     {
         Storage::fake('employee_documents');
         Storage::fake('public');
@@ -521,17 +288,16 @@ class EmployeeDocumentTest extends TestCase
         $this->actingAs($user);
         $file = UploadedFile::fake()->create('ijazah.pdf', 100, 'application/pdf');
 
-        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
             'tanggal_terbit' => '2026-01-01',
             'kategori_dokumen' => 'ijazah',
-            'pegawai_id' => $employee->id,
             'berkas' => $file,
-        ], ['Accept' => 'application/json']);
+        ]);
 
-        $response->assertCreated();
-        $response->assertJsonPath('document.nama_dokumen', 'Ijazah Master Tester');
+        $response->assertCreated()
+            ->assertJsonPath('document.jenis_dokumen', 'ijazah');
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -672,12 +438,11 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($user);
-        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Dokumen Tanpa Nomor',
             'kategori_dokumen' => 'lainnya',
-            'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
-        ], ['Accept' => 'application/json']);
+        ]);
 
         $response->assertCreated();
 
@@ -697,15 +462,13 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Script Berbahaya',
             'kategori_dokumen' => 'lainnya',
-            'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('script.sh', 5, 'text/x-shellscript'),
-        ], ['Accept' => 'application/json']);
+        ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('berkas');
+        $response->assertUnprocessable()->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
@@ -720,15 +483,13 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Dokumen Terlalu Besar',
             'kategori_dokumen' => 'lainnya',
-            'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('terlalu-besar.pdf', 10241, 'application/pdf'),
-        ], ['Accept' => 'application/json']);
+        ]);
 
-        $response->assertUnprocessable();
-        $response->assertJsonValidationErrors('berkas');
+        $response->assertUnprocessable()->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Dokumen Terlalu Besar',
@@ -741,7 +502,6 @@ class EmployeeDocumentTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
-        Storage::fake(Document::STORAGE_DISK);
         $filePath = 'employees/documents/download-test.pdf';
         Storage::disk(Document::STORAGE_DISK)->put($filePath, 'dummy pdf content');
 
@@ -905,35 +665,5 @@ class EmployeeDocumentTest extends TestCase
 
         $this->assertDatabaseMissing('documents', ['id' => $document->id]);
         Storage::disk(Document::STORAGE_DISK)->assertMissing($filePath);
-    }
-
-    public function test_uploading_sk_pengangkatan_archive_without_repair_still_syncs_jenis_pegawai(): void
-    {
-        Storage::fake(Document::STORAGE_DISK);
-        $user = User::factory()->adminKepegawaian()->create();
-        $pns = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
-        $pppk = RefJenisPegawai::firstOrCreate(['nama' => 'PPPK']);
-        // Jenis pegawai tidak konsisten dengan appointment (mis. data lama/impor).
-        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pppk->id]);
-        $employee->appointments()->create([
-            'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan' => '2020-01-01',
-            'no_sk' => 'SK/ANGKAT/2020',
-            'tanggal_sk' => '2019-12-15',
-            'file_sk' => "{$employee->id}/sk_pengangkatan/valid.pdf",
-        ]);
-        Storage::disk(Document::STORAGE_DISK)->put("{$employee->id}/sk_pengangkatan/valid.pdf", 'SK lama valid');
-
-        // Unggahan arsip: appointment sudah punya file valid sehingga tidak ada repair.
-        // Endpoint generic /dokumen menolak SK Pengangkatan; jalur resmi adalah
-        // replace pengangkatan (/berkas-sk), bukan arsip generic.
-        $this->actingAs($user)
-            ->postJson("/api/v1/pegawai/{$employee->id}/dokumen", [
-                'nama_dokumen' => 'SK Pengangkatan Arsip',
-                'kategori_dokumen' => 'sk_pengangkatan',
-                'pegawai_id' => $employee->id,
-                'berkas' => UploadedFile::fake()->create('sk-pengangkatan.pdf', 10, 'application/pdf'),
-            ], ['Accept' => 'application/json'])
-            ->assertUnprocessable();
     }
 }

@@ -39,7 +39,6 @@ class Show extends Component
             'positionHistories.jabatan',
             'positionHistories.unitKerja',
             'salaryHistories',
-            'appointments',
             'disciplineRecords',
             'educationHistories.jenjang',
             'educationHistories.programStudi',

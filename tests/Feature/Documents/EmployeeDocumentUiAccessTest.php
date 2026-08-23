@@ -32,7 +32,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
             ->assertDontSee('Unggah Dokumen Baru');
     }
 
-    public function test_admin_kepegawaian_sees_dokumen_sk_upload_actions(): void
+    public function test_admin_kepegawaian_sees_separated_tables_and_additional_document_modal(): void
     {
         $this->actingAsRole('admin_kepegawaian');
         $employee = Employee::factory()->create();
@@ -40,22 +40,11 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->get(route('pegawai.show', $employee->id))
             ->assertOk()
             ->assertSee('Dokumen SK')
-            ->assertSee('Tambah Berkas SK')
-            ->assertSee('Unggah Berkas')
-            ->assertSee('Hapus berkas hanya bisa dilakukan Super Admin')
-            ->assertDontSee('>Hapus Berkas<', false);
-    }
-
-    public function test_super_admin_can_delete_berkas_from_dokumen_sk_tab(): void
-    {
-        $this->actingAsRole('super_admin');
-        $employee = Employee::factory()->create();
-
-        $this->get(route('pegawai.show', $employee->id))
-            ->assertOk()
-            ->assertSee('Tambah Berkas SK')
-            ->assertSee('Hapus Berkas')
-            ->assertDontSee('Hapus berkas hanya bisa dilakukan Super Admin');
+            ->assertSee('Berkas Lainnya')
+            ->assertSee('Unggah Berkas Lainnya')
+            ->assertSee('Form ini hanya untuk dokumen tambahan')
+            ->assertDontSee('Tambah Berkas SK')
+            ->assertDontSee('Ganti Berkas SK');
     }
 
     public function test_pimpinan_cannot_open_archive_or_admin_employee_detail(): void

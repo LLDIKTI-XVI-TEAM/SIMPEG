@@ -7,6 +7,7 @@ use App\Actions\Employees\UploadImportBatchAction;
 use App\Models\ImportBatch;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Support\EmployeeImport\ImportBatchCacheMutation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -198,10 +199,11 @@ class ImportEmployeeBatchJob implements ShouldBeUnique, ShouldQueue, ShouldQueue
             'exception_class' => $exception::class,
         ]);
 
-        $batch = Cache::get(UploadImportBatchAction::CACHE_PREFIX.$this->batchId) ?? [];
+        $cacheKey = UploadImportBatchAction::CACHE_PREFIX.$this->batchId;
+        $batch = Cache::get($cacheKey) ?? [];
         $batch['status'] = 'failed';
         $batch['error_message'] = self::FAILURE_MESSAGE;
-        Cache::put(UploadImportBatchAction::CACHE_PREFIX.$this->batchId, $batch, now()->addMinutes(10));
+        ImportBatchCacheMutation::putDirect($cacheKey, $batch, now()->addMinutes(10));
     }
 
     /** Payload lama memakai batch id agar ownership stabil pada setiap fresh unserialize dan redelivery. */

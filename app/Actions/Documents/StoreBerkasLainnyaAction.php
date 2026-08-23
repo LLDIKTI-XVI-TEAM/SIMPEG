@@ -6,6 +6,7 @@ use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,8 @@ use Throwable;
 class StoreBerkasLainnyaAction
 {
     use BuildsDocumentAuditPayload;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Menyimpan berkas lainnya (KTP/KK, ijazah, lainnya) dari modal profil pegawai.
@@ -28,6 +31,12 @@ class StoreBerkasLainnyaAction
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
         $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
         $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
+
+        // Transaksi middleware dapat membungkus transaksi Action. Kompensasi ini
+        // memastikan file ikut dibersihkan bila transaksi request terluar rollback.
+        $this->sideEffects->afterRollback(function () use ($filePath): void {
+            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+        });
 
         try {
             return DB::transaction(function () use ($employee, $data, $filePath, $request): Document {

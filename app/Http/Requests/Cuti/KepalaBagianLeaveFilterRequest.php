@@ -10,7 +10,7 @@ class KepalaBagianLeaveFilterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->role === 'kepala_bagian';
+        return $this->user()?->getEffectiveRole() === 'kepala_bagian';
     }
 
     public function rules(): array

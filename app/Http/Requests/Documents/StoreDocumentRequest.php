@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests\Documents;
 
-use App\Models\Employee;
-use App\Support\Documents\DocumentAuthorization;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -13,37 +11,10 @@ class StoreDocumentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if (DocumentAuthorization::allowsLocalApiBypass()) {
-            return true;
-        }
-
         $user = $this->user();
 
         return $user !== null
             && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
-    }
-
-    /**
-     * Endpoint store di-scope oleh {employee} dari route, sehingga pegawai_id
-     * tidak perlu diwajibkan dari payload klien. Saat tidak dikirim, id pegawai
-     * diisi dari route (model binding) agar aturan uuid/exists tetap tervalidasi
-     * dan klien tidak perlu memilih pegawai lain yang nilainya akan diabaikan.
-     */
-    protected function prepareForValidation(): void
-    {
-        if ($this->has('pegawai_id')) {
-            return;
-        }
-
-        $routeEmployee = $this->route('employee');
-
-        $employeeId = $routeEmployee instanceof Employee
-            ? $routeEmployee->id
-            : (is_string($routeEmployee) || is_numeric($routeEmployee) ? (string) $routeEmployee : '');
-
-        if ($employeeId !== '') {
-            $this->merge(['pegawai_id' => $employeeId]);
-        }
     }
 
     public function rules(): array
@@ -55,10 +26,7 @@ class StoreDocumentRequest extends FormRequest
             'kategori_dokumen' => [
                 'required',
                 'string',
-                // Endpoint profile-scoped ini hanya melayani Berkas Lainnya. Dokumen SK
-                // hanya boleh dibuat lewat jalur domain masing-masing (/berkas-sk untuk
-                // riwayat append-only atau replace pengangkatan), bukan endpoint generic.
-                Rule::in(DocumentCategory::otherUploadKeys()),
+                Rule::in(array_filter(DocumentCategory::editableKeys(), fn ($key) => $key !== 'sk_status_pegawai')),
             ],
             'pegawai_id' => ['required', 'uuid', 'exists:employees,id'],
             'deskripsi' => ['nullable', 'string'],

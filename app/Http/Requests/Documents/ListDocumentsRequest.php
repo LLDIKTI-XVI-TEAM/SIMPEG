@@ -21,8 +21,6 @@ class ListDocumentsRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:100'],
             'kategori' => ['nullable', 'string', 'max:100'],
-            'unit_kerja' => ['nullable', 'string', 'max:150'],
-            'status' => ['nullable', 'in:tersedia,file_tidak_ditemukan'],
             // Dikirim tombol Refresh untuk menandai pemeriksaan filesystem terbaru.
             'refresh' => ['nullable', 'boolean'],
             'per_page' => ['nullable', 'integer', 'in:5,10,25,50'],
@@ -35,8 +33,6 @@ class ListDocumentsRequest extends FormRequest
         return [
             'search' => 'Kata Pencarian',
             'kategori' => 'Kategori Dokumen',
-            'unit_kerja' => 'Unit Kerja',
-            'status' => 'Status Dokumen',
             'per_page' => 'Jumlah Data per Halaman',
             'page' => 'Halaman',
         ];

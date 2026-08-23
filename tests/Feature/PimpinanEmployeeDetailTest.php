@@ -122,12 +122,8 @@ class PimpinanEmployeeDetailTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('title="Status kelengkapan dokumen"', false)
-            // Badge read-only memakai helper mapping yang sama dengan tampilan admin
-            // sehingga label/warna tidak berbeda untuk status yang sama.
-            ->assertSee('docBadgeClass(p.is_lengkap)', false)
-            ->assertSee('docStatusLabel(p.is_lengkap)', false)
-            ->assertDontSee("p.is_lengkap === 'tidak_lengkap'", false)
-            ->assertDontSee("p.is_lengkap === 'kosong'", false)
+            ->assertSee("p.is_lengkap === 'lengkap'       ? 'Lengkap'", false)
+            ->assertSee("p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap'", false)
             ->assertDontSee('openDocumentStatus', false)
             ->assertDontSee('/status-dokumen', false)
             ->assertDontSee('Rincian Dokumen Pegawai')
@@ -523,11 +519,6 @@ class PimpinanEmployeeDetailTest extends TestCase
                 'empty' => 'Belum ada data pengangkatan.',
                 'admin_actions' => false,
             ],
-            'docs' => [
-                'headings' => ['Nama Dokumen', 'Kategori', 'Nomor Dokumen', 'Tanggal Terbit', 'Ukuran'],
-                'empty' => 'Belum ada dokumen atau berkas yang diunggah untuk pegawai ini.',
-                'admin_actions' => true,
-            ],
         ];
 
         foreach ($responses as $surface => $response) {
@@ -555,6 +546,13 @@ class PimpinanEmployeeDetailTest extends TestCase
                     : $this->assertStringNotContainsString('>Aksi<', $tableHtml);
             }
         }
+
+        // Admin memisahkan SK dan berkas tambahan, sedangkan surface Pimpinan
+        // mempertahankan satu tabel baca-saja dengan data yang sudah dimasking.
+        $responses['admin']
+            ->assertSee('data-employee-detail-table="dokumen-sk"', false)
+            ->assertSee('data-employee-detail-table="berkas-lainnya"', false);
+        $responses['pimpinan']->assertSee('data-employee-detail-table="docs"', false);
 
         $responses['pimpinan']
             ->assertDontSee('>Aksi<', false)

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Documents;
 
+use App\Support\Documents\DocumentAuthorization;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\File;
@@ -10,21 +11,18 @@ class StoreBerkasLainnyaRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+        if (DocumentAuthorization::allowsLocalApiBypass()) {
             return true;
         }
 
-        $user = $this->user();
-
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return DocumentAuthorization::canManage($this->user());
     }
 
     public function rules(): array
     {
         return [
             'nama_dokumen' => ['required', 'string', 'max:255'],
-            'kategori_dokumen' => ['required', 'string', 'in:ijazah,ktp_kk,lainnya'],
+            'kategori_dokumen' => ['required', 'string', 'in:'.implode(',', DocumentCategory::otherUploadKeys())],
             'nomor_dokumen' => ['nullable', 'string', 'max:100'],
             'tanggal_terbit' => ['nullable', 'date'],
             'keterangan' => ['nullable', 'string', 'max:500'],

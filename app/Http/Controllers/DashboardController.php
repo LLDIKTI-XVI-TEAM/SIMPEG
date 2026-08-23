@@ -16,7 +16,7 @@ class DashboardController extends Controller
         BuildPegawaiDashboardAction $pegawaiDashboard,
     ): View|RedirectResponse {
         $user = $request->user();
-        $role = $user?->role;
+        $role = $user?->getEffectiveRole();
 
         if ($role === 'pimpinan') {
             return redirect()->route('pimpinan.dashboard');

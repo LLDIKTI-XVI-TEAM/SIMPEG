@@ -44,7 +44,7 @@
                     </svg>
                     Refresh
                 </x-ui.button>
-                @if(auth()->user()->role !== 'super_admin' && auth()->user()->hasPermission('cuti.create') && ! auth()->user()->employee?->is_kepala_lembaga)
+                @if(auth()->user()->getEffectiveRole() !== 'super_admin' && auth()->user()->hasPermission('cuti.create') && ! auth()->user()->employee?->is_kepala_lembaga)
                 <x-ui.button href="{{ route('cuti.create') }}" variant="secondary" size="md">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />

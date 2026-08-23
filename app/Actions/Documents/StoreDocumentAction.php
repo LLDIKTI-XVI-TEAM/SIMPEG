@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,8 @@ use Throwable;
 class StoreDocumentAction
 {
     use BuildsDocumentAuditPayload;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Categories that should also create a history record.
@@ -37,6 +40,12 @@ class StoreDocumentAction
         $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
         $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
         $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
+
+        // Jika transaksi request terluar gagal sesudah Action selesai, hapus file yang
+        // belum memiliki record dokumen sah agar tidak menjadi orphan.
+        $this->sideEffects->afterRollback(function () use ($filePath): void {
+            Storage::disk(Document::STORAGE_DISK)->delete($filePath);
+        });
 
         try {
             return DB::transaction(function () use ($employee, $category, $payload, $filePath): Document {
@@ -144,23 +153,16 @@ class StoreDocumentAction
 
     private function syncAppointment(Employee $employee, ?string $noSk, mixed $tanggalSk, string $fileSk): void
     {
-        // Pengangkatan aktif diambil dari yang paling mutakhir agar metadata arsip
-        // tidak menempel pada appointment lama.
-        $appointment = $employee->appointments()
-            ->orderByDesc('tmt_pengangkatan')
-            ->orderByDesc('created_at')
-            ->first();
-
+        $appointment = $employee->appointment;
         if ($appointment && ! $appointment->file_sk) {
             $appointment->update(['file_sk' => $fileSk, 'no_sk' => $noSk ?? $appointment->no_sk, 'tanggal_sk' => $tanggalSk ?? $appointment->tanggal_sk]);
         }
 
-        // Sinkron jenis_pegawai_id dari jenis pengangkatan terbaru TIDAK boleh
-        // bergantung pada backfill berkas: unggahan arsip sk_pengangkatan tetap
-        // memperbaiki data lama/impor yang jenis pegawainya belum konsisten.
+        // Sync jenis_pegawai_id jika ada nomor dokumen mengindikasikan jenis pengangkatan
+        // (ini hanya bisa dilakukan ketika category = sk_pengangkatan dan ada appointment)
         if ($appointment && $appointment->jenis_pengangkatan) {
             $jenisPegawai = RefJenisPegawai::whereRaw('UPPER(nama) = ?', [strtoupper($appointment->jenis_pengangkatan)])->first();
-            if ($jenisPegawai && $jenisPegawai->id !== $employee->jenis_pegawai_id) {
+            if ($jenisPegawai) {
                 $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
             }
         }

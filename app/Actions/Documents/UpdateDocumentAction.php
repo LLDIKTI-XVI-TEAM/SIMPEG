@@ -6,13 +6,13 @@ use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
 use App\Models\Appointment;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
-use App\Models\EducationHistory;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SalaryHistory;
 use App\Services\AuditService;
+use App\Services\TransactionSideEffectManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\UploadedFile;
@@ -24,6 +24,8 @@ use Throwable;
 class UpdateDocumentAction
 {
     use BuildsDocumentAuditPayload;
+
+    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
     /**
      * Ganti metadata dokumen dan, jika ada, file fisiknya.
@@ -42,6 +44,10 @@ class UpdateDocumentAction
         try {
             if ($file !== null) {
                 $replacementPath = $this->storeReplacementFile($document, $payload['kategori_dokumen'], $file);
+                $pathForRollback = $replacementPath;
+                $this->sideEffects->afterRollback(function () use ($disk, $pathForRollback): void {
+                    $disk->delete($pathForRollback);
+                });
             }
 
             [$updatedDocument, $oldFilePath] = DB::transaction(function () use ($document, $payload, $replacementPath): array {
@@ -90,7 +96,17 @@ class UpdateDocumentAction
         if ($replacementPath !== null
             && $oldFilePath !== $replacementPath
             && ! $this->fileIsStillReferenced($oldFilePath)) {
-            $disk->delete($oldFilePath);
+            $deleteOldFile = function () use ($disk, $oldFilePath): void {
+                if (! $this->fileIsStillReferenced($oldFilePath)) {
+                    $disk->delete($oldFilePath);
+                }
+            };
+
+            // Saat dipanggil di bawah transaksi middleware, transaksi Action hanyalah
+            // savepoint. File lama baru boleh dihapus setelah transaksi terluar commit.
+            if (! $this->sideEffects->afterCommit($deleteOldFile)) {
+                $deleteOldFile();
+            }
         }
 
         return $updatedDocument;
@@ -125,16 +141,6 @@ class UpdateDocumentAction
             'nomor_berkas' => $document->nomor_dokumen,
             'file_sk' => $document->file_path,
         ]);
-
-        // Sinkronkan file_ijazah pada EducationHistory yang masih merujuk path file lama.
-        // Hanya dilakukan selama kategori dokumen tetap ijazah; jangan menautkan berkas
-        // non-ijazah (ktp_kk/lainnya) ke riwayat pendidikan sebagai ijazah.
-        if ($oldCategory === 'ijazah' && $document->jenis_dokumen === 'ijazah') {
-            EducationHistory::query()
-                ->where('employee_id', $document->employee_id)
-                ->where('file_ijazah', $oldFilePath)
-                ->update(['file_ijazah' => $document->file_path]);
-        }
 
         Employee::query()
             ->where('id', $document->employee_id)
@@ -187,7 +193,6 @@ class UpdateDocumentAction
             || PositionHistory::query()->where('file_sk', $filePath)->exists()
             || SalaryHistory::query()->where('file_sk', $filePath)->exists()
             || DisciplineRecord::query()->where('file_sk', $filePath)->exists()
-            || Appointment::query()->where('file_sk', $filePath)->exists()
-            || EducationHistory::query()->where('file_ijazah', $filePath)->exists();
+            || Appointment::query()->where('file_sk', $filePath)->exists();
     }
 }
