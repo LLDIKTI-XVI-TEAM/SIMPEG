@@ -2,12 +2,17 @@
 
 namespace Tests\Feature\Documents;
 
+use App\Jobs\CleanupEmployeeDocumentFileJob;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Support\Documents\BerkasLainnyaMutationGuard;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -78,6 +83,90 @@ class BerkasLainnyaStorageFailureTest extends TestCase
         $this->assertDatabaseMissing('audit_logs', ['event' => 'CREATE']);
     }
 
+    public function test_delete_menjadwalkan_cleanup_ketika_penghapusan_disk_gagal(): void
+    {
+        Queue::fake();
+        $this->actingAsRole('admin_kepegawaian');
+        $document = $this->createBerkas();
+        $path = $document->file_path;
+
+        Log::shouldReceive('warning')->once()->with(
+            'Penghapusan file dokumen pegawai ditunda karena storage gagal.',
+            ['file_path_hash' => hash('sha256', $path)],
+        );
+
+        $this->failNextDelete();
+
+        $this->deleteJson("/api/v1/pegawai/{$document->employee_id}/berkas-lainnya/{$document->id}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Berkas berhasil dihapus.');
+
+        $this->assertDatabaseMissing('documents', ['id' => $document->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($path);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'DELETE',
+            'auditable_id' => $document->id,
+        ]);
+        Queue::assertPushed(
+            CleanupEmployeeDocumentFileJob::class,
+            fn (CleanupEmployeeDocumentFileJob $job): bool => $job->filePath === $path,
+        );
+    }
+
+    public function test_job_cleanup_menghapus_file_yang_tidak_lagi_direferensikan(): void
+    {
+        $document = $this->createBerkas();
+        $path = $document->file_path;
+        $document->delete();
+
+        $job = new CleanupEmployeeDocumentFileJob($path);
+        $job->handle(app(BerkasLainnyaMutationGuard::class));
+
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($path);
+    }
+
+    public function test_job_cleanup_mempertahankan_file_yang_kembali_direferensikan(): void
+    {
+        $document = $this->createBerkas();
+
+        $job = new CleanupEmployeeDocumentFileJob($document->file_path);
+        $job->handle(app(BerkasLainnyaMutationGuard::class));
+
+        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+    }
+
+    public function test_job_cleanup_melempar_saat_delete_gagal_agar_queue_mencoba_ulang(): void
+    {
+        $document = $this->createBerkas();
+        $path = $document->file_path;
+        $document->delete();
+        $this->failNextDelete();
+        $job = new CleanupEmployeeDocumentFileJob($path);
+
+        $this->assertSame(3, $job->tries);
+        $this->assertSame([60, 300], $job->backoff());
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Pembersihan file dokumen pegawai gagal.');
+
+        $job->handle(app(BerkasLainnyaMutationGuard::class));
+    }
+
+    public function test_job_cleanup_melaporkan_kegagalan_final_tanpa_path_mentah(): void
+    {
+        $path = 'pegawai-rahasia/lainnya/berkas.pdf';
+        $exception = new RuntimeException('Detail I/O internal');
+        Log::shouldReceive('error')->once()->with(
+            'Pembersihan file dokumen pegawai gagal setelah retry maksimum.',
+            [
+                'file_path_hash' => hash('sha256', $path),
+                'exception_class' => RuntimeException::class,
+            ],
+        );
+
+        (new CleanupEmployeeDocumentFileJob($path))->failed($exception);
+    }
+
     /**
      * Ganti disk arsip dengan versi yang selalu gagal menulis seperti storage penuh:
      * putFileAs() mengembalikan false tanpa melempar exception. Method lain tetap
@@ -98,6 +187,28 @@ class BerkasLainnyaStorageFailureTest extends TestCase
             public function putFileAs($path, $file, $name = null, $options = [])
             {
                 // Meniru perilaku Flysystem saat penulisan gagal pada throw => false.
+                return false;
+            }
+
+            public function __call($method, $parameters)
+            {
+                return $this->inner->{$method}(...$parameters);
+            }
+        };
+
+        Storage::set(Document::STORAGE_DISK, $failingDisk);
+    }
+
+    /** Ganti disk dengan adapter yang meniru delete() gagal pada throw => false. */
+    private function failNextDelete(): void
+    {
+        $original = Storage::disk(Document::STORAGE_DISK);
+        $failingDisk = new class($original)
+        {
+            public function __construct(private readonly FilesystemAdapter $inner) {}
+
+            public function delete($paths): bool
+            {
                 return false;
             }
 
