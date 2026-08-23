@@ -150,7 +150,11 @@
             if (cached) {
                 this.documentsRows = cached.rows;
                 this.meta = cached.meta;
-                this.$nextTick(() => this._watchFilters());
+                // Tampilkan cache segera, lalu revalidasi agar arsip tetap sinkron dengan mutasi dari profil.
+                this.$nextTick(() => {
+                    this._watchFilters();
+                    this.fetchPage(this.meta.current_page, true);
+                });
                 return;
             }
 

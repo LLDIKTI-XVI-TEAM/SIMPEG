@@ -77,19 +77,48 @@ class EmployeeDocumentUiAccessTest extends TestCase
             ->assertJsonPath('document.jenis_dokumen', 'ktp_kk');
     }
 
-    public function test_document_archive_and_profile_views_contain_cache_invalidation_contracts(): void
+    public function test_profile_document_mutations_invalidate_central_archive_cache_after_success(): void
     {
         $this->actingAsRole('admin_kepegawaian');
         $employee = Employee::factory()->create();
 
-        $this->get(route('dokumen'))
+        $content = $this->get(route('pegawai.show', $employee->id))
             ->assertOk()
-            ->assertSee('_cacheTTL')
-            ->assertSee('_mutationKey')
-            ->assertSee('getCachedPage');
+            ->getContent();
 
-        $this->get(route('pegawai.show', $employee->id))
+        $this->assertStringContainsString("key && key.startsWith('dokumen_')", $content);
+        $this->assertMatchesRegularExpression(
+            '/async submitUploadBerkas\(\).*?if \(res\.ok\).*?this\.clearDocumentArchiveCache\(\);/s',
+            $content,
+        );
+        $this->assertMatchesRegularExpression(
+            '/async submitUpdateBerkas\(\).*?if \(res\.ok\).*?this\.clearDocumentArchiveCache\(\);/s',
+            $content,
+        );
+        $this->assertMatchesRegularExpression(
+            '/async submitDeleteBerkas\(\).*?if \(res\.ok\).*?this\.clearDocumentArchiveCache\(\);/s',
+            $content,
+        );
+    }
+
+    public function test_archive_revalidates_cached_rows_when_page_is_initialized(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+
+        $content = $this->get(route('dokumen'))
             ->assertOk()
-            ->assertSee('clearDocumentArchiveCache');
+            ->getContent();
+
+        $initStart = strpos($content, 'init() {');
+        $watchStart = strpos($content, '_watchFilters() {', $initStart === false ? 0 : $initStart);
+
+        $this->assertNotFalse($initStart);
+        $this->assertNotFalse($watchStart);
+
+        $initScript = substr($content, $initStart, $watchStart - $initStart);
+
+        $this->assertStringContainsString('this.documentsRows = cached.rows;', $initScript);
+        $this->assertStringContainsString('this.fetchPage(this.meta.current_page, true);', $initScript);
+        $this->assertStringContainsString("params.set('refresh', '1');", $content);
     }
 }
