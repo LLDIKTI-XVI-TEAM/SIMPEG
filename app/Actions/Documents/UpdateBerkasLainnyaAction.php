@@ -3,6 +3,7 @@
 namespace App\Actions\Documents;
 
 use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
+use App\Actions\Documents\Concerns\InteractsWithEmployeeDocumentStorage;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Services\AuditService;
@@ -12,12 +13,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Throwable;
 
 class UpdateBerkasLainnyaAction
 {
     use BuildsDocumentAuditPayload;
+    use InteractsWithEmployeeDocumentStorage;
 
     public function __construct(
         private readonly TransactionSideEffectManager $sideEffects,
@@ -46,9 +47,15 @@ class UpdateBerkasLainnyaAction
 
         if ($file !== null) {
             $category = (string) $data['kategori_dokumen'];
-            $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-            $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
-            $replacementPath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
+            // Disk throw => false: hasil non-string berarti penyimpanan gagal.
+            // Ditolak di sini — sebelum transaksi dan sebelum delete file lama —
+            // agar satu-satunya salinan dokumen tidak hilang akibat request yang
+            // tampak berhasil.
+            $replacementPath = $this->storeValidatedFile(
+                $file,
+                $employee->id.'/'.$category,
+                $this->buildEmployeeDocumentFilename($employee->id, $category, $file),
+            );
             $pathForRollback = $replacementPath;
 
             $this->sideEffects->afterRollback(function () use ($disk, $pathForRollback): void {

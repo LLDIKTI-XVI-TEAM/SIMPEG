@@ -3,6 +3,7 @@
 namespace App\Actions\Documents;
 
 use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
+use App\Actions\Documents\Concerns\InteractsWithEmployeeDocumentStorage;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Services\AuditService;
@@ -11,12 +12,12 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Throwable;
 
 class StoreBerkasLainnyaAction
 {
     use BuildsDocumentAuditPayload;
+    use InteractsWithEmployeeDocumentStorage;
 
     public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
 
@@ -28,9 +29,14 @@ class StoreBerkasLainnyaAction
     public function execute(Employee $employee, array $data, UploadedFile $file, ?Request $request = null): Document
     {
         $category = (string) $data['kategori_dokumen'];
-        $extension = strtolower($file->getClientOriginalExtension() ?: $file->extension());
-        $filename = $employee->id.'_'.$category.'_'.Str::uuid().'.'.$extension;
-        $filePath = $file->storeAs($employee->id.'/'.$category, $filename, Document::STORAGE_DISK);
+        // Guard penyimpanan: disk throw => false bisa mengembalikan false saat penuh/
+        // read-only. Ditolak di sini sebelum transaksi DB agar tidak ada metadata
+        // dengan path invalid atau file yatim.
+        $filePath = $this->storeValidatedFile(
+            $file,
+            $employee->id.'/'.$category,
+            $this->buildEmployeeDocumentFilename($employee->id, $category, $file),
+        );
 
         // Transaksi middleware dapat membungkus transaksi Action. Kompensasi ini
         // memastikan file ikut dibersihkan bila transaksi request terluar rollback.
