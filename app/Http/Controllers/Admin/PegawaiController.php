@@ -345,9 +345,12 @@ class PegawaiController extends Controller
             'per_page' => $paginator->perPage(),
         ];
 
-        // Pemulihan massal masih dibatasi Super Admin pada route, sehingga kontrol seleksi
-        // disembunyikan bagi role lain agar tombol tidak menjanjikan aksi yang akan ditolak backend.
-        $canBulkRestore = $request->user()?->role === 'super_admin';
+        $user = $request->user();
+
+        // Kontrol mengikuti role efektif agar simulasi role tidak menampilkan aksi Super Admin
+        // yang tetap akan ditolak oleh middleware saat formulir dikirim.
+        $canBulkRestore = $user?->getEffectiveRole() === 'super_admin'
+            && $user->hasPermission('employees.restore');
 
         return view('admin.pegawai.backup', compact(
             'perPage',
