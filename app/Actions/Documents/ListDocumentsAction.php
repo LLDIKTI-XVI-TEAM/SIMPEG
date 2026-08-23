@@ -38,15 +38,35 @@ class ListDocumentsAction
                 'employee:id,nama_lengkap,nip,foto',
             ]);
 
-        if (! empty($validated['search'])) {
-            $keyword = '%'.mb_strtolower($validated['search']).'%';
-            $query->where(function ($q) use ($keyword): void {
+        $searchTerm = trim((string) ($validated['search'] ?? ''));
+        if ($searchTerm !== '') {
+            $keyword = '%'.mb_strtolower($searchTerm).'%';
+
+            // Label kategori (mis. "KTP & KK", "SK KGB") tidak tersimpan apa adanya di
+            // kolom jenis_dokumen — petakan label yang cocok ke kuncinya agar pencarian
+            // berdasarkan nama kategori tetap menemukan dokumennya. Arah satu saja
+            // (label memuat istilah) supaya konsisten dengan semantik LIKE kolom lain
+            // dan istilah pendek tidak meledak ke seluruh kategori.
+            $matchedCategoryKeys = [];
+            $lowerTerm = mb_strtolower($searchTerm);
+            foreach (DocumentCategory::labels() as $categoryKey => $categoryLabel) {
+                if (str_contains(mb_strtolower($categoryLabel), $lowerTerm)) {
+                    $matchedCategoryKeys[] = $categoryKey;
+                }
+            }
+
+            $query->where(function ($q) use ($keyword, $matchedCategoryKeys): void {
                 $q->whereRaw('lower(documents.nama_dokumen) like ?', [$keyword])
                     ->orWhereRaw('lower(documents.nomor_dokumen) like ?', [$keyword])
+                    ->orWhereRaw('lower(documents.jenis_dokumen) like ?', [$keyword])
                     ->orWhereHas('employee', function ($employeeQuery) use ($keyword): void {
                         $employeeQuery->whereRaw('lower(nama_lengkap) like ?', [$keyword])
                             ->orWhereRaw('lower(nip) like ?', [$keyword]);
                     });
+
+                if ($matchedCategoryKeys !== []) {
+                    $q->orWhereIn('documents.jenis_dokumen', $matchedCategoryKeys);
+                }
             });
         }
 

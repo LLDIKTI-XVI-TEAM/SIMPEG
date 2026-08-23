@@ -93,6 +93,45 @@ class CentralArchiveReadOnlyTest extends TestCase
         $this->get(route('dokumen.download', $document->id))->assertOk();
     }
 
+    public function test_archive_search_matches_category_label_and_key(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+
+        $employee = Employee::factory()->create();
+        $ktpDocument = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ktp_kk',
+            'nama_dokumen' => 'Identitas Pegawai 001',
+            'file_path' => $employee->id.'/ktp_kk/identitas.pdf',
+        ]);
+        Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Ijazah S1 Teknik',
+            'file_path' => $employee->id.'/ijazah/s1.pdf',
+        ]);
+
+        // Pencarian label kategori harus menemukan dokumennya meski label tidak
+        // tersimpan apa adanya di kolom jenis_dokumen.
+        $this->getJson('/api/v1/dokumen?search='.rawurlencode('KTP & KK').'&per_page=5')
+            ->assertOk()
+            ->assertJsonCount(1, 'documents.data')
+            ->assertJsonPath('documents.total', 1)
+            ->assertJsonPath('documents.data.0.id', $ktpDocument->id);
+
+        // Kunci kategori (nilai kolom) juga harus bisa dicari langsung.
+        $this->getJson('/api/v1/dokumen?search=ktp_kk&per_page=5')
+            ->assertOk()
+            ->assertJsonCount(1, 'documents.data')
+            ->assertJsonPath('documents.data.0.id', $ktpDocument->id);
+
+        // Pencarian parsial label lain tetap bekerja.
+        $this->getJson('/api/v1/dokumen?search=Ijazah&per_page=5')
+            ->assertOk()
+            ->assertJsonCount(1, 'documents.data')
+            ->assertJsonPath('documents.data.0.nama_pegawai', $employee->nama_lengkap);
+    }
+
     public function test_archive_searches_across_employees_by_name_and_nip_with_correct_pagination(): void
     {
         $this->actingAsRole('admin_kepegawaian');
