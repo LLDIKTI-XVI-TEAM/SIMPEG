@@ -121,6 +121,20 @@
         skList: {{ \Illuminate\Support\Js::from($documentSkRows) }},
         berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
 
+        clearDocumentArchiveCache() {
+            try {
+                const toDelete = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('dokumen_')) toDelete.push(key);
+                }
+                toDelete.forEach(k => sessionStorage.removeItem(k));
+                const now = String(Date.now());
+                sessionStorage.setItem('simpeg_dokumen_last_mutation', now);
+                localStorage.setItem('simpeg_dokumen_last_mutation', now);
+            } catch (e) {}
+        },
+
         async submitUploadBerkas() {
             if (!this.newBerkas.file) {
                 this.uploadBerkasError = 'File berkas wajib dipilih.';
@@ -152,6 +166,7 @@
                     const json = await res.json();
                     // Tambahkan dokumen baru ke daftar secara reaktif (tanpa reload)
                     this.berkasList.unshift(json.document);
+                    this.clearDocumentArchiveCache();
                     this.showUploadBerkas = false;
                     this.newBerkas = { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null };
                     const fileInput = document.getElementById('berkas_upload_input');
@@ -214,6 +229,7 @@
 
                 if (res.ok) {
                     this.berkasList = this.berkasList.map((doc) => doc.id === json.document.id ? json.document : doc);
+                    this.clearDocumentArchiveCache();
                     this.showEditBerkas = false;
                     this.editingBerkas = null;
                     const fileInput = document.getElementById('edit_berkas_upload_input');
@@ -256,6 +272,7 @@
                 if (res.ok) {
                     const deletedId = this.deletingBerkas.id;
                     this.berkasList = this.berkasList.filter((doc) => doc.id !== deletedId);
+                    this.clearDocumentArchiveCache();
                     this.showDeleteBerkas = false;
                     this.deletingBerkas = null;
                     this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
@@ -890,6 +907,10 @@
                         sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
                         this.applyEducationSummary(result.education_summary);
                         this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
+                    }
+
+                    if (['disiplin', 'kgb', 'jabatan', 'pangkat', 'pendidikan'].includes(this.modalType)) {
+                        this.clearDocumentArchiveCache();
                     }
                     
                     this.showModal = false;

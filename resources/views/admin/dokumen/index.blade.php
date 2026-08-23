@@ -11,6 +11,10 @@
         perPage: 10,
         searchTimer: null,
         fetchError: null,
+        dataChanged: @js(session('document_data_changed', false)),
+        _cacheTTL: 300000,
+        _cacheVersion: 'v1',
+        _mutationKey: 'simpeg_dokumen_last_mutation',
 
         get cacheKey() {
             const f = this.filters;
@@ -26,18 +30,53 @@
             toDelete.forEach(k => sessionStorage.removeItem(k));
         },
 
-        async fetchPage(page, forceRefresh = false) {
+        getCachedPage(page) {
             const cKey = this.cacheKey + `_p${page}`;
             const cached = sessionStorage.getItem(cKey);
+            if (!cached) return null;
 
-            if (!forceRefresh && cached) {
-                try {
-                    const data = JSON.parse(cached);
-                    this.documentsRows = data.rows;
-                    this.meta = data.meta;
-                    return;
-                } catch (e) {
+            try {
+                const data = JSON.parse(cached);
+                if (!data || typeof data !== 'object' || !Array.isArray(data.rows)) {
                     sessionStorage.removeItem(cKey);
+                    return null;
+                }
+
+                if (data.v !== this._cacheVersion) {
+                    sessionStorage.removeItem(cKey);
+                    return null;
+                }
+
+                const now = Date.now();
+                if (!data.t || (now - data.t) > this._cacheTTL) {
+                    sessionStorage.removeItem(cKey);
+                    return null;
+                }
+
+                const localMutation = parseInt(localStorage.getItem(this._mutationKey) || '0', 10);
+                const sessionMutation = parseInt(sessionStorage.getItem(this._mutationKey) || '0', 10);
+                const lastMutation = Math.max(localMutation, sessionMutation);
+                if (data.t < lastMutation) {
+                    sessionStorage.removeItem(cKey);
+                    return null;
+                }
+
+                return data;
+            } catch (e) {
+                sessionStorage.removeItem(cKey);
+                return null;
+            }
+        },
+
+        async fetchPage(page, forceRefresh = false) {
+            const cKey = this.cacheKey + `_p${page}`;
+
+            if (!forceRefresh) {
+                const cached = this.getCachedPage(page);
+                if (cached) {
+                    this.documentsRows = cached.rows;
+                    this.meta = cached.meta;
+                    return;
                 }
             }
 
@@ -74,7 +113,12 @@
                     per_page:     json.documents?.per_page     ?? this.perPage,
                 };
 
-                sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
+                sessionStorage.setItem(cKey, JSON.stringify({
+                    v: this._cacheVersion,
+                    t: Date.now(),
+                    rows,
+                    meta,
+                }));
                 this.documentsRows = rows;
                 this.meta = meta;
             } catch (e) {
@@ -91,24 +135,23 @@
         },
 
         init() {
+            const navType = performance.getEntriesByType?.('navigation')?.[0]?.type;
+            if (navType === 'reload' || this.dataChanged) {
+                this.clearCache();
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const filterParam = urlParams.get('filter');
             if (filterParam === 'kadaluarsa') {
                 this.filters.kategori = 'sk_pengangkatan';
             }
 
-            const cKey = this.cacheKey + `_p${this.meta.current_page}`;
-            const cached = sessionStorage.getItem(cKey);
+            const cached = this.getCachedPage(this.meta.current_page);
             if (cached) {
-                try {
-                    const data = JSON.parse(cached);
-                    this.documentsRows = data.rows;
-                    this.meta = data.meta;
-                    this.$nextTick(() => this._watchFilters());
-                    return;
-                } catch (e) {
-                    sessionStorage.removeItem(cKey);
-                }
+                this.documentsRows = cached.rows;
+                this.meta = cached.meta;
+                this.$nextTick(() => this._watchFilters());
+                return;
             }
 
             this._watchFilters();

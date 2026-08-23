@@ -76,4 +76,20 @@ class EmployeeDocumentUiAccessTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('document.jenis_dokumen', 'ktp_kk');
     }
+
+    public function test_document_archive_and_profile_views_contain_cache_invalidation_contracts(): void
+    {
+        $this->actingAsRole('admin_kepegawaian');
+        $employee = Employee::factory()->create();
+
+        $this->get(route('dokumen'))
+            ->assertOk()
+            ->assertSee('_cacheTTL')
+            ->assertSee('_mutationKey')
+            ->assertSee('getCachedPage');
+
+        $this->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->assertSee('clearDocumentArchiveCache');
+    }
 }
