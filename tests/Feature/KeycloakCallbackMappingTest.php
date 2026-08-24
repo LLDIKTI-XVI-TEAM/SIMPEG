@@ -115,6 +115,52 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
+    /** preferred_username Keycloak yang sudah dipakai user lain tidak menggagalkan login; identitas kanonis adalah keycloak_id. */
+    public function test_keycloak_username_collision_does_not_break_login(): void
+    {
+        // User demo lokal memegang keycloak_username 'demo-klabat' (constraint unik).
+        User::factory()->create([
+            'email' => 'demo-klabat@example.test',
+            'keycloak_username' => 'demo-klabat',
+            'role' => 'super_admin',
+        ]);
+
+        config()->set('services.keycloak.role_mapping', [
+            'dayensite@gmail.com' => 'super_admin',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Superadmin LLDIKTI16',
+            'email' => 'dayensite@gmail.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-dayensite',
+            'nickname' => 'demo-klabat', // benturan: username sama dengan milik user demo
+            'name' => 'Superadmin LLDIKTI16',
+            'email' => 'dayensite@gmail.com',
+            'raw' => ['email' => 'dayensite@gmail.com', 'email_verified' => true, 'preferred_username' => 'demo-klabat'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+
+        // Login sukses: keycloak_id terisi, role dari mapping tetap diberikan,
+        // dan keycloak_username yang bentrok TIDAK menimpa milik user demo.
+        $mappedUser = User::where('email', 'dayensite@gmail.com')->first();
+        $this->assertSame('kc-dayensite', $mappedUser->keycloak_id);
+        $this->assertSame('super_admin', $mappedUser->role);
+        $this->assertNotSame('demo-klabat', $mappedUser->keycloak_username);
+
+        // Pemilik asli username tidak berubah.
+        $this->assertDatabaseHas('users', [
+            'email' => 'demo-klabat@example.test',
+            'keycloak_username' => 'demo-klabat',
+        ]);
+    }
+
     /** User baru ter-map valid dengan email di role_mapping mendapat role pemetaan, bukan default pegawai. */
     public function test_new_mapped_login_after_bootstrap_gets_mapped_role_instead_of_pegawai(): void
     {

@@ -104,10 +104,15 @@ class HandleKeycloakCallbackAction
             $user->fill([
                 'name' => $keycloakUser->getName() ?: $username ?: $employee->nama_lengkap,
                 'keycloak_id' => $keycloakId,
-                'keycloak_username' => $username,
                 'employee_id' => $employee->id,
                 'email_verified_at' => $user->email_verified_at ?? now(),
             ]);
+
+            // Guard benturan juga di jalur user baru: username hanya diambil jika belum
+            // dipakai user lain; identitas kanonis tetap keycloak_id (subject Keycloak).
+            if ($this->usernameIsAvailable($user, $username)) {
+                $user->keycloak_username = $username;
+            }
 
             if (! $user->exists) {
                 // Mapping pegawai valid + role internal belum ada → role mengikuti pemetaan
@@ -140,9 +145,15 @@ class HandleKeycloakCallbackAction
         $user->fill([
             'name' => $name ?: $user->name,
             'keycloak_id' => $keycloakId,
-            'keycloak_username' => $username ?: $user->keycloak_username,
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
+
+        // keycloak_username disimpan hanya jika belum dipakai user lain; identitas kanonis
+        // login adalah keycloak_id (subject), jadi benturan username tidak boleh menggagalkan login.
+        $claimedUsername = $username ?: $user->keycloak_username;
+        if ($this->usernameIsAvailable($user, $claimedUsername)) {
+            $user->keycloak_username = $claimedUsername;
+        }
 
         // Role internal kosong (null atau string kosong) pada mapping pegawai valid
         // diinisialisasi mengikuti pemetaan email SSO bila tersedia, selain itu sebagai
@@ -301,5 +312,27 @@ class HandleKeycloakCallbackAction
         }
 
         return $mapped;
+    }
+
+    /**
+     * True bila keycloak_username boleh disimpan pada user ini: kosong, sudah miliknya,
+     * atau belum dipakai user lain. Constraint unik users_keycloak_username_unique
+     * tidak boleh menggagalkan login karena identitas kanonis adalah keycloak_id.
+     */
+    private function usernameIsAvailable(User $user, ?string $username): bool
+    {
+        if (! is_string($username) || trim($username) === '') {
+            return false;
+        }
+
+        if ($user->keycloak_username !== null
+            && strtolower(trim($user->keycloak_username)) === strtolower(trim($username))) {
+            return true;
+        }
+
+        return ! User::query()
+            ->whereKeyNot($user->getKey())
+            ->whereRaw('lower(keycloak_username) = ?', [strtolower(trim($username))])
+            ->exists();
     }
 }
