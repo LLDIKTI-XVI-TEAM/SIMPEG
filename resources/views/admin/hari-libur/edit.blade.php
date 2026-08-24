@@ -19,7 +19,7 @@
             </x-slot:actions>
         </x-admin.page-header>
 
-        @if ($errors->any())
+        @if ($errors->getBag('hariLiburEdit')->any())
             <x-ui.alert variant="danger" title="Perubahan belum tersimpan">
                 Periksa kembali kolom yang ditandai pada formulir.
             </x-ui.alert>
@@ -37,6 +37,7 @@
                         label="Tanggal"
                         id="tanggal"
                         :value="$hariLibur->tanggal?->format('Y-m-d')"
+                        error-bag="hariLiburEdit"
                         required
                         size="lg"
                     />
@@ -47,6 +48,7 @@
                         type="text"
                         id="nama"
                         :value="$hariLibur->nama"
+                        error-bag="hariLiburEdit"
                         required
                         size="lg"
                     />
@@ -56,6 +58,7 @@
                         label="Jenis Libur"
                         id="tipe"
                         :value="$hariLibur->tipe()"
+                        error-bag="hariLiburEdit"
                         required
                     >
                         <option value="libur_nasional">Libur Nasional</option>

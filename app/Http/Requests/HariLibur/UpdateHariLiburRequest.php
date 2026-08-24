@@ -9,6 +9,14 @@ use Illuminate\Validation\Validator;
 
 class UpdateHariLiburRequest extends FormRequest
 {
+    /**
+     * Error Edit tidak boleh dibaca oleh modal Tambah yang memakai nama field
+     * sama pada halaman daftar Hari Libur.
+     *
+     * @var string
+     */
+    protected $errorBag = 'hariLiburEdit';
+
     public function authorize(): bool
     {
         return $this->user()?->role === 'super_admin';

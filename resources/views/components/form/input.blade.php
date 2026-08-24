@@ -9,6 +9,8 @@
     'disabled' => false,
     'help' => null,
     'errorKey' => null,
+    'errorBag' => null,
+    'useOldInput' => true,
     'size' => 'md',
     'labelSrOnly' => false,
     'wrapperClass' => '',
@@ -17,10 +19,12 @@
 @php
     $fieldId = $id ?? str_replace(['.', '[', ']'], ['_', '_', ''], $name);
     $fieldErrorKey = $errorKey ?? $name;
+    $fieldErrors = $errorBag ? $errors->getBag($errorBag) : $errors;
     $errorId = $fieldId . '_error';
     $helpId = $fieldId . '_help';
-    $hasError = $errors->has($fieldErrorKey);
+    $hasError = $fieldErrors->has($fieldErrorKey);
     $describedBy = trim(($help ? $helpId : '') . ' ' . ($hasError ? $errorId : ''));
+    $shouldUseOldInput = filter_var($useOldInput, FILTER_VALIDATE_BOOL);
 
     $sizes = [
         'sm' => 'px-3 py-2 text-xs',
@@ -28,7 +32,7 @@
         'lg' => 'px-4 py-2.5 text-sm',
     ];
 
-    $inputValue = old($fieldErrorKey, $value);
+    $inputValue = $shouldUseOldInput ? old($fieldErrorKey, $value) : $value;
 @endphp
 
 <div @class(['space-y-1', $wrapperClass])>
@@ -75,7 +79,7 @@
         <p id="{{ $helpId }}" class="text-[11px] text-muted font-sans">{{ $help }}</p>
     @endif
 
-    @error($fieldErrorKey)
-        <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $message }}</p>
-    @enderror
+    @if ($hasError)
+        <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
+    @endif
 </div>

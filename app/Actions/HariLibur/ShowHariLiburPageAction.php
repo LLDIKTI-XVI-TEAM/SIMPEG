@@ -54,8 +54,23 @@ class ShowHariLiburPageAction
             ->paginate($perPage)
             ->withQueryString();
 
+        $kalenderHariLibur = RefHariLibur::query()
+            ->where('tahun', $tahunAktif)
+            ->orderBy('tanggal')
+            ->get()
+            ->map(fn (RefHariLibur $item): array => [
+                'id' => $item->id,
+                'tanggal' => $item->tanggal?->format('Y-m-d'),
+                'nama' => $item->nama,
+                'is_cuti_bersama' => (bool) $item->is_cuti_bersama,
+                'label_tipe' => $item->labelTipe(),
+            ])
+            ->values()
+            ->all();
+
         return [
             'hariLibur' => $hariLibur,
+            'kalenderHariLibur' => $kalenderHariLibur,
             'tahunTersedia' => $tahunTersedia,
             'filters' => [
                 'tahun' => $tahunAktif,

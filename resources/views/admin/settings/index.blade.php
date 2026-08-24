@@ -71,7 +71,6 @@
         ['tabel' => 'ref_jenis_kelamin', 'deskripsi' => 'Identitas gender pegawai (Laki-laki, Perempuan)', 'baris' => 2, 'sprint' => 'Sprint 2', 'route' => 'data-master'],
         ['tabel' => 'ref_status_perkawinan', 'deskripsi' => 'Status marital (Belum Kawin, Kawin, Cerai Hidup, Cerai Mati)', 'baris' => 4, 'sprint' => 'Sprint 2', 'route' => 'data-master'],
         ['tabel' => 'ref_jenjang_pendidikan', 'deskripsi' => 'Pendidikan formal terakhir (SD, SMP, SMA, D3, S1, S2, S3)', 'baris' => 7, 'sprint' => 'Sprint 2', 'route' => 'data-master'],
-        ['tabel' => 'ref_hari_libur', 'deskripsi' => 'Kalender libur nasional dan cuti bersama', 'baris' => 14, 'sprint' => 'Sprint 2', 'route' => 'hari-libur'],
     ];
     @endphp
 

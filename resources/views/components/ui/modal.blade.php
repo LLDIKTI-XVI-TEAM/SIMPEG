@@ -10,6 +10,7 @@
     'headerClass' => '',
     'footerClass' => '',
     'overlayClass' => '',
+    'id' => null,
 ])
 
 @php
@@ -27,6 +28,7 @@
 @endphp
 
 <div
+    @if ($id) id="{{ $id }}" @endif
     @if ($show) x-show="{{ $show }}" @endif
     @if ($closeAction) @keydown.escape.window="{{ $closeAction }}" @endif
     class="fixed inset-0 z-50 overflow-y-auto"

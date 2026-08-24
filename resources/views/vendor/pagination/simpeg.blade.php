@@ -17,7 +17,7 @@
             {{-- Pagination Elements --}}
             @php
                 $currentPage = $paginator->currentPage();
-                $lastPage = $paginator->lastPage();
+                $lastPage = max(1, $paginator->lastPage());
 
                 $customElements = [];
                 if ($lastPage <= 5) {
