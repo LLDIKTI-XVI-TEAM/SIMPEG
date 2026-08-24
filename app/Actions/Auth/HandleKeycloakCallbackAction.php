@@ -21,6 +21,15 @@ class HandleKeycloakCallbackAction
         'email',
     ];
 
+    /** Role internal SIMPEG yang sah sebagai target pemetaan email SSO. */
+    private const ALLOWED_INTERNAL_ROLES = [
+        'super_admin',
+        'admin_kepegawaian',
+        'pimpinan',
+        'kepala_bagian',
+        'pegawai',
+    ];
+
     /**
      * Memproses callback Keycloak tanpa memakai role claim Keycloak sebagai sumber RBAC SIMPEG.
      */
@@ -101,9 +110,11 @@ class HandleKeycloakCallbackAction
             ]);
 
             if (! $user->exists) {
-                // Mapping pegawai valid + role internal belum ada → default SSO Pegawai berperan
+                // Mapping pegawai valid + role internal belum ada → role mengikuti pemetaan
+                // email SSO bila tersedia; tanpa pemetaan, default SSO Pegawai berperan
                 // sebagai Pegawai; akun pertama sistem diberi akses super_admin agar dapat dikonfigurasi.
-                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
+                $user->role = $this->mappedRoleForEmail($matchedEmail)
+                    ?? (User::query()->exists() ? 'pegawai' : 'super_admin');
                 $user->password = Str::random(48);
             }
 
@@ -134,7 +145,8 @@ class HandleKeycloakCallbackAction
         ]);
 
         // Role internal kosong (null atau string kosong) pada mapping pegawai valid
-        // diinisialisasi sebagai Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
+        // diinisialisasi mengikuti pemetaan email SSO bila tersedia, selain itu sebagai
+        // Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
         // Inisialisasi hanya untuk pegawai yang masih aktif: pegawai yang sudah dinonaktifkan
         // (soft-delete) tidak layak menerima role baru, agar akses yang dicabut lewat deaktivasi
         // tidak pulih hanya karena role account lama masih kosong.
@@ -142,7 +154,7 @@ class HandleKeycloakCallbackAction
             && is_string($user->employee_id)
             && ! $this->employeeIsSoftDeleted($user->employee_id)
             && in_array($user->role, [null, ''], true)) {
-            $user->role = 'pegawai';
+            $user->role = $this->mappedRoleForEmail($user->email) ?? 'pegawai';
         }
 
         // Inisialisasi role adalah mutasi penting: disimpan bersama jejak auditnya dalam satu
@@ -266,5 +278,28 @@ class HandleKeycloakCallbackAction
         );
 
         return in_array(strtolower(trim($username)), $allowedUsernames, true);
+    }
+
+    /**
+     * Role internal yang ditetapkan untuk email SSO tertentu lewat config role_mapping.
+     *
+     * Hanya dipakai pada saat bootstrap (user baru / role internal masih kosong); role yang
+     * sudah terisi tidak pernah dioverwrite. Role di luar allowlist ditolak fail-closed.
+     */
+    private function mappedRoleForEmail(?string $email): ?string
+    {
+        if (! is_string($email) || trim($email) === '') {
+            return null;
+        }
+
+        $roleMapping = (array) config('services.keycloak.role_mapping', []);
+
+        $mapped = $roleMapping[strtolower(trim($email))] ?? null;
+
+        if (! is_string($mapped) || ! in_array($mapped, self::ALLOWED_INTERNAL_ROLES, true)) {
+            return null;
+        }
+
+        return $mapped;
     }
 }

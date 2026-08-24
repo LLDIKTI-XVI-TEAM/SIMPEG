@@ -43,6 +43,16 @@ return [
         'client_secret' => env('KEYCLOAK_CLIENT_SECRET'),
         'redirect' => env('KEYCLOAK_REDIRECT_URI'),
         'employee_match_field' => env('SSO_EMPLOYEE_MATCH_FIELD', 'email'),
+        // Email SSO (terverifikasi) yang saat login pertama di-bootstrap ke role internal SIMPEG.
+        // Berlaku hanya untuk akun baru / role internal masih kosong; role yang sudah ditetapkan
+        // tidak pernah dioverwrite oleh pemetaan ini.
+        'role_mapping' => [
+            'dayensite@gmail.com' => 'super_admin',
+            'sitedayen@gmail.com' => 'admin_kepegawaian',
+            'dionkobi08@gmail.com' => 'pimpinan',
+            'dayen6153@gmail.com' => 'kepala_bagian',
+            'dionleonn05@gmail.com' => 'pegawai',
+        ],
         'dev_usernames' => in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)
             ? array_filter(array_map('trim', explode(',', env('SSO_DEV_USERNAMES', 'demo-klabat,demo-klabat-kepeg,demo-klabat-kabag,demo-klabat-pimpinan,demo-klabat-pegawai'))))
             : [],

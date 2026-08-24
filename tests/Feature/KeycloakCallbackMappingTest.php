@@ -85,6 +85,149 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
     }
 
+    public function test_first_login_with_mapped_email_gets_mapped_role_instead_of_bootstrap_super_admin(): void
+    {
+        config()->set('services.keycloak.role_mapping', [
+            'kabag@example.com' => 'kepala_bagian',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kabag SSO',
+            'email' => 'kabag@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-kabag',
+            'nickname' => 'kabag',
+            'name' => 'Kabag SSO',
+            'email' => 'kabag@example.com',
+            'raw' => ['email' => 'kabag@example.com', 'email_verified' => true, 'preferred_username' => 'kabag'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'email' => 'kabag@example.com',
+            'keycloak_id' => 'kc-kabag',
+            'employee_id' => $employee->id,
+            'role' => 'kepala_bagian',
+        ]);
+    }
+
+    /** User baru ter-map valid dengan email di role_mapping mendapat role pemetaan, bukan default pegawai. */
+    public function test_new_mapped_login_after_bootstrap_gets_mapped_role_instead_of_pegawai(): void
+    {
+        User::factory()->superAdmin()->create();
+
+        config()->set('services.keycloak.role_mapping', [
+            'kepeg@example.com' => 'admin_kepegawaian',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kepeg SSO',
+            'email' => 'kepeg@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-kepeg',
+            'nickname' => 'kepeg',
+            'name' => 'Kepeg SSO',
+            'email' => 'kepeg@example.com',
+            'raw' => ['email' => 'kepeg@example.com', 'email_verified' => true, 'preferred_username' => 'kepeg'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'email' => 'kepeg@example.com',
+            'keycloak_id' => 'kc-kepeg',
+            'employee_id' => $employee->id,
+            'role' => 'admin_kepegawaian',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_type', 'User')->sole();
+        $this->assertSame(['role' => null], $audit->old_values);
+        $this->assertSame('admin_kepegawaian', $audit->new_values['role'] ?? null);
+        $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
+    }
+
+    /** Role internal yang sudah ditetapkan tidak pernah dioverwrite oleh role_mapping email SSO. */
+    public function test_existing_role_is_never_overwritten_by_email_mapping(): void
+    {
+        config()->set('services.keycloak.role_mapping', [
+            'pimpinan@example.com' => 'pimpinan',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pimpinan Lama',
+            'email' => 'pimpinan@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'pimpinan@example.com',
+            'keycloak_id' => 'kc-pimpinan-lama',
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-pimpinan-lama',
+            'nickname' => 'pimpinan-lama',
+            'name' => 'Pimpinan Lama',
+            'email' => 'pimpinan@example.com',
+            'raw' => ['email' => 'pimpinan@example.com', 'email_verified' => true, 'preferred_username' => 'pimpinan-lama'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'role' => 'pegawai',
+        ]);
+    }
+
+    /** User lama ber-role kosong dengan email ter-map diinisialisasi ke role pemetaan saat login; inisialisasi diaudit. */
+    public function test_existing_mapped_user_with_blank_role_gets_mapped_role_on_login(): void
+    {
+        config()->set('services.keycloak.role_mapping', [
+            'dayen@example.com' => 'kepala_bagian',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Dayen Lama',
+            'email' => 'dayen@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'dayen@example.com',
+            'keycloak_id' => 'kc-dayen-lama',
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-dayen-lama',
+            'nickname' => 'dayen-lama',
+            'name' => 'Dayen Lama',
+            'email' => 'dayen@example.com',
+            'raw' => ['email' => 'dayen@example.com', 'email_verified' => true, 'preferred_username' => 'dayen-lama'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'role' => 'kepala_bagian',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_type', 'User')->sole();
+        $this->assertSame(['role' => null], $audit->old_values);
+        $this->assertSame('kepala_bagian', $audit->new_values['role'] ?? null);
+        $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
+    }
+
     /** User lama ber-role kosong dengan mapping valid diinisialisasi menjadi pegawai saat login; inisialisasi diaudit. */
     public function test_existing_mapped_user_with_blank_role_is_initialized_to_pegawai_on_login(): void
     {
