@@ -1,25 +1,23 @@
 <x-pegawai.detail.panel tab="docs" id-prefix="admin">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-            <h3 class="text-sm font-bold text-ink font-sans">Dokumen &amp; SK</h3>
-            <p class="mt-0.5 text-xs text-muted font-sans">
-                Dokumen SK ditampilkan terpisah dari KTP/KK, ijazah, dan berkas tambahan lainnya.
-            </p>
-        </div>
-
+    <x-pegawai.detail.section-header
+        title="Dokumen & SK"
+        description="Dokumen SK ditampilkan terpisah dari KTP/KK, ijazah, dan berkas tambahan lainnya."
+    >
         @if($canManageDocuments)
-            <button
-                type="button"
-                @click="showUploadBerkas = true; uploadBerkasError = ''; uploadBerkasErrors = {}"
-                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90"
-            >
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Unggah Berkas Lainnya
-            </button>
+            <x-slot:actions>
+                <button
+                    type="button"
+                    @click="showUploadBerkas = true; uploadBerkasError = ''; uploadBerkasErrors = {}"
+                    class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                >
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Unggah Berkas Lainnya
+                </button>
+            </x-slot:actions>
         @endif
-    </div>
+    </x-pegawai.detail.section-header>
 
     @if($canManageDocuments)
         <x-ui.modal
