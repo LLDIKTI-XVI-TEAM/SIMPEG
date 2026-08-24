@@ -26,7 +26,7 @@ class PrepareEmployeeDocumentRowsAction
             ...$employee->statusHistories->pluck('file_sk'),
             ...$employee->disciplineRecords->pluck('file_sk'),
             ...$employee->educationHistories->pluck('file_ijazah'),
-            $employee->appointment?->file_sk,
+            ...$employee->appointments->pluck('file_sk'),
             $employee->status_berkas_path,
         ])->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
             ->flip();

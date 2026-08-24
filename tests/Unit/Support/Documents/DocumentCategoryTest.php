@@ -28,4 +28,11 @@ class DocumentCategoryTest extends TestCase
         $this->assertFalse(DocumentCategory::isProtectedSk('lainnya'));
         $this->assertFalse(DocumentCategory::isProtectedSk('ktp_kk'));
     }
+
+    public function test_legacy_sk_remains_protected_without_becoming_an_editable_category(): void
+    {
+        $this->assertTrue(DocumentCategory::isProtectedSk('SK'));
+        $this->assertSame('Dokumen SK', DocumentCategory::label('SK'));
+        $this->assertNotContains('SK', DocumentCategory::editableKeys());
+    }
 }

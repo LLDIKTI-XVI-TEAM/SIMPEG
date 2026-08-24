@@ -47,6 +47,7 @@ class Show extends Component
             'educationHistories.programStudi',
             'documents',
             'appointment',
+            'appointments',
             'agama',
             'statusKawin',
             'jenisPegawai',
