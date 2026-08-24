@@ -662,7 +662,7 @@ class SwitchRoleTest extends TestCase
             ->assertSee(route('revert-role'), false);
     }
 
-    /** Kontrol dokumen harus mengikuti role efektif seperti middleware route, bukan role asli. */
+    /** Arsip terpusat tetap baca-saja pada role asli maupun role simulasi. */
     public function test_document_controls_follow_effective_role_during_simulation(): void
     {
         $user = $this->createUserWithRole('super_admin');
@@ -676,8 +676,8 @@ class SwitchRoleTest extends TestCase
         $this->actingAs($user)
             ->get(route('dokumen'))
             ->assertOk()
-            ->assertSee('title="Edit"', false)
-            ->assertSee('title="Hapus"', false);
+            ->assertDontSee('title="Edit"', false)
+            ->assertDontSee('title="Hapus"', false);
 
         $this->actingAs($user)->post(route('switch-role'), [
             'target_role' => 'admin_kepegawaian',
@@ -688,7 +688,7 @@ class SwitchRoleTest extends TestCase
         $this->actingAs($user)
             ->get(route('dokumen'))
             ->assertOk()
-            ->assertSee('title="Edit"', false)
+            ->assertDontSee('title="Edit"', false)
             ->assertDontSee('title="Hapus"', false);
 
         $this->actingAs($user)
@@ -981,8 +981,8 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
-    /** Rollback audit simulasi wajib mempertahankan arsip lama dan membersihkan file pengganti. */
-    public function test_simulated_document_update_restores_files_when_usage_audit_fails(): void
+    /** Role simulasi tidak boleh mengaktifkan kembali mutasi pada arsip terpusat. */
+    public function test_simulated_document_update_stays_forbidden_in_central_archive(): void
     {
         Storage::fake(Document::STORAGE_DISK);
 
@@ -1000,22 +1000,15 @@ class SwitchRoleTest extends TestCase
 
         $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
         $user->refresh();
-        $this->installUsageAuditFailureTrigger();
 
-        try {
-            $response = $this->actingAs($user)->post(route('dokumen.update', $document->id), [
-                'kategori_dokumen' => 'lainnya',
-                'nama_dokumen' => 'Dokumen Baru',
-                'nomor_dokumen' => 'DOC-BARU',
-                'tanggal_terbit' => '2026-08-20',
-                'deskripsi' => 'Penggantian yang harus rollback.',
-                'berkas' => UploadedFile::fake()->create('dokumen-baru.pdf', 64, 'application/pdf'),
-            ]);
-
-            $response->assertServerError();
-        } finally {
-            $this->removeUsageAuditFailureTrigger();
-        }
+        $this->actingAs($user)->post(route('dokumen.update', $document->id), [
+            'kategori_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Baru',
+            'nomor_dokumen' => 'DOC-BARU',
+            'tanggal_terbit' => '2026-08-20',
+            'deskripsi' => 'Mutasi arsip terpusat harus ditolak.',
+            'berkas' => UploadedFile::fake()->create('dokumen-baru.pdf', 64, 'application/pdf'),
+        ])->assertForbidden();
 
         $document->refresh();
         $this->assertSame('Dokumen Lama', $document->nama_dokumen);
@@ -1023,11 +1016,6 @@ class SwitchRoleTest extends TestCase
         $this->assertSame($oldPath, $document->file_path);
         Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
         $this->assertSame([$oldPath], Storage::disk(Document::STORAGE_DISK)->allFiles());
-        $this->assertDatabaseMissing('audit_logs', [
-            'event' => 'UPDATE',
-            'auditable_type' => 'Document',
-            'auditable_id' => $document->id,
-        ]);
     }
 
     /** File unggahan tidak boleh menjadi orphan ketika audit penggunaan membatalkan request. */
@@ -1043,13 +1031,12 @@ class SwitchRoleTest extends TestCase
         $this->installUsageAuditFailureTrigger();
 
         try {
-            $response = $this->actingAs($user)->post(route('dokumen.store'), [
-                'pegawai_id' => $employee->id,
+            $response = $this->actingAs($user)->postJson(route('api.v1.pegawai.berkas-lainnya.store', $employee), [
                 'kategori_dokumen' => 'lainnya',
                 'nama_dokumen' => 'Dokumen Baru',
                 'nomor_dokumen' => 'DOC-BARU',
                 'tanggal_terbit' => '2026-08-20',
-                'deskripsi' => 'Unggahan yang harus rollback.',
+                'keterangan' => 'Unggahan yang harus rollback.',
                 'berkas' => UploadedFile::fake()->create('dokumen-baru.pdf', 64, 'application/pdf'),
             ]);
 
@@ -1069,8 +1056,8 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
-    /** File lama baru dihapus setelah perubahan dokumen dan audit penggunaan berhasil commit. */
-    public function test_simulated_document_update_deletes_old_file_after_usage_audit_commits(): void
+    /** Update profil harus mengembalikan metadata dan file ketika audit penggunaan membatalkan request. */
+    public function test_simulated_additional_document_update_rolls_back_file_when_usage_audit_fails(): void
     {
         Storage::fake(Document::STORAGE_DISK);
 
@@ -1088,20 +1075,96 @@ class SwitchRoleTest extends TestCase
 
         $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
         $user->refresh();
+        $this->installUsageAuditFailureTrigger();
 
-        $response = $this->actingAs($user)->post(route('dokumen.update', $document->id), [
+        try {
+            $response = $this->actingAs($user)->post(route('api.v1.pegawai.berkas-lainnya.update', [$employee, $document]), [
+                '_method' => 'PUT',
+                'kategori_dokumen' => 'lainnya',
+                'nama_dokumen' => 'Dokumen Baru',
+                'nomor_dokumen' => 'DOC-BARU',
+                'berkas' => UploadedFile::fake()->create('dokumen-baru.pdf', 64, 'application/pdf'),
+            ], ['Accept' => 'application/json']);
+
+            $response->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $document->refresh();
+        $this->assertSame('Dokumen Lama', $document->nama_dokumen);
+        $this->assertSame('DOC-LAMA', $document->nomor_dokumen);
+        $this->assertSame($oldPath, $document->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
+        $this->assertSame([$oldPath], Storage::disk(Document::STORAGE_DISK)->allFiles());
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'Document',
+            'auditable_id' => $document->id,
+        ]);
+    }
+
+    /** Delete profil tidak boleh menghapus metadata atau file ketika transaksi penggunaan role rollback. */
+    public function test_simulated_additional_document_delete_rolls_back_when_usage_audit_fails(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $user = $this->createUserWithRole('super_admin');
+        $employee = Employee::factory()->create();
+        $path = $employee->id.'/lainnya/dokumen-hapus.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($path, 'dokumen tetap ada');
+        $document = Document::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Dokumen Hapus',
+            'file_path' => $path,
+        ]);
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+        $this->installUsageAuditFailureTrigger();
+
+        try {
+            $response = $this->actingAs($user)->deleteJson(
+                route('api.v1.pegawai.berkas-lainnya.destroy', [$employee, $document]),
+            );
+
+            $response->assertServerError();
+        } finally {
+            $this->removeUsageAuditFailureTrigger();
+        }
+
+        $this->assertDatabaseHas('documents', ['id' => $document->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($path);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'DELETE',
+            'auditable_type' => 'Document',
+            'auditable_id' => $document->id,
+        ]);
+    }
+
+    /** Unggahan profil dan audit penggunaan role simulasi harus commit bersama. */
+    public function test_simulated_additional_document_upload_commits_with_usage_audit(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $user = $this->createUserWithRole('super_admin');
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'admin_kepegawaian']);
+        $user->refresh();
+
+        $response = $this->actingAs($user)->postJson(route('api.v1.pegawai.berkas-lainnya.store', $employee), [
             'kategori_dokumen' => 'lainnya',
             'nama_dokumen' => 'Dokumen Baru',
             'nomor_dokumen' => 'DOC-BARU',
             'tanggal_terbit' => '2026-08-20',
-            'deskripsi' => 'Penggantian yang harus commit bersama audit.',
+            'keterangan' => 'Unggahan yang harus commit bersama audit.',
             'berkas' => UploadedFile::fake()->create('dokumen-baru.pdf', 64, 'application/pdf'),
         ]);
 
-        $response->assertRedirect(route('dokumen'));
-        $document->refresh();
-        $this->assertNotSame($oldPath, $document->file_path);
-        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldPath);
+        $response->assertCreated();
+        $document = Document::query()->where('nomor_dokumen', 'DOC-BARU')->firstOrFail();
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'ROLE_SIMULATION_USAGE',
@@ -1139,25 +1202,23 @@ class SwitchRoleTest extends TestCase
         });
 
         try {
-            $response = $this->actingAs($user)->post(route('dokumen.update', $document->id), [
+            $response = $this->actingAs($user)->postJson(route('api.v1.pegawai.berkas-lainnya.store', $employee), [
                 'kategori_dokumen' => 'lainnya',
                 'nama_dokumen' => 'Dokumen Setelah Commit',
                 'nomor_dokumen' => 'DOC-COMMITTED',
                 'tanggal_terbit' => '2026-08-20',
-                'deskripsi' => 'Database sudah commit sebelum callback queue gagal.',
+                'keterangan' => 'Database sudah commit sebelum callback queue gagal.',
                 'berkas' => UploadedFile::fake()->create('dokumen-committed.pdf', 64, 'application/pdf'),
             ]);
 
-            $response->assertRedirect(route('dokumen'));
+            $response->assertCreated();
         } finally {
             Event::forget($eventName);
         }
 
-        $document->refresh();
+        $document = Document::query()->where('nomor_dokumen', 'DOC-COMMITTED')->firstOrFail();
         $this->assertSame('Dokumen Setelah Commit', $document->nama_dokumen);
         $this->assertSame('DOC-COMMITTED', $document->nomor_dokumen);
-        $this->assertNotSame($oldPath, $document->file_path);
-        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldPath);
         Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
         $this->assertDatabaseHas('audit_logs', [
             'event' => 'ROLE_SIMULATION_USAGE',

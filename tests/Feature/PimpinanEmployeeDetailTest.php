@@ -519,11 +519,6 @@ class PimpinanEmployeeDetailTest extends TestCase
                 'empty' => 'Belum ada data pengangkatan.',
                 'admin_actions' => false,
             ],
-            'docs' => [
-                'headings' => ['Nama Dokumen', 'Kategori', 'Nomor Dokumen', 'Tanggal Terbit', 'Ukuran'],
-                'empty' => 'Belum ada dokumen atau berkas yang diunggah untuk pegawai ini.',
-                'admin_actions' => true,
-            ],
         ];
 
         foreach ($responses as $surface => $response) {
@@ -551,6 +546,13 @@ class PimpinanEmployeeDetailTest extends TestCase
                     : $this->assertStringNotContainsString('>Aksi<', $tableHtml);
             }
         }
+
+        // Admin memisahkan SK dan berkas tambahan, sedangkan surface Pimpinan
+        // mempertahankan satu tabel baca-saja dengan data yang sudah dimasking.
+        $responses['admin']
+            ->assertSee('data-employee-detail-table="dokumen-sk"', false)
+            ->assertSee('data-employee-detail-table="berkas-lainnya"', false);
+        $responses['pimpinan']->assertSee('data-employee-detail-table="docs"', false);
 
         $responses['pimpinan']
             ->assertDontSee('>Aksi<', false)

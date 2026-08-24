@@ -1,8 +1,7 @@
 <div>
 
     @php
-        $allDocuments   = collect($p->documents ?? []);
-        $riwayatDokumen = $allDocuments;
+        $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
 
         $canAssignSupervisor = auth()->check()
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
@@ -109,19 +108,32 @@
         uploadBerkasError: '',
         uploadBerkasErrors: {},
         newBerkas: { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null },
-        dokumenList: {{ $riwayatDokumen->map(fn($d) => [
-            'id'             => $d->id,
-            'nama_dokumen'   => $d->nama_dokumen,
-            'jenis_dokumen'  => $d->jenis_dokumen,
-            'kategori_label' => \App\Support\Documents\DocumentCategory::label($d->jenis_dokumen),
-            'nomor_dokumen'  => $d->nomor_dokumen,
-            'tanggal_dokumen'=> $d->tanggal_dokumen ? \Carbon\Carbon::parse($d->tanggal_dokumen)->format('d-m-Y') : null,
-            'file_size'      => $d->fileSizeLabel(),
-            'file_path'      => $d->file_path,
-            'keterangan'     => $d->keterangan,
-            'detail_url'     => route('dokumen.show', $d->id),
-            'download_url'   => route('dokumen.download', $d->id),
-        ])->toJson() }},
+        showEditBerkas: false,
+        isUpdatingBerkas: false,
+        editBerkasError: '',
+        editBerkasErrors: {},
+        editingBerkas: null,
+        editBerkas: { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null },
+        showDeleteBerkas: false,
+        isDeletingBerkas: false,
+        deleteBerkasError: '',
+        deletingBerkas: null,
+        skList: {{ \Illuminate\Support\Js::from($documentSkRows) }},
+        berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
+
+        clearDocumentArchiveCache() {
+            try {
+                const toDelete = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('dokumen_')) toDelete.push(key);
+                }
+                toDelete.forEach(k => sessionStorage.removeItem(k));
+                const now = String(Date.now());
+                sessionStorage.setItem('simpeg_dokumen_last_mutation', now);
+                localStorage.setItem('simpeg_dokumen_last_mutation', now);
+            } catch (e) {}
+        },
 
         async submitUploadBerkas() {
             if (!this.newBerkas.file) {
@@ -153,7 +165,8 @@
                 if (res.ok) {
                     const json = await res.json();
                     // Tambahkan dokumen baru ke daftar secara reaktif (tanpa reload)
-                    this.dokumenList.unshift(json.document);
+                    this.berkasList.unshift(json.document);
+                    this.clearDocumentArchiveCache();
                     this.showUploadBerkas = false;
                     this.newBerkas = { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null };
                     const fileInput = document.getElementById('berkas_upload_input');
@@ -171,6 +184,106 @@
                 this.uploadBerkasError = 'Gagal mengunggah berkas. Periksa koneksi internet Anda.';
             } finally {
                 this.isUploadingBerkas = false;
+            }
+        },
+        openEditBerkas(doc) {
+            if (!doc.can_mutate) return;
+            this.editingBerkas = doc;
+            this.editBerkas = {
+                nama_dokumen: doc.nama_dokumen ?? '',
+                kategori_dokumen: doc.jenis_dokumen ?? 'lainnya',
+                nomor_dokumen: doc.nomor_dokumen ?? '',
+                tanggal_terbit: doc.tanggal_input ?? '',
+                keterangan: doc.keterangan ?? '',
+                file: null,
+            };
+            this.editBerkasError = '';
+            this.editBerkasErrors = {};
+            this.showEditBerkas = true;
+        },
+        async submitUpdateBerkas() {
+            if (!this.editingBerkas) return;
+            this.isUpdatingBerkas = true;
+            this.editBerkasError = '';
+            this.editBerkasErrors = {};
+
+            const fd = new FormData();
+            fd.append('_method', 'PUT');
+            fd.append('nama_dokumen', this.editBerkas.nama_dokumen);
+            fd.append('kategori_dokumen', this.editBerkas.kategori_dokumen);
+            fd.append('nomor_dokumen', this.editBerkas.nomor_dokumen);
+            fd.append('tanggal_terbit', this.editBerkas.tanggal_terbit);
+            fd.append('keterangan', this.editBerkas.keterangan);
+            if (this.editBerkas.file) fd.append('berkas', this.editBerkas.file);
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya/${this.editingBerkas.id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: fd,
+                });
+                const json = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    this.berkasList = this.berkasList.map((doc) => doc.id === json.document.id ? json.document : doc);
+                    this.clearDocumentArchiveCache();
+                    this.showEditBerkas = false;
+                    this.editingBerkas = null;
+                    const fileInput = document.getElementById('edit_berkas_upload_input');
+                    if (fileInput) fileInput.value = '';
+                    this.toast = { show: true, message: 'Berkas berhasil diperbarui.', type: 'success' };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                } else if (res.status === 422) {
+                    this.editBerkasErrors = json.errors ?? {};
+                    this.editBerkasError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
+                } else {
+                    this.editBerkasError = json.message ?? 'Gagal memperbarui berkas. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.editBerkasError = 'Gagal memperbarui berkas. Periksa koneksi internet Anda.';
+            } finally {
+                this.isUpdatingBerkas = false;
+            }
+        },
+        openDeleteBerkas(doc) {
+            if (!doc.can_mutate) return;
+            this.deletingBerkas = doc;
+            this.deleteBerkasError = '';
+            this.showDeleteBerkas = true;
+        },
+        async submitDeleteBerkas() {
+            if (!this.deletingBerkas) return;
+            this.isDeletingBerkas = true;
+            this.deleteBerkasError = '';
+
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya/${this.deletingBerkas.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                });
+                const json = await res.json().catch(() => ({}));
+
+                if (res.ok) {
+                    const deletedId = this.deletingBerkas.id;
+                    this.berkasList = this.berkasList.filter((doc) => doc.id !== deletedId);
+                    this.clearDocumentArchiveCache();
+                    this.showDeleteBerkas = false;
+                    this.deletingBerkas = null;
+                    this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
+                    setTimeout(() => { this.toast.show = false; }, 3500);
+                } else {
+                    this.deleteBerkasError = json.errors?.document?.[0] ?? json.message ?? 'Gagal menghapus berkas. Silakan coba lagi.';
+                }
+            } catch (e) {
+                this.deleteBerkasError = 'Gagal menghapus berkas. Periksa koneksi internet Anda.';
+            } finally {
+                this.isDeletingBerkas = false;
             }
         },
         async updateKinerjaBaik(value) {
@@ -795,6 +908,10 @@
                         this.applyEducationSummary(result.education_summary);
                         this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
                     }
+
+                    if (['disiplin', 'kgb', 'jabatan', 'pangkat', 'pendidikan'].includes(this.modalType)) {
+                        this.clearDocumentArchiveCache();
+                    }
                     
                     this.showModal = false;
                     this.toast = { show: true, message: 'Data berhasil disimpan!', type: 'success' };
@@ -1403,193 +1520,7 @@
                 ])
             </x-pegawai.detail.panel>
 
-            {{-- TAB 9: DOKUMEN & SK --}}
-            <x-pegawai.detail.panel tab="docs" id-prefix="admin">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Daftar Dokumen & Berkas Pegawai</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Seluruh berkas kepegawaian termasuk SK, ijazah, KTP/KK, dan dokumen lainnya.</p>
-                    </div>
-                    @can('update', $p)
-                    <button type="button" @click="showUploadBerkas = !showUploadBerkas"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10 font-sans">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Unggah Berkas
-                    </button>
-                    @endcan
-                </div>
-
-                {{-- Panel Upload Berkas Lainnya --}}
-                @can('update', $p)
-                <div x-show="showUploadBerkas" x-transition class="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-4">
-                    <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unggah Berkas Baru</h4>
-
-                    {{-- Error global --}}
-                    <p x-show="uploadBerkasError" x-text="uploadBerkasError"
-                       class="text-xs text-danger font-semibold font-sans"></p>
-
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        {{-- Nama Dokumen --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                Nama Dokumen <span class="text-danger">*</span>
-                            </label>
-                            <input type="text" x-model="newBerkas.nama_dokumen"
-                                placeholder="Misal: KTP An. Budi Santoso"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                            <p x-show="uploadBerkasErrors.nama_dokumen" x-text="uploadBerkasErrors.nama_dokumen?.[0]"
-                               class="text-xs text-danger font-sans"></p>
-                        </div>
-
-                        {{-- Kategori --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                Kategori <span class="text-danger">*</span>
-                            </label>
-                            <div class="relative">
-                                <select x-model="newBerkas.kategori_dokumen"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                                    <option value="ktp_kk">KTP & KK</option>
-                                    <option value="ijazah">Ijazah</option>
-                                    <option value="lainnya">Lainnya</option>
-                                </select>
-                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <p x-show="uploadBerkasErrors.kategori_dokumen" x-text="uploadBerkasErrors.kategori_dokumen?.[0]"
-                               class="text-xs text-danger font-sans"></p>
-                        </div>
-
-                        {{-- Nomor Dokumen --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Dokumen</label>
-                            <input type="text" x-model="newBerkas.nomor_dokumen"
-                                placeholder="Opsional"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        </div>
-
-                        {{-- Tanggal Terbit --}}
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Terbit</label>
-                            <input type="date" x-model="newBerkas.tanggal_terbit"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
-                        </div>
-
-                        {{-- Keterangan --}}
-                        <div class="space-y-1 sm:col-span-2">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Keterangan</label>
-                            <input type="text" x-model="newBerkas.keterangan"
-                                placeholder="Keterangan opsional"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
-                        </div>
-
-                        {{-- File Upload --}}
-                        <div class="space-y-1 sm:col-span-2">
-                            <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                File Berkas <span class="text-danger">*</span>
-                            </label>
-                            <div class="flex items-center gap-2">
-                                <label for="berkas_upload_input"
-                                    class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10 font-sans">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                                    </svg>
-                                    Pilih File
-                                </label>
-                                <input type="file" id="berkas_upload_input" class="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                                    @change="newBerkas.file = $event.target.files[0] || null">
-                                <span class="min-w-0 flex-1 truncate text-xs font-sans"
-                                    :class="newBerkas.file ? 'text-ink' : 'text-muted'"
-                                    x-text="newBerkas.file ? newBerkas.file.name : 'Belum ada file dipilih'"></span>
-                                <button x-show="newBerkas.file" type="button"
-                                    @click="newBerkas.file = null; document.getElementById('berkas_upload_input').value = ''"
-                                    class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
-                            </div>
-                            <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG/DOC/DOCX, maks. 10 MB.</p>
-                            <p x-show="uploadBerkasErrors.berkas" x-text="uploadBerkasErrors.berkas?.[0]"
-                               class="text-xs text-danger font-sans"></p>
-                        </div>
-                    </div>
-
-                    {{-- Tombol aksi --}}
-                    <div class="flex items-center gap-2 pt-1">
-                        <button type="button" @click="submitUploadBerkas()"
-                            :disabled="isUploadingBerkas"
-                            class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:opacity-60 font-sans">
-                            <svg x-show="isUploadingBerkas" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                            <span x-text="isUploadingBerkas ? 'Mengunggah...' : 'Unggah'"></span>
-                        </button>
-                        <button type="button" @click="showUploadBerkas = false; uploadBerkasError = ''; uploadBerkasErrors = {};"
-                            class="inline-flex items-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted transition hover:bg-soft font-sans">
-                            Batal
-                        </button>
-                    </div>
-                </div>
-                @endcan
-
-                {{-- Tabel Dokumen (Alpine reactive) --}}
-                <x-pegawai.detail.table
-                    name="docs"
-                    :headings="['Nama Dokumen', 'Kategori', 'Nomor Dokumen', 'Tanggal Terbit', 'Ukuran']"
-                    :show-actions="true"
-                >
-                            <template x-if="dokumenList.length === 0">
-                                <tr>
-                                    <td colspan="6" class="px-4 py-6 text-center text-muted font-sans">
-                                        Belum ada dokumen atau berkas yang diunggah untuk pegawai ini.
-                                    </td>
-                                </tr>
-                            </template>
-                            <template x-for="doc in dokumenList" :key="doc.id">
-                                <tr class="transition-colors hover:bg-soft/30">
-                                    <td class="px-4 py-3 max-w-xs">
-                                        <div class="flex items-start gap-2.5">
-                                            <div class="flex h-8 w-6 shrink-0 items-center justify-center rounded border border-border bg-soft p-0.5 shadow-sm">
-                                                <span class="text-[5px] font-bold text-primary uppercase"
-                                                    x-text="(doc.file_path || '').split('.').pop()?.substring(0, 4) || 'file'"></span>
-                                            </div>
-                                            <div class="min-w-0">
-                                                <p class="font-bold font-sans truncate" x-text="doc.nama_dokumen"></p>
-                                                <p x-show="doc.keterangan" class="text-[10px] text-muted truncate" x-text="doc.keterangan"></p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-muted font-sans" x-text="doc.kategori_label"></td>
-                                    <td class="px-4 py-3 text-muted font-mono" x-text="doc.nomor_dokumen || '-'"></td>
-                                    <td class="px-4 py-3 text-muted" x-text="doc.tanggal_dokumen || '-'"></td>
-                                    <td class="px-4 py-3 text-muted" x-text="doc.file_size"></td>
-                                    <td class="px-4 py-3">
-                                        <div class="flex items-center gap-1.5">
-                                            <a :href="doc.detail_url"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                                title="Lihat detail">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                                </svg>
-                                            </a>
-                                            <a :href="doc.download_url"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                                title="Unduh">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                                                </svg>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </template>
-                </x-pegawai.detail.table>
-            </x-pegawai.detail.panel>
+            @include('admin.pegawai.partials.tab-dokumen-sk')
 
         </x-pegawai.detail.shell>
 

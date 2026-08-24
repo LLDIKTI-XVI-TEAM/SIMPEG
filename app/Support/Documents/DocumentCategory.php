@@ -6,6 +6,14 @@ class DocumentCategory
 {
     private const PIMPINAN_HIDDEN = ['ktp_kk'];
 
+    /**
+     * Kategori lama tetap dikenali sebagai SK agar arsip existing tidak turun ke
+     * Berkas Lainnya. Nilai ini tidak masuk LABELS supaya bukan opsi input baru.
+     */
+    private const LEGACY_SK_LABELS = [
+        'SK' => 'Dokumen SK',
+    ];
+
     public const LABELS = [
         'sk_pengangkatan' => 'SK Pengangkatan',
         'sk_pangkat' => 'SK Kenaikan Pangkat',
@@ -56,8 +64,41 @@ class DocumentCategory
         return array_values(array_diff(self::keys(), self::PIMPINAN_HIDDEN));
     }
 
+    /**
+     * Berkas non-SK yang boleh diunggah dari modal profil pegawai.
+     *
+     * @return list<string>
+     */
+    public static function otherUploadKeys(): array
+    {
+        return ['ijazah', 'ktp_kk', 'lainnya'];
+    }
+
+    public static function isOtherUpload(?string $category): bool
+    {
+        return in_array($category, self::otherUploadKeys(), true);
+    }
+
+    public static function isProtectedSk(?string $category): bool
+    {
+        return in_array($category, [
+            'sk_pengangkatan',
+            'sk_pangkat',
+            'sk_jabatan',
+            'sk_kgb',
+            'sk_hukuman_disiplin',
+            'sk_mutasi',
+            'sk_pensiun',
+            'sk_status_pegawai',
+        ], true) || ($category !== null && array_key_exists($category, self::LEGACY_SK_LABELS));
+    }
+
     public static function label(?string $category): string
     {
-        return self::LABELS[$category] ?? 'Lainnya';
+        if ($category === null) {
+            return 'Lainnya';
+        }
+
+        return self::LABELS[$category] ?? self::LEGACY_SK_LABELS[$category] ?? 'Lainnya';
     }
 }

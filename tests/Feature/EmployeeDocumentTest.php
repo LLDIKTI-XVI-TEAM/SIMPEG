@@ -274,11 +274,11 @@ class EmployeeDocumentTest extends TestCase
         $response = $this->get('/dashboard/dokumen');
 
         $response->assertOk();
-        $response->assertViewHas('pegawaiList');
         $response->assertViewHas('categoryLabels');
+        $response->assertViewMissing('pegawaiList');
     }
 
-    public function test_admin_can_upload_document_via_controller(): void
+    public function test_admin_can_upload_additional_document_from_employee_profile(): void
     {
         Storage::fake('employee_documents');
         Storage::fake('public');
@@ -288,17 +288,16 @@ class EmployeeDocumentTest extends TestCase
         $this->actingAs($user);
         $file = UploadedFile::fake()->create('ijazah.pdf', 100, 'application/pdf');
 
-        $response = $this->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Ijazah Master Tester',
             'nomor_dokumen' => 'IJZ-M-TEST',
             'tanggal_terbit' => '2026-01-01',
             'kategori_dokumen' => 'ijazah',
-            'pegawai_id' => $employee->id,
             'berkas' => $file,
         ]);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHas('success');
+        $response->assertCreated()
+            ->assertJsonPath('document.jenis_dokumen', 'ijazah');
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -439,14 +438,13 @@ class EmployeeDocumentTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->actingAs($user);
-        $response = $this->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Dokumen Tanpa Nomor',
             'kategori_dokumen' => 'lainnya',
-            'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('dokumen.pdf', 100, 'application/pdf'),
         ]);
 
-        $response->assertRedirect('/dashboard/dokumen');
+        $response->assertCreated();
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -464,15 +462,13 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Script Berbahaya',
             'kategori_dokumen' => 'lainnya',
-            'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('script.sh', 5, 'text/x-shellscript'),
         ]);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHasErrors('berkas');
+        $response->assertUnprocessable()->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Script Berbahaya',
@@ -487,15 +483,13 @@ class EmployeeDocumentTest extends TestCase
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
 
         $this->actingAs($user);
-        $response = $this->from('/dashboard/dokumen')->post('/dashboard/dokumen/upload', [
+        $response = $this->postJson("/api/v1/pegawai/{$employee->id}/berkas-lainnya", [
             'nama_dokumen' => 'Dokumen Terlalu Besar',
             'kategori_dokumen' => 'lainnya',
-            'pegawai_id' => $employee->id,
             'berkas' => UploadedFile::fake()->create('terlalu-besar.pdf', 10241, 'application/pdf'),
         ]);
 
-        $response->assertRedirect('/dashboard/dokumen');
-        $response->assertSessionHasErrors('berkas');
+        $response->assertUnprocessable()->assertJsonValidationErrors('berkas');
         $this->assertDatabaseMissing('documents', [
             'employee_id' => $employee->id,
             'nama_dokumen' => 'Dokumen Terlalu Besar',
