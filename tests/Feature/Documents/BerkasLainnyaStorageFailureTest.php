@@ -64,6 +64,69 @@ class BerkasLainnyaStorageFailureTest extends TestCase
         ]);
     }
 
+    public function test_update_menjadwalkan_cleanup_ketika_penghapusan_file_lama_gagal(): void
+    {
+        Queue::fake();
+        $this->actingAsRole('admin_kepegawaian');
+        $document = $this->createBerkas();
+        $oldPath = $document->file_path;
+
+        Log::shouldReceive('warning')->once()->with(
+            'Penghapusan file dokumen pegawai ditunda karena storage gagal.',
+            ['file_path_hash' => hash('sha256', $oldPath)],
+        );
+
+        $this->failNextDelete();
+
+        $this->post("/api/v1/pegawai/{$document->employee_id}/berkas-lainnya/{$document->id}", [
+            '_method' => 'PUT',
+            'nama_dokumen' => 'Surat Keterangan Terbaru',
+            'kategori_dokumen' => 'lainnya',
+            'berkas' => UploadedFile::fake()->create('pengganti.pdf', 60, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('message', 'Berkas berhasil diperbarui.');
+
+        $updated = $document->refresh();
+
+        $this->assertNotSame($oldPath, $updated->file_path);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($updated->file_path);
+        $this->assertDatabaseHas('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_id' => $document->id,
+        ]);
+        Queue::assertPushed(
+            CleanupEmployeeDocumentFileJob::class,
+            fn (CleanupEmployeeDocumentFileJob $job): bool => $job->filePath === $oldPath,
+        );
+    }
+
+    public function test_update_mempertahankan_file_lama_yang_masih_direferensikan(): void
+    {
+        Queue::fake();
+        $this->actingAsRole('admin_kepegawaian');
+        $document = $this->createBerkas();
+        $oldPath = $document->file_path;
+        Document::create([
+            'employee_id' => $document->employee_id,
+            'jenis_dokumen' => 'lainnya',
+            'nama_dokumen' => 'Referensi File Bersama',
+            'file_path' => $oldPath,
+        ]);
+        $this->failNextDelete();
+
+        $this->post("/api/v1/pegawai/{$document->employee_id}/berkas-lainnya/{$document->id}", [
+            '_method' => 'PUT',
+            'nama_dokumen' => 'Surat Keterangan Terbaru',
+            'kategori_dokumen' => 'lainnya',
+            'berkas' => UploadedFile::fake()->create('pengganti.pdf', 60, 'application/pdf'),
+        ], ['Accept' => 'application/json'])->assertOk();
+
+        Storage::disk(Document::STORAGE_DISK)->assertExists($oldPath);
+        Queue::assertNotPushed(CleanupEmployeeDocumentFileJob::class);
+    }
+
     public function test_upload_menolak_berkas_baru_ketika_penulisan_disk_gagal(): void
     {
         $this->actingAsRole('admin_kepegawaian');

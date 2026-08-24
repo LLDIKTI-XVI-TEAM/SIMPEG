@@ -7,6 +7,7 @@ use App\Actions\Documents\Concerns\InteractsWithEmployeeDocumentStorage;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Services\AuditService;
+use App\Services\Documents\EmployeeDocumentFileCleanupService;
 use App\Services\TransactionSideEffectManager;
 use App\Support\Documents\BerkasLainnyaMutationGuard;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class UpdateBerkasLainnyaAction
     public function __construct(
         private readonly TransactionSideEffectManager $sideEffects,
         private readonly BerkasLainnyaMutationGuard $guard,
+        private readonly EmployeeDocumentFileCleanupService $fileCleanup,
     ) {}
 
     /**
@@ -112,10 +114,8 @@ class UpdateBerkasLainnyaAction
         }
 
         if ($replacementPath !== null && $oldFilePath !== $replacementPath) {
-            $deleteOldFile = function () use ($disk, $oldFilePath): void {
-                if (! $this->guard->fileIsStillReferenced($oldFilePath)) {
-                    $disk->delete($oldFilePath);
-                }
+            $deleteOldFile = function () use ($oldFilePath): void {
+                $this->fileCleanup->deleteOrScheduleRetry($oldFilePath);
             };
 
             if (! $this->sideEffects->afterCommit($deleteOldFile)) {

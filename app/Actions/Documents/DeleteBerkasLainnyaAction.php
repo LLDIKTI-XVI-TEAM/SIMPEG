@@ -3,16 +3,14 @@
 namespace App\Actions\Documents;
 
 use App\Actions\Documents\Concerns\BuildsDocumentAuditPayload;
-use App\Jobs\CleanupEmployeeDocumentFileJob;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Services\AuditService;
+use App\Services\Documents\EmployeeDocumentFileCleanupService;
 use App\Services\TransactionSideEffectManager;
 use App\Support\Documents\BerkasLainnyaMutationGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class DeleteBerkasLainnyaAction
 {
@@ -21,6 +19,7 @@ class DeleteBerkasLainnyaAction
     public function __construct(
         private readonly TransactionSideEffectManager $sideEffects,
         private readonly BerkasLainnyaMutationGuard $guard,
+        private readonly EmployeeDocumentFileCleanupService $fileCleanup,
     ) {}
 
     /**
@@ -57,19 +56,7 @@ class DeleteBerkasLainnyaAction
         });
 
         $deleteFile = function () use ($filePath): void {
-            if ($this->guard->fileIsStillReferenced($filePath)) {
-                return;
-            }
-
-            if (Storage::disk(Document::STORAGE_DISK)->delete($filePath)) {
-                return;
-            }
-
-            // Metadata sudah commit; queue memulihkan kegagalan I/O tanpa mengekspos path privat.
-            Log::warning('Penghapusan file dokumen pegawai ditunda karena storage gagal.', [
-                'file_path_hash' => hash('sha256', $filePath),
-            ]);
-            CleanupEmployeeDocumentFileJob::dispatch($filePath);
+            $this->fileCleanup->deleteOrScheduleRetry($filePath);
         };
 
         if (! $this->sideEffects->afterCommit($deleteFile)) {
