@@ -13,6 +13,7 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
+use App\Services\EmployeeDocumentStatusService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Model;
@@ -34,6 +35,7 @@ class Show extends Component
 
     public function render(
         EmployeeHistoryAttachmentService $attachments,
+        EmployeeDocumentStatusService $documentStatusService,
         PrepareEmployeeDocumentRowsAction $prepareDocuments,
     ) {
         $p = Employee::with([
@@ -102,7 +104,12 @@ class Show extends Component
 
         $this->prepareHistoryAttachmentDownloadUrls($p, $attachments);
         $documentRows = $prepareDocuments->execute($p);
-        $documentSkRows = $documentRows['sk'];
+        // Matriks aktif harus menjadi sumber tunggal tampilan dan penilaian
+        // dokumen wajib pada profil, sama seperti daftar dan endpoint status.
+        $documentStatus = $documentStatusService->summarize($p);
+        // Arsip SK tetap ditampilkan sebagai record read-only dan tidak pernah
+        // menjadi sumber hitungan kelengkapan di luar kalkulator kanonis.
+        $archivedSkRows = $documentRows['sk'];
         $otherDocumentRows = $documentRows['others'];
 
         // Snapshot status adalah sumber utama. Riwayat latest hanya menjadi fallback
@@ -120,7 +127,7 @@ class Show extends Component
             (string) $p->educationHistories->count()
         );
 
-        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory', 'pendidikanCacheVersion', 'documentSkRows', 'otherDocumentRows'));
+        return view('admin.pegawai.show', compact('p', 'golonganOptions', 'jabatanOptions', 'jenisJabatanOptions', 'unitKerjaOptions', 'eselonOptions', 'jenjangOptions', 'programStudiOptions', 'educationProgramStudiOptions', 'estimasiTanggalPensiun', 'currentSupervisor', 'currentSupervisorPosition', 'latestRank', 'latestPosition', 'selectedSupervisorId', 'selectedSupervisorName', 'statusPresentation', 'latestStatusHistory', 'pendidikanCacheVersion', 'documentStatus', 'archivedSkRows', 'otherDocumentRows'));
     }
 
     /**

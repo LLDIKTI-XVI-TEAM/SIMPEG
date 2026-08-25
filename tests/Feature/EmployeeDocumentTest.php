@@ -16,6 +16,7 @@ use App\Models\RefUnitKerja;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Database\Seeders\SkRequirementSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -32,8 +33,8 @@ class EmployeeDocumentTest extends TestCase
         parent::setUp();
 
         $this->seed(ReferenceSeeder::class);
+        $this->seed(SkRequirementSeeder::class);
         $this->seed(RbacSeeder::class);
-
     }
 
     public function test_rank_history_creation_syncs_to_documents_table(): void

@@ -126,7 +126,6 @@
         isDeletingBerkas: false,
         deleteBerkasError: '',
         deletingBerkas: null,
-        skList: {{ \Illuminate\Support\Js::from($documentSkRows) }},
         berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
 
         clearDocumentArchiveCache() {
@@ -919,6 +918,12 @@
 
                     if (['disiplin', 'kgb', 'jabatan', 'pangkat', 'pendidikan'].includes(this.modalType)) {
                         this.clearDocumentArchiveCache();
+                    }
+
+                    // Matriks dihitung ulang di server dari riwayat resmi. Render
+                    // ulang komponen agar status dan arsip tidak memakai snapshot lama.
+                    if (['kgb', 'jabatan', 'pangkat'].includes(this.modalType)) {
+                        await this.$wire.$refresh();
                     }
                     
                     this.showModal = false;

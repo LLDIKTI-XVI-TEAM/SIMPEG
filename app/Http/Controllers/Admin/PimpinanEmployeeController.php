@@ -12,6 +12,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Services\Documents\SkRequirementMatrixVersionService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,8 +22,11 @@ class PimpinanEmployeeController extends Controller
     /** @var list<string> */
     private const HISTORY_ATTACHMENT_TYPES = ['rank', 'position', 'salary', 'appointment', 'education'];
 
-    public function index(Request $request, ListEmployeesAction $listEmployees)
-    {
+    public function index(
+        Request $request,
+        ListEmployeesAction $listEmployees,
+        SkRequirementMatrixVersionService $matrixVersion,
+    ) {
         $filters = [
             'search' => trim((string) $request->query('search', '')),
             'golongan' => trim((string) $request->query('golongan', '')),
@@ -59,6 +63,7 @@ class PimpinanEmployeeController extends Controller
             ])
             ->all();
         $isReadOnly = true;
+        $skRequirementVersion = $matrixVersion->current();
 
         $golonganOptions = Employee::query()
             ->whereNotNull('golongan_terakhir')
@@ -89,6 +94,7 @@ class PimpinanEmployeeController extends Controller
             'employeeShowUrlPrefix',
             'serverRenderedDetailLinks',
             'isReadOnly',
+            'skRequirementVersion',
         ));
     }
 

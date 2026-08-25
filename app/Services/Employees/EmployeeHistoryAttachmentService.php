@@ -37,6 +37,9 @@ class EmployeeHistoryAttachmentService
         $paths = collect($paths)
             ->filter(fn (mixed $path): bool => is_string($path) && $path !== '')
             ->unique()
+            // Path yang sudah diperiksa disimpan, termasuk hasil tanpa metadata,
+            // agar kalkulasi banyak pegawai tidak mengulang query yang sama.
+            ->reject(fn (string $path): bool => array_key_exists($path, $this->documentReferences))
             ->values();
         if ($paths->isEmpty()) {
             return;

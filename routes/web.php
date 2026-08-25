@@ -43,6 +43,7 @@ use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SkRequirementController;
 use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
@@ -364,6 +365,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/pegawai', Index::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
         ->name('data-pegawai');
+    Route::post('/pegawai/sk-requirements', [SkRequirementController::class, 'update'])
+        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:sk_requirements.manage'])
+        ->name('sk-requirements.update');
     Route::get('/pegawai/create', Create::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
         ->name('pegawai.create');

@@ -611,6 +611,27 @@ class EmployeeShowTest extends TestCase
             ->assertSee("unit: h.unit_kerja?.nama ?? '-',", false);
     }
 
+    public function test_detail_page_refreshes_document_matrix_after_relevant_history_is_created(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $submitForm = Str::of($content)
+            ->after('async submitForm()')
+            ->before('} catch (error)')
+            ->toString();
+
+        $this->assertStringContainsString(
+            "if (['kgb', 'jabatan', 'pangkat'].includes(this.modalType)) {",
+            $submitForm,
+        );
+        $this->assertStringContainsString('await this.$wire.$refresh();', $submitForm);
+    }
+
     public function test_detail_page_formats_position_history_dates_in_table(): void
     {
         $employee = $this->employeeWithReferences();

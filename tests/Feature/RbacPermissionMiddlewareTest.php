@@ -53,13 +53,14 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->seed(RbacSeeder::class);
 
         // Seeder gabungan mencakup permission operasional, cuti, data referensi, dan simulasi role.
-        $this->assertSame(39, Permission::count());
+        $this->assertSame(40, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
         );
         $this->assertTrue(Permission::where('name', 'employees.deactivate')->exists());
         $this->assertTrue(Permission::where('name', 'employees.restore')->exists());
+        $this->assertTrue(Permission::where('name', 'sk_requirements.manage')->exists());
     }
 
     public function test_reference_table_permission_only_belongs_to_super_admin(): void

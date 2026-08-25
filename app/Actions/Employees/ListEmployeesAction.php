@@ -2,13 +2,16 @@
 
 namespace App\Actions\Employees;
 
-use App\Models\Document;
 use App\Models\Employee;
+use App\Services\EmployeeDocumentStatusService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\Storage;
 
 class ListEmployeesAction
 {
+    public function __construct(
+        private readonly EmployeeDocumentStatusService $documentStatus,
+    ) {}
+
     /**
      * Mengambil daftar pegawai dengan filter default hanya pegawai aktif.
      *
@@ -29,7 +32,7 @@ class ListEmployeesAction
             $employees->onlyTrashed();
         }
 
-        return $employees
+        $paginator = $employees
             ->select([
                 'id',
                 'nama_lengkap',
@@ -44,20 +47,18 @@ class ListEmployeesAction
             ->with([
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,nama',
-                // Semua riwayat dibutuhkan untuk memeriksa kelengkapan SK, bukan
-                // hanya riwayat terbaru yang sebelumnya diperlukan oleh tabel.
-                'rankHistories:id,employee_id,file_sk',
+                'rankHistories:id,employee_id,no_sk,tanggal_sk,tmt_pangkat,file_sk,is_latest,created_at',
                 'positionHistories' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id'])
+                    ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])
                     ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
-                'salaryHistories:id,employee_id,file_sk',
+                'salaryHistories:id,employee_id,no_sk,tanggal_sk,tmt_kgb,file_sk,is_latest,created_at',
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'file_sk', 'tmt_pengangkatan'])
-                    ->orderByDesc('tmt_pengangkatan'),
-                // Berkas lainnya (KTP, KK, mutasi, dll) — hanya ambil field yang dibutuhkan
-                'documents:id,employee_id,file_path',
+                    ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                    ->orderByDesc('tmt_pengangkatan')
+                    ->orderByDesc('created_at'),
+                'documents:id,employee_id,jenis_dokumen,nama_dokumen,nomor_dokumen,tanggal_dokumen,file_path,keterangan,created_at',
             ])
             ->when(
                 $validated['search'] ?? null,
@@ -113,8 +114,11 @@ class ListEmployeesAction
             )
             ->orderBy($sort, $direction)
             ->paginate($perPage)
-            ->withQueryString()
-            ->through(fn (Employee $p) => $this->toTableRow($p));
+            ->withQueryString();
+
+        $this->documentStatus->primeForEmployees($paginator->getCollection());
+
+        return $paginator->through(fn (Employee $p) => $this->toTableRow($p));
     }
 
     /**
@@ -128,6 +132,8 @@ class ListEmployeesAction
         $statusNama = $p->statusPegawai?->nama ?? $p->status_aktif;
         $tmt = $currentPosition?->tmt_jabatan ?? $p->appointments->first()?->tmt_pengangkatan;
 
+        $documentStatus = $this->documentStatus->summarize($p);
+
         return [
             'id' => $p->id,
             'nama_lengkap' => $p->nama_lengkap,
@@ -139,51 +145,13 @@ class ListEmployeesAction
             'jenis_pegawai' => $p->jenisPegawai?->nama ?? '-',
             'status_nama' => $statusNama,
             'status_key' => strtolower((string) $statusNama),
-            'is_lengkap' => $this->checkDocumentStatus($p),
+            // Key is_lengkap dipertahankan karena sudah menjadi kontrak tabel;
+            // nilainya adalah key status, bukan boolean profil pegawai.
+            'is_lengkap' => $documentStatus['status_kelengkapan'],
+            'dokumen_is_dinilai' => $documentStatus['is_dinilai'],
+            'dokumen_tersedia_count' => $documentStatus['tersedia_count'],
+            'dokumen_total_wajib' => $documentStatus['total_wajib'],
             'tmt' => $tmt?->format('d/m/Y'),
         ];
-    }
-
-    /**
-     * Mengembalikan status kelengkapan dokumen pegawai dalam 4 kondisi:
-     * - 'kosong'       : Tidak ada riwayat SK maupun berkas lainnya di database.
-     * - 'tersedia'     : Tidak ada riwayat SK, tapi ada berkas lainnya (KTP, KK, mutasi, dll)
-     *                    yang filenya tersedia di storage.
-     * - 'tidak_lengkap': Ada riwayat SK di database, namun ada file_sk yang kosong
-     *                    atau file fisiknya tidak ditemukan di storage.
-     * - 'lengkap'      : Semua riwayat SK memiliki file_sk dan file fisiknya tersedia di storage.
-     */
-    private function checkDocumentStatus(Employee $employee): string
-    {
-        $histories = $employee->rankHistories
-            ->concat($employee->positionHistories)
-            ->concat($employee->salaryHistories)
-            ->concat($employee->appointments);
-
-        // Tidak ada riwayat SK apapun
-        if ($histories->isEmpty()) {
-            // Cek apakah ada berkas lain (KTP, KK, mutasi, dll) yang filenya tersedia
-            $disk = Storage::disk(Document::STORAGE_DISK);
-            $adaBerkasLainDenganFile = $employee->documents
-                ->contains(fn ($doc): bool => filled($doc->file_path) && $disk->exists($doc->file_path));
-
-            return $adaBerkasLainDenganFile ? 'tersedia' : 'kosong';
-        }
-
-        $filePaths = $histories->pluck('file_sk');
-
-        // Ada riwayat tapi salah satu file_sk NULL/kosong → tidak lengkap
-        if ($filePaths->contains(fn ($path): bool => blank($path))) {
-            return 'tidak_lengkap';
-        }
-
-        $disk = Storage::disk(Document::STORAGE_DISK);
-
-        // Ada file_sk di DB tapi file fisiknya hilang dari storage → tidak lengkap
-        $semuaAdaDiStorage = $filePaths
-            ->unique()
-            ->every(fn (string $path): bool => $disk->exists($path));
-
-        return $semuaAdaDiStorage ? 'lengkap' : 'tidak_lengkap';
     }
 }
