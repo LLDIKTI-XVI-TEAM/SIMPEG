@@ -126,18 +126,11 @@ class HandleKeycloakCallbackAction
             return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
         }
 
-        // Akun development seperti demo-klabat harus sudah dibuat di SIMPEG, tidak dibuat otomatis dari Keycloak.
-        $devUser = $username && $this->isAllowedDevUsername($username)
-            ? User::where('keycloak_username', $username)->first()
-            : null;
-
-        if (! $devUser) {
-            return view('auth.unregistered', [
-                'message' => 'Akun Keycloak belum terdaftar di SIMPEG.',
-            ]);
-        }
-
-        return $this->loginMappedUser($devUser, $keycloakId, $username, $keycloakUser->getName(), $request);
+        // Akun tanpa email terverifikasi tidak memiliki jalur khusus: seluruh login
+        // harus melalui identitas Keycloak asli (akun demo/dev whitelist dihapus).
+        return view('auth.unregistered', [
+            'message' => 'Akun Keycloak belum terdaftar di SIMPEG.',
+        ]);
     }
 
     private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse
@@ -279,16 +272,6 @@ class HandleKeycloakCallbackAction
         }
 
         return $value;
-    }
-
-    private function isAllowedDevUsername(string $username): bool
-    {
-        $allowedUsernames = array_map(
-            fn (string $value): string => strtolower(trim($value)),
-            config('services.keycloak.dev_usernames', []),
-        );
-
-        return in_array(strtolower(trim($username)), $allowedUsernames, true);
     }
 
     /**

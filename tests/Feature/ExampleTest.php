@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use Database\Seeders\DemoSsoUserSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -37,15 +36,13 @@ class ExampleTest extends TestCase
         );
     }
 
-    public function test_dev_login_directly_logs_in_default_demo_user(): void
+    public function test_dev_login_route_is_removed(): void
     {
-        $this->seed(DemoSsoUserSeeder::class);
-
+        // Seluruh login wajib melalui identitas Keycloak asli; jalur demo/dev-login dihapus.
         $response = $this->get('/dev-login');
 
-        $response->assertRedirect(route('dashboard'));
-        $this->assertAuthenticated();
-        $this->assertSame('super_admin', auth()->user()->role);
+        $response->assertNotFound();
+        $this->assertGuest();
     }
 
     public function test_keycloak_login_redirects_to_keycloak(): void

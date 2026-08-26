@@ -72,9 +72,6 @@ Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
     ->name('cuti.verify');
 
 if (app()->environment(['local', 'testing'])) {
-    Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
-    Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
-
     Route::get('/map-dummy-employee', function () {
         $user = auth()->user();
         if ($user) {

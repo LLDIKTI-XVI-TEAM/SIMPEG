@@ -9,7 +9,6 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
@@ -603,9 +602,11 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseCount('users', 0);
     }
 
-    public function test_missing_email_with_whitelisted_dev_user_can_login(): void
+    public function test_missing_email_is_denied_even_for_existing_local_user(): void
     {
-        $user = User::factory()->superAdmin()->create([
+        // Jalur whitelist dev-username dihapus: seluruh login wajib via identitas
+        // Keycloak asli; akun lokal tanpa email terverifikasi tidak diotorisasi.
+        User::factory()->superAdmin()->create([
             'email' => 'demo-klabat@dev.local',
             'keycloak_username' => 'demo-klabat',
             'employee_id' => null,
@@ -621,38 +622,12 @@ class KeycloakCallbackMappingTest extends TestCase
 
         $response = $this->get('/auth/keycloak/callback');
 
-        $response->assertRedirect(route('dashboard'));
-        $this->assertAuthenticatedAs($user->fresh());
-        $this->assertDatabaseHas('users', [
-            'id' => $user->id,
-            'keycloak_id' => 'kc-demo',
-            'keycloak_username' => 'demo-klabat',
-            'employee_id' => null,
-            'role' => 'super_admin',
-        ]);
-    }
-
-    public function test_missing_email_with_non_allowlisted_local_user_is_denied(): void
-    {
-        User::factory()->superAdmin()->create([
-            'email' => 'demo-role@dev.local',
-            'keycloak_username' => 'demo-role',
-            'employee_id' => null,
-        ]);
-
-        $this->fakeKeycloakUser([
-            'id' => 'kc-demo-role',
-            'nickname' => 'demo-role',
-            'name' => 'Demo Role',
-            'email' => null,
-            'raw' => ['preferred_username' => 'demo-role'],
-        ]);
-
-        $response = $this->get('/auth/keycloak/callback');
-
         $response->assertOk();
         $response->assertSee('Akun Keycloak belum terdaftar');
         $this->assertGuest();
+        $this->assertDatabaseMissing('users', [
+            'keycloak_id' => 'kc-demo',
+        ]);
     }
 
     public function test_duplicate_employee_match_is_denied(): void
@@ -707,20 +682,22 @@ class KeycloakCallbackMappingTest extends TestCase
 
     public function test_keycloak_role_claim_does_not_change_simpeg_role(): void
     {
-        config()->set('services.keycloak.dev_usernames', ['demo-role']);
+        // Bootstrap user SIMPEG pertama dulu agar akun SSO baru mendapat default pegawai.
+        User::factory()->superAdmin()->create();
 
-        $user = User::factory()->pegawai()->create([
-            'email' => 'demo-role@dev.local',
-            'keycloak_username' => 'demo-role',
-            'employee_id' => null,
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Demo Role',
+            'email' => 'demo-role@example.com',
         ]);
 
         $this->fakeKeycloakUser([
             'id' => 'kc-role',
             'nickname' => 'demo-role',
             'name' => 'Demo Role',
-            'email' => null,
+            'email' => 'demo-role@example.com',
             'raw' => [
+                'email' => 'demo-role@example.com',
+                'email_verified' => true,
                 'preferred_username' => 'demo-role',
                 'realm_access' => ['roles' => ['super_admin']],
             ],
@@ -730,7 +707,10 @@ class KeycloakCallbackMappingTest extends TestCase
 
         $response->assertRedirect(route('dashboard'));
         $this->assertDatabaseHas('users', [
-            'id' => $user->id,
+            'email' => 'demo-role@example.com',
+            'keycloak_id' => 'kc-role',
+            'employee_id' => $employee->id,
+            // Claim role Keycloak (super_admin) tidak pernah menjadi sumber RBAC SIMPEG.
             'role' => 'pegawai',
         ]);
     }
@@ -777,24 +757,14 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_database_seeder_creates_all_configured_demo_role_users(): void
+    public function test_database_seeder_does_not_create_demo_role_users(): void
     {
+        // DemoSsoUserSeeder dihapus: seluruh login wajib melalui identitas Keycloak asli,
+        // sehingga seeder tidak boleh menanam akun demo dengan password lokal.
         $this->seed(DatabaseSeeder::class);
 
-        $expectedUsers = [
-            'demo-klabat' => 'super_admin',
-            'demo-klabat-kepeg' => 'admin_kepegawaian',
-            'demo-klabat-kabag' => 'kepala_bagian',
-            'demo-klabat-pimpinan' => 'pimpinan',
-            'demo-klabat-pegawai' => 'pegawai',
-        ];
-
-        foreach ($expectedUsers as $username => $role) {
-            $user = User::where('keycloak_username', $username)->first();
-
-            $this->assertNotNull($user, "Demo user {$username} should exist.");
-            $this->assertSame($role, $user->role);
-            $this->assertTrue(Hash::check($username, $user->password), "Demo user {$username} should use matching password.");
+        foreach (['demo-klabat', 'demo-klabat-kepeg', 'demo-klabat-kabag', 'demo-klabat-pimpinan', 'demo-klabat-pegawai'] as $username) {
+            $this->assertNull(User::where('keycloak_username', $username)->first(), "Demo user {$username} tidak boleh ada.");
         }
     }
 

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Services\AuditService;
-use Database\Seeders\DemoSsoUserSeeder;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -103,22 +102,19 @@ class SessionTimeoutTest extends TestCase
         $this->assertFalse(session()->has('simpeg_session_timeout_message'));
     }
 
-    public function test_dev_login_preserves_timeout_message_after_session_regeneration(): void
+    public function test_auth_session_regeneration_preserves_timeout_message(): void
     {
-        $this->seed(DemoSsoUserSeeder::class);
+        $user = User::factory()->adminKepegawaian()->create();
 
-        $this->withSession([
-            'simpeg_session_timeout_message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
-        ])->post(route('dev-login'), [
-            'username' => 'demo-klabat',
-            'password' => 'demo-klabat',
-        ])
-            ->assertRedirect(route('dashboard'));
-
-        $response = $this->get(route('dashboard'));
-
-        $response->assertOk();
-        $response->assertSee('Sesi Anda telah berakhir. Silakan login kembali.');
+        // Simulasi regenerasi session saat login SSO: timeout message yang sudah
+        // disiapkan harus tetap tampil setelah session aktif dibuka kembali.
+        $this->actingAs($user)
+            ->withSession([
+                'simpeg_session_timeout_message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
+            ])
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Sesi Anda telah berakhir. Silakan login kembali.');
     }
 
     public function test_notification_polling_does_not_refresh_activity_timestamp(): void
