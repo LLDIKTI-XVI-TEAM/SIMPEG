@@ -7,10 +7,14 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
+use App\Services\Cuti\LeaveUsageReconciliationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -28,35 +32,34 @@ class LeaveBalancePreviewTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     public function test_pegawai_menerima_preview_saldo_milik_sendiri_pada_tahun_tanggal_mulai(): void
     {
         $employee = $this->employeeWithAppointment('2024-01-01');
         $otherEmployee = $this->employeeWithAppointment('2024-01-01');
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
-        $balance = LeaveBalance::create([
-            'employee_id' => $employee->id,
-            'tahun' => 2027,
-            'jatah_awal' => 12,
-            'carry_over' => 3,
-            'terpakai' => 2,
-            'sisa' => 13,
-            'sisa_n2' => 0,
-            'sisa_n1' => 3,
-            'sisa_tahun_berjalan' => 10,
-            'terpakai_tahun_berjalan' => 2,
-            'hangus' => 0,
+        $admin = User::factory()->adminKepegawaian()->create();
+        RefJenisCuti::query()->create([
+            'nama' => 'Cuti Tahunan',
+            'code' => 'tahunan',
+            'mengurangi_saldo_tahunan' => true,
+            'khusus_pns' => false,
         ]);
-        LeaveBalanceLedger::create([
-            'employee_id' => $employee->id,
-            'leave_balance_id' => $balance->id,
-            'tahun' => 2027,
-            'event_type' => LeaveBalanceLedger::EVENT_MANUAL_ADJUSTMENT,
-            'amount' => 3,
-            'source_year' => 2027,
-            'reason' => 'Koreksi administratif untuk pengujian preview.',
-            'created_by' => $user->id,
-            'occurred_at' => now(),
-        ]);
+        Carbon::setTestNow('2027-08-04 09:00:00');
+        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+            $employee,
+            2027,
+            [2025 => 12, 2026 => 9, 2027 => 2],
+            now(config('app.timezone')),
+            'Fixture fakta pemakaian untuk preview saldo.',
+            $admin,
+        );
         LeaveBalance::create([
             'employee_id' => $otherEmployee->id,
             'tahun' => 2027,
@@ -83,17 +86,17 @@ class LeaveBalancePreviewTest extends TestCase
             ->assertJsonPath('data.rule_5_active', false)
             ->assertJsonPath('data.eligible', true)
             ->assertJsonPath('data.jatah_dasar', 12)
-            ->assertJsonPath('data.carry_over', 3)
+            ->assertJsonPath('data.carry_over', 1)
             ->assertJsonPath('data.terpakai_final', 2)
-            ->assertJsonPath('data.koreksi_administratif', 3)
             ->assertJsonPath('data.saldo_aktual', 13)
             ->assertJsonPath('data.dialokasikan_aktif', 0)
             ->assertJsonPath('data.saldo_dapat_diajukan', 13)
-            ->assertJsonPath('data.bucket.n1', 3)
-            ->assertJsonPath('data.bucket.current', 10);
+            ->assertJsonPath('data.bucket.n1', 1)
+            ->assertJsonPath('data.bucket.current', 12)
+            ->assertJsonMissingPath('data.koreksi_administratif');
     }
 
-    public function test_preview_entitlement_virtual_tidak_menulis_saldo_hanya_karena_form_diminta(): void
+    public function test_preview_tanpa_rekonsiliasi_gagal_tertutup_dan_tidak_menulis_projection(): void
     {
         $employee = $this->employeeWithAppointment('2024-01-01');
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
@@ -101,10 +104,10 @@ class LeaveBalancePreviewTest extends TestCase
         $this->actingAs($user)
             ->getJson(route('api.v1.cuti.balance-preview', ['tanggal_mulai' => '2027-02-03']))
             ->assertOk()
-            ->assertJsonPath('data.eligible', true)
-            ->assertJsonPath('data.jatah_dasar', 12)
-            ->assertJsonPath('data.saldo_aktual', 12)
-            ->assertJsonPath('data.saldo_dapat_diajukan', 12);
+            ->assertJsonPath('data.eligible', false)
+            ->assertJsonPath('data.jatah_dasar', 0)
+            ->assertJsonPath('data.saldo_aktual', 0)
+            ->assertJsonPath('data.saldo_dapat_diajukan', 0);
 
         $this->assertDatabaseMissing('leave_balances', [
             'employee_id' => $employee->id,
@@ -172,7 +175,7 @@ class LeaveBalancePreviewTest extends TestCase
             'mengurangi_saldo_tahunan' => false,
             'khusus_pns' => true,
         ]);
-        LeaveRequest::create([
+        $largeRequest = LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => $large->id,
             'tanggal_mulai' => '2027-03-01',
@@ -181,6 +184,20 @@ class LeaveBalancePreviewTest extends TestCase
             'alasan' => 'Cuti Besar final.',
             'status' => 'disetujui',
         ]);
+        LeaveUsageRecord::query()->create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $large->id,
+            'source_type' => LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
+            'leave_request_id' => $largeRequest->id,
+            'usage_year' => 2027,
+            'effective_date' => '2027-03-01',
+            'start_date' => '2027-03-01',
+            'end_date' => '2027-03-31',
+            'workdays' => 20,
+            'administrative_note' => 'Fixture fakta Cuti Besar final.',
+            'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+            'recorded_by' => $user->id,
+        ]);
         $beforeLedger = LeaveBalanceLedger::query()->count();
 
         $this->actingAs($user)
@@ -188,7 +205,7 @@ class LeaveBalancePreviewTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['data' => [
                 'tahun', 'tanggal_acuan', 'eligible', 'jatah_dasar', 'carry_over',
-                'terpakai_final', 'koreksi_administratif', 'saldo_aktual',
+                'terpakai_final', 'saldo_aktual',
                 'dialokasikan_aktif', 'dilindungi_penangguhan_dinas', 'saldo_dapat_diajukan', 'rule_5_active',
                 'bucket' => ['n2', 'n1', 'current'],
             ]])
@@ -253,7 +270,8 @@ class LeaveBalancePreviewTest extends TestCase
 
     private function employeeWithAppointment(string $tmt): Employee
     {
-        $employee = Employee::factory()->create();
+        $jenisPns = RefJenisPegawai::query()->firstOrCreate(['nama' => 'PNS']);
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $jenisPns->id]);
         Appointment::create([
             'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',

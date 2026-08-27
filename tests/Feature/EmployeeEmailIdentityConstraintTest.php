@@ -8,10 +8,12 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
+#[Group('serial')]
 class EmployeeEmailIdentityConstraintTest extends TestCase
 {
     use DatabaseMigrations;
@@ -85,28 +87,36 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
         $paths = $this->racePaths();
         $process = $this->migrationWorker($paths);
         $workerBlocked = false;
-
-        DB::beginTransaction();
+        $writerTransactionOpen = false;
 
         try {
-            // UPDATE memperoleh ROW EXCLUSIVE sehingga SHARE lock migrasi harus menunggu.
-            DB::table('employees')->where('id', $first->id)->update(['updated_at' => now()]);
             $process->start();
-            $this->assertTrue($this->waitForFile($paths['pid'], 10_000), 'Worker migrasi gagal menulis PID backend.');
+            $workerPid = $this->waitForWorkerPid($process, $paths['pid'], 30_000);
 
-            $workerBlocked = $this->waitForWorkerLock((int) File::get($paths['pid']), 5_000);
-        } finally {
-            DB::rollBack();
-        }
+            DB::beginTransaction();
+            $writerTransactionOpen = true;
 
-        $process->wait();
+            try {
+                // UPDATE memperoleh ROW EXCLUSIVE sehingga SHARE lock migrasi harus menunggu.
+                DB::table('employees')->where('id', $first->id)->update(['updated_at' => now()]);
+                File::put($paths['start'], 'mulai');
 
-        try {
+                $workerBlocked = $this->waitForWorkerLock($workerPid, $paths['result'], 5_000);
+            } finally {
+                DB::rollBack();
+                $writerTransactionOpen = false;
+            }
+
+            $process->wait();
+
             $this->assertTrue(
                 $workerBlocked,
-                'Migrasi harus menunggu lock writer sebelum memeriksa duplikasi email.',
+                'Migrasi harus menunggu lock writer sebelum memeriksa duplikasi email. '.$this->processDiagnostic($process),
             );
-            $this->assertTrue($this->waitForFile($paths['result'], 1_000), $process->getErrorOutput());
+            $this->assertTrue(
+                $this->waitForFile($paths['result'], 1_000),
+                'Worker migrasi tidak menulis hasil. '.$this->processDiagnostic($process),
+            );
 
             $outcome = json_decode(File::get($paths['result']), true, flags: JSON_THROW_ON_ERROR);
             $this->assertFalse($outcome['ok']);
@@ -122,6 +132,14 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
             );
             $this->assertFalse($this->uniqueIndexExists());
         } finally {
+            if ($writerTransactionOpen) {
+                DB::rollBack();
+            }
+
+            if ($process->isRunning()) {
+                $process->stop(1);
+            }
+
             DB::table('employees')->where('id', $second->id)->update([
                 'email_pribadi' => 'alamat.kedua@example.com',
             ]);
@@ -162,7 +180,7 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
         }
     }
 
-    /** @return array{pid:string,result:string} */
+    /** @return array{pid:string,start:string,result:string} */
     private function racePaths(): array
     {
         $directory = storage_path('framework/testing/email-identity-migration-'.Str::uuid());
@@ -171,11 +189,12 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
 
         return [
             'pid' => $directory.'/pid',
+            'start' => $directory.'/start',
             'result' => $directory.'/result.json',
         ];
     }
 
-    /** @param array{pid:string,result:string} $paths */
+    /** @param array{pid:string,start:string,result:string} $paths */
     private function migrationWorker(array $paths): Process
     {
         $script = <<<'PHP'
@@ -183,17 +202,29 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
             $app = require $argv[1].'/bootstrap/app.php';
             $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
             $pid = Illuminate\Support\Facades\DB::selectOne('select pg_backend_pid() as pid')->pid;
-            file_put_contents($argv[2], (string) $pid);
+            file_put_contents($argv[2], (string) $pid, LOCK_EX);
+
+            $signalDeadline = microtime(true) + 45;
+
+            while (! is_file($argv[3])) {
+                if (microtime(true) >= $signalDeadline) {
+                    $outcome = ['ok' => false, 'message' => 'Worker tidak menerima sinyal mulai.'];
+                    file_put_contents($argv[4], json_encode($outcome, JSON_THROW_ON_ERROR), LOCK_EX);
+                    exit(2);
+                }
+
+                usleep(10_000);
+            }
 
             try {
-                $migration = require $argv[4];
+                $migration = require $argv[5];
                 $migration->up();
                 $outcome = ['ok' => true, 'message' => null];
             } catch (Throwable $exception) {
                 $outcome = ['ok' => false, 'message' => $exception->getMessage()];
             }
 
-            file_put_contents($argv[3], json_encode($outcome, JSON_THROW_ON_ERROR));
+            file_put_contents($argv[4], json_encode($outcome, JSON_THROW_ON_ERROR), LOCK_EX);
             PHP;
 
         return new Process([
@@ -202,9 +233,10 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
             $script,
             base_path(),
             $paths['pid'],
+            $paths['start'],
             $paths['result'],
             database_path('migrations/2026_08_12_100000_add_email_pribadi_unique_to_employees_table.php'),
-        ], base_path(), timeout: 30);
+        ], base_path(), timeout: 90);
     }
 
     private function waitForFile(string $path, int $timeoutMilliseconds): bool
@@ -224,7 +256,35 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
         return File::exists($path);
     }
 
-    private function waitForWorkerLock(int $workerPid, int $timeoutMilliseconds): bool
+    /** Menunggu worker selesai bootstrap tanpa mencampurkan waktu startup ke pembuktian lock. */
+    private function waitForWorkerPid(Process $process, string $path, int $timeoutMilliseconds): int
+    {
+        $deadline = microtime(true) + ($timeoutMilliseconds / 1000);
+
+        do {
+            clearstatcache(true, $path);
+
+            if (File::exists($path)) {
+                $workerPid = filter_var(trim(File::get($path)), FILTER_VALIDATE_INT);
+
+                if (! is_int($workerPid) || $workerPid <= 0) {
+                    throw new RuntimeException('Worker migrasi menulis PID backend yang tidak valid. '.$this->processDiagnostic($process));
+                }
+
+                return $workerPid;
+            }
+
+            if (! $process->isRunning()) {
+                throw new RuntimeException('Worker migrasi berhenti sebelum siap. '.$this->processDiagnostic($process));
+            }
+
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+
+        throw new RuntimeException('Worker migrasi belum siap dalam batas waktu. '.$this->processDiagnostic($process));
+    }
+
+    private function waitForWorkerLock(int $workerPid, string $resultPath, int $timeoutMilliseconds): bool
     {
         $deadline = microtime(true) + ($timeoutMilliseconds / 1000);
 
@@ -238,7 +298,7 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
                 return true;
             }
 
-            if ($this->waitForFile($this->racePathsResult(), 0)) {
+            if ($this->waitForFile($resultPath, 0)) {
                 return false;
             }
 
@@ -248,9 +308,20 @@ class EmployeeEmailIdentityConstraintTest extends TestCase
         return false;
     }
 
-    private function racePathsResult(): string
+    /** Menyediakan status proses lengkap agar kegagalan readiness dapat ditindaklanjuti. */
+    private function processDiagnostic(Process $process): string
     {
-        return $this->raceDirectory.'/result.json';
+        $exitCode = $process->getExitCode();
+        $output = trim($process->getOutput());
+        $errorOutput = trim($process->getErrorOutput());
+
+        return sprintf(
+            'status=%s; exit=%s; stdout=%s; stderr=%s',
+            $process->isRunning() ? 'running' : 'stopped',
+            $exitCode === null ? 'n/a' : (string) $exitCode,
+            $output === '' ? '<kosong>' : $output,
+            $errorOutput === '' ? '<kosong>' : $errorOutput,
+        );
     }
 
     private function restoreUniqueIndex(): void

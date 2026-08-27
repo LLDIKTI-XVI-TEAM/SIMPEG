@@ -621,7 +621,7 @@ class CutiFoundationSchemaTest extends TestCase
         $approver = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Uji',
-            'code' => 'tahunan_uji',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -673,7 +673,7 @@ class CutiFoundationSchemaTest extends TestCase
             'employee_id' => $pemohon->id,
             'leave_balance_id' => $saldo->id,
             'tahun' => 2026,
-            'event_type' => 'opening_balance_set',
+            'event_type' => LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED,
             'amount' => 12,
         ]);
         $reservation = LeaveBalanceReservationEvent::create([
@@ -702,7 +702,7 @@ class CutiFoundationSchemaTest extends TestCase
         $this->assertSame($pemohon->id, $leaveCase->employee->id);
         $this->assertSame($jenisCuti->id, $leaveCase->jenisCuti->id);
         $this->assertSame($cuti->id, $leaveCase->leaveRequests->sole()->id);
-        $this->assertTrue($saldo->ledgerEntries()->where('event_type', 'opening_balance_set')->exists());
+        $this->assertTrue($saldo->ledgerEntries()->where('event_type', LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED)->exists());
         $this->assertSame(1, $cuti->balanceReservationEvents()->sum('amount'));
         $this->assertSame($reservation->id, $saldo->reservationEvents()->firstOrFail()->id);
         $this->assertSame('token-uji-fondasi', $cuti->proof->token);
@@ -719,7 +719,7 @@ class CutiFoundationSchemaTest extends TestCase
         $pemohon = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Constraint',
-            'code' => 'tahunan_constraint',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -769,7 +769,7 @@ class CutiFoundationSchemaTest extends TestCase
         $pemohon = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Token',
-            'code' => 'tahunan_token',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -815,7 +815,7 @@ class CutiFoundationSchemaTest extends TestCase
             'employee_id' => $pemohon->id,
             'leave_balance_id' => $saldo->id,
             'tahun' => 2026,
-            'event_type' => 'opening_balance_set',
+            'event_type' => LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED,
             'amount' => 12,
             'dedup_key' => 'saldo-awal-2026',
         ]);
@@ -824,7 +824,7 @@ class CutiFoundationSchemaTest extends TestCase
                 'employee_id' => $pemohon->id,
                 'leave_balance_id' => $saldo->id,
                 'tahun' => 2026,
-                'event_type' => 'opening_balance_set',
+                'event_type' => LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED,
                 'amount' => 12,
                 'dedup_key' => 'saldo-awal-2026',
             ]),
@@ -889,7 +889,7 @@ class CutiFoundationSchemaTest extends TestCase
 
             try {
                 $ledger->forceFill([
-                    'event_type' => LeaveBalanceLedger::EVENT_OPENING_BALANCE_SET,
+                    'event_type' => LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED,
                     'amount' => 99,
                     'reason' => 'Percobaan ubah ledger.',
                 ])->save();
@@ -916,7 +916,7 @@ class CutiFoundationSchemaTest extends TestCase
         $employee = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Reservasi',
-            'code' => 'tahunan_reservasi',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -947,7 +947,7 @@ class CutiFoundationSchemaTest extends TestCase
         $employee = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Reservasi Immutable',
-            'code' => 'tahunan_reservasi_immutable',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);

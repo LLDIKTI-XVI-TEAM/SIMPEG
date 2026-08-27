@@ -63,7 +63,7 @@ class CutiConfigPageTest extends TestCase
             ->assertSee('role="combobox"', false)
             ->assertSee('x-show="false"', false)
             ->assertSee("document.getElementById('employee-search')?.form?.requestSubmit()", false)
-            ->assertSee('@keydown.enter.prevent="selectActive($event)"', false)
+            ->assertSee('@keydown.enter="selectActive($event)"', false)
             ->assertSee(':name="selectedId ? null :', false)
             ->assertSee('x-show="selectedId"', false)
             ->assertSee($pegawai->nama_lengkap)

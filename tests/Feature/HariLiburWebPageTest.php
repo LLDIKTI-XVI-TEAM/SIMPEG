@@ -92,7 +92,8 @@ class HariLiburWebPageTest extends TestCase
         $response->assertSee('Tipe Libur', false);
         $response->assertSee('Buka detail hari libur.', false);
         $response->assertSee('role="dialog"', false);
-        $response->assertSee('@keydown.escape.window="closeCalendarDetail()"', false);
+        $response->assertSee('@keydown.escape.window="if (selectedEvent !== null) { closeCalendarDetail() }"', false);
+        $response->assertDontSee('@keydown.escape.window="closeCalendarDetail()"', false);
         $response->assertSee('trapCalendarDetailFocus($event)', false);
         $response->assertSee('openAddHariLibur()', false);
         $response->assertSee('closeAddHariLibur()', false);

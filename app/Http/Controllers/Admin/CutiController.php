@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\BuildCutiDetailAction;
 use App\Actions\Cuti\DeclineLeaveAction;
+use App\Actions\Cuti\DownloadLeaveAttachmentAction;
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
@@ -17,6 +18,7 @@ use App\Actions\Cuti\ShowCutiRekapAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\ApproveLeaveRequest;
+use App\Http\Requests\Cuti\ListCutiRekapRequest;
 use App\Http\Requests\Cuti\PostponeLeaveRequest;
 use App\Http\Requests\Cuti\RecordDutyPostponementRequest;
 use App\Http\Requests\Cuti\ResubmitLeaveRequestRequest;
@@ -24,6 +26,7 @@ use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -35,9 +38,12 @@ class CutiController extends Controller
         return $action->execute($leaveRequest, request()->user());
     }
 
-    public function rekap(Request $request, ShowCutiRekapAction $action)
+    public function rekap(ListCutiRekapRequest $request, ShowCutiRekapAction $action): View
     {
-        return view('admin.cuti.rekap', $action->execute($request->query()));
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return view('admin.cuti.rekap', $action->execute($request->validated(), $actor));
     }
 
     /**
@@ -57,14 +63,21 @@ class CutiController extends Controller
      * Menampilkan form pengajuan cuti baru.
      * Penyusunan data form (saldo ledger, jenis cuti, kesiapan chain) didelegasikan ke Action agar controller tetap tipis.
      */
-    public function create(PrepareLeaveRequestFormAction $action)
+    public function create(Request $request, PrepareLeaveRequestFormAction $action)
     {
-        $employee = request()->user()?->employee;
+        $employee = $request->user()?->employee;
 
         // Akun tanpa data pegawai tidak boleh mengajukan cuti; tolak di backend, bukan hanya menyembunyikan menu.
         abort_if($employee === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat mengajukan cuti.');
 
-        return view('admin.cuti.form-pengajuan', $action->execute($employee));
+        $selectedLeaveTypeId = $request->old('jenis_cuti_id');
+        $selectedLeaveCaseId = $request->old('leave_request_case_id');
+
+        return view('admin.cuti.form-pengajuan', $action->execute(
+            $employee,
+            is_string($selectedLeaveTypeId) ? $selectedLeaveTypeId : null,
+            is_string($selectedLeaveCaseId) ? $selectedLeaveCaseId : null,
+        ));
     }
 
     /** Menampilkan detail cuti dari konteks baca yang telah diotorisasi Action. */
@@ -74,6 +87,15 @@ class CutiController extends Controller
         $user = $request->user();
 
         return view('admin.cuti.show', $action->execute($id, $user));
+    }
+
+    /** Unduhan lampiran pemohon/read-all didelegasikan ke Action dengan guard kepemilikan. */
+    public function downloadAttachment(LeaveRequest $leaveRequest, Request $request, DownloadLeaveAttachmentAction $action): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $action->forOwnerOrReadAll($leaveRequest, $user);
     }
 
     /**

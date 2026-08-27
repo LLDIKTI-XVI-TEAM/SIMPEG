@@ -39,7 +39,8 @@ class CutiRbacTest extends TestCase
         'cuti.configure',
         'cuti.configure_chain',
         'cuti.balance.read',
-        'cuti.balance.adjust',
+        'cuti.balance.reconcile',
+        'cuti.manual.manage',
         'cuti.proof.generate',
         'cuti.kepala_lembaga_documents.manage',
     ];
@@ -84,16 +85,40 @@ class CutiRbacTest extends TestCase
         ]);
     }
 
-    public function test_super_admin_memiliki_permission_cuti_selain_hak_mengajukan_sendiri(): void
+    public function test_super_admin_tidak_mewarisi_permission_mutasi_khusus_admin_kepegawaian(): void
     {
         $user = User::factory()->superAdmin()->create();
+        $excluded = ['cuti.create', 'cuti.balance.reconcile', 'cuti.manual.manage'];
 
         foreach (self::CUTI_PERMISSIONS as $permission) {
             $this->assertSame(
-                $permission !== 'cuti.create',
+                ! in_array($permission, $excluded, true),
                 $user->hasPermission($permission),
                 "mapping cuti super_admin tidak sesuai untuk {$permission}",
             );
+        }
+    }
+
+    public function test_permission_rekonsiliasi_dan_manual_hanya_dipetakan_ke_admin_kepegawaian(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $superAdmin = User::factory()->superAdmin()->create();
+        $adminRole = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
+        $superAdminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+
+        foreach (['cuti.balance.reconcile', 'cuti.manual.manage'] as $permissionName) {
+            $permission = Permission::query()->where('name', $permissionName)->firstOrFail();
+
+            $this->assertTrue($admin->hasPermission($permissionName));
+            $this->assertFalse($superAdmin->hasPermission($permissionName));
+            $this->assertDatabaseHas('role_permissions', [
+                'role_id' => $adminRole->id,
+                'permission_id' => $permission->id,
+            ]);
+            $this->assertDatabaseMissing('role_permissions', [
+                'role_id' => $superAdminRole->id,
+                'permission_id' => $permission->id,
+            ]);
         }
     }
 
@@ -191,6 +216,7 @@ class CutiRbacTest extends TestCase
             'approver_id' => $approver->id,
             'acted_at' => $audit->new_values['acted_at'],
             'komentar' => null,
+            'actor_role' => 'pegawai',
         ], $audit->new_values);
     }
 

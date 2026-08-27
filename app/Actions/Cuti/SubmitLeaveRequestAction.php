@@ -10,6 +10,7 @@ use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveEligibilityService;
+use App\Services\Cuti\LeaveUsageOverlapService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\NotificationService;
 use App\Services\WorkdayCalculator;
@@ -32,6 +33,7 @@ class SubmitLeaveRequestAction
         private readonly ApprovalChainResolver $approvalChains,
         private readonly LeaveBalanceReservationService $reservations,
         private readonly LeaveEligibilityService $eligibility,
+        private readonly LeaveUsageOverlapService $overlap,
     ) {}
 
     /**
@@ -70,10 +72,15 @@ class SubmitLeaveRequestAction
         // Hari kerja selalu dihitung ulang di server agar tidak bergantung pada nilai yang dikirim klien.
         $jumlahHariKerja = $this->workdayCalculator->calculate($mulai, $selesai);
 
-        $lampiranPath = null;
-        if ($request->hasFile('lampiran')) {
-            $lampiranPath = $this->files->storeLampiran($request->file('lampiran'));
+        // Rentang tanpa hari kerja tidak boleh membentuk pengajuan, reservasi, maupun approval aktif.
+        if ($jumlahHariKerja <= 0) {
+            throw ValidationException::withMessages([
+                'tanggal_selesai' => 'Rentang tanggal pengajuan tidak memiliki hari kerja. Pilih periode yang mencakup setidaknya satu hari kerja.',
+            ]);
         }
+
+        $lampiranPath = null;
+        $storedLampiran = null;
 
         // Penyimpanan pengajuan dan notifikasi atasan dibungkus transaksi agar tidak ada pengajuan tersimpan
         // tanpa notifikasi pasangannya bila salah satu langkah gagal.
@@ -81,12 +88,19 @@ class SubmitLeaveRequestAction
             $requestUser = $request->user();
             $actor = $requestUser instanceof User ? $requestUser : null;
 
-            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, $lampiranPath, $steps, $actor, $leaveType, $request) {
-                // K-CUT-02/K-CUT-03: service mengulang kelayakan di dalam transaksi
-                // dan mengunci rangkaian yang dipilih agar submit paralel tidak bisa
-                // melampaui batas kumulatif Melahirkan atau CLTN.
+            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, &$lampiranPath, &$storedLampiran, $steps, $actor, $leaveType, $request) {
+                $lockedEmployee = $this->overlap->lockEmployee($employee);
+                $this->overlap->assertNoOverlap($lockedEmployee, $mulai, $selesai);
+
+                if ($request->hasFile('lampiran')) {
+                    $storedLampiran = $this->files->storeLampiran($request->file('lampiran'), $lockedEmployee->id);
+                    $lampiranPath = $storedLampiran['path'];
+                }
+
+                // Kelayakan diulang di dalam transaksi dan rangkaian dikunci agar submit paralel
+                // tidak melampaui batas kumulatif Melahirkan atau CLTN.
                 [$leaveCase, $caseCreated] = $this->eligibility->resolveForNewSubmission(
-                    $employee,
+                    $lockedEmployee,
                     $leaveType,
                     $mulai,
                     $selesai,
@@ -104,7 +118,7 @@ class SubmitLeaveRequestAction
                         $leaveCase->id,
                         null,
                         [
-                            'employee_id' => $employee->id,
+                            'employee_id' => $lockedEmployee->id,
                             'jenis_cuti_id' => $leaveType->id,
                             'jenis_cuti_code' => $leaveType->code,
                             'tanggal_mulai_rangkaian' => $mulai->toDateString(),
@@ -114,7 +128,7 @@ class SubmitLeaveRequestAction
                 }
 
                 $leaveRequest = LeaveRequest::create([
-                    'employee_id' => $employee->id,
+                    'employee_id' => $lockedEmployee->id,
                     'jenis_cuti_id' => $data['jenis_cuti_id'],
                     'leave_request_case_id' => $leaveCase?->id,
                     'tanggal_mulai' => $mulai->toDateString(),
@@ -163,25 +177,55 @@ class SubmitLeaveRequestAction
 
                 $this->notifyActiveApprover($leaveRequest);
 
+                // Audit adalah bagian dari konsistensi pengajuan: kegagalan jejak harus
+                // membatalkan request, step, reservasi, dan notifikasi dalam transaksi yang sama.
+                AuditService::logOrFail(
+                    'CREATE',
+                    'LeaveRequest',
+                    $leaveRequest->id,
+                    null,
+                    $this->sanitizedAuditValues($leaveRequest),
+                    $request,
+                );
+
                 return $leaveRequest;
             });
         } catch (\Throwable $exception) {
             // File berada di luar transaksi DB; hapus lampiran baru bila persistensi berikutnya gagal.
-            $this->files->deletePublicFile($lampiranPath);
+            $this->files->deleteLeaveAttachment($lampiranPath, $employee->id);
 
             throw $exception;
         }
 
-        // Snapshot kontak tetap disimpan pada cuti, tetapi audit hanya mencatat status pengisiannya untuk melindungi PII.
-        $auditValues = $leaveRequest->toArray();
-        unset($auditValues['alamat_selama_cuti'], $auditValues['nomor_telepon']);
-        $auditValues['alamat_selama_cuti_diisi'] = $leaveRequest->alamat_selama_cuti !== null;
-        $auditValues['nomor_telepon_diisi'] = $leaveRequest->nomor_telepon !== null;
-
-        // Audit bersifat fire-and-forget sehingga sengaja di luar transaksi agar kegagalan audit tidak membatalkan pengajuan.
-        AuditService::log('CREATE', 'LeaveRequest', $leaveRequest->id, null, $auditValues, $request);
+        if ($storedLampiran !== null) {
+            $this->files->adoptLeaveAttachment(
+                $storedLampiran['recovery_task_id'],
+                $employee->id,
+                $storedLampiran['path'],
+            );
+        }
 
         return $leaveRequest;
+    }
+
+    /** Menyimpan hanya indikator kontak/lampiran pada audit agar PII dan path privat tidak keluar dari batas domain. */
+    private function sanitizedAuditValues(LeaveRequest $leaveRequest): array
+    {
+        return [
+            'employee_id' => $leaveRequest->employee_id,
+            'jenis_cuti_id' => $leaveRequest->jenis_cuti_id,
+            'leave_request_case_id' => $leaveRequest->leave_request_case_id,
+            'tanggal_mulai' => $leaveRequest->tanggal_mulai?->toDateString(),
+            'tanggal_selesai' => $leaveRequest->tanggal_selesai?->toDateString(),
+            'jumlah_hari_kerja' => $leaveRequest->jumlah_hari_kerja,
+            'alasan' => $leaveRequest->alasan,
+            'status' => $leaveRequest->status,
+            'rollover_source_year' => $leaveRequest->rollover_source_year,
+            'rollover_target_year' => $leaveRequest->rollover_target_year,
+            'alamat_selama_cuti_diisi' => filled($leaveRequest->alamat_selama_cuti),
+            'nomor_telepon_diisi' => filled($leaveRequest->nomor_telepon),
+            'lampiran_diisi' => filled($leaveRequest->lampiran_path),
+        ];
     }
 
     /**

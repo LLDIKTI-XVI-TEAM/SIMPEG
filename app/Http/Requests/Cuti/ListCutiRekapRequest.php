@@ -20,10 +20,13 @@ class ListCutiRekapRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'periode' => ['nullable', 'string', 'max:20'],
-            'unit' => ['nullable', 'string', 'max:150'],
-            'pegawai' => ['nullable', 'uuid'],
-            'jenis' => ['nullable', 'uuid', 'exists:ref_jenis_cuti,id'],
+            'periode' => ['bail', 'nullable', 'string', 'max:20', 'regex:/^(?:(?!0000)\d{4}(?:-(?:0[1-9]|1[0-2]))?|(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember) (?!0000)\d{4})$/'],
+            'unit' => ['bail', 'nullable', 'uuid', 'exists:ref_unit_kerja,id'],
+            'pegawai' => ['bail', 'nullable', 'uuid', 'exists:employees,id'],
+            'jenis' => ['bail', 'nullable', 'uuid', 'exists:ref_jenis_cuti,id'],
+            'page' => ['bail', 'nullable', 'integer', 'min:1'],
+            'page_saldo' => ['bail', 'nullable', 'integer', 'min:1'],
+            'page_usage' => ['bail', 'nullable', 'integer', 'min:1'],
         ];
     }
 
@@ -32,7 +35,7 @@ class ListCutiRekapRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        foreach (['pegawai', 'jenis'] as $field) {
+        foreach (['unit', 'pegawai', 'jenis'] as $field) {
             $value = $this->input($field);
 
             if ($value !== null && (is_array($value) || ! is_string($value) || ! Str::isUuid($value))) {

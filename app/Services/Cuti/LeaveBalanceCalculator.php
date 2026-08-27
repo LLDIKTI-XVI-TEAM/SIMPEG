@@ -147,22 +147,42 @@ class LeaveBalanceCalculator
     }
 
     /**
-     * Menerapkan koreksi saldo bertanda dengan clamp agar saldo tidak pernah negatif.
+     * Membentuk bucket awal tahun dari sisa tahun lalu dan total pemakaian faktual.
      *
-     * Untuk koreksi debit yang melewati nol, hanya porsi yang benar-benar terpakai yang dicatat
-     * sebagai "applied"; niat asli admin disimpan terpisah di reason/metadata oleh pemanggil.
+     * Bucket yang lebih tua dipertahankan lebih dahulu. Ceiling hanya membatasi carry
+     * yang benar-benar tersedia dan tidak pernah menambahkan hak secara otomatis.
      *
-     * @return array{applied:int, newAvailable:int}
+     * @return array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}
      */
-    public function clampCorrection(int $available, int $intended): array
-    {
-        // Saldo tidak boleh negatif; batas bawah dikunci di nol.
-        $newAvailable = max(0, $available + $intended);
-        $applied = $newAvailable - $available;
+    public function calculateRolloverFromUsage(
+        int $previousN1,
+        int $previousCurrent,
+        int $usageN2,
+        int $usageN1,
+        int $maximumCeiling,
+    ): array {
+        if ($previousN1 < 0 || $previousCurrent < 0 || $usageN2 < 0 || $usageN1 < 0) {
+            throw new \InvalidArgumentException('Nilai saldo dan pemakaian cuti tidak boleh negatif.');
+        }
+
+        if (! in_array($maximumCeiling, [12, 18, 24], true)) {
+            throw new \InvalidArgumentException('Ceiling cuti tahunan harus 12, 18, atau 24 hari.');
+        }
+
+        $carryRoom = $maximumCeiling - self::ANNUAL_ENTITLEMENT;
+        $n2Candidate = $usageN2 === 0 && $usageN1 === 0
+            ? min($previousN1, self::CARRY_OVER_CAP)
+            : 0;
+        $n2 = min($n2Candidate, $carryRoom);
+        $n1 = min($previousCurrent, self::CARRY_OVER_CAP, $carryRoom - $n2);
+        $hangus = ($previousN1 - $n2) + ($previousCurrent - $n1);
 
         return [
-            'applied' => $applied,
-            'newAvailable' => $newAvailable,
+            'n2' => $n2,
+            'n1' => $n1,
+            'current' => self::ANNUAL_ENTITLEMENT,
+            'hangus' => $hangus,
+            'maxUsable' => $n2 + $n1 + self::ANNUAL_ENTITLEMENT,
         ];
     }
 

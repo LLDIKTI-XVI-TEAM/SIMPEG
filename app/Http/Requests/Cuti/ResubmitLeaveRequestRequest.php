@@ -141,7 +141,7 @@ class ResubmitLeaveRequestRequest extends FormRequest
                 return;
             }
 
-            if (! $leaveRequest?->jenisCuti?->mengurangi_saldo_tahunan) {
+            if (! ($leaveRequest?->jenisCuti?->reducesAnnualBalance() ?? false)) {
                 return;
             }
 

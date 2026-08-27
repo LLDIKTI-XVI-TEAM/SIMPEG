@@ -9,6 +9,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/js/app.js',
                 'resources/js/pages/employee-import.js',
+                'resources/js/pages/manual-external-approval.js',
             ],
             refresh: true,
         }),

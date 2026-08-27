@@ -40,7 +40,7 @@ class ShowMyLeaveBalanceAction
 
     /**
      * Menyusun payload API legacy dengan `sisa` tercatat dan `sisa_efektif` additive.
-     * Riwayat sengaja tidak dipaginasi karena kontrak endpoint lama mengembalikan koleksi utuh.
+     * Riwayat tetap berupa koleksi legacy, tetapi dibatasi agar endpoint pribadi tidak memuat data tanpa batas.
      *
      * @return array{
      *     balance:?array{jatah_awal:int,carry_over:int,terpakai:int,sisa:int,sisa_efektif:int,tahun:int},
@@ -66,7 +66,9 @@ class ShowMyLeaveBalanceAction
             'history' => LeaveRequest::query()
                 ->where('employee_id', $employee->id)
                 ->with(['jenisCuti', 'approvals.approver', 'steps'])
-                ->orderByDesc('created_at')
+                ->latest()
+                ->orderByDesc('id')
+                ->limit(100)
                 ->get()
                 ->map(fn (LeaveRequest $leaveRequest): array => [
                     'id' => $leaveRequest->id,

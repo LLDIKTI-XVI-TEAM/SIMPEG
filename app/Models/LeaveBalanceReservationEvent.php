@@ -104,7 +104,13 @@ class LeaveBalanceReservationEvent extends Model
     public function scopeForActiveRequests(Builder $query): void
     {
         $query->whereHas('leaveRequest', function (Builder $leaveRequests): void {
-            $leaveRequests->whereIn('status', self::activeRequestStatuses());
+            // Kode jenis cuti adalah otoritas domain. Filter ini juga melindungi pembacaan
+            // event legacy yang sempat dibuat ketika flag referensi lama masih kotor.
+            $leaveRequests
+                ->whereIn('status', self::activeRequestStatuses())
+                ->whereHas('jenisCuti', function (Builder $leaveTypes): void {
+                    $leaveTypes->where('code', RefJenisCuti::CODE_TAHUNAN);
+                });
         });
     }
 

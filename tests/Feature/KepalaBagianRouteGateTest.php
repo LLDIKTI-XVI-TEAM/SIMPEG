@@ -47,7 +47,7 @@ class KepalaBagianRouteGateTest extends TestCase
         $leave = LeaveRequest::create([
             'employee_id' => Employee::factory()->create()->id,
             'jenis_cuti_id' => RefJenisCuti::create([
-                'nama' => 'Cuti Tahunan Gate', 'code' => 'tahunan-gate',
+                'nama' => 'Cuti Tahunan Gate', 'code' => 'tahunan',
                 'mengurangi_saldo_tahunan' => true, 'khusus_pns' => false,
             ])->id,
             'tanggal_mulai' => '2026-08-03', 'tanggal_selesai' => '2026-08-07',

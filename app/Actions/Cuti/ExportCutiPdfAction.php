@@ -3,7 +3,6 @@
 namespace App\Actions\Cuti;
 
 use App\Queries\Cuti\CutiRekapQuery;
-use App\Support\Cuti\CutiReportStatusFormatter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -14,7 +13,6 @@ class ExportCutiPdfAction
 
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
-        private readonly CutiReportStatusFormatter $statusFormatter,
     ) {}
 
     /**
@@ -24,28 +22,35 @@ class ExportCutiPdfAction
      */
     public function execute(array $filters): Response|RedirectResponse
     {
-        $query = $this->rekapQuery->detailRows($filters);
-        $count = (clone $query)->count();
+        $detailCount = $this->rekapQuery->detailCount($filters);
 
-        if ($count > self::MAX_ROWS) {
+        if ($detailCount > self::MAX_ROWS) {
             return back()->with(
                 'error',
-                "Laporan memuat {$count} baris, melebihi batas ".self::MAX_ROWS.'. Persempit filter lalu coba lagi.',
+                "Laporan memuat {$detailCount} baris, melebihi batas ".self::MAX_ROWS.'. Persempit filter lalu coba lagi.',
             );
         }
 
-        $rows = $query->get();
-        $rows->each(function ($row): void {
-            $row->setAttribute('report_status', $this->statusFormatter->format($row));
-        });
+        $summaryCount = $this->rekapQuery->summaryCount($filters);
+        $totalRows = $detailCount + $summaryCount;
+
+        if ($totalRows > self::MAX_ROWS) {
+            return back()->with(
+                'error',
+                "Laporan memuat {$totalRows} baris, melebihi batas ".self::MAX_ROWS.'. Persempit filter lalu coba lagi.',
+            );
+        }
+
+        $rows = $this->rekapQuery->allDetailRows($filters);
+        $summaryRows = $this->rekapQuery->summaryRows($filters);
 
         $pdf = Pdf::loadView('admin.cuti.pdf.laporan-cuti', [
             'rows' => $rows,
-            'summaryRows' => $this->rekapQuery->summaryRows($rows, $filters),
+            'summaryRows' => $summaryRows,
             'periodLabel' => $this->rekapQuery->periodLabel($filters),
             'filters' => $filters,
             'generatedAt' => now(),
-        ])->setPaper('a4', 'portrait');
+        ])->setPaper('a4', 'landscape');
 
         $periodLabel = $this->rekapQuery->periodLabel($filters);
 

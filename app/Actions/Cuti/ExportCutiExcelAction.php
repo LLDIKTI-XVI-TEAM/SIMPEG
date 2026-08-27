@@ -2,10 +2,9 @@
 
 namespace App\Actions\Cuti;
 
+use App\Data\Cuti\CutiRekapReadRow;
 use App\Models\LeaveBalance;
-use App\Models\LeaveRequest;
 use App\Queries\Cuti\CutiRekapQuery;
-use App\Support\Cuti\CutiReportStatusFormatter;
 use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\RedirectResponse;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -21,7 +20,6 @@ class ExportCutiExcelAction
 
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
-        private readonly CutiReportStatusFormatter $statusFormatter,
     ) {}
 
     /**
@@ -31,8 +29,7 @@ class ExportCutiExcelAction
      */
     public function execute(array $filters): Response|RedirectResponse
     {
-        $detailQuery = $this->rekapQuery->detailRows($filters);
-        $count = (clone $detailQuery)->count();
+        $count = $this->rekapQuery->detailCount($filters);
 
         if ($count > self::MAX_ROWS) {
             return back()->with(
@@ -41,7 +38,7 @@ class ExportCutiExcelAction
             );
         }
 
-        $details = $detailQuery->get();
+        $details = $this->rekapQuery->allDetailRows($filters);
 
         // Sheet saldo adalah state materialized per tahun dan menentukan scope-nya
         // sendiri lewat filter unit/pegawai/tahun. Ia tidak boleh dibatasi oleh
@@ -68,7 +65,7 @@ class ExportCutiExcelAction
         $summarySheet->setTitle('Ringkasan Cuti');
         $this->writeSummarySheet(
             $summarySheet,
-            $this->rekapQuery->summaryRows($details, $filters),
+            $this->rekapQuery->summaryRows($filters),
             $this->rekapQuery->saldoYear($filters),
         );
 
@@ -90,28 +87,27 @@ class ExportCutiExcelAction
         ]);
     }
 
-    /** @param iterable<int, LeaveRequest> $rows */
+    /** @param iterable<int, CutiRekapReadRow> $rows */
     private function writeDetailSheet(Worksheet $sheet, iterable $rows): void
     {
-        $headers = ['No', 'NIP', 'Nama', 'Nama (Aman)', 'Jenis Cuti', 'Tanggal Mulai', 'Tanggal Selesai', 'Hari Kerja', 'Status'];
+        $headers = ['No', 'NIP', 'Nama', 'Jenis Cuti', 'Tanggal Mulai', 'Tanggal Selesai', 'Hari Kerja', 'Sumber', 'Status'];
         foreach ($headers as $index => $header) {
             $sheet->setCellValueExplicit([$index + 1, 1], $header, DataType::TYPE_STRING);
         }
         $sheet->freezePane('A2');
 
-        foreach ($rows as $index => $leaveRequest) {
+        foreach ($rows as $index => $rowData) {
             $row = $index + 2;
-            $name = $leaveRequest->employee?->nama_lengkap ?? '-';
             $sheet->setCellValue('A'.$row, $index + 1);
-            $this->setSafeText($sheet, 'B'.$row, $leaveRequest->employee?->nip ?? '-');
-            $this->setSafeText($sheet, 'C'.$row, $name);
-            $this->setSafeText($sheet, 'D'.$row, $name);
-            $this->setSafeText($sheet, 'E'.$row, $leaveRequest->jenisCuti?->nama ?? '-');
-            $sheet->setCellValue('F'.$row, Date::dateTimeToExcel($leaveRequest->tanggal_mulai));
-            $sheet->setCellValue('G'.$row, Date::dateTimeToExcel($leaveRequest->tanggal_selesai));
-            $sheet->getStyle('F'.$row.':G'.$row)->getNumberFormat()->setFormatCode('yyyy-mm-dd');
-            $sheet->setCellValue('H'.$row, $leaveRequest->jumlah_hari_kerja);
-            $this->setSafeText($sheet, 'I'.$row, $this->statusFormatter->format($leaveRequest));
+            $this->setSafeText($sheet, 'B'.$row, $rowData->nip);
+            $this->setSafeText($sheet, 'C'.$row, $rowData->nama);
+            $this->setSafeText($sheet, 'D'.$row, $rowData->jenis);
+            $sheet->setCellValue('E'.$row, Date::dateTimeToExcel($rowData->tanggalMulai));
+            $sheet->setCellValue('F'.$row, Date::dateTimeToExcel($rowData->tanggalSelesai));
+            $sheet->getStyle('E'.$row.':F'.$row)->getNumberFormat()->setFormatCode('yyyy-mm-dd');
+            $sheet->setCellValue('G'.$row, $rowData->hari);
+            $this->setSafeText($sheet, 'H'.$row, $rowData->sourceLabel);
+            $this->setSafeText($sheet, 'I'.$row, $rowData->statusLabel);
         }
 
         $this->applyTableStyles($sheet, 'I', empty($rows) ? 1 : (is_array($rows) || $rows instanceof \Countable ? count($rows) + 1 : 1000));

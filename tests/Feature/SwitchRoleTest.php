@@ -804,6 +804,29 @@ class SwitchRoleTest extends TestCase
         $response->assertSee('Kembalikan Role Asli');
     }
 
+    /** Capability layout selama simulasi harus mengikuti permission role tujuan, bukan role asli. */
+    public function test_layout_capabilities_follow_effective_role_permission_mapping(): void
+    {
+        $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $adminRole->permissions()->detach(
+            Permission::whereIn('name', [
+                'employees.restore',
+                'cuti.balance.reconcile',
+                'cuti.manual.manage',
+            ])->pluck('id'),
+        );
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)
+            ->post(route('switch-role'), ['target_role' => 'admin_kepegawaian'])
+            ->assertRedirect(route('dashboard'));
+
+        $response = $this->actingAs($user->refresh())->get(route('cuti'));
+        $response->assertOk();
+        $response->assertDontSee('href="'.route('data-backup').'"', false);
+        $response->assertDontSee('Administrasi Pemakaian Cuti');
+    }
+
     /** Aktor fallback 'system' (bukan UUID) tidak boleh dikuerikan/disimpan sebagai uuid (22P02 di PostgreSQL). */
     public function test_audit_explicit_path_accepts_system_actor_without_uuid_lookup(): void
     {

@@ -2,10 +2,14 @@
 
 namespace App\Providers;
 
+use App\Models\User;
+use App\Services\Rbac\UiPermissionCapabilityService;
 use App\Services\TransactionSideEffectManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\View\View as ViewInstance;
 use SocialiteProviders\Keycloak\KeycloakExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 
@@ -18,6 +22,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Satu request harus berbagi daftar kompensasi yang sama antara middleware dan Action.
         $this->app->singleton(TransactionSideEffectManager::class);
+
+        // Cache capability dibatasi pada lifecycle request agar perubahan RBAC pada request berikutnya langsung berlaku.
+        $this->app->scoped(UiPermissionCapabilityService::class);
     }
 
     /**
@@ -35,6 +42,19 @@ class AppServiceProvider extends ServiceProvider
             if (method_exists($user, 'hasPermission') && $user->hasPermission($ability)) {
                 return true;
             }
+        });
+
+        View::composer('components.layouts.app', function (ViewInstance $view): void {
+            $authenticated = auth()->user();
+            $actor = $authenticated instanceof User ? $authenticated : null;
+            $permissionNames = in_array($actor?->role, ['super_admin', 'admin_kepegawaian'], true)
+                ? ['employees.restore', 'cuti.balance.reconcile', 'cuti.manual.manage']
+                : [];
+
+            $view->with(
+                'layoutCapabilities',
+                app(UiPermissionCapabilityService::class)->resolve($actor, $permissionNames),
+            );
         });
     }
 }

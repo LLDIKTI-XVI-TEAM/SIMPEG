@@ -59,7 +59,8 @@ class RbacSeeder extends Seeder
             'cuti.configure' => ['module' => 'cuti', 'description' => 'Mengonfigurasi approval chain cuti'],
             'cuti.configure_chain' => ['module' => 'cuti', 'description' => 'Mengonfigurasi rantai approval cuti per pegawai'],
             'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
-            'cuti.balance.adjust' => ['module' => 'cuti', 'description' => 'Melakukan koreksi saldo cuti yang diaudit'],
+            'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
+            'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
             'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
         ];
@@ -81,7 +82,11 @@ class RbacSeeder extends Seeder
         // bersifat person-based via approval_configs; pemetaan role penampungnya menunggu konfirmasi dan ditegakkan
         // di approval engine. cuti.configure dibatasi khusus super_admin.
         $this->syncRolePermissions([
-            'super_admin' => array_values(array_diff(array_keys($permissions), ['cuti.create'])),
+            'super_admin' => array_values(array_diff(array_keys($permissions), [
+                'cuti.create',
+                'cuti.balance.reconcile',
+                'cuti.manual.manage',
+            ])),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
@@ -107,7 +112,8 @@ class RbacSeeder extends Seeder
                 'cuti.create',
                 'cuti.read_all',
                 'cuti.balance.read',
-                'cuti.balance.adjust',
+                'cuti.balance.reconcile',
+                'cuti.manual.manage',
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [

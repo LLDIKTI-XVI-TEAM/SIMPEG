@@ -2,68 +2,98 @@
 
 namespace App\Actions\Cuti;
 
+use App\Exceptions\LeaveProofGenerationException;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\User;
-use App\Services\TransactionSideEffectManager;
+use App\Services\Cuti\LeaveProofDocumentStorageService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
+use Throwable;
 
 class GenerateLeaveProofAction
 {
     public function __construct(
         private readonly DownloadOfficialLeavePdfAction $officialPdf,
-        private readonly TransactionSideEffectManager $sideEffects,
+        private readonly LeaveProofDocumentStorageService $documents,
     ) {}
 
-    public function execute(LeaveRequest $leaveRequest, ?User $generatedBy): LeaveProof
+    /**
+     * Menulis PDF final ke storage privat dengan nama UUID tanpa menimpa bukti lama.
+     * Path baru dikembalikan agar orkestrator dapat mengompensasinya bila transaksi gagal belakangan.
+     *
+     * @return array{proof: LeaveProof, new_document_path: string|null, recovery_task_id: string|null}
+     */
+    public function execute(LeaveRequest $leaveRequest, User $generatedBy): array
     {
-        $proof = LeaveProof::query()->firstOrCreate(
-            ['leave_request_id' => $leaveRequest->id],
-            ['token' => Str::random(80)],
-        );
+        $proof = LeaveProof::query()->where('leave_request_id', $leaveRequest->id)->firstOrFail();
 
-        // Waktu terbit dibekukan sebelum render agar tanggal penerbitan pada dokumen
-        // sama dengan metadata bukti yang dipakai verifikasi QR.
-        if ($proof->wasRecentlyCreated) {
-            $proof->forceFill([
-                'generated_by' => $generatedBy?->id,
-                'generated_at' => now(),
-            ])->save();
+        if ($proof->generated_by !== $generatedBy->id) {
+            throw new RuntimeException('Penerbit dokumen bukti tidak sesuai aktor persetujuan final.');
         }
 
         $leaveRequest->setRelation('proof', $proof);
 
-        // Dokumen tersimpan memakai template dan data formulir resmi yang sama dengan
-        // unduhan pada halaman pegawai, sehingga seluruh permukaan (pegawai, kepala
-        // bagian, pimpinan) menerima dokumen yang identik.
-        $path = 'leave-proofs/'.$leaveRequest->id.'.pdf';
-        $disk = Storage::disk('local');
-        $hadExistingDocument = $disk->exists($path);
-        $previousDocument = $hadExistingDocument ? $disk->get($path) : null;
+        if ($proof->document_path !== null) {
+            $this->documents->assertValidExistingDocument(
+                $leaveRequest->id,
+                $proof->document_path,
+                $proof->document_mime,
+            );
 
-        $disk->put(
-            $path,
-            Pdf::loadView('admin.cuti.pdf.formulir-cuti', $this->officialPdf->viewData($leaveRequest))
+            return ['proof' => $proof, 'new_document_path' => null, 'recovery_task_id' => null];
+        }
+
+        $path = $this->documents->newPath($leaveRequest->id);
+
+        try {
+            $contents = Pdf::loadView('admin.cuti.pdf.formulir-cuti', $this->officialPdf->viewData($leaveRequest))
                 ->setPaper([0, 0, 612, 1008], 'portrait')
-                ->output(),
-        );
-        $this->sideEffects->afterRollback(function () use ($disk, $path, $hadExistingDocument, $previousDocument): void {
-            if ($hadExistingDocument && $previousDocument !== null) {
-                $disk->put($path, $previousDocument);
+                ->output();
+            $recoveryTask = $this->documents->prepareNewDocument($leaveRequest->id, $path, $contents);
+            $this->documents->putPdf($leaveRequest->id, $path, $contents);
 
-                return;
+            $proof->forceFill([
+                'document_path' => $path,
+                'document_mime' => LeaveProofDocumentStorageService::MIME,
+            ])->save();
+        } catch (Throwable $exception) {
+            if (DB::transactionLevel() === 0) {
+                $this->deleteNewDocument($leaveRequest->id, $path);
+
+                throw $exception;
             }
 
-            $disk->delete($path);
-        });
+            // Cleanup wajib dijadwalkan sesudah transaksi pemanggil rollback agar manifest tidak ikut hilang.
+            throw new LeaveProofGenerationException($path, $exception);
+        }
 
-        $proof->forceFill([
-            'document_path' => $path,
-            'document_mime' => 'application/pdf',
-        ])->save();
+        $result = [
+            'proof' => $proof->fresh(),
+            'new_document_path' => $path,
+            'recovery_task_id' => $recoveryTask->id,
+        ];
 
-        return $proof;
+        if (DB::transactionLevel() === 0) {
+            $this->adoptNewDocument($recoveryTask->id, $leaveRequest->id, $path);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Menghapus hanya file UUID yang baru dibuat oleh boundary ini; path lain dan bukti historis
+     * tidak pernah menjadi target kompensasi walaupun caller mengirim nilai yang salah.
+     */
+    public function deleteNewDocument(string $leaveRequestId, ?string $path): void
+    {
+        $this->documents->deleteNewDocument($leaveRequestId, $path);
+    }
+
+    /** Menyelesaikan manifest setelah transaksi pemanggil committed; retry recovery menjadi fallback. */
+    public function adoptNewDocument(string $taskId, string $leaveRequestId, string $path): bool
+    {
+        return $this->documents->adoptNewDocument($taskId, $leaveRequestId, $path);
     }
 }

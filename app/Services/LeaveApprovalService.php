@@ -11,7 +11,9 @@ use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\Cuti\LeaveProofService;
+use App\Services\Cuti\LeaveUsageRecordService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -52,31 +54,40 @@ class LeaveApprovalService
         private readonly LeaveBalanceService $balances,
         private readonly LeaveBalanceReservationService $reservations,
         private readonly LeaveEligibilityService $eligibility,
+        private readonly LeaveUsageRecordService $usageRecords,
     ) {}
 
     /**
-     * Menyetujui step aktif. Step berikutnya diaktifkan, duplikasi approver dilewati, dan final approval memotong saldo.
+     * Menyetujui step aktif. Step berikutnya diaktifkan, duplikasi approver dilewati, dan final approval
+     * membentuk fakta pemakaian yang menjadi satu-satunya sumber replay saldo tahunan.
      *
-     * Aktor Employee adalah approver snapshot yang berwenang atas step aktif; parameter opsional User adalah
-     * akun manusia yang benar-benar menekan aksi. Keduanya dibedakan karena bukti final menyimpan jejak akun
-     * (FK generated_by -> users), sedangkan otorisasi step tetap berbasis employee. actingUser diletakkan di
-     * akhir signature agar pemanggil lama (tes langsung service) tetap kompatibel secara sumber.
+     * Aktor Employee adalah approver snapshot, sedangkan User adalah akun manusia yang wajib cocok agar
+     * ledger, audit, dan bukti final tidak pernah memakai identitas implisit atau aktor sistem.
      */
-    public function approve(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar = null, ?User $actingUser = null): LeaveRequest
-    {
-        // Akun user yang menekan aksi wajib merupakan akun milik approver Employee yang sama, karena jejak
-        // audit bukti final (generated_by -> users) harus menunjuk manusia yang benar-benar menyetujui.
-        // Dijalankan sebelum transaksi/mutasi agar penolakan tidak menyisakan efek samping; employee_id yang
-        // null pun dianggap tidak cocok (fail-closed) sehingga akun tanpa keterikatan pegawai tidak lolos.
-        if ($actingUser !== null && $actingUser->employee_id !== $actor->id) {
+    public function approve(
+        LeaveRequest $leaveRequest,
+        Employee $actor,
+        ?string $komentar = null,
+        ?User $actingUser = null,
+        ?Request $httpRequest = null,
+    ): LeaveRequest {
+        // Seluruh persetujuan membutuhkan akun manusia eksplisit sebelum lock dan mutasi apa pun.
+        if ($actingUser === null || $actingUser->employee_id !== $actor->id) {
             throw new AuthorizationException('Akun Anda tidak cocok dengan approver yang berwenang untuk tahap persetujuan ini.');
         }
 
-        $this->assertApprovalActionable($leaveRequest);
-        $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
-
-        return DB::transaction(function () use ($leaveRequest, $actor, $komentar, $actingUser): LeaveRequest {
-            $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+        return DB::transaction(function () use ($leaveRequest, $actor, $komentar, $actingUser, $httpRequest): LeaveRequest {
+            // Mutasi request existing selalu mengunci request lebih dahulu, lalu employee,
+            // agar approval, penangguhan dinas, rollover, dan resubmit tidak membentuk siklus lock.
+            $locked = LeaveRequest::query()
+                ->with('jenisCuti')
+                ->whereKey($leaveRequest->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $employee = Employee::query()
+                ->whereKey($locked->employee_id)
+                ->lockForUpdate()
+                ->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
@@ -97,19 +108,16 @@ class LeaveApprovalService
                 return $locked;
             }
 
-            // Cabang final saja: potong saldo, tandai disetujui, lalu terbitkan bukti. Urutan penting agar
-            // bukti dibangun dari status final yang sudah tersimpan. Penerbitan bukti (termasuk audit fail-closed)
-            // berjalan dalam transaksi luar ini; jika gagal, exception membubung dan me-rollback status, saldo,
-            // ledger, catatan approval, serta bukti secara atomik.
-            // Konversi dan pemotongan berada dalam transaksi yang sama. Konversi
-            // dilakukan lebih dulu agar seluruh mutasi memakai urutan kunci yang sama:
-            // request, pegawai, lalu saldo. Jika deduction gagal, event konversi ikut rollback.
-            $employee = Employee::query()
-                ->whereKey($locked->employee_id)
-                ->lockForUpdate()
-                ->firstOrFail();
+            // Cabang final mengonversi reservasi, menutup request, lalu menulis fakta historis.
+            // Replay saldo berasal dari fakta itu; tidak ada lagi debit langsung pada ringkasan saldo.
+            $isAnnual = $locked->jenisCuti?->reducesAnnualBalance() ?? false;
+            $isCutiBesar = $locked->jenisCuti?->code === 'besar';
 
-            $isCutiBesar = $locked->jenisCuti()->where('code', 'besar')->exists();
+            if ($isAnnual) {
+                // Rule 5 diperiksa ulang saat final karena Cuti Besar dapat menjadi final
+                // setelah pengajuan tahunan membuat reservasi tetapi sebelum disetujui.
+                $this->balances->assertAnnualLeaveAllowed($employee, $locked->tanggal_mulai->year);
+            }
 
             if ($isCutiBesar) {
                 // Kelayakan persisted dan konflik saldo dicek setelah mutex pegawai agar final approval
@@ -121,12 +129,11 @@ class LeaveApprovalService
                 );
             }
 
-            $this->reservations->convertForFinalApproval($locked, $actingUser);
-            if (! $isCutiBesar) {
-                $this->deductBalanceIfRequired($locked);
-            }
+            $this->reservations->convertForFinalApproval($locked, $actingUser, $httpRequest);
             $locked->forceFill(['status' => self::STATUS_DISETUJUI])->save();
-            $this->proofs->generateForApprovedRequest($locked->refresh(), $actor, $actingUser);
+            $locked = $locked->refresh()->load('jenisCuti');
+            $this->usageRecords->recordApprovedRequest($locked, $actingUser, $httpRequest);
+            $this->proofs->generateForApprovedRequest($locked, $actor, $actingUser, $httpRequest);
 
             return $locked->refresh();
         });
@@ -336,14 +343,5 @@ class LeaveApprovalService
         }
 
         return null;
-    }
-
-    /**
-     * Memotong saldo lewat service ledger agar final approval tidak memakai path summary lama.
-     * Eligibility jenis cuti memakai metadata, bukan nama tampilan, agar aman dari perubahan label.
-     */
-    private function deductBalanceIfRequired(LeaveRequest $leaveRequest): void
-    {
-        $this->balances->deductForFinalApproval($leaveRequest);
     }
 }

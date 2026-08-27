@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
+use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\EducationHistory;
 use App\Models\Employee;
@@ -12,13 +14,16 @@ use App\Models\LeaveRequest;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
 use App\Models\SalaryHistory;
 use App\Models\User;
+use App\Services\Cuti\LeaveUsageRecordService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -74,20 +79,10 @@ class ProfileTest extends TestCase
     {
         $employee = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
-        $balance = LeaveBalance::create([
-            'employee_id' => $employee->id,
-            'tahun' => now()->year,
-            'jatah_awal' => 12,
-            'carry_over' => 6,
-            'terpakai' => 0,
-            'sisa' => 18,
-            'sisa_n2' => 0,
-            'sisa_n1' => 6,
-            'sisa_tahun_berjalan' => 12,
-            'terpakai_tahun_berjalan' => 0,
-            'hangus' => 0,
-        ]);
-        LeaveRequest::create([
+        $pns = RefJenisPegawai::query()->where('nama', 'PNS')->firstOrFail();
+        $employee->forceFill(['jenis_pegawai_id' => $pns->id])->save();
+        $this->reconcileAnnualUsage($employee, usageN2: 12, usageN1: 6, usageCurrent: 0);
+        $largeRequest = LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => RefJenisCuti::query()->where('code', 'besar')->firstOrFail()->id,
             'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
@@ -96,6 +91,17 @@ class ProfileTest extends TestCase
             'alasan' => 'Cuti Besar final.',
             'status' => 'disetujui',
         ]);
+        $approverEmployee = Employee::factory()->create();
+        $approver = User::factory()->pimpinan()->create(['employee_id' => $approverEmployee->id]);
+        app(LeaveUsageRecordService::class)->recordApprovedRequest(
+            $largeRequest,
+            $approver,
+            $this->actorRequest($approver),
+        );
+        $balance = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', now()->year)
+            ->firstOrFail();
 
         $response = $this->actingAs($user)->get('/dashboard/profil?tab=cuti');
 
@@ -107,6 +113,42 @@ class ProfileTest extends TestCase
             ->assertSee('Hak Efektif Tahun Ini', false)
             ->assertSee('tidak dapat digunakan pada tahun Cuti Besar', false);
         $this->assertSame(18, $balance->fresh()->sisa);
+    }
+
+    private function reconcileAnnualUsage(
+        Employee $employee,
+        int $usageN2,
+        int $usageN1,
+        int $usageCurrent,
+    ): void {
+        Appointment::query()->updateOrCreate(
+            ['employee_id' => $employee->id],
+            [
+                'jenis_pengangkatan' => 'PNS',
+                'tmt_pengangkatan' => '2020-01-01',
+            ],
+        );
+        $admin = User::factory()->adminKepegawaian()->create();
+        app(ReconcileAnnualLeaveUsageAction::class)->execute(
+            $employee->id,
+            [
+                'balance_year' => now()->year,
+                'usage_n2' => $usageN2,
+                'usage_n1' => $usageN1,
+                'usage_current' => $usageCurrent,
+                'administrative_note' => 'Rekonsiliasi fixture profil pegawai.',
+            ],
+            $admin,
+            $this->actorRequest($admin),
+        );
+    }
+
+    private function actorRequest(User $actor): Request
+    {
+        $request = Request::create('/cuti/usage', 'POST');
+        $request->setUserResolver(fn (): User => $actor);
+
+        return $request;
     }
 
     public function test_profile_ews_section_uses_real_alerts_not_mock(): void

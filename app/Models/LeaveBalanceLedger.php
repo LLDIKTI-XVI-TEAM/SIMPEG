@@ -29,6 +29,8 @@ class LeaveBalanceLedger extends Model
 
     public const EVENT_ANNUAL_ENTITLEMENT_GRANTED = 'annual_entitlement_granted';
 
+    public const EVENT_BALANCE_RECALCULATED = 'balance_recalculated';
+
     public const EVENT_CARRY_OVER_EXPIRED = 'carry_over_expired';
 
     public const EVENT_CARRY_OVER_GRANTED = 'carry_over_granted';
@@ -42,6 +44,12 @@ class LeaveBalanceLedger extends Model
     public const EVENT_OPENING_BALANCE_SET = 'opening_balance_set';
 
     public const EVENT_ROLLOVER_APPLIED = 'rollover_applied';
+
+    public const EVENT_USAGE_FACT_CANCELLED = 'usage_fact_cancelled';
+
+    public const EVENT_USAGE_FACT_RECORDED = 'usage_fact_recorded';
+
+    public const EVENT_USAGE_FACT_SUPERSEDED = 'usage_fact_superseded';
 
     protected $table = 'leave_balance_ledger';
 
@@ -70,13 +78,14 @@ class LeaveBalanceLedger extends Model
     {
         return [
             self::EVENT_ANNUAL_ENTITLEMENT_GRANTED,
+            self::EVENT_BALANCE_RECALCULATED,
             self::EVENT_CARRY_OVER_EXPIRED,
             self::EVENT_CARRY_OVER_GRANTED,
             self::EVENT_DUTY_POSTPONEMENT_RECORDED,
-            self::EVENT_LEAVE_DEDUCTED,
-            self::EVENT_MANUAL_ADJUSTMENT,
-            self::EVENT_OPENING_BALANCE_SET,
             self::EVENT_ROLLOVER_APPLIED,
+            self::EVENT_USAGE_FACT_CANCELLED,
+            self::EVENT_USAGE_FACT_RECORDED,
+            self::EVENT_USAGE_FACT_SUPERSEDED,
         ];
     }
 

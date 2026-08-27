@@ -15,6 +15,8 @@ class RefJenisCuti extends Model
 {
     use HasUuid;
 
+    public const CODE_TAHUNAN = 'tahunan';
+
     protected $table = 'ref_jenis_cuti';
 
     protected $fillable = ['nama', 'code', 'mengurangi_saldo_tahunan', 'khusus_pns'];
@@ -25,5 +27,11 @@ class RefJenisCuti extends Model
             'mengurangi_saldo_tahunan' => 'boolean',
             'khusus_pns' => 'boolean',
         ];
+    }
+
+    /** Kode kanonik menjadi sumber keputusan saldo; flag database hanya invariant tersimpan. */
+    public function reducesAnnualBalance(): bool
+    {
+        return $this->code === self::CODE_TAHUNAN;
     }
 }

@@ -18,6 +18,7 @@
         "socialiteproviders/keycloak": "^5.3"
     },
     "require-dev": {
+        "brianium/paratest": "^7.8.5",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
         "laravel/dusk": "8.6",
@@ -57,6 +58,10 @@
             "@php artisan config:clear --ansi",
             "@php -d memory_limit=-1 artisan test"
         ],
+        "test:ci:parallel": "@php -d memory_limit=-1 artisan test --parallel --processes=2 --recreate-databases --exclude-group=serial --exclude-group=guarded-destructive",
+        "test:ci:serial": "@php -d memory_limit=-1 artisan test --group=serial --exclude-group=guarded-destructive",
+        "test:ci:guarded": "@php -d memory_limit=-1 artisan test --group=guarded-destructive --fail-on-skipped",
+        "test:js": "npm run test:js",
         "test:browser": "@php artisan dusk",
         "format": "@php vendor/bin/pint",
         "format:check": "@php vendor/bin/pint --test",
@@ -64,6 +69,7 @@
         "qa": [
             "@format:check",
             "@analyse",
+            "@test:js",
             "@test"
         ],
         "post-autoload-dump": [

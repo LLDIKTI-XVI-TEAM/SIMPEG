@@ -4,7 +4,7 @@
         <div class="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight text-ink">Saldo Cuti Saya</h1>
-                <p class="text-sm text-muted">Transparansi data saldo cuti tahunan dan riwayat pengajuan cuti Anda.</p>
+                <p class="text-sm text-muted">Saldo dihitung dari pemakaian cuti yang tercatat dan tidak dapat diubah langsung.</p>
             </div>
             <div class="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-1.5 border border-border shadow-sm">
                 <span class="h-2 w-2 rounded-full bg-success"></span>
@@ -63,7 +63,7 @@
         @else
             <x-ui.card>
                 <p class="text-sm font-semibold text-ink">Saldo cuti tahunan belum tersedia</p>
-                <p class="mt-1 text-sm text-muted">Saldo akan tampil setelah hak cuti tahunan dibuat oleh proses pengajuan atau admin kepegawaian.</p>
+                <p class="mt-1 text-sm text-muted">Saldo akan tampil setelah data pemakaian tiga tahun dicatat dan hak cuti tahunan selesai dihitung.</p>
             </x-ui.card>
         @endif
 
@@ -87,14 +87,16 @@
                     </x-ui.table-head>
                     <x-ui.table-body class="text-sm text-ink">
                         @forelse($history as $r)
-                            <x-ui.table-row :interactive="true" class="hover:bg-muted/5">
+                            <x-ui.table-row class="!cursor-default hover:!bg-transparent">
                                 <x-ui.table-td padding="wide" class="font-medium">{{ $r->jenisCuti?->nama }}</x-ui.table-td>
                                 <x-ui.table-td padding="wide">
                                     <div class="font-semibold">{{ $r->tanggal_mulai->translatedFormat('d M Y') }}</div>
                                     <div class="text-xs text-muted">s/d {{ $r->tanggal_selesai->translatedFormat('d M Y') }}</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td align="center" padding="wide" class="font-medium">{{ $r->jumlah_hari_kerja }} hari</x-ui.table-td>
-                                <x-ui.table-td title="{{ $r->alasan }}" padding="wide" class="max-w-xs truncate">{{ $r->alasan }}</x-ui.table-td>
+                                <x-ui.table-td padding="wide" class="min-w-64 whitespace-normal break-words leading-relaxed">
+                                    {{ $r->alasan }}
+                                </x-ui.table-td>
                                 <x-ui.table-td align="center" padding="wide">
                                     <x-ui.badge
                                         :variant="match ($r->status) {

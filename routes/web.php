@@ -27,9 +27,12 @@ use App\Http\Controllers\Admin\KepalaBagianEmployeeController;
 use App\Http\Controllers\Admin\KepalaBagianEwsController;
 use App\Http\Controllers\Admin\KepalaBagianLeaveController;
 use App\Http\Controllers\Admin\KepalaBagianLeaveDecisionController;
+use App\Http\Controllers\Admin\KepalaBagianSearchController;
 use App\Http\Controllers\Admin\KepalaLembagaSupportingDocumentController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
+use App\Http\Controllers\Admin\LeaveUsageController;
+use App\Http\Controllers\Admin\ManualLeaveUsageController;
 use App\Http\Controllers\Admin\NotificationChannelController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\PegawaiController;
@@ -302,8 +305,43 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
+        ->middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
+    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile'])
+        ->prefix('cuti/rekonsiliasi-tahunan')
+        ->name('cuti.reconciliation.')
+        ->group(function (): void {
+            Route::post('/{employee}', [LeaveUsageController::class, 'reconcile'])
+                ->whereUuid('employee')
+                ->name('store');
+            Route::post('/{reconciliation}/koreksi', [LeaveUsageController::class, 'correct'])
+                ->whereUuid('reconciliation')
+                ->name('correct');
+            Route::get('/{reconciliation}/dokumen/{document}/unduh', [LeaveUsageController::class, 'downloadDocument'])
+                ->whereUuid('reconciliation')
+                ->whereUuid('document')
+                ->name('document.download');
+        });
+    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.manual.manage'])
+        ->prefix('cuti/pemakaian-manual')
+        ->name('cuti.manual.')
+        ->group(function (): void {
+            Route::get('/penyetuju/cari', [ManualLeaveUsageController::class, 'lookupApprovers'])
+                ->middleware('throttle:60,1')
+                ->name('approver-lookup');
+            Route::post('/{employee}', [ManualLeaveUsageController::class, 'store'])
+                ->whereUuid('employee')
+                ->name('store');
+            Route::post('/{usage}/koreksi', [ManualLeaveUsageController::class, 'correct'])
+                ->whereUuid('usage')
+                ->name('correct');
+            Route::post('/{usage}/batalkan', [ManualLeaveUsageController::class, 'cancel'])
+                ->whereUuid('usage')
+                ->name('cancel');
+            Route::get('/{usage}/dokumen/{document}', [ManualLeaveUsageController::class, 'download'])
+                ->whereUuid(['usage', 'document'])
+                ->name('download');
+        });
     Route::get('/cuti/pegawai/cari', CutiEmployeeLookupController::class)
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'throttle:60,1'])
         ->name('cuti.employee-lookup');
@@ -432,14 +470,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
         ->name('cuti.saldo');
-    Route::post('/dashboard/cuti/saldo/{employee}/opening-balance', [LeaveBalanceController::class, 'storeOpeningBalance'])
-        ->whereUuid('employee')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
-        ->name('cuti.saldo.opening-balance');
-    Route::post('/dashboard/cuti/saldo/{employee}/adjust', [LeaveBalanceController::class, 'adjust'])
-        ->whereUuid('employee')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.adjust'])
-        ->name('cuti.saldo.adjust');
 
     Route::get('/pegawai/legacy', function () {
         return redirect()->route('data-pegawai');
@@ -483,6 +513,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
         ->name('cuti.formulir-pdf')
+        ->whereUuid('leaveRequest');
+    Route::get('/dashboard/cuti/{leaveRequest}/lampiran', [CutiController::class, 'downloadAttachment'])
+        ->name('cuti.attachment.download')
         ->whereUuid('leaveRequest');
     // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
     // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.
@@ -725,6 +758,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->group(function (): void {
             Route::get('/', fn () => redirect()->route('kepala-bagian.dashboard'));
             Route::get('/dashboard', [KepalaBagianDashboardController::class, 'index'])->name('dashboard');
+            Route::get('/search', KepalaBagianSearchController::class)
+                ->middleware('throttle:60,1')
+                ->name('search');
 
             Route::get('/bawahan', [KepalaBagianEmployeeController::class, 'index'])->name('bawahan.index');
             Route::get('/bawahan/{employee}', [KepalaBagianEmployeeController::class, 'show'])

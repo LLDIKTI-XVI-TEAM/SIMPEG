@@ -37,6 +37,34 @@ class NotificationInboxTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_notification_bell_marks_background_fetch_as_ajax_so_validation_redirect_stays_on_page(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk();
+
+        $this->assertMatchesRegularExpression(
+            "/fetch\\(this\\.endpoint,\\s*\\{\\s*headers:\\s*\\{\\s*Accept:\\s*'application\\/json',\\s*'X-Requested-With':\\s*'XMLHttpRequest'/s",
+            $response->getContent(),
+        );
+    }
+
+    public function test_notification_bell_stops_polling_when_livewire_navigation_destroys_component(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk();
+
+        $this->assertMatchesRegularExpression(
+            '/destroy\(\)\s*\{\s*this\.stopPolling\(\);\s*\}/s',
+            $response->getContent(),
+        );
+    }
+
     public function test_notification_service_creates_unread_notification_for_employee(): void
     {
         $employee = Employee::factory()->create();

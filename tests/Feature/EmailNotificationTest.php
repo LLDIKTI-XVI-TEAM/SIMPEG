@@ -558,9 +558,10 @@ class EmailNotificationTest extends TestCase
         $this->enableEventChannels('cuti.disetujui');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
         $pybmc = Employee::factory()->create();
+        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
         $leave = $this->makeLeaveRequestWithSteps($employee, [$pybmc]);
 
-        app(ApproveLeaveAction::class)->execute($leave, $pybmc, null, Request::create('/'));
+        app(ApproveLeaveAction::class)->execute($leave, $pybmc, null, $this->actorRequest($pybmcUser));
 
         $this->assertSame('disetujui', $leave->fresh()->status);
         $this->assertDatabaseHas('notifications', [
@@ -675,10 +676,16 @@ class EmailNotificationTest extends TestCase
         $this->enableEventChannels('cuti.menunggu_persetujuan');
         $employee = Employee::factory()->create();
         $kepalaBagian = Employee::factory()->create(['email' => 'kabag@example.test']);
+        $kepalaBagianUser = User::factory()->kepalaBagian()->create(['employee_id' => $kepalaBagian->id]);
         $pybmc = Employee::factory()->create(['email' => 'pybmc@example.test']);
         $leave = $this->makeLeaveRequestWithSteps($employee, [$kepalaBagian, $pybmc]);
 
-        app(ApproveLeaveAction::class)->execute($leave, $kepalaBagian, null, Request::create('/'));
+        app(ApproveLeaveAction::class)->execute(
+            $leave,
+            $kepalaBagian,
+            null,
+            $this->actorRequest($kepalaBagianUser),
+        );
 
         $notification = SimpegNotification::query()
             ->where('user_id', $pybmc->id)
@@ -813,6 +820,14 @@ class EmailNotificationTest extends TestCase
             'interval_days' => 30,
             'is_processed' => false,
         ]);
+    }
+
+    private function actorRequest(User $actor): Request
+    {
+        $request = Request::create('/cuti/approval', 'POST');
+        $request->setUserResolver(fn (): User => $actor);
+
+        return $request;
     }
 
     /**

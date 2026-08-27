@@ -14,10 +14,12 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Tests\Concerns\CreatesAdoptedLeaveAttachment;
 use Tests\TestCase;
 
 class PimpinanLeaveDetailTest extends TestCase
 {
+    use CreatesAdoptedLeaveAttachment;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -25,6 +27,7 @@ class PimpinanLeaveDetailTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        $this->setUpAdoptedLeaveAttachmentFixtures();
     }
 
     public function test_monitoring_filters_by_unit_year_month_perubahan_and_employee_search(): void
@@ -159,11 +162,10 @@ class PimpinanLeaveDetailTest extends TestCase
 
     public function test_detail_only_exposes_attachment_through_an_authorized_route_when_file_exists(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
 
         $leave = $this->leave(Employee::factory()->create(), $this->leaveType(), '2026-07-06', 'menunggu_approval');
-        $leave->forceFill(['lampiran_path' => 'cuti/surat-pendukung.pdf'])->save();
-        Storage::disk('public')->put('cuti/surat-pendukung.pdf', 'lampiran aktual');
+        $this->createAdoptedLeaveAttachment($leave, "%PDF-1.4\n% lampiran aktual\n%%EOF\n");
         $pimpinan = $this->pimpinan();
 
         $this->actingAs($pimpinan)
@@ -171,10 +173,16 @@ class PimpinanLeaveDetailTest extends TestCase
             ->assertOk()
             ->assertSee('Lampiran Pendukung')
             ->assertSee(route('pimpinan.cuti.attachment.download', $leave), false);
-        $this->actingAs($pimpinan)
-            ->get(route('pimpinan.cuti.attachment.download', $leave))
+        $download = $this->actingAs($pimpinan)
+            ->get(route('pimpinan.cuti.attachment.download', $leave));
+        $download
             ->assertOk()
-            ->assertDownload('Lampiran_Cuti_'.strtoupper(substr($leave->id, 0, 8)).'.pdf');
+            ->assertDownload('Lampiran_Cuti_'.strtoupper(substr($leave->id, 0, 8)).'.pdf')
+            ->assertHeader('Pragma', 'no-cache')
+            ->assertHeader('X-Content-Type-Options', 'nosniff');
+        foreach (['private', 'no-store', 'max-age=0'] as $directive) {
+            $this->assertStringContainsString($directive, (string) $download->headers->get('Cache-Control'));
+        }
     }
 
     public function test_detail_shows_an_empty_attachment_state_without_a_fake_link(): void

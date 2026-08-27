@@ -5,11 +5,13 @@ namespace App\Services\Cuti;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -21,6 +23,8 @@ use Illuminate\Validation\ValidationException;
  */
 class LeaveEligibilityService
 {
+    public const FORM_OPTION_LIMIT = 100;
+
     private const CASE_TYPE_CODES = ['melahirkan', 'cltn'];
 
     /**
@@ -66,6 +70,79 @@ class LeaveEligibilityService
 
         $this->assertCaseMatches($leaveCase, $employee, $leaveType);
         $this->assertCasePeriodAllowed($leaveCase, $leaveType, $startDate, $endDate, $excludingLeaveRequest);
+    }
+
+    /**
+     * Menentukan rangkaian fakta eksternal tanpa menerapkan kelayakan pemohon normal.
+     * Hanya pencatatan pertama yang boleh membuat rangkaian; koreksi wajib memilih
+     * rangkaian existing agar perubahan jenis tidak membentuk hubungan diam-diam.
+     *
+     * @return array{0: LeaveRequestCase|null, 1: bool} [rangkaian, dibuatBaru]
+     */
+    public function resolveForManualUsage(
+        Employee $employee,
+        RefJenisCuti $leaveType,
+        Carbon $startDate,
+        Carbon $endDate,
+        ?string $leaveRequestCaseId = null,
+        ?LeaveUsageRecord $excludingManual = null,
+        bool $allowCreate = false,
+        ?User $actor = null,
+    ): array {
+        $this->assertSingleCalendarYear($startDate, $endDate);
+
+        if (! $this->requiresExplicitCase($leaveType)) {
+            if ($leaveRequestCaseId !== null) {
+                throw $this->validationError(
+                    'leave_request_case_id',
+                    'Keterkaitan rangkaian hanya berlaku untuk Cuti Melahirkan dan CLTN.',
+                );
+            }
+
+            return [null, false];
+        }
+
+        if ($leaveRequestCaseId === null) {
+            $this->assertWithinCalendarLimit($leaveType, $startDate, $endDate);
+
+            if (! $allowCreate) {
+                throw $this->validationError(
+                    'leave_request_case_id',
+                    'Rangkaian pengajuan cuti wajib dipilih saat mengoreksi Cuti Melahirkan atau CLTN.',
+                );
+            }
+
+            return [
+                LeaveRequestCase::query()->create([
+                    'employee_id' => $employee->id,
+                    'jenis_cuti_id' => $leaveType->id,
+                    'created_by' => $actor?->id,
+                ]),
+                true,
+            ];
+        }
+
+        // Caller telah mengunci pegawai lebih dahulu; urutan ini mencegah inversi lock pegawai-rangkaian.
+        $leaveCase = LeaveRequestCase::query()
+            ->whereKey($leaveRequestCaseId)
+            ->lockForUpdate()
+            ->first();
+
+        if ($leaveCase === null) {
+            throw $this->validationError('leave_request_case_id', 'Rangkaian pengajuan cuti yang dipilih tidak ditemukan.');
+        }
+
+        $this->assertCaseMatches($leaveCase, $employee, $leaveType);
+        $this->assertCasePeriodAllowed(
+            $leaveCase,
+            $leaveType,
+            $startDate,
+            $endDate,
+            null,
+            $excludingManual,
+        );
+
+        return [$leaveCase, false];
     }
 
     /**
@@ -153,9 +230,8 @@ class LeaveEligibilityService
         }
 
         if ($leaveRequest->leave_request_case_id === null) {
-            // Baris legacy tanpa rangkaian tidak boleh lolos resubmit diam-diam;
-            // migration Tahap 5 mengisi relasinya, dan error ini menjadi fail-closed
-            // bila ada data yang belum dimigrasikan dengan benar.
+            // Resubmit tanpa rangkaian eksplisit ditolak agar periode terpisah tidak dapat
+            // membuka kembali batas kalender Melahirkan atau CLTN.
             throw $this->validationError(
                 'leave_request_case_id',
                 'Rangkaian pengajuan cuti belum tersedia. Hubungi Admin Kepegawaian untuk memeriksa data pengajuan ini.',
@@ -177,24 +253,64 @@ class LeaveEligibilityService
 
     /**
      * Rangkaian yang dapat dipilih pemohon pada form. Hanya rangkaian miliknya
-     * sendiri dengan pengajuan yang belum berstatus Tidak Disetujui yang tampil;
-     * otorisasi dan kecocokan jenis tetap divalidasi ulang di server.
+     * sendiri yang memiliki pengajuan aktif atau fakta manual eksternal aktif
+     * yang tampil; otorisasi dan kecocokan jenis tetap divalidasi ulang di server.
      *
      * @return Collection<int, LeaveRequestCase>
      */
-    public function continuationCasesFor(Employee $employee): Collection
+    public function continuationCasesFor(Employee $employee, ?string $selectedCaseId = null): Collection
     {
-        return LeaveRequestCase::query()
+        $query = LeaveRequestCase::query()
             ->where('employee_id', $employee->id)
             ->whereHas('jenisCuti', fn ($query) => $query->whereIn('code', self::CASE_TYPE_CODES))
-            ->whereHas('leaveRequests', fn ($query) => $query->where('status', '!=', 'tidak_disetujui'))
+            ->where(function ($query): void {
+                $query->whereHas('leaveRequests', fn ($requestQuery) => $requestQuery
+                    ->whereIn('status', LeaveUsageOverlapService::ACTIVE_REQUEST_STATUSES))
+                    ->orWhereHas('leaveUsageRecords', fn ($usageQuery) => $usageQuery
+                        ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
+                        ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE));
+            })
+            ->select([
+                'leave_request_cases.id',
+                'leave_request_cases.employee_id',
+                'leave_request_cases.jenis_cuti_id',
+                'leave_request_cases.created_at',
+            ])
             ->with([
                 'jenisCuti:id,nama,code',
-                'leaveRequests' => fn ($query) => $query
-                    ->select(['id', 'leave_request_case_id', 'tanggal_mulai', 'tanggal_selesai', 'status'])
-                    ->orderBy('tanggal_mulai'),
             ])
-            ->latest('created_at')
+            // Periode diringkas oleh subquery agregat agar memori dan payload form
+            // tidak bertambah mengikuti jumlah histori pada setiap rangkaian.
+            ->withMin([
+                'leaveRequests as request_period_start' => fn ($query) => $query
+                    ->whereIn('status', LeaveUsageOverlapService::ACTIVE_REQUEST_STATUSES),
+            ], 'tanggal_mulai')
+            ->withMax([
+                'leaveRequests as request_period_end' => fn ($query) => $query
+                    ->whereIn('status', LeaveUsageOverlapService::ACTIVE_REQUEST_STATUSES),
+            ], 'tanggal_selesai')
+            ->withMin([
+                'leaveUsageRecords as manual_period_start' => fn ($query) => $query
+                    ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
+                    ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE),
+            ], 'start_date')
+            ->withMax([
+                'leaveUsageRecords as manual_period_end' => fn ($query) => $query
+                    ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
+                    ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE),
+            ], 'end_date');
+
+        // Nilai lama yang valid diprioritaskan supaya kegagalan validasi tidak
+        // menghilangkan pilihan hanya karena rangkaian tersebut berada di luar halaman terbaru.
+        if ($selectedCaseId !== null && Str::isUuid($selectedCaseId)) {
+            $query->orderByRaw('CASE WHEN leave_request_cases.id = ? THEN 0 ELSE 1 END', [$selectedCaseId]);
+        }
+
+        return $query
+            ->latest('leave_request_cases.created_at')
+            // UUID menjadi tie-breaker agar batas opsi tidak bergeser ketika case tercatat pada detik yang sama.
+            ->orderByDesc('leave_request_cases.id')
+            ->limit(self::FORM_OPTION_LIMIT)
             ->get();
     }
 
@@ -316,25 +432,46 @@ class LeaveEligibilityService
         Carbon $startDate,
         Carbon $endDate,
         ?LeaveRequest $excludingLeaveRequest = null,
+        ?LeaveUsageRecord $excludingManual = null,
     ): void {
-        $periods = $leaveCase->leaveRequests()
+        $requestBounds = $leaveCase->leaveRequests()
             ->when(
                 $excludingLeaveRequest !== null,
                 fn ($query) => $query->where('id', '!=', $excludingLeaveRequest->id),
             )
-            ->where('status', '!=', 'tidak_disetujui')
-            ->get(['tanggal_mulai', 'tanggal_selesai']);
+            ->whereIn('status', LeaveUsageOverlapService::ACTIVE_REQUEST_STATUSES)
+            ->toBase()
+            ->selectRaw('MIN(tanggal_mulai) AS earliest_start, MAX(tanggal_selesai) AS latest_end')
+            ->first();
+        $manualBounds = $leaveCase->leaveUsageRecords()
+            ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
+            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
+            ->when(
+                $excludingManual !== null,
+                fn ($query) => $query->where('id', '!=', $excludingManual->id),
+            )
+            ->toBase()
+            ->selectRaw('MIN(start_date) AS earliest_start, MAX(end_date) AS latest_end')
+            ->first();
 
         $earliestStart = $startDate->copy();
         $latestEnd = $endDate->copy();
 
-        foreach ($periods as $period) {
-            if ($period->tanggal_mulai->lt($earliestStart)) {
-                $earliestStart = $period->tanggal_mulai->copy();
+        foreach ([$requestBounds, $manualBounds] as $bounds) {
+            if ($bounds?->earliest_start !== null) {
+                $candidateStart = Carbon::parse($bounds->earliest_start)->startOfDay();
+
+                if ($candidateStart->lt($earliestStart)) {
+                    $earliestStart = $candidateStart;
+                }
             }
 
-            if ($period->tanggal_selesai->gt($latestEnd)) {
-                $latestEnd = $period->tanggal_selesai->copy();
+            if ($bounds?->latest_end !== null) {
+                $candidateEnd = Carbon::parse($bounds->latest_end)->startOfDay();
+
+                if ($candidateEnd->gt($latestEnd)) {
+                    $latestEnd = $candidateEnd;
+                }
             }
         }
 

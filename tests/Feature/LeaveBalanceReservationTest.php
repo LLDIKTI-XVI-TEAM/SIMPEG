@@ -9,12 +9,16 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Queries\Cuti\LeaveBalanceAdminEmployeeQuery;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveUsageRecordService;
 use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,7 +40,23 @@ class LeaveBalanceReservationTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    /** @return array{user: User, employee: Employee, supervisor: Employee, pybmc: Employee} */
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    /**
+     * @return array{
+     *     user: User,
+     *     employee: Employee,
+     *     supervisor: Employee,
+     *     supervisor_user: User,
+     *     pybmc: Employee,
+     *     pybmc_user: User
+     * }
+     */
     private function makePemohon(): array
     {
         $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
@@ -44,6 +64,8 @@ class LeaveBalanceReservationTest extends TestCase
         $supervisor = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $supervisorUser = User::factory()->kepalaBagian()->create(['employee_id' => $supervisor->id]);
+        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
 
         Appointment::create([
             'employee_id' => $employee->id,
@@ -96,7 +118,14 @@ class LeaveBalanceReservationTest extends TestCase
             'hangus' => 0,
         ]);
 
-        return compact('user', 'employee', 'supervisor', 'pybmc');
+        return [
+            'user' => $user,
+            'employee' => $employee,
+            'supervisor' => $supervisor,
+            'supervisor_user' => $supervisorUser,
+            'pybmc' => $pybmc,
+            'pybmc_user' => $pybmcUser,
+        ];
     }
 
     private function annualLeaveType(): RefJenisCuti
@@ -119,6 +148,32 @@ class LeaveBalanceReservationTest extends TestCase
         ]);
     }
 
+    /** Membentuk fakta Cuti Besar final melalui jalur approved-request kanonis. */
+    private function recordApprovedLargeUsage(Employee $employee, User $actor, string $name): LeaveRequest
+    {
+        $large = RefJenisCuti::create([
+            'nama' => $name,
+            'code' => 'besar',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => true,
+        ]);
+        $request = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $large->id,
+            'tanggal_mulai' => '2026-03-02',
+            'tanggal_selesai' => '2026-03-31',
+            'jumlah_hari_kerja' => 20,
+            'alasan' => 'Cuti Besar final.',
+            'status' => 'disetujui',
+        ]);
+        $fact = app(LeaveUsageRecordService::class)->recordApprovedRequest($request, $actor);
+
+        $this->assertSame(LeaveUsageRecord::SOURCE_APPROVED_REQUEST, $fact->source_type);
+        $this->assertSame(LeaveUsageRecord::STATUS_ACTIVE, $fact->record_status);
+
+        return $request;
+    }
+
     /** @return array<string, string> */
     private function payload(RefJenisCuti $jenis, string $mulai = '2026-07-06', string $selesai = '2026-07-10'): array
     {
@@ -132,15 +187,19 @@ class LeaveBalanceReservationTest extends TestCase
         ];
     }
 
-    /** @return array{request: LeaveRequest, actor: User, balance: LeaveBalance} */
+    /**
+     * @param  array{user:User,employee:Employee,supervisor:Employee,supervisor_user:User,pybmc:Employee,pybmc_user:User}|null  $actors
+     * @return array{request: LeaveRequest, actor: User, balance: LeaveBalance}
+     */
     private function makeReservedRequest(
         int $reservedDays = 5,
         ?RefJenisCuti $jenis = null,
         string $mulai = '2026-07-06',
         string $selesai = '2026-07-10',
         int $workdays = 5,
+        ?array $actors = null,
     ): array {
-        $aktor = $this->makePemohon();
+        $aktor = $actors ?? $this->makePemohon();
         $jenis ??= $this->annualLeaveType();
         $balance = LeaveBalance::query()
             ->where('employee_id', $aktor['employee']->id)
@@ -362,6 +421,40 @@ class LeaveBalanceReservationTest extends TestCase
         $this->assertSame(7, (int) LeaveBalanceReservationEvent::query()->sum('amount'));
     }
 
+    public function test_seluruh_consumer_reservasi_aktif_mengabaikan_event_non_tahunan_tanpa_menunggu_rekonsiliasi(): void
+    {
+        Carbon::setTestNow('2026-08-23 09:00:00');
+        $aktor = $this->makePemohon();
+        $this->makeReservedRequest(3, $this->annualLeaveType(), actors: $aktor);
+        $this->makeReservedRequest(20, $this->sickLeaveType(), actors: $aktor);
+        $tanggalAcuan = Carbon::parse('2026-08-23');
+
+        $this->assertSame(
+            9,
+            app(LeaveBalanceReservationService::class)
+                ->availableForSubmission($aktor['employee'], 2026, $tanggalAcuan),
+        );
+
+        $preview = app(LeaveBalanceService::class)->previewFor($aktor['employee'], $tanggalAcuan);
+        $this->assertSame(3, $preview['dialokasikan_aktif']);
+        $this->assertSame(9, $preview['saldo_dapat_diajukan']);
+
+        $workspace = app(LeaveBalanceAdminEmployeeQuery::class)
+            ->selectedWorkspace($aktor['employee']->id, 2026);
+        $this->assertSame(3, $workspace['activeReserved']);
+
+        app(LeaveBalanceRecalculationService::class)->recalculateForDatabaseUpgrade(
+            $aktor['employee'],
+            2026,
+            'Memastikan reservasi non-tahunan tidak memblokir rekalkulasi.',
+        );
+
+        $this->assertSame(12, (int) LeaveBalance::query()
+            ->where('employee_id', $aktor['employee']->id)
+            ->where('tahun', 2026)
+            ->value('sisa'));
+    }
+
     public function test_resubmit_recalculates_reservation_without_changing_final_balance(): void
     {
         $aktor = $this->makePemohon();
@@ -416,6 +509,19 @@ class LeaveBalanceReservationTest extends TestCase
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
         app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], 'Tanggal perlu dipindahkan ke tahun berikutnya.');
+        LeaveBalance::create([
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2027,
+            'jatah_awal' => 12,
+            'carry_over' => 0,
+            'terpakai' => 0,
+            'sisa' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 0,
+        ]);
 
         $this->actingAs($aktor['user'])
             ->patch(route('cuti.resubmit', $leaveRequest), [
@@ -449,7 +555,7 @@ class LeaveBalanceReservationTest extends TestCase
             ->value('sisa'));
     }
 
-    public function test_final_approval_converts_reservation_then_deducts_final_balance_once(): void
+    public function test_final_approval_converts_reservation_then_records_fact_and_replays_balance_once(): void
     {
         $aktor = $this->makePemohon();
         $jenis = $this->annualLeaveType();
@@ -460,8 +566,8 @@ class LeaveBalanceReservationTest extends TestCase
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
         $approval = app(LeaveApprovalService::class);
-        $approval->approve($leaveRequest, $aktor['supervisor']);
-        $approval->approve($leaveRequest->fresh(), $aktor['pybmc']);
+        $approval->approve($leaveRequest, $aktor['supervisor'], null, $aktor['supervisor_user']);
+        $approval->approve($leaveRequest->fresh(), $aktor['pybmc'], null, $aktor['pybmc_user']);
 
         $this->assertSame('disetujui', $leaveRequest->fresh()->status);
         $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
@@ -480,53 +586,82 @@ class LeaveBalanceReservationTest extends TestCase
         $balance = LeaveBalance::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
         $this->assertSame(7, $balance->sisa);
         $this->assertSame(5, $balance->terpakai);
-        $this->assertSame(-5, (int) LeaveBalanceLedger::query()
+        $fact = LeaveUsageRecord::query()
+            ->where('leave_request_id', $leaveRequest->id)
+            ->sole();
+        $this->assertSame(LeaveUsageRecord::SOURCE_APPROVED_REQUEST, $fact->source_type);
+        $this->assertSame(LeaveUsageRecord::STATUS_ACTIVE, $fact->record_status);
+        $this->assertSame(5, $fact->workdays);
+        $this->assertSame(1, LeaveBalanceLedger::query()
+            ->where('leave_request_id', $leaveRequest->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_USAGE_FACT_RECORDED)
+            ->count());
+        $this->assertSame(1, LeaveBalanceLedger::query()
+            ->where('employee_id', $aktor['employee']->id)
+            ->where('event_type', LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED)
+            ->count());
+        $this->assertSame(0, LeaveBalanceLedger::query()
             ->where('leave_request_id', $leaveRequest->id)
             ->where('event_type', LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED)
-            ->sum('amount'));
+            ->count());
     }
 
-    public function test_final_deduction_tahunan_ditolak_setelah_cuti_besar_final_tanpa_mutasi(): void
+    public function test_final_approval_tahunan_ditolak_setelah_cuti_besar_final_tanpa_mutasi(): void
     {
         $aktor = $this->makePemohon();
         $jenis = $this->annualLeaveType();
-        $annual = LeaveRequest::create([
-            'employee_id' => $aktor['employee']->id,
-            'jenis_cuti_id' => $jenis->id,
-            'tanggal_mulai' => '2026-07-06',
-            'tanggal_selesai' => '2026-07-10',
-            'jumlah_hari_kerja' => 5,
-            'alasan' => 'Request lama untuk uji direct deduction.',
-            'status' => 'menunggu_approval',
+        $this->recordApprovedLargeUsage($aktor['employee'], $aktor['pybmc_user'], 'Cuti Besar Rule 5');
+        $annual = $this->makeReservedRequest(jenis: $jenis, actors: $aktor)['request'];
+        $annual->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $aktor['supervisor']->id,
+                'status' => 'active',
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $aktor['pybmc']->id,
+                'status' => 'pending',
+                'is_final' => true,
+            ],
         ]);
-        LeaveRequest::create([
-            'employee_id' => $aktor['employee']->id,
-            'jenis_cuti_id' => RefJenisCuti::create([
-                'nama' => 'Cuti Besar Rule 5',
-                'code' => 'besar',
-                'mengurangi_saldo_tahunan' => false,
-                'khusus_pns' => true,
-            ])->id,
-            'tanggal_mulai' => '2026-08-03',
-            'tanggal_selesai' => '2026-08-31',
-            'jumlah_hari_kerja' => 20,
-            'alasan' => 'Cuti Besar final.',
-            'status' => 'disetujui',
-        ]);
+
+        $approval = app(LeaveApprovalService::class);
+        $approval->approve($annual, $aktor['supervisor'], null, $aktor['supervisor_user']);
 
         try {
-            app(LeaveBalanceService::class)->deductForFinalApproval($annual->load('jenisCuti'));
-            $this->fail('Deduction tahunan harus ditolak setelah Cuti Besar final.');
+            $approval->approve($annual->fresh(), $aktor['pybmc'], null, $aktor['pybmc_user']);
+            $this->fail('Persetujuan final tahunan harus ditolak setelah Cuti Besar final.');
         } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('tanggal_mulai', $exception->errors());
+            $this->assertSame(
+                'Cuti Tahunan tidak dapat digunakan pada tahun yang sama dengan Cuti Besar yang telah disetujui.',
+                $exception->errors()['tanggal_mulai'][0] ?? null,
+            );
         }
 
+        $this->assertSame('menunggu_approval', $annual->fresh()->status);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'leave_request_id' => $annual->id,
+            'step_order' => 2,
+            'status' => 'active',
+        ]);
+        $this->assertSame(5, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $annual->id)
+            ->sum('amount'));
         $balance = LeaveBalance::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
         $this->assertSame(12, $balance->sisa);
         $this->assertSame(0, $balance->terpakai);
+        $this->assertDatabaseMissing('leave_usage_records', [
+            'leave_request_id' => $annual->id,
+        ]);
         $this->assertDatabaseMissing('leave_balance_ledger', [
             'leave_request_id' => $annual->id,
-            'event_type' => LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED,
+            'event_type' => LeaveBalanceLedger::EVENT_USAGE_FACT_RECORDED,
         ]);
     }
 
@@ -534,21 +669,11 @@ class LeaveBalanceReservationTest extends TestCase
     {
         $aktor = $this->makePemohon();
         $annual = $this->annualLeaveType();
-        $large = RefJenisCuti::create([
-            'nama' => 'Cuti Besar Rule 5 Submit',
-            'code' => 'besar',
-            'mengurangi_saldo_tahunan' => false,
-            'khusus_pns' => true,
-        ]);
-        LeaveRequest::create([
-            'employee_id' => $aktor['employee']->id,
-            'jenis_cuti_id' => $large->id,
-            'tanggal_mulai' => '2026-03-02',
-            'tanggal_selesai' => '2026-03-31',
-            'jumlah_hari_kerja' => 20,
-            'alasan' => 'Cuti Besar final.',
-            'status' => 'disetujui',
-        ]);
+        $this->recordApprovedLargeUsage(
+            $aktor['employee'],
+            $aktor['pybmc_user'],
+            'Cuti Besar Rule 5 Submit',
+        );
 
         $this->actingAs($aktor['user'])
             ->postJson(route('cuti.store'), $this->payload($annual))
@@ -606,28 +731,16 @@ class LeaveBalanceReservationTest extends TestCase
     {
         $aktor = $this->makePemohon();
         $annual = $this->annualLeaveType();
-        $this->actingAs($aktor['user'])->post(route('cuti.store'), $this->payload($annual));
-        $request = LeaveRequest::query()->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($request, $aktor['supervisor'], 'Perbaiki tanggal.');
+        $this->recordApprovedLargeUsage(
+            $aktor['employee'],
+            $aktor['pybmc_user'],
+            'Cuti Besar Rule 5 Resubmit',
+        );
+        $request = $this->makeReservedRequest(jenis: $annual, actors: $aktor)['request'];
+        $request->forceFill(['status' => 'perlu_perubahan'])->save();
         $beforeReservation = (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
             ->sum('amount');
-
-        $large = RefJenisCuti::create([
-            'nama' => 'Cuti Besar Rule 5 Resubmit',
-            'code' => 'besar',
-            'mengurangi_saldo_tahunan' => false,
-            'khusus_pns' => true,
-        ]);
-        LeaveRequest::create([
-            'employee_id' => $aktor['employee']->id,
-            'jenis_cuti_id' => $large->id,
-            'tanggal_mulai' => '2026-03-02',
-            'tanggal_selesai' => '2026-03-31',
-            'jumlah_hari_kerja' => 20,
-            'alasan' => 'Cuti Besar final.',
-            'status' => 'disetujui',
-        ]);
 
         $this->actingAs($aktor['user'])
             ->patchJson(route('cuti.resubmit', $request), [
@@ -655,6 +768,11 @@ class LeaveBalanceReservationTest extends TestCase
     {
         $aktor = $this->makePemohon();
         $annual = $this->annualLeaveType();
+        $this->recordApprovedLargeUsage(
+            $aktor['employee'],
+            $aktor['pybmc_user'],
+            'Cuti Besar Rule 5 Guard Submit',
+        );
         $request = LeaveRequest::create([
             'employee_id' => $aktor['employee']->id,
             'jenis_cuti_id' => $annual->id,
@@ -664,20 +782,6 @@ class LeaveBalanceReservationTest extends TestCase
             'alasan' => 'Uji guard reservasi submit.',
             'status' => 'menunggu_approval',
         ])->load('jenisCuti');
-        LeaveRequest::create([
-            'employee_id' => $aktor['employee']->id,
-            'jenis_cuti_id' => RefJenisCuti::create([
-                'nama' => 'Cuti Besar Rule 5 Guard Submit',
-                'code' => 'besar',
-                'mengurangi_saldo_tahunan' => false,
-                'khusus_pns' => true,
-            ])->id,
-            'tanggal_mulai' => '2026-03-02',
-            'tanggal_selesai' => '2026-03-31',
-            'jumlah_hari_kerja' => 20,
-            'alasan' => 'Cuti Besar final.',
-            'status' => 'disetujui',
-        ]);
 
         try {
             app(LeaveBalanceReservationService::class)->reserveForNewRequest($request, $aktor['user']);
@@ -694,21 +798,14 @@ class LeaveBalanceReservationTest extends TestCase
 
     public function test_reservasi_resubmit_menolak_tahunan_dengan_pesan_rule_5_tanpa_mutasi(): void
     {
-        $fixture = $this->makeReservedRequest();
-        LeaveRequest::create([
-            'employee_id' => $fixture['request']->employee_id,
-            'jenis_cuti_id' => RefJenisCuti::create([
-                'nama' => 'Cuti Besar Rule 5 Guard Resubmit',
-                'code' => 'besar',
-                'mengurangi_saldo_tahunan' => false,
-                'khusus_pns' => true,
-            ])->id,
-            'tanggal_mulai' => '2026-03-02',
-            'tanggal_selesai' => '2026-03-31',
-            'jumlah_hari_kerja' => 20,
-            'alasan' => 'Cuti Besar final.',
-            'status' => 'disetujui',
-        ]);
+        $actors = $this->makePemohon();
+        $annual = $this->annualLeaveType();
+        $this->recordApprovedLargeUsage(
+            $actors['employee'],
+            $actors['pybmc_user'],
+            'Cuti Besar Rule 5 Guard Resubmit',
+        );
+        $fixture = $this->makeReservedRequest(jenis: $annual, actors: $actors);
 
         try {
             app(LeaveBalanceReservationService::class)->adjustForResubmission(

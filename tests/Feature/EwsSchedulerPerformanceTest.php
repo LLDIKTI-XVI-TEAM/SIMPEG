@@ -7,6 +7,7 @@ use App\Models\EmployeeMilestone;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
+use App\Models\SimpegNotification;
 use App\Services\EwsEngineService;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -204,21 +205,26 @@ class EwsSchedulerPerformanceTest extends TestCase
             ->count(5)
             ->create(['status_aktif' => 'Aktif']);
 
+        DB::flushQueryLog();
         DB::enableQueryLog();
         $service = app(EwsEngineService::class);
         $service->run();
         $queries5 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        // Clear and test with 10 employees
-        EwsAlert::truncate();
-        EwsSchedulerRun::truncate();
-        Employee::truncate();
+        // Reset hanya keluaran scheduler. Pegawai pertama dipertahankan agar fixture
+        // append-only tetap utuh dan sampel kedua benar-benar berisi total 10 pegawai.
+        SimpegNotification::query()->delete();
+        EwsAlert::query()->delete();
+        EwsSchedulerRun::query()->delete();
 
         Employee::factory()
-            ->count(10)
+            ->count(5)
             ->create(['status_aktif' => 'Aktif']);
 
+        $this->assertSame(10, Employee::query()->count());
+
+        DB::flushQueryLog();
         DB::enableQueryLog();
         $service = app(EwsEngineService::class);
         $service->run();

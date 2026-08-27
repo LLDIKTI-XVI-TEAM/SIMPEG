@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   qa:
-    name: ${{ github.event_name != 'push' && 'Pint + PHPStan + Test' || 'Development squash verification' }}
+    name: ${{ github.event_name != 'push' && 'Pint + PHPStan + JavaScript + Test' || 'Development squash verification' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -123,14 +123,29 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Run JavaScript tests
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: npm run test:js
+
       - name: Build frontend assets
         # Sebagian view Blade memakai @vite() yang butuh public/build/manifest.json.
         # Tanpa build ini, test yang merender view gagal 500 (ViteManifestNotFoundException).
         run: npm run build
 
-      - name: Run Laravel tests
+      - name: Run safe Laravel tests in parallel
         if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
-        run: composer test
+        run: composer test:ci:parallel
+
+      - name: Run serial Laravel tests
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: composer test:ci:serial
+
+      - name: Run guarded destructive migration tests
+        # Step terakhir pada jalur full sengaja mereset simpeg_test setelah suite utama selesai.
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        env:
+          SIMPEG_ALLOW_DESTRUCTIVE_MIGRATION_TESTS: 'true'
+        run: composer test:ci:guarded
 
       - name: Run development smoke tests
         if: github.event_name == 'push' && steps.development_push.outputs.mode == 'smoke'

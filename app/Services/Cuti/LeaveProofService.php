@@ -8,6 +8,7 @@ use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\User;
+use App\Support\Cuti\CutiInstitution;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
@@ -15,6 +16,7 @@ use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -34,7 +36,7 @@ class LeaveProofService
     /**
      * Nama institusi yang dicantumkan pada bukti verifikasi publik.
      */
-    private const INSTITUTION = 'LLDIKTI Wilayah XVI';
+    private const INSTITUTION = CutiInstitution::NAME;
 
     /**
      * Batas panjang URL verifikasi yang wajar sebelum dikirim ke encoder QR,
@@ -57,8 +59,12 @@ class LeaveProofService
      * Parameter Employee penerbit dipakai sebagai konteks aktor (mis. relasi step approver), sedangkan
      * kolom FK generated_by hanya boleh diisi UUID user, bukan UUID employee, agar jejak akun tetap benar.
      */
-    public function generateForApprovedRequest(LeaveRequest $leaveRequest, Employee $generatedByEmployee, ?User $generatedByUser = null): LeaveProof
-    {
+    public function generateForApprovedRequest(
+        LeaveRequest $leaveRequest,
+        Employee $generatedByEmployee,
+        ?User $generatedByUser = null,
+        ?Request $httpRequest = null,
+    ): LeaveProof {
         // Guard fail-closed: bukti final hanya untuk pengajuan yang benar-benar sudah disetujui penuh.
         if ($leaveRequest->status !== 'disetujui') {
             throw ValidationException::withMessages([
@@ -77,7 +83,7 @@ class LeaveProofService
         $leaveRequest->loadMissing(['employee', 'jenisCuti', 'approvals.approver', 'steps.approver']);
         $metadata = $this->buildMetadata($leaveRequest);
 
-        return DB::transaction(function () use ($leaveRequest, $generatedByEmployee, $generatedByUser, $metadata): LeaveProof {
+        return DB::transaction(function () use ($leaveRequest, $generatedByEmployee, $generatedByUser, $metadata, $httpRequest): LeaveProof {
             // Cek ulang di dalam transaksi agar dua penerbitan paralel tidak menghasilkan dua bukti.
             $existing = LeaveProof::query()->where('leave_request_id', $leaveRequest->id)->first();
 
@@ -94,7 +100,7 @@ class LeaveProofService
 
             // Audit penerbitan hanya ditulis untuk bukti yang benar-benar baru dibuat.
             if ($created) {
-                $this->auditGeneration($proof, $leaveRequest, $generatedByEmployee, $generatedByUser);
+                $this->auditGeneration($proof, $leaveRequest, $generatedByEmployee, $generatedByUser, $httpRequest);
             }
 
             return $proof;
@@ -426,8 +432,13 @@ class LeaveProofService
      * nama pegawai penerbit (mis. saat approval final tanpa akun user), lalu terakhir label sistem.
      * Ini hanya konteks aktor audit; FK generated_by tetap UUID user atau null, bukan identitas employee.
      */
-    private function auditGeneration(LeaveProof $proof, LeaveRequest $leaveRequest, Employee $generatedByEmployee, ?User $generatedByUser): void
-    {
+    private function auditGeneration(
+        LeaveProof $proof,
+        LeaveRequest $leaveRequest,
+        Employee $generatedByEmployee,
+        ?User $generatedByUser,
+        ?Request $httpRequest,
+    ): void {
         AuditLog::query()->create([
             'user_id' => $generatedByUser?->id,
             'user_name' => $generatedByUser?->name ?? $generatedByEmployee->nama_lengkap ?? 'Sistem SIMPEG',
@@ -442,6 +453,8 @@ class LeaveProofService
                 'generated_by' => $generatedByUser?->id,
                 'generated_at' => $proof->generated_at?->toIso8601String(),
             ],
+            'ip_address' => $httpRequest?->ip(),
+            'user_agent' => $httpRequest?->userAgent(),
         ]);
     }
 

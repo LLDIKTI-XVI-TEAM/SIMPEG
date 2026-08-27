@@ -9,9 +9,11 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
+#[Group('serial')]
 class SupervisorAssignmentConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;

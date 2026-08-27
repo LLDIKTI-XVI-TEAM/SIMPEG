@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\EwsConfig;
+use App\Services\Cuti\AnnualLeaveBusinessClock;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -17,10 +18,24 @@ Schedule::command('discipline-records:deactivate-expired')
 // Command menghitung tahun sumber saat dieksekusi agar aman untuk cron maupun scheduler worker yang berjalan lama.
 Schedule::command('cuti:rollover')
     ->yearlyOn(1, 1, '00:05')
+    // Mutex dua jam mencegah dua scheduler mereplay pegawai yang sama ketika proses tahunan masih berjalan.
+    ->withoutOverlapping(120)
     ->timezone(config('app.timezone'));
+
+// Projection nol direplay harian agar anniversary yang terlewat saat downtime tetap dipulihkan.
+Schedule::command('cuti:reconcile-anniversary-entitlements --limit=100')
+    ->dailyAt('00:15')
+    ->withoutOverlapping(30)
+    ->timezone(AnnualLeaveBusinessClock::TIMEZONE);
 
 // Reconciler bounded memulihkan claim import yang commit tetapi kehilangan publish queue.
 Schedule::command('import:recover-dispatches --limit=50')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->timezone(config('app.timezone'));
+
+// Recovery bounded memulihkan file privat yatim atau adoption yang terputus oleh hard crash.
+Schedule::command('storage:retry-recovery --limit=100')
     ->everyFiveMinutes()
     ->withoutOverlapping(10)
     ->timezone(config('app.timezone'));

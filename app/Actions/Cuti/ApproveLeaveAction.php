@@ -3,14 +3,17 @@
 namespace App\Actions\Cuti;
 
 use App\Actions\Cuti\Concerns\BuildsLeaveDecisionAuditPayload;
+use App\Exceptions\LeaveProofGenerationException;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Mengoordinasikan tindakan menyetujui pengajuan cuti.
@@ -28,52 +31,102 @@ class ApproveLeaveAction
     ) {}
 
     /**
-     * Menyetujui pengajuan cuti atas nama approver yang bertindak.
+     * Menyetujui pengajuan dengan aktor manusia eksplisit dan transaksi fail-closed.
+     * File PDF baru dikompensasi bila transaksi database atau notifikasi gagal.
      */
     public function execute(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar, Request $request): LeaveRequest
     {
-        $statusSebelum = $leaveRequest->status;
-        $stepSebelum = $leaveRequest->steps()
-            ->where('status', 'active')
-            ->where('approver_employee_id', $actor->id)
-            ->first();
-
-        // Aktor manusia dipisahkan dari approver Employee: user menjadi jejak akun penerbit bukti final,
-        // sedangkan otorisasi step tetap berbasis employee. Request::user() dapat mengembalikan
-        // Authenticatable|null, jadi dipersempit lewat instanceof alih-alih cast tak aman.
         $requestUser = $request->user();
-        $actingUser = $requestUser instanceof User ? $requestUser : null;
 
-        // Persetujuan dan jejaknya disatukan dalam satu transaksi supaya pengajuan tidak pernah
-        // berpindah tahap tanpa baris audit. Penerbitan bukti dan notifikasi tetap di luar transaksi
-        // agar kegagalannya tidak membatalkan persetujuan yang sah.
-        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $komentar, $request, $actingUser, $statusSebelum, $stepSebelum): LeaveRequest {
-            $leaveRequest = $this->approvals->approve($leaveRequest, $actor, $komentar, $actingUser);
-
-            // Persetujuan tahap menengah hanya meneruskan berkas, sedangkan tahap akhir menutup pengajuan.
-            // Keduanya dipisahkan agar penyaringan audit dapat membedakan verifikasi dari keputusan resmi.
-            $event = $leaveRequest->status === 'disetujui' ? 'DECIDE' : 'VERIFY';
-            $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, $event, $komentar);
-
-            AuditService::logOrFail(
-                $event,
-                'LeaveRequest',
-                $leaveRequest->id,
-                $auditPayload['old'],
-                $auditPayload['new'],
-                $request,
-            );
-
-            return $leaveRequest;
-        });
-
-        $this->notifyAfterApproval($leaveRequest);
-
-        if ($leaveRequest->status === 'disetujui') {
-            $this->proofs->execute($leaveRequest, $request->user() instanceof User ? $request->user() : null);
+        if (! $requestUser instanceof User || $requestUser->employee_id !== $actor->id) {
+            throw new AuthorizationException('Akun Anda tidak cocok dengan approver yang berwenang untuk tahap persetujuan ini.');
         }
 
-        return $leaveRequest;
+        $newDocumentPath = null;
+        $newDocumentRecoveryTaskId = null;
+
+        try {
+            $approved = DB::transaction(function () use (
+                $leaveRequest,
+                $actor,
+                $komentar,
+                $request,
+                $requestUser,
+                &$newDocumentPath,
+                &$newDocumentRecoveryTaskId,
+            ): LeaveRequest {
+                // State audit dibaca setelah request terkunci agar model stale atau keputusan paralel
+                // tidak dapat menulis status sebelum yang berbeda dari keadaan transaksi.
+                $lockedBefore = LeaveRequest::query()
+                    ->whereKey($leaveRequest->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $statusSebelum = $lockedBefore->status;
+                $stepSebelum = $lockedBefore->steps()
+                    ->where('status', 'active')
+                    ->where('approver_employee_id', $actor->id)
+                    ->orderBy('step_order')
+                    ->lockForUpdate()
+                    ->first();
+                $leaveRequest = $this->approvals->approve(
+                    $lockedBefore,
+                    $actor,
+                    $komentar,
+                    $requestUser,
+                    $request,
+                );
+
+                if ($leaveRequest->status === 'disetujui') {
+                    $proofResult = $this->proofs->execute($leaveRequest, $requestUser);
+                    $newDocumentPath = $proofResult['new_document_path'];
+                    $newDocumentRecoveryTaskId = $proofResult['recovery_task_id'];
+                }
+
+                // Notifikasi in-app tetap berada di transaksi; job email memakai afterCommit
+                // sehingga rollback tidak pernah mengirim keputusan yang belum sah.
+                $this->notifyAfterApproval($leaveRequest);
+
+                // Audit keputusan ditulis paling akhir agar kegagalannya membatalkan status,
+                // reservasi, fakta, replay, bukti metadata, dan notifikasi sebagai satu unit.
+                $event = $leaveRequest->status === 'disetujui' ? 'DECIDE' : 'VERIFY';
+                $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, $event, $komentar);
+                $auditPayload['new']['actor_role'] = $requestUser->role;
+
+                AuditService::logAsOrFail(
+                    $requestUser->id,
+                    (string) $requestUser->name,
+                    $event,
+                    'LeaveRequest',
+                    $leaveRequest->id,
+                    $auditPayload['old'],
+                    $auditPayload['new'],
+                    $request,
+                );
+
+                return $leaveRequest;
+            });
+        } catch (Throwable $exception) {
+            $primaryException = $exception;
+            if ($exception instanceof LeaveProofGenerationException) {
+                $newDocumentPath = $exception->cleanupPath;
+                $primaryException = $exception->getPrevious() ?? $exception;
+            }
+            $this->proofs->deleteNewDocument($leaveRequest->id, $newDocumentPath);
+
+            throw $primaryException;
+        }
+
+        if (is_string($newDocumentRecoveryTaskId) && is_string($newDocumentPath)) {
+            // Pada request normal transaksi approval sudah committed. Bila masih ada transaksi luar,
+            // adoption ikut commit atau rollback metadata sehingga intent aman tetap PREPARED saat batal.
+            $this->proofs->adoptNewDocument(
+                $newDocumentRecoveryTaskId,
+                $leaveRequest->id,
+                $newDocumentPath,
+            );
+        }
+
+        return $approved;
     }
 
     /**

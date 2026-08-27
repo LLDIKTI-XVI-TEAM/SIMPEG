@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Document;
+use App\Models\LeaveRequest;
+use App\Models\StorageRecoveryTask;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -10,7 +12,10 @@ use Illuminate\Support\Str;
 
 class EmployeeFileStorageService
 {
-    public function __construct(private readonly TransactionSideEffectManager $sideEffects) {}
+    public function __construct(
+        private readonly StorageRecoveryService $recovery,
+        private readonly TransactionSideEffectManager $sideEffects,
+    ) {}
 
     public function storePhoto(UploadedFile $file): string
     {
@@ -26,9 +31,136 @@ class EmployeeFileStorageService
      * Menyimpan lampiran pendukung pengajuan cuti (mis. surat keterangan).
      * Disimpan terpisah pada folder cuti agar berkas cuti tidak tercampur dengan dokumen pegawai lain.
      */
-    public function storeLampiran(UploadedFile $file): string
+    /** @return array{path:string,recovery_task_id:string} */
+    public function storeLampiran(UploadedFile $file, string $employeeId): array
     {
-        return $this->store($file, 'cuti');
+        $extension = strtolower($file->getClientOriginalExtension());
+        $mimeType = $file->getMimeType();
+        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
+        $allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+
+        if (! in_array($extension, $allowedExtensions, true)
+            || ! in_array($mimeType, $allowedMimeTypes, true)) {
+            throw new \InvalidArgumentException('Format lampiran cuti tidak diizinkan.');
+        }
+
+        $storedName = Str::uuid().'.'.$extension;
+        $directory = LeaveRequest::ATTACHMENT_PATH_PREFIX.'/'.$employeeId;
+        $expectedPath = $directory.'/'.$storedName;
+        $realPath = $file->getRealPath();
+        $sha256 = is_string($realPath) ? hash_file('sha256', $realPath) : false;
+        if (! is_string($sha256)) {
+            throw new \RuntimeException('Lampiran pengajuan gagal dihitung sebelum disimpan.');
+        }
+        $recoveryTask = $this->recovery->prepareLeaveAttachmentCreationTarget(
+            $expectedPath,
+            $employeeId,
+            $sha256,
+        );
+        $path = $file->storeAs($directory, $storedName, ['disk' => LeaveRequest::ATTACHMENT_STORAGE_DISK]);
+
+        if ($path === false || $path !== $expectedPath) {
+            throw new \RuntimeException('Gagal menyimpan lampiran pengajuan cuti.');
+        }
+
+        // Rollback request simulasi dijalankan setelah transaksi database berakhir, sehingga
+        // manifest recovery dapat dipersistenkan dan menghapus hanya lampiran milik pegawai ini.
+        $this->sideEffects->afterRollback(function () use ($path, $employeeId): void {
+            $this->deleteLeaveAttachment($path, $employeeId);
+        });
+
+        return ['path' => $path, 'recovery_task_id' => $recoveryTask->id];
+    }
+
+    /**
+     * Adoption ditunda sampai transaksi request terluar commit; tanpa scope luar,
+     * caller sudah menyelesaikan transaksi domain sehingga adoption dapat langsung dicoba.
+     */
+    public function adoptLeaveAttachment(string $taskId, string $employeeId, string $path): bool
+    {
+        if ($this->sideEffects->afterCommit(
+            fn () => $this->attemptLeaveAttachmentAdoption($taskId, $employeeId, $path),
+        )) {
+            return true;
+        }
+
+        return $this->attemptLeaveAttachmentAdoption($taskId, $employeeId, $path);
+    }
+
+    /** Mencatat lalu mencoba cleanup berkas cuti privat baru setelah transaksi domain gagal. */
+    public function deleteLeaveAttachment(?string $path, string $employeeId): bool
+    {
+        if ($path === null || $path === '') {
+            return true;
+        }
+
+        if (! $this->isCanonicalLeaveAttachmentPath($path, $employeeId)) {
+            Log::warning('Menolak menghapus lampiran cuti dengan path tidak kanonis.');
+
+            return false;
+        }
+
+        $task = $this->recovery->scheduleDelete(
+            StorageRecoveryService::CATEGORY_LEAVE_ATTACHMENT,
+            LeaveRequest::ATTACHMENT_STORAGE_DISK,
+            $path,
+            $employeeId,
+        );
+
+        return $this->recovery->attempt($task->id);
+    }
+
+    /**
+     * Menentukan disk dari path row terkunci dan menulis task di transaksi yang sama dengan penggantian referensi.
+     * Path di luar canonical-local atau exact legacy-public ditolak sebelum mutasi database dilakukan.
+     */
+    public function scheduleReplacedLeaveAttachment(?string $path, string $employeeId): ?StorageRecoveryTask
+    {
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        if ($this->isCanonicalLeaveAttachmentPath($path, $employeeId)) {
+            return $this->recovery->scheduleDelete(
+                StorageRecoveryService::CATEGORY_LEAVE_ATTACHMENT,
+                LeaveRequest::ATTACHMENT_STORAGE_DISK,
+                $path,
+                $employeeId,
+            );
+        }
+
+        if ($this->recovery->isSafeLegacyLeaveAttachmentPath($path)) {
+            // Legacy source dapat dipakai lintas pegawai, sehingga owner task sengaja null dan referensi dicek global.
+            return $this->recovery->scheduleDelete(
+                StorageRecoveryService::CATEGORY_LEAVE_ATTACHMENT,
+                'public',
+                $path,
+            );
+        }
+
+        throw new \RuntimeException('Lampiran lama tidak memenuhi kontrak path storage yang aman.');
+    }
+
+    public function attemptRecoveryTask(?string $taskId): bool
+    {
+        if ($taskId === null) {
+            return true;
+        }
+
+        // Penghapusan file lama tidak dapat di-rollback. Saat mutation berada di bawah
+        // transaksi middleware, tunggu commit terluar agar referensi lama tidak hidup kembali.
+        if ($this->sideEffects->afterCommit(fn () => $this->recovery->attempt($taskId))) {
+            return true;
+        }
+
+        return $this->recovery->attempt($taskId);
+    }
+
+    /** Unduhan hanya tersedia bila path kanonis dan byte cocok dengan manifest final yang diadopsi. */
+    public function hasLeaveAttachment(?string $path, string $employeeId): bool
+    {
+        return is_string($path)
+            && $this->recovery->verifyAdoptedLeaveAttachmentArtifact($employeeId, $path);
     }
 
     /**
@@ -68,20 +200,7 @@ class EmployeeFileStorageService
 
     public function deleteEmployeeDocumentFile(?string $path): void
     {
-        if ($path === null || $path === '') {
-            return;
-        }
-
-        try {
-            if (! Storage::disk(Document::STORAGE_DISK)->delete($path)) {
-                Log::warning('Gagal menghapus dokumen privat pegawai.', ['path' => $path]);
-            }
-        } catch (\Throwable $exception) {
-            Log::warning('Gagal menghapus dokumen privat pegawai.', [
-                'path' => $path,
-                'error' => $exception->getMessage(),
-            ]);
-        }
+        $this->deleteOnDisk($path, Document::STORAGE_DISK, 'dokumen privat pegawai');
     }
 
     private function store(UploadedFile $file, string $directory): string
@@ -89,8 +208,56 @@ class EmployeeFileStorageService
         return $this->storeOnDisk($file, $directory, 'public');
     }
 
-    private function storeOnDisk(UploadedFile $file, string $directory, string $disk): string
+    private function deleteOnDisk(?string $path, string $disk, string $label): void
     {
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        try {
+            if (! Storage::disk($disk)->delete($path)) {
+                Log::warning("Gagal menghapus {$label}.", ['path' => $path]);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning("Gagal menghapus {$label}.", ['path' => $path, 'error' => $exception->getMessage()]);
+        }
+    }
+
+    /** Path lampiran harus persis milik employee dan nama UUID hasil server sebelum baca atau hapus. */
+    private function isCanonicalLeaveAttachmentPath(?string $path, string $employeeId): bool
+    {
+        return is_string($path)
+            && $this->recovery->isCanonicalLeaveAttachmentPath($path, $employeeId);
+    }
+
+    /** Kegagalan adoption pasca-commit tidak boleh membuat klien mengulang pengajuan yang sudah sah. */
+    private function attemptLeaveAttachmentAdoption(string $taskId, string $employeeId, string $path): bool
+    {
+        try {
+            $this->recovery->markLeaveAttachmentCreationTargetAdopted($taskId, $employeeId, $path);
+
+            return true;
+        } catch (\Throwable $exception) {
+            try {
+                Log::critical('Intent target lampiran pengajuan gagal diadopsi setelah commit.', [
+                    'task_id' => $taskId,
+                    'employee_id' => $employeeId,
+                    'error_type' => $exception::class,
+                ]);
+            } catch (\Throwable) {
+                // Pelaporan sekunder tidak boleh mengubah pengajuan yang sudah committed.
+            }
+
+            return false;
+        }
+    }
+
+    private function storeOnDisk(
+        UploadedFile $file,
+        string $directory,
+        string $disk,
+        bool $registerRollbackCleanup = true,
+    ): string {
         $extension = strtolower($file->extension() ?: $file->getClientOriginalExtension());
         $filename = Str::uuid().'.'.$extension;
         $path = $file->storeAs($directory, $filename, ['disk' => $disk]);
@@ -99,17 +266,12 @@ class EmployeeFileStorageService
             throw new \RuntimeException('Gagal menyimpan file upload pegawai.');
         }
 
-        // Seluruh upload melalui service ini mendapat kompensasi ketika transaksi
-        // request simulasi gagal sesudah Action selesai.
-        $this->sideEffects->afterRollback(function () use ($disk, $path): void {
-            if ($disk === 'public') {
-                $this->deletePublicFile($path);
-
-                return;
-            }
-
-            $this->deleteEmployeeDocumentFile($path);
-        });
+        if ($registerRollbackCleanup) {
+            // Upload umum mengikuti disk aktual; lampiran cuti mendaftarkan recovery owner-scoped sendiri.
+            $this->sideEffects->afterRollback(
+                fn () => $this->deleteOnDisk($path, $disk, "berkas pada disk {$disk}"),
+            );
+        }
 
         return $path;
     }

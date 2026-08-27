@@ -39,7 +39,8 @@ class SkRequirementMatrixTest extends TestCase
             ->assertSee('max-w-3xl', false)
             ->assertSee('PPPK tidak memiliki konfigurasi awal dan dapat dikustom')
             ->assertSee('x-model="skMatrixDraft[typeId]"', false)
-            ->assertSee('@keydown.escape.window="closeSkRequirementModal()"', false)
+            ->assertSee('@keydown.escape.window="if (showSkRequirementModal) { closeSkRequirementModal() }"', false)
+            ->assertDontSee('@keydown.escape.window="closeSkRequirementModal()"', false)
             ->assertDontSee("document.querySelectorAll('#sk-requirement-modal input[type=checkbox]')", false)
             ->assertSee('Simpan Matriks');
     }

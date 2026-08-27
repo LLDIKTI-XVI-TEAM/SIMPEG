@@ -2,10 +2,12 @@
 
 namespace App\Actions\Cuti;
 
+use App\Data\Cuti\VerifierLeaveHistoryRow;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefHariLibur;
 use App\Models\User;
+use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -18,6 +20,8 @@ class BuildCutiDetailAction
         private readonly DownloadOfficialLeavePdfAction $pdfAction,
         private readonly PreviewLeaveBalanceAction $balancePreview,
         private readonly BuildVerifierLeaveContextAction $verifierContext,
+        private readonly EmployeeFileStorageService $files,
+        private readonly DownloadLeaveAttachmentAction $attachmentDownloads,
     ) {}
 
     /**
@@ -35,7 +39,7 @@ class BuildCutiDetailAction
      *     verifierContext: array{
      *         balance: array<string, mixed>,
      *         cutiBersama: Collection<int, RefHariLibur>,
-     *         riwayatTahunan: Collection<int, LeaveRequest>
+     *         riwayatTahunan: Collection<int, VerifierLeaveHistoryRow>
      *     }|null,
      *     activeStep: LeaveRequestStep|null
      * }
@@ -88,6 +92,8 @@ class BuildCutiDetailAction
             'canAct' => $canAct,
             'isVerifierContext' => $isVerifierContext,
             'canDownloadFormulir' => $canDownloadFormulir,
+            'attachmentAvailable' => $this->attachmentDownloads->canReadAsGeneralActor($cuti, $user)
+                && $this->files->hasLeaveAttachment($cuti->lampiran_path, $cuti->employee_id),
             'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
                 && $cuti->employee_id === $user->employee_id,
             'isRolloverReturn' => $isRolloverReturn,

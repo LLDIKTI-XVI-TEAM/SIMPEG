@@ -2,16 +2,10 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Actions\Cuti\AdjustLeaveBalanceAction;
-use App\Actions\Cuti\SetOpeningLeaveBalanceAction;
 use App\Actions\Cuti\ShowLeaveBalanceAdminAction;
 use App\Actions\Cuti\ShowMyLeaveBalanceAction;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Cuti\AdjustLeaveBalanceRequest;
 use App\Http\Requests\Cuti\LeaveBalanceAdminPageRequest;
-use App\Http\Requests\Cuti\OpeningLeaveBalanceRequest;
-use App\Models\Employee;
-use App\Models\User;
 use Illuminate\Http\Request;
 
 class LeaveBalanceController extends Controller
@@ -35,53 +29,5 @@ class LeaveBalanceController extends Controller
         }
 
         return view('admin.cuti.personal-saldo', $action->forWeb($employee, now()));
-    }
-
-    /**
-     * Menyimpan koreksi saldo dari halaman admin.
-     * Route dan request final akan memvalidasi detail input; method ini ada agar gate backend aktif lebih dulu.
-     */
-    public function storeOpeningBalance(OpeningLeaveBalanceRequest $request, Employee $employee, SetOpeningLeaveBalanceAction $action)
-    {
-        $actor = $request->user();
-        abort_unless($actor instanceof User, 403);
-        $payload = $request->validated();
-
-        $action->execute($employee, $payload, $actor);
-
-        return $this->redirectToAdminBalancePanel($employee, $payload)
-            ->with('success', 'Saldo awal cuti berhasil disimpan.');
-    }
-
-    /**
-     * Menyimpan koreksi saldo dari halaman admin.
-     * Request menangani validasi dan otorisasi; action menjaga controller tetap bebas logika bisnis.
-     */
-    public function adjust(AdjustLeaveBalanceRequest $request, Employee $employee, AdjustLeaveBalanceAction $action)
-    {
-        $actor = $request->user();
-        abort_unless($actor instanceof User, 403);
-        $payload = $request->validated();
-
-        $action->execute($employee, $payload, $actor);
-
-        return $this->redirectToAdminBalancePanel($employee, $payload)
-            ->with('success', 'Koreksi saldo cuti berhasil disimpan.');
-    }
-
-    /**
-     * Mengembalikan admin ke panel saldo pegawai yang baru dikoreksi agar konteks audit dan ledger tetap terlihat.
-     *
-     * @param  array<string, mixed>  $payload  Payload tervalidasi yang memuat konteks filter opsional.
-     */
-    private function redirectToAdminBalancePanel(Employee $employee, array $payload)
-    {
-        return redirect()->route('cuti.saldo.administrasi', array_filter([
-            'pegawai' => $employee->id,
-            'status' => $payload['status'] ?? null,
-            'search' => $payload['search'] ?? null,
-            'tab' => $payload['tab'] ?? null,
-            'page_pegawai' => $payload['page_pegawai'] ?? null,
-        ], static fn (mixed $value): bool => $value !== null && $value !== ''));
     }
 }

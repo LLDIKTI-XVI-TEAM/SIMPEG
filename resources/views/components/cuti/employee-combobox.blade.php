@@ -16,6 +16,8 @@
     'fallbackLabel' => 'Pilih Pegawai',
     'fallbackPlaceholder' => 'ID pegawai',
     'submitLabel' => 'Terapkan',
+    'embedded' => false,
+    'autoSubmit' => true,
 ])
 
 @php
@@ -25,11 +27,12 @@
     $fallbackOptions = collect($fallbackOptions);
 @endphp
 
-<form
+<div
     x-data="{
         query: @js($selectedLabel ?? $queryValue ?? ''),
         selectedId: @js($selectedId ?? ''),
         selectedLabel: @js($selectedLabel ?? ''),
+        autoSubmit: @js($autoSubmit),
         results: [],
         open: false,
         loading: false,
@@ -73,8 +76,12 @@
                 const url = new URL(this.endpoint, window.location.origin);
                 url.searchParams.set('q', term);
 
+                // Lookup AJAX tidak boleh menimpa URL sebelumnya yang dipakai redirect validasi Laravel.
                 const response = await fetch(url, {
-                    headers: { Accept: 'application/json' },
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     credentials: 'same-origin',
                     signal: this.controller.signal,
                 });
@@ -104,7 +111,19 @@
             this.results = [];
             this.open = false;
             this.activeIndex = -1;
-            this.$nextTick(() => document.getElementById(@js($id))?.form?.requestSubmit());
+            if (this.autoSubmit) {
+                this.$nextTick(() => document.getElementById(@js($id))?.form?.requestSubmit());
+            }
+        },
+        clearSelection() {
+            this.selectedId = '';
+            this.selectedLabel = '';
+            this.query = '';
+            this.results = [];
+            this.error = '';
+            this.open = false;
+            this.activeIndex = -1;
+            this.$nextTick(() => document.getElementById(@js($id))?.focus());
         },
         moveActive(direction) {
             if (! this.results.length) return;
@@ -116,6 +135,13 @@
             if (this.open && this.activeIndex >= 0 && this.results[this.activeIndex]) {
                 event.preventDefault();
                 this.choose(this.results[this.activeIndex]);
+
+                return;
+            }
+
+            if (! this.autoSubmit) {
+                event.preventDefault();
+                event.currentTarget?.form?.requestSubmit();
             }
         },
         close() {
@@ -130,17 +156,23 @@
             return '';
         },
     }"
-    method="GET"
-    action="{{ $action }}"
     {{ $attributes->class('min-w-0') }}
 >
+    @unless($embedded)
+        <form method="GET" action="{{ $action }}">
+    @endunless
+
     @foreach ($preserved as $preservedName => $preservedValue)
         @if ($preservedValue !== null && $preservedValue !== '')
             <input type="hidden" name="{{ $preservedName }}" value="{{ $preservedValue }}">
         @endif
     @endforeach
 
-    <input type="hidden" :name="selectedId ? @js($name) : null" x-model="selectedId">
+    @if($embedded)
+        <input type="hidden" name="{{ $name }}" value="{{ $selectedId ?? '' }}" x-model="selectedId">
+    @else
+        <input type="hidden" :name="selectedId ? @js($name) : null" x-model="selectedId">
+    @endif
 
     <div class="space-y-1">
         <label for="{{ $id }}" class="text-xs font-bold uppercase tracking-wider text-ink">{{ $label }}</label>
@@ -149,15 +181,17 @@
         <div class="relative">
             <input
                 id="{{ $id }}"
-                name="{{ $queryName }}"
-                :name="selectedId ? null : @js($queryName)"
+                @unless($embedded)
+                    name="{{ $queryName }}"
+                    :name="selectedId ? null : @js($queryName)"
+                @endunless
                 type="search"
                 x-model="query"
                 @input="onInput()"
                 @focus="if (results.length || loading || error) open = true"
                 @keydown.arrow-down.prevent="moveActive(1)"
                 @keydown.arrow-up.prevent="moveActive(-1)"
-                @keydown.enter.prevent="selectActive($event)"
+                @keydown.enter="selectActive($event)"
                 @keydown.escape.prevent="close()"
                 role="combobox"
                 aria-autocomplete="list"
@@ -207,28 +241,35 @@
 
         </div>
 
-        @if ($clearUrl)
+        @if($embedded)
+            <button x-show="selectedId" x-cloak type="button" @click="clearSelection()" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Bersihkan</button>
+        @elseif ($clearUrl)
             <a x-show="selectedId" x-cloak href="{{ $clearUrl }}" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Bersihkan</a>
         @endif
 
-        <button x-show="false" type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">{{ $submitLabel }}</button>
+        @unless($embedded)
+            <button x-show="false" type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">{{ $submitLabel }}</button>
+        @endunless
         </div>
 
         <p id="{{ $helpId }}" class="text-[11px] text-muted">{{ $help }}</p>
         <p id="{{ $statusId }}" class="sr-only" aria-live="polite" x-text="statusMessage()"></p>
 
-    <noscript>
-        @if ($fallbackOptions->isNotEmpty())
-            <label for="{{ $id }}-fallback" class="sr-only">{{ $fallbackLabel }}</label>
-            <select id="{{ $id }}-fallback" name="{{ $name }}" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                <option value="">Pilih pegawai dari hasil pencarian</option>
-                @foreach ($fallbackOptions as $employee)
-                    <option value="{{ $employee->id }}" @selected($selectedId === $employee->id)>{{ $employee->nama_lengkap }} ({{ $employee->nip }})</option>
-                @endforeach
-            </select>
-        @elseif ($fallbackName)
-            <label for="{{ $id }}-fallback" class="sr-only">{{ $fallbackLabel }}</label>
-            <input id="{{ $id }}-fallback" name="{{ $fallbackName }}" type="text" value="{{ $selectedId }}" placeholder="{{ $fallbackPlaceholder }}" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-        @endif
-    </noscript>
-</form>
+    @unless($embedded)
+        <noscript>
+            @if ($fallbackOptions->isNotEmpty())
+                <label for="{{ $id }}-fallback" class="sr-only">{{ $fallbackLabel }}</label>
+                <select id="{{ $id }}-fallback" name="{{ $name }}" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                    <option value="">Pilih pegawai dari hasil pencarian</option>
+                    @foreach ($fallbackOptions as $employee)
+                        <option value="{{ $employee->id }}" @selected($selectedId === $employee->id)>{{ $employee->nama_lengkap }} ({{ $employee->nip }})</option>
+                    @endforeach
+                </select>
+            @elseif ($fallbackName)
+                <label for="{{ $id }}-fallback" class="sr-only">{{ $fallbackLabel }}</label>
+                <input id="{{ $id }}-fallback" name="{{ $fallbackName }}" type="text" value="{{ $selectedId }}" placeholder="{{ $fallbackPlaceholder }}" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+            @endif
+        </noscript>
+        </form>
+    @endunless
+</div>

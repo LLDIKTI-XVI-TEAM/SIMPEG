@@ -51,16 +51,25 @@ class PimpinanFrontendViewTest extends TestCase
             'is_final' => true,
         ]);
 
-        $this->actingAs($this->pimpinan(['employee_id' => $approver->id]))
+        $response = $this->actingAs($this->pimpinan(['employee_id' => $approver->id]))
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
             ->assertSee('Pegawai Cuti Tampilan')
             ->assertSee('Perubahan')
             ->assertDontSee('Disetujui dengan Perubahan')
-            ->assertSee('Wajib diisi jika memilih Perubahan, Tunda Sementara, atau Tidak Disetujui...')
+            ->assertSee('Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui...')
+            ->assertDontSee('Tunda Sementara')
             ->assertDontSee('aria-describedby="decision-note-help keputusan-error"', false)
             ->assertDontSee('aria-describedby="decision-note-help catatan-error"', false)
+            ->assertSee('aria-describedby="pimpinan-approval-confirmation-description"', false)
+            ->assertSee('id="pimpinan-approval-confirmation-description"', false)
+            ->assertSee('@keydown.escape.window="if (confirmOpen) { confirmOpen = false }"', false)
             ->assertSee(route('pimpinan.cuti.decision', $leave), false);
+
+        $this->assertMatchesRegularExpression(
+            '/<button(?=[^>]*\bid="pimpinan-approval-confirmation-cancel")(?=[^>]*\bdata-modal-initial-focus="true")[^>]*>/s',
+            (string) $response->getContent(),
+        );
     }
 
     public function test_leave_surfaces_label_returned_rollover_without_offering_a_decision(): void
@@ -71,7 +80,7 @@ class PimpinanFrontendViewTest extends TestCase
             'employee_id' => $applicant->id,
             'jenis_cuti_id' => RefJenisCuti::create([
                 'nama' => 'Cuti Tahunan Rollover Pimpinan',
-                'code' => 'tahunan_rollover_pimpinan',
+                'code' => 'tahunan',
                 'mengurangi_saldo_tahunan' => true,
                 'khusus_pns' => false,
             ])->id,
@@ -121,7 +130,7 @@ class PimpinanFrontendViewTest extends TestCase
             'employee_id' => $applicant->id,
             'jenis_cuti_id' => RefJenisCuti::create([
                 'nama' => 'Cuti Tahunan Counter Rollover',
-                'code' => 'tahunan_counter_rollover',
+                'code' => 'tahunan',
                 'mengurangi_saldo_tahunan' => true,
                 'khusus_pns' => false,
             ])->id,

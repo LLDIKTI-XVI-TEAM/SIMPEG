@@ -4,15 +4,15 @@ namespace App\Actions\Cuti;
 
 use App\Models\Employee;
 use App\Models\LeaveBalance;
-use App\Models\LeaveRequest;
+use App\Models\User;
 use App\Queries\Cuti\CutiRekapQuery;
-use App\Support\Cuti\CutiReportStatusFormatter;
+use App\Services\Rbac\UiPermissionCapabilityService;
 
 class ShowCutiRekapAction
 {
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
-        private readonly CutiReportStatusFormatter $statusFormatter,
+        private readonly UiPermissionCapabilityService $capabilities,
     ) {}
 
     /**
@@ -21,7 +21,7 @@ class ShowCutiRekapAction
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function execute(array $filters): array
+    public function execute(array $filters, ?User $actor = null): array
     {
         $periode = $this->stringFilter($filters, 'periode');
         $unit = $this->stringFilter($filters, 'unit');
@@ -38,28 +38,21 @@ class ShowCutiRekapAction
         $leaveBalances = (clone $balanceQuery)->paginate(10, ['*'], 'page_saldo')->withQueryString();
         $leaveBalances->through(fn (LeaveBalance $balance): array => $this->mapBalance($balance));
 
-        $usageRows = $this->rekapQuery->detailRows($filters)
-            ->paginate(10, ['*'], 'page_usage')
-            ->withQueryString();
-        $usageRows->through(fn (LeaveRequest $leaveRequest): array => [
-            'nama' => $leaveRequest->employee?->nama_lengkap ?? '-',
-            'nip' => $leaveRequest->employee?->nip ?? '-',
-            'jenis' => $leaveRequest->jenisCuti?->nama ?? '-',
-            'mulai' => $leaveRequest->tanggal_mulai?->format('d M Y') ?? '-',
-            'selesai' => $leaveRequest->tanggal_selesai?->format('d M Y') ?? '-',
-            'hari' => $leaveRequest->jumlah_hari_kerja,
-            'status' => $leaveRequest->status,
-            'status_label' => $this->statusFormatter->format($leaveRequest),
-        ]);
+        $usageRows = $this->rekapQuery->paginateDetailRows($filters, 10, 'page_usage');
 
         $selectedEmployee = $pegawaiId === null
             ? null
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
+        $unitOptions = $this->rekapQuery->unitOptions($unit);
+        $jenisOptions = $this->rekapQuery->leaveTypeOptions($jenisId);
+        $canAdministerBalance = $actor?->getEffectiveRole() === 'admin_kepegawaian'
+            && ($this->capabilities->allows($actor, 'cuti.balance.reconcile')
+                || $this->capabilities->allows($actor, 'cuti.manual.manage'));
 
         return compact(
             'summary', 'leaveBalances', 'usageRows',
             'periode', 'unit', 'pegawaiId', 'jenisId',
-            'selectedEmployee',
+            'selectedEmployee', 'unitOptions', 'jenisOptions', 'canAdministerBalance',
         );
     }
 
@@ -73,7 +66,7 @@ class ShowCutiRekapAction
             'tahun' => $balance->tahun,
             'nama' => $balance->employee?->nama_lengkap ?? '-',
             'nip' => $balance->employee?->nip ?? '-',
-            'unit' => $balance->employee?->jabatan_terakhir ?? '-',
+            'unit' => $balance->getAttribute('unit_name') ?? '-',
             'jatah' => $balance->jatah_awal,
             'carry' => $balance->carry_over,
             'sisa_n2' => $balance->sisa_n2,

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\GenerateLeaveProofAction;
 use App\Models\Employee;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
@@ -11,6 +12,9 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 class PimpinanLeaveProofTest extends TestCase
@@ -22,6 +26,7 @@ class PimpinanLeaveProofTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        Storage::fake('local');
     }
 
     public function test_final_approval_generates_one_private_leave_proof_document(): void
@@ -88,14 +93,104 @@ class PimpinanLeaveProofTest extends TestCase
             'catatan' => 'Disetujui.',
         ]);
 
-        $this->actingAs($pimpinan)
-            ->get(route('pimpinan.cuti.document.show', $leave))
-            ->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
-        $this->actingAs($pimpinan)
-            ->get(route('pimpinan.cuti.document.download', $leave))
-            ->assertOk()
-            ->assertHeader('content-type', 'application/pdf');
+        foreach (['pimpinan.cuti.document.show', 'pimpinan.cuti.document.download'] as $routeName) {
+            $response = $this->actingAs($pimpinan)
+                ->get(route($routeName, $leave))
+                ->assertOk()
+                ->assertHeader('content-type', 'application/pdf')
+                ->assertHeader('pragma', 'no-cache')
+                ->assertHeader('x-content-type-options', 'nosniff');
+
+            $cacheControl = strtolower((string) $response->headers->get('cache-control'));
+            $this->assertStringContainsString('no-store', $cacheControl);
+            $this->assertStringContainsString('no-cache', $cacheControl);
+            $this->assertStringContainsString('must-revalidate', $cacheControl);
+            $this->assertSame('0', $response->headers->get('expires'));
+        }
+    }
+
+    /** @return array<string, array{string}> */
+    public static function invalidStoredProofCases(): array
+    {
+        return [
+            'folder request lain' => ['cross_request'],
+            'folder dokumen pegawai' => ['employee_documents'],
+            'path traversal' => ['traversal'],
+            'mime bukan PDF' => ['wrong_mime'],
+            'file hilang' => ['missing'],
+        ];
+    }
+
+    /** @return array<string, array{string}> */
+    public static function invalidExistingProofCases(): array
+    {
+        return [
+            'folder request lain' => ['cross_request'],
+            'folder dokumen pegawai' => ['employee_documents'],
+            'mime bukan PDF' => ['wrong_mime'],
+        ];
+    }
+
+    #[DataProvider('invalidStoredProofCases')]
+    public function test_download_bukti_tersimpan_fail_closed_untuk_path_mime_atau_file_tidak_sah(string $case): void
+    {
+        [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
+
+        $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'keputusan' => 'DISETUJUI',
+            'catatan' => 'Disetujui.',
+        ])->assertRedirect();
+
+        $proof = LeaveProof::query()->where('leave_request_id', $leave->id)->sole();
+        $filename = Str::uuid().'.pdf';
+        $path = match ($case) {
+            'cross_request' => 'leave-proofs/'.Str::uuid().'/'.$filename,
+            'employee_documents' => 'employee-documents/'.$leave->employee_id.'/'.$filename,
+            'traversal' => 'leave-proofs/'.$leave->id.'/../'.$filename,
+            default => 'leave-proofs/'.$leave->id.'/'.$filename,
+        };
+
+        if ($case !== 'missing' && $case !== 'traversal') {
+            $this->assertTrue(Storage::disk('local')->put($path, "%PDF-1.4\nSIMPEG TEST\n%%EOF"));
+        }
+
+        $proof->forceFill([
+            'document_path' => $path,
+            'document_mime' => $case === 'wrong_mime' ? 'image/png' : 'application/pdf',
+        ])->save();
+
+        foreach (['pimpinan.cuti.document.show', 'pimpinan.cuti.document.download'] as $routeName) {
+            $this->actingAs($pimpinan)
+                ->get(route($routeName, $leave))
+                ->assertNotFound()
+                ->assertDontSee('SIMPEG TEST');
+        }
+    }
+
+    #[DataProvider('invalidExistingProofCases')]
+    public function test_generator_idempoten_menolak_bukti_existing_yang_tidak_memenuhi_kontrak_storage(string $case): void
+    {
+        [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
+
+        $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'keputusan' => 'DISETUJUI',
+            'catatan' => 'Disetujui.',
+        ])->assertRedirect();
+
+        $proof = LeaveProof::query()->where('leave_request_id', $leave->id)->sole();
+        $path = $case === 'cross_request'
+            ? 'leave-proofs/'.Str::uuid().'/'.Str::uuid().'.pdf'
+            : ($case === 'employee_documents'
+                ? 'employee-documents/'.$leave->employee_id.'/'.Str::uuid().'.pdf'
+                : (string) $proof->document_path);
+        $this->assertTrue(Storage::disk('local')->put($path, "%PDF-1.4\nSIMPEG TEST\n%%EOF"));
+        $proof->forceFill([
+            'document_path' => $path,
+            'document_mime' => $case === 'wrong_mime' ? 'image/png' : 'application/pdf',
+        ])->save();
+
+        $this->expectException(RuntimeException::class);
+        app(GenerateLeaveProofAction::class)->execute($leave->fresh(), $pimpinan);
     }
 
     public function test_non_pimpinan_cannot_open_a_final_leave_document(): void

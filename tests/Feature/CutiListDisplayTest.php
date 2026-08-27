@@ -182,7 +182,7 @@ class CutiListDisplayTest extends TestCase
         $user = User::factory()->superAdmin()->create();
         $jenis = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Rule 3',
-            'code' => 'tahunan-rule-3-list',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -215,7 +215,7 @@ class CutiListDisplayTest extends TestCase
         $user = User::factory()->superAdmin()->create();
         $jenis = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Rollover',
-            'code' => 'tahunan_rollover_list',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);

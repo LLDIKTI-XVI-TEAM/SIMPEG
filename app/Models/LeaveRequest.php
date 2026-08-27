@@ -31,6 +31,10 @@ class LeaveRequest extends Model
 {
     use HasUuid;
 
+    public const ATTACHMENT_STORAGE_DISK = 'local';
+
+    public const ATTACHMENT_PATH_PREFIX = 'cuti/lampiran';
+
     public const STATUS_DUTY_POSTPONED = 'ditangguhkan_tugas_dinas';
 
     public const STATUS_RETURNED_FOR_ROLLOVER = 'dikembalikan_karena_rollover';
@@ -102,5 +106,11 @@ class LeaveRequest extends Model
     public function balanceReservationEvents(): HasMany
     {
         return $this->hasMany(LeaveBalanceReservationEvent::class);
+    }
+
+    /** @return HasOne<LeaveUsageRecord, $this> */
+    public function usageRecord(): HasOne
+    {
+        return $this->hasOne(LeaveUsageRecord::class, 'leave_request_id');
     }
 }
