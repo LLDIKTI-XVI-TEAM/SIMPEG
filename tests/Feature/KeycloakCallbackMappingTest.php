@@ -757,14 +757,21 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_database_seeder_does_not_create_demo_role_users(): void
+    public function test_database_seeder_creates_demo_role_users(): void
     {
-        // DemoSsoUserSeeder dihapus: seluruh login wajib melalui identitas Keycloak asli,
-        // sehingga seeder tidak boleh menanam akun demo dengan password lokal.
+        // Setelah merge development, DatabaseSeeder memanggil DemoSsoUserSeeder + SsoRoleMappedAccountSeeder
+        // sehingga akun demo tetap tersedia untuk PhaseSevenBrowserQaSeeder, bersama mapping SSO.
         $this->seed(DatabaseSeeder::class);
 
         foreach (['demo-klabat', 'demo-klabat-kepeg', 'demo-klabat-kabag', 'demo-klabat-pimpinan', 'demo-klabat-pegawai'] as $username) {
-            $this->assertNull(User::where('keycloak_username', $username)->first(), "Demo user {$username} tidak boleh ada.");
+            $this->assertNotNull(User::where('keycloak_username', $username)->first(), "Demo user {$username} harus ada untuk fixture browser QA.");
+        }
+
+        foreach ((array) config('services.keycloak.role_mapping', []) as $email => $role) {
+            $this->assertDatabaseHas('users', [
+                'email' => $email,
+                'role' => $role,
+            ]);
         }
     }
 
