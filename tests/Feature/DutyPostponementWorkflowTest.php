@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\RecordDutyPostponementAction;
+use App\Data\Cuti\CutiRekapReadRow;
+use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApproval;
@@ -130,7 +132,7 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder([
                 'data-action-visual="temporary-secondary"',
-                'Tunda Sementara',
+                'Ditangguhkan',
                 'Penangguhan karena tugas dinas menutup pengajuan lama dan melindungi hak sesuai ketentuan.',
                 'data-action-visual="terminal-warning"',
                 'Tangguhkan karena Tugas Dinas',
@@ -145,7 +147,9 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertSee('minlength="5"', false)
             ->assertSee('maxlength="500"', false)
             ->assertSee('aria-describedby="decision-description-duty-postponement alasan-duty-postponement-help', false)
-            ->assertSee('@keydown.escape.window="close()"', false)
+            ->assertSee('@keydown.escape.window="if (decisionForm === &#039;dutyPostponement&#039;) { close() }"', false)
+            ->assertDontSee('@keydown.escape.window="close()"', false)
+            ->assertSee('@keydown.escape.window="if (decisionForm !== null) close()"', false)
             ->assertSee('this.$nextTick(() => this.lastTrigger?.focus())', false)
             ->assertSee('Konfirmasi Penangguhan Tugas Dinas');
     }
@@ -164,7 +168,8 @@ class DutyPostponementWorkflowTest extends TestCase
         $this->actingAs($fixture['actingUser'])
             ->get(route('cuti.show', $fixture['request']))
             ->assertOk()
-            ->assertSee('Tunda Sementara')
+            ->assertSee('Ditangguhkan')
+            ->assertDontSee('Tunda Sementara')
             ->assertDontSee(route('cuti.penangguhan-tugas-dinas', $fixture['request']), false);
 
         $fixture['request']->forceFill([
@@ -214,9 +219,15 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertDontSee(route('cuti.penangguhan-tugas-dinas', $terminal), false);
 
         $formatter = app(CutiReportStatusFormatter::class);
-        $this->assertSame('Ditangguhkan karena Tugas Dinas', $formatter->format($terminal));
+        $this->assertSame(
+            'Ditangguhkan karena Tugas Dinas',
+            $formatter->format($terminal->status, null, CutiRekapReadRow::SOURCE_LEAVE_REQUEST),
+        );
         $terminal->forceFill(['status' => 'ditangguhkan']);
-        $this->assertSame('Ditangguhkan', $formatter->format($terminal));
+        $this->assertSame(
+            'Ditangguhkan',
+            $formatter->format($terminal->status, null, CutiRekapReadRow::SOURCE_LEAVE_REQUEST),
+        );
     }
 
     public function test_duty_postponement_admin_detail_localizes_other_skipped_reasons(): void
@@ -796,7 +807,7 @@ class DutyPostponementWorkflowTest extends TestCase
             try {
                 $service = app(LeaveApprovalService::class);
                 match ($decision) {
-                    'approve' => $service->approve($terminal, $fixture['actor']),
+                    'approve' => $service->approve($terminal, $fixture['actor'], null, $fixture['actingUser']),
                     'postpone' => $service->postpone($terminal, $fixture['actor'], 'Keputusan lanjutan tidak sah.'),
                     'requestChanges' => $service->requestChanges($terminal, $fixture['actor'], 'Keputusan lanjutan tidak sah.'),
                     'decline' => $service->decline($terminal, $fixture['actor'], 'Keputusan lanjutan tidak sah.'),
@@ -922,9 +933,11 @@ class DutyPostponementWorkflowTest extends TestCase
                 ->sole();
             $metadata = $ledger->metadata;
             $metadata[$fact] = $corruptedValue;
-            DB::table('leave_balance_ledger')
-                ->where('id', $ledger->id)
-                ->update(['metadata' => json_encode($metadata, JSON_THROW_ON_ERROR)]);
+            $this->mutateLedgerForCorruptionFixture(
+                fn () => DB::table('leave_balance_ledger')
+                    ->where('id', $ledger->id)
+                    ->update(['metadata' => json_encode($metadata, JSON_THROW_ON_ERROR)]),
+            );
             $counts = $this->effectCounts($terminal->id);
 
             try {
@@ -993,9 +1006,11 @@ class DutyPostponementWorkflowTest extends TestCase
         // dari sisi ledger karena baris audit tidak dapat diubah lagi setelah tersimpan.
         $metadata = $ledger->metadata;
         $metadata['source_status'] = 'disetujui';
-        DB::table('leave_balance_ledger')->where('id', $ledger->id)->update([
-            'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
-        ]);
+        $this->mutateLedgerForCorruptionFixture(
+            fn () => DB::table('leave_balance_ledger')->where('id', $ledger->id)->update([
+                'metadata' => json_encode($metadata, JSON_THROW_ON_ERROR),
+            ]),
+        );
         $counts = $this->effectCounts($terminal->id);
 
         try {
@@ -1118,7 +1133,9 @@ class DutyPostponementWorkflowTest extends TestCase
     private function deleteTerminalEffect(string $requestId, string $effect): void
     {
         match ($effect) {
-            'ledger' => DB::table('leave_balance_ledger')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)->delete(),
+            'ledger' => $this->mutateLedgerForCorruptionFixture(
+                fn () => DB::table('leave_balance_ledger')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)->delete(),
+            ),
             'release' => DB::table('leave_balance_reservation_events')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceReservationEvent::EVENT_RELEASED)->delete(),
             'approval' => DB::table('leave_approvals')->where('leave_request_id', $requestId)->where('action', LeaveApproval::ACTION_DUTY_POSTPONEMENT)->delete(),
             'notification' => DB::table('notifications')->where('data->leave_request_id', $requestId)->where('type', 'cuti.ditangguhkan_tugas_dinas')->delete(),
@@ -1128,11 +1145,25 @@ class DutyPostponementWorkflowTest extends TestCase
     private function corruptTerminalEffect(string $requestId, string $effect): void
     {
         match ($effect) {
-            'ledger' => DB::table('leave_balance_ledger')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)->update(['reason' => 'Alasan ledger dirusak.']),
+            'ledger' => $this->mutateLedgerForCorruptionFixture(
+                fn () => DB::table('leave_balance_ledger')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)->update(['reason' => 'Alasan ledger dirusak.']),
+            ),
             'release' => DB::table('leave_balance_reservation_events')->where('leave_request_id', $requestId)->where('event_type', LeaveBalanceReservationEvent::EVENT_RELEASED)->update(['created_by' => User::factory()->create()->id]),
             'approval' => DB::table('leave_approvals')->where('leave_request_id', $requestId)->where('action', LeaveApproval::ACTION_DUTY_POSTPONEMENT)->update(['komentar' => 'Komentar history dirusak.']),
             'notification' => DB::table('notifications')->where('data->leave_request_id', $requestId)->where('type', 'cuti.ditangguhkan_tugas_dinas')->update(['title' => 'Judul dirusak']),
         };
+    }
+
+    private function mutateLedgerForCorruptionFixture(callable $mutation): void
+    {
+        // Regression ini membutuhkan state korup buatan; guard ledger tetap aktif di luar mutation fixture sempit ini.
+        DB::statement('ALTER TABLE leave_balance_ledger DISABLE TRIGGER leave_balance_ledger_no_update_delete');
+
+        try {
+            $mutation();
+        } finally {
+            DB::statement('ALTER TABLE leave_balance_ledger ENABLE TRIGGER leave_balance_ledger_no_update_delete');
+        }
     }
 
     private function setDutyPostponementChannelPolicy(string $channelCode, bool $isEnabled): void
@@ -1153,6 +1184,11 @@ class DutyPostponementWorkflowTest extends TestCase
     private function makeWorkflowFixture(): array
     {
         $applicant = Employee::factory()->create();
+        Appointment::create([
+            'employee_id' => $applicant->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+        ]);
         User::factory()->pegawai()->create(['employee_id' => $applicant->id]);
         $actor = Employee::factory()->create();
         $actingUser = User::factory()->kepalaBagian()->create(['employee_id' => $actor->id]);

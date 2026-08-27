@@ -13,7 +13,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3" x-data="cutiForm(@js($saldoCuti), @js($continuationLeaveCases))">
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3" x-data="cutiForm(@js($saldoCuti), @js($continuationLeaveCases), @js($leaveTypeCodes))">
             <div class="lg:col-span-2">
                 @if(!$isKepalaLembaga)
                 <form action="{{ route('cuti.store') }}" method="POST" enctype="multipart/form-data" class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
@@ -58,7 +58,7 @@
                                 :disabled="$formLocked">
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
-                                    <option value="{{ $jenis->id }}" data-code="{{ $jenis->code }}" data-mengurangi-saldo-tahunan="{{ $jenis->mengurangi_saldo_tahunan ? 'true' : 'false' }}">{{ $jenis->nama }}</option>
+                                    <option value="{{ $jenis->id }}" data-code="{{ $jenis->code }}" @selected(old('jenis_cuti_id') === $jenis->id)>{{ $jenis->nama }}</option>
                                 @endforeach
                             </x-form.select>
                             @error('jenis_cuti_id')
@@ -66,15 +66,15 @@
                             @enderror
                         </div>
 
-                        {{-- K-CUT-02: sambungkan pengajuan yang dipecah karena batas tahun ke rangkaian
-                            eksplisit milik pemohon. Tidak ada hubungan yang disimpulkan dari teks alasan. --}}
+                        {{-- Pengajuan lintas tahun disambungkan ke rangkaian eksplisit milik pemohon,
+                            bukan disimpulkan dari teks alasan yang dapat berubah. --}}
                         <div x-show="requiresLeaveCase()" x-cloak>
                             <label for="leave_request_case_id" class="mb-1 block text-sm font-medium text-ink">Rangkaian Pengajuan</label>
                             <x-form.select id="leave_request_case_id" name="leave_request_case_id" x-model="selectedLeaveRequestCase"
                                 :disabled="$formLocked" aria-describedby="leave_request_case_id-help">
                                 <option value="">Pengajuan baru (bukan kelanjutan rangkaian sebelumnya)</option>
                                 <template x-for="leaveCase in casesForSelectedType()" :key="leaveCase.id">
-                                    <option :value="leaveCase.id" x-text="leaveCase.label"></option>
+                                    <option :value="leaveCase.id" :selected="leaveCase.id === selectedLeaveRequestCase" x-text="leaveCase.label"></option>
                                 </template>
                             </x-form.select>
                             <p id="leave_request_case_id-help" class="mt-1 text-xs text-muted">
@@ -90,6 +90,7 @@
                             <div>
                                 <label for="tanggal_mulai" class="block text-sm font-medium text-ink mb-1">Tanggal Mulai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="onStartDateChanged"
+                                    value="{{ old('tanggal_mulai') }}"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                     {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_mulai')
@@ -101,6 +102,7 @@
                             <div>
                                 <label for="tanggal_selesai" class="block text-sm font-medium text-ink mb-1">Tanggal Selesai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_selesai" name="tanggal_selesai" required x-model="endDate" @change="calculateDays"
+                                    value="{{ old('tanggal_selesai') }}"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                     {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_selesai')
@@ -139,7 +141,7 @@
                             <textarea id="alasan" name="alasan" rows="3" required
                                 class="w-full resize-none rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                 placeholder="Jelaskan alasan cuti Anda secara singkat..."
-                                {{ $formLocked ? 'disabled' : '' }}></textarea>
+                                {{ $formLocked ? 'disabled' : '' }}>{{ old('alasan') }}</textarea>
                             @error('alasan')
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                             @enderror
@@ -239,10 +241,6 @@
                             <span class="text-sm text-muted">Cuti yang Sudah Disetujui</span>
                             <span class="text-sm font-semibold text-danger" x-text="formatDays(balance.terpakai_final)"></span>
                         </div>
-                        <div class="flex justify-between items-center pb-2 border-b border-border/50" x-show="balance.koreksi_administratif !== 0">
-                            <span class="text-sm text-muted">Koreksi Administratif</span>
-                            <span class="text-sm font-semibold" :class="balance.koreksi_administratif > 0 ? 'text-success' : 'text-danger'" x-text="formatSignedDays(balance.koreksi_administratif)"></span>
-                        </div>
                         <div class="flex justify-between items-center pb-2 border-b border-border/50">
                             <span class="text-sm font-semibold text-ink">Saldo Tersedia Aktual</span>
                             <span class="text-lg font-bold text-success" x-text="formatDays(balance.saldo_aktual)"></span>
@@ -293,9 +291,9 @@
     <!-- AlpineJS logic for form -->
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.data('cutiForm', (initialBalance, continuationLeaveCases) => ({
-                startDate: '',
-                endDate: '',
+            Alpine.data('cutiForm', (initialBalance, continuationLeaveCases, leaveTypeCodes) => ({
+                startDate: @js(old('tanggal_mulai', '')),
+                endDate: @js(old('tanggal_selesai', '')),
                 workDays: 0,
                 workdayWarnings: [],
                 workdayError: '',
@@ -304,6 +302,7 @@
                 selectedJenisCuti: @js(old('jenis_cuti_id', '')),
                 selectedLeaveRequestCase: @js(old('leave_request_case_id', '')),
                 continuationLeaveCases,
+                leaveTypeCodes,
                 balance: initialBalance,
                 balanceRequestId: 0,
                 isRefreshingBalance: false,
@@ -317,6 +316,18 @@
                 init() {
                     this.handleWindowFocus = () => this.refreshBalance();
                     window.addEventListener('focus', this.handleWindowFocus);
+
+                    // Setelah validasi gagal, pulihkan kalkulasi berdasarkan
+                    // tanggal lama sehingga ringkasan form tidak kembali ke nol.
+                    this.$nextTick(() => {
+                        if (this.startDate) {
+                            this.refreshBalance();
+                        }
+
+                        if (this.startDate && this.endDate) {
+                            this.calculateDays();
+                        }
+                    });
                 },
 
                 destroy() {
@@ -327,17 +338,8 @@
                     return `${Number(value ?? 0)} Hari`;
                 },
 
-                formatSignedDays(value) {
-                    const amount = Number(value ?? 0);
-                    const sign = amount > 0 ? '+' : '';
-
-                    return `${sign}${amount} Hari`;
-                },
-
                 selectedLeaveTypeCode() {
-                    const select = document.getElementById('jenis_cuti_id');
-
-                    return select?.options[select.selectedIndex]?.getAttribute('data-code') ?? '';
+                    return this.leaveTypeCodes[this.selectedJenisCuti] ?? '';
                 },
 
                 requiresLeaveCase() {
@@ -411,16 +413,11 @@
                 validateSaldo() {
                     this.saldoError = false;
                     this.saldoErrorMsg = '';
-                    
-                    const select = document.getElementById('jenis_cuti_id');
-                    if (select.selectedIndex > 0) {
-                        const mengurangiSaldoTahunan = select.options[select.selectedIndex].getAttribute('data-mengurangi-saldo-tahunan') === 'true';
-                        
-                        // Metadata jenis cuti berasal dari database; nama tampilan tidak dipakai sebagai aturan bisnis.
-                        if (mengurangiSaldoTahunan && this.workDays > this.balance.saldo_dapat_diajukan) {
-                            this.saldoError = true;
-                            this.saldoErrorMsg = `Saldo cuti tahunan tidak mencukupi. Saldo yang masih dapat diajukan: ${this.balance.saldo_dapat_diajukan} hari, sedangkan pengajuan: ${this.workDays} hari.`;
-                        }
+
+                    // Code tahunan adalah identitas aturan saldo yang sama dengan validasi backend.
+                    if (this.selectedLeaveTypeCode() === 'tahunan' && this.workDays > this.balance.saldo_dapat_diajukan) {
+                        this.saldoError = true;
+                        this.saldoErrorMsg = `Saldo cuti tahunan tidak mencukupi. Saldo yang masih dapat diajukan: ${this.balance.saldo_dapat_diajukan} hari, sedangkan pengajuan: ${this.workDays} hari.`;
                     }
                 },
                 

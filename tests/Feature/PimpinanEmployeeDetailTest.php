@@ -15,6 +15,7 @@ use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJenisJabatan;
+use App\Models\RefJenisPegawai;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
@@ -25,6 +26,7 @@ use App\Models\SalaryHistory;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SkRequirementSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +42,10 @@ class PimpinanEmployeeDetailTest extends TestCase
     {
         parent::setUp();
 
+        foreach (['PNS', 'CPNS', 'PPPK'] as $employeeType) {
+            RefJenisPegawai::firstOrCreate(['nama' => $employeeType]);
+        }
+        $this->seed(SkRequirementSeeder::class);
         $this->seed(RbacSeeder::class);
     }
 
@@ -122,8 +128,9 @@ class PimpinanEmployeeDetailTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('title="Status kelengkapan dokumen"', false)
-            ->assertSee("p.is_lengkap === 'lengkap'       ? 'Lengkap'", false)
-            ->assertSee("p.is_lengkap === 'tidak_lengkap' ? 'Tidak Lengkap'", false)
+            ->assertSee('docStatusWithCount(p)', false)
+            ->assertSee("belum_lengkap: 'Belum Lengkap'", false)
+            ->assertSee("perlu_perbaikan: 'Perlu Perbaikan'", false)
             ->assertDontSee('openDocumentStatus', false)
             ->assertDontSee('/status-dokumen', false)
             ->assertDontSee('Rincian Dokumen Pegawai')

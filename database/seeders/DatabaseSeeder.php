@@ -16,11 +16,12 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             ReferenceSeeder::class,
+            SkRequirementSeeder::class,
             RbacSeeder::class,
             ApprovalConfigSeeder::class,
             EwsConfigSeeder::class,
+            DemoSsoUserSeeder::class,
             SsoRoleMappedAccountSeeder::class,
-            LeaveBalance2026Seeder::class,
         ]);
 
     }

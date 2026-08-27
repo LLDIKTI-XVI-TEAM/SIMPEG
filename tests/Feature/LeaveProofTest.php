@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
+use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApproval;
@@ -10,6 +12,7 @@ use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
@@ -18,6 +21,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -392,8 +396,19 @@ class LeaveProofTest extends TestCase
             'event' => 'LEAVE_PROOF_GENERATED',
         ]);
 
-        // Tidak ada mutasi saldo untuk jenis cuti yang tidak mengurangi saldo tahunan.
-        $this->assertSame(0, LeaveBalanceLedger::where('leave_request_id', $fixture['request']->id)->count());
+        // Jenis non-tahunan tetap membentuk fakta dan ledger audit, tetapi tidak membuat projection saldo tahunan.
+        $usage = LeaveUsageRecord::query()
+            ->where('leave_request_id', $fixture['request']->id)
+            ->firstOrFail();
+        $this->assertSame(LeaveUsageRecord::SOURCE_APPROVED_REQUEST, $usage->source_type);
+        $this->assertSame(3, $usage->workdays);
+        $this->assertDatabaseHas('leave_balance_ledger', [
+            'leave_request_id' => $fixture['request']->id,
+            'event_type' => LeaveBalanceLedger::EVENT_USAGE_FACT_RECORDED,
+            'amount' => 3,
+        ]);
+        $this->assertSame(1, LeaveBalanceLedger::where('leave_request_id', $fixture['request']->id)->count());
+        $this->assertSame(0, LeaveBalance::where('employee_id', $fixture['pemohon_employee']->id)->count());
     }
 
     public function test_kegagalan_audit_bukti_merollback_status_final_saldo_dan_bukti(): void
@@ -888,8 +903,13 @@ class LeaveProofTest extends TestCase
         $pybmcEmployee = Employee::factory()->create(['nama_lengkap' => 'Pejabat PYBMC Approval']);
         $pybmcUser = User::factory()->create(['employee_id' => $pybmcEmployee->id]);
 
+        $code = match ($namaJenis) {
+            'Cuti Tahunan' => 'tahunan',
+            'Cuti Sakit' => 'sakit',
+            default => str($namaJenis)->slug('_')->toString(),
+        };
         $jenis = RefJenisCuti::firstOrCreate(
-            ['code' => str($namaJenis)->slug('_')->toString()],
+            ['code' => $code],
             [
                 'nama' => $namaJenis,
                 'mengurangi_saldo_tahunan' => $namaJenis === 'Cuti Tahunan',
@@ -898,14 +918,25 @@ class LeaveProofTest extends TestCase
         );
 
         if ($createBalance) {
-            LeaveBalance::create([
+            Appointment::create([
                 'employee_id' => $pemohonEmployee->id,
-                'tahun' => 2026,
-                'jatah_awal' => 12,
-                'carry_over' => 0,
-                'terpakai' => 0,
-                'sisa' => 12,
+                'jenis_pengangkatan' => 'PNS',
+                'tmt_pengangkatan' => '2020-01-01',
             ]);
+            $this->seed(RbacSeeder::class);
+            $admin = User::factory()->adminKepegawaian()->create();
+            app(ReconcileAnnualLeaveUsageAction::class)->execute(
+                $pemohonEmployee->id,
+                [
+                    'balance_year' => 2026,
+                    'usage_n2' => 12,
+                    'usage_n1' => 12,
+                    'usage_current' => 0,
+                    'administrative_note' => 'Rekonsiliasi fixture penerbitan bukti cuti.',
+                ],
+                $admin,
+                $this->actorRequest($admin),
+            );
         }
 
         $request = LeaveRequest::create([
@@ -946,6 +977,14 @@ class LeaveProofTest extends TestCase
             'jenis' => $jenis,
             'request' => $request->fresh(),
         ];
+    }
+
+    private function actorRequest(User $actor): Request
+    {
+        $request = Request::create('/cuti/reconciliation', 'POST');
+        $request->setUserResolver(fn (): User => $actor);
+
+        return $request;
     }
 
     /**

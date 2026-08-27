@@ -258,6 +258,18 @@ class Employee extends Model
         return $this->hasMany(LeaveBalance::class);
     }
 
+    /** @return HasMany<LeaveUsageRecord, $this> */
+    public function leaveUsageRecords(): HasMany
+    {
+        return $this->hasMany(LeaveUsageRecord::class);
+    }
+
+    /** @return HasMany<LeaveUsageReconciliationSet, $this> */
+    public function leaveUsageReconciliationSets(): HasMany
+    {
+        return $this->hasMany(LeaveUsageReconciliationSet::class);
+    }
+
     /** @return HasMany<EmployeeMilestone, $this> */
     public function milestones(): HasMany
     {

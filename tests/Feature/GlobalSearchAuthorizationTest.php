@@ -19,4 +19,19 @@ class GlobalSearchAuthorizationTest extends TestCase
             ->getJson(route('global.search', ['q' => 'pegawai']))
             ->assertOk();
     }
+
+    public function test_global_search_marks_background_fetch_as_ajax_so_validation_redirect_stays_on_page(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertOk();
+
+        $this->assertMatchesRegularExpression(
+            "/fetch\\(url\\.toString\\(\\),\\s*\\{\\s*headers:\\s*\\{\\s*Accept:\\s*'application\\/json',\\s*'X-Requested-With':\\s*'XMLHttpRequest'/s",
+            $response->getContent(),
+        );
+    }
 }

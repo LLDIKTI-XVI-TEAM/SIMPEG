@@ -279,7 +279,7 @@
             </div>
 
             {{-- MODAL KEPUTUSAN --}}
-            <x-ui.modal show="confirmOpen" close-action="if (!isSubmitting) confirmOpen = false" @keydown.escape.window="if (!isSubmitting) confirmOpen = false">
+            <x-ui.modal show="confirmOpen" close-action="if (!isSubmitting) confirmOpen = false" description-id="kabag-dashboard-decision-description">
                 <x-slot:title>
                     <span x-text="decisionType === 'DISETUJUI' ? 'Konfirmasi Persetujuan Cuti' : (decisionType === 'PERUBAHAN' ? 'Keputusan: Perubahan' : (decisionType === 'DITANGGUHKAN' ? 'Keputusan: Ditangguhkan' : 'Keputusan: Tidak Disetujui'))"></span>
                 </x-slot:title>
@@ -289,7 +289,7 @@
                     <input type="hidden" name="keputusan" :value="decisionType">
 
                     <div class="space-y-4">
-                        <p class="text-sm text-ink">
+                        <p id="kabag-dashboard-decision-description" class="text-sm text-ink">
                             Pengajuan cuti untuk <span class="font-bold text-ink" x-text="selectedEmployeeName"></span>.
                             <template x-if="decisionType === 'DISETUJUI'">
                                 <span>Apakah Anda yakin ingin menyetujui pengajuan ini? Pengajuan akan diteruskan ke proses selanjutnya.</span>
@@ -317,7 +317,7 @@
                     </div>
 
                     <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                        <x-ui.button type="button" @click="confirmOpen = false" variant="secondary" ::disabled="isSubmitting">Batal</x-ui.button>
+                        <x-ui.button id="kabag-dashboard-decision-cancel" type="button" @click="confirmOpen = false" data-modal-initial-focus="true" variant="secondary" ::disabled="isSubmitting">Batal</x-ui.button>
                         <x-ui.button type="submit"
                             ::variant="decisionType === 'DISETUJUI' ? 'success' : (decisionType === 'TIDAK_DISETUJUI' ? 'danger' : 'primary')"
                             ::disabled="isSubmitting || (decisionType !== 'DISETUJUI' && note.trim().length < 5)">

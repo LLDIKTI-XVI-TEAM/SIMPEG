@@ -9,14 +9,18 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
+use App\Models\User;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
+#[Group('serial')]
 class Rule5PostgresConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
@@ -49,7 +53,7 @@ class Rule5PostgresConcurrencyTest extends TestCase
         parent::tearDown();
     }
 
-    /** @return array{employee: Employee, finalApprover: Employee, large: LeaveRequest} */
+    /** @return array{employee: Employee, finalApprover: Employee, finalApproverUser: User, large: LeaveRequest} */
     private function createRaceFixture(): array
     {
         $employee = Employee::factory()->create([
@@ -57,6 +61,10 @@ class Rule5PostgresConcurrencyTest extends TestCase
         ]);
         $firstApprover = Employee::factory()->create();
         $finalApprover = Employee::factory()->create();
+        $finalApproverUser = User::factory()->create([
+            'employee_id' => $finalApprover->id,
+            'role' => 'pimpinan',
+        ]);
         Appointment::create([
             'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
@@ -106,7 +114,7 @@ class Rule5PostgresConcurrencyTest extends TestCase
             ],
         ]);
 
-        return compact('employee', 'finalApprover', 'large');
+        return compact('employee', 'finalApprover', 'finalApproverUser', 'large');
     }
 
     public function test_final_cuti_besar_dan_reservasi_tahunan_diserialisasi_pada_employee_lock(): void
@@ -131,6 +139,7 @@ class Rule5PostgresConcurrencyTest extends TestCase
                 'result' => $approveResult,
                 'request_id' => $fixture['large']->id,
                 'approver_id' => $fixture['finalApprover']->id,
+                'actor_user_id' => $fixture['finalApproverUser']->id,
             ], JSON_THROW_ON_ERROR))], base_path(), timeout: 20);
             $reserve = new Process([PHP_BINARY, $worker, base64_encode(json_encode([
                 'mode' => 'reserve_annual',
@@ -175,26 +184,36 @@ class Rule5PostgresConcurrencyTest extends TestCase
         } finally {
             // Evidence worker hanya hidup dalam database test; bersihkan sebelum hook migration
             // agar guard rollback produksi tetap melindungi data nyata.
-            $this->kosongkanAuditSebelumPenurunanMigrasi();
-            DB::table('leave_balance_reservation_events')->delete();
+            $this->cleanupProtectedDatabaseEvidence();
         }
     }
 
     /**
-     * Membuang baris audit yang ditulis proses pekerja sebelum penurunan migrasi dijalankan.
+     * Membuang histori cuti yang ditulis worker sebelum penurunan migration disposable.
      *
      * Proses pekerja berjalan di luar transaksi test sehingga barisnya benar-benar tersimpan,
-     * sedangkan penurunan migrasi menolak berjalan selama audit masih memuat event saldo cuti.
+     * sedangkan penurunan migration menolak berjalan selama fact, ledger, atau audit masih ada.
      * Penjaga append-only dilepas lebih dahulu karena tabel ini memang akan dibuang seketika
      * setelahnya, dan penjaga dipasang kembali oleh migrasi pada test berikutnya.
      */
-    private function kosongkanAuditSebelumPenurunanMigrasi(): void
+    private function cleanupProtectedDatabaseEvidence(): void
     {
-        if (DB::connection()->getDriverName() === 'pgsql') {
-            DB::unprepared('drop trigger if exists audit_logs_append_only on audit_logs;');
-            DB::unprepared('drop trigger if exists audit_logs_append_only_truncate on audit_logs;');
+        foreach (DB::table('leave_proofs')->whereNotNull('document_path')->pluck('document_path') as $path) {
+            Storage::disk('local')->delete((string) $path);
         }
 
+        DB::unprepared(<<<'SQL'
+DROP TRIGGER IF EXISTS leave_usage_record_no_delete ON leave_usage_records;
+DROP TRIGGER IF EXISTS leave_usage_record_no_truncate ON leave_usage_records;
+DROP TRIGGER IF EXISTS leave_balance_ledger_no_update_delete ON leave_balance_ledger;
+DROP TRIGGER IF EXISTS leave_balance_ledger_no_truncate ON leave_balance_ledger;
+DROP TRIGGER IF EXISTS audit_logs_append_only ON audit_logs;
+DROP TRIGGER IF EXISTS audit_logs_append_only_truncate ON audit_logs;
+SQL);
+
+        DB::table('leave_usage_records')->delete();
+        DB::table('leave_balance_ledger')->delete();
         DB::table('audit_logs')->delete();
+        DB::table('leave_balance_reservation_events')->delete();
     }
 }

@@ -46,7 +46,7 @@ class PimpinanDashboardDataTest extends TestCase
         ]);
         $leaveType = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan',
-            'code' => 'CUTI_TAHUNAN',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -96,7 +96,7 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertSee(route('pimpinan.cuti.index', ['status' => 'menunggu']), false)
             ->assertSee('Pengajuan Cuti')
             ->assertSee('href="'.route('cuti').'"', false)
-            ->assertSee('globalSearch()', false)
+            ->assertSee('globalSearch($el.dataset.searchUrl)', false)
             ->assertDontSee('Ahmad Fauzi')
             ->assertDontSee('Nadia Kusuma')
             ->assertDontSee('Admin HR');

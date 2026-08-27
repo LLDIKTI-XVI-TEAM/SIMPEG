@@ -7,6 +7,9 @@
     'variant' => 'primary', // primary, danger, warning
     'action' => null, // Optional form action URL
     'method' => 'POST', // Form method
+    'showIcon' => true,
+    'showConfirmIcon' => true,
+    'showCancelIcon' => true,
 ])
 
 @php
@@ -66,25 +69,27 @@
                  style="max-width: 400px; margin-left: auto; margin-right: auto;"
                  @click.away="open = false">
 
-                {{-- Icon Top Center --}}
-                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full ring-8 {{ $iconColors[(string)$variant] ?? $iconColors['primary'] }}">
-                    @if($variant === 'danger')
-                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    @elseif($variant === 'warning')
-                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    @else
-                        <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-                        </svg>
-                    @endif
-                </div>
+                @if ($showIcon)
+                    {{-- Icon Top Center --}}
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full ring-8 {{ $iconColors[(string) $variant] ?? $iconColors['primary'] }}">
+                        @if ($variant === 'danger')
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        @elseif ($variant === 'warning')
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        @else
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                            </svg>
+                        @endif
+                    </div>
+                @endif
 
                 {{-- Text Content --}}
-                <div class="mt-5 text-center">
+                <div @class(['text-center', 'mt-5' => $showIcon])>
                     <h3 class="text-xl font-bold text-ink" id="modal-title-{{ $id }}">
                         {{ $title }}
                     </h3>
@@ -105,9 +110,11 @@
                     <button type="button"
                             @click="open = false"
                             class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink hover:bg-soft transition-colors font-sans focus:outline-none shadow-sm">
-                        <svg class="w-4 h-4 mr-2 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                        </svg>
+                        @if ($showCancelIcon)
+                            <svg class="w-4 h-4 mr-2 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                            </svg>
+                        @endif
                         {{ $cancelText }}
                     </button>
 
@@ -123,7 +130,9 @@
                                     x-bind:disabled="submitting"
                                     class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-all focus:outline-none disabled:opacity-75 disabled:cursor-wait {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
                                 <span x-show="!submitting" class="inline-flex items-center">
-                                    {!! $confirmIcons[(string)$variant] ?? $confirmIcons['primary'] !!}
+                                    @if ($showConfirmIcon)
+                                        {!! $confirmIcons[(string) $variant] ?? $confirmIcons['primary'] !!}
+                                    @endif
                                     {{ $confirmText }}
                                 </span>
                                 <span x-show="submitting" style="display: none;" class="inline-flex items-center">
@@ -143,7 +152,9 @@
                                     x-bind:disabled="submitting"
                                     class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-all focus:outline-none disabled:opacity-75 disabled:cursor-wait {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
                                 <span x-show="!submitting" class="inline-flex items-center">
-                                    {!! $confirmIcons[(string)$variant] ?? $confirmIcons['primary'] !!}
+                                    @if ($showConfirmIcon)
+                                        {!! $confirmIcons[(string) $variant] ?? $confirmIcons['primary'] !!}
+                                    @endif
                                     {{ $confirmText }}
                                 </span>
                                 <span x-show="submitting" style="display: none;" class="inline-flex items-center">

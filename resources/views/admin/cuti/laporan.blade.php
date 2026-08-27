@@ -1,3 +1,12 @@
+@php
+    $reportFilters = array_filter([
+        'periode' => $periode,
+        'unit' => $unit,
+        'pegawai' => $pegawaiId,
+        'jenis' => $jenisId,
+    ]);
+@endphp
+
 <x-layouts.app title="Laporan Cuti">
     <div class="space-y-6">
         <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -7,13 +16,56 @@
             </div>
             <div class="flex flex-wrap gap-2">
                 @if(Route::has('cuti.laporan.pdf'))
-                    <a href="{{ route('cuti.laporan.pdf', $filters) }}" class="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink hover:bg-soft">Unduh PDF</a>
+                    <a href="{{ route('cuti.laporan.pdf', $reportFilters) }}" class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Unduh PDF</a>
                 @endif
                 @if(Route::has('cuti.laporan.excel'))
-                    <a href="{{ route('cuti.laporan.excel', $filters) }}" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Unduh Excel</a>
+                    <a href="{{ route('cuti.laporan.excel', $reportFilters) }}" class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Unduh Excel</a>
                 @endif
             </div>
         </header>
+
+        <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Filter laporan cuti">
+            <form id="laporan-filter" method="GET" action="{{ route('cuti.laporan') }}" class="space-y-5">
+                <x-cuti.period-filter :period="$periode" id-prefix="laporan" />
+
+                <div class="grid gap-4 md:grid-cols-3">
+                    <div class="space-y-1">
+                        <label for="laporan-unit" class="text-xs font-bold uppercase tracking-wider text-ink">Unit Kerja</label>
+                        <select id="laporan-unit" name="unit" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option value="">Semua unit kerja</option>
+                            @foreach($unitOptions as $option)
+                                <option value="{{ $option['id'] }}" @selected($unit === $option['id'])>{{ $option['nama'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label for="laporan-jenis" class="text-xs font-bold uppercase tracking-wider text-ink">Jenis Cuti</label>
+                        <select id="laporan-jenis" name="jenis" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option value="">Semua jenis cuti</option>
+                            @foreach($jenisOptions as $option)
+                                <option value="{{ $option['id'] }}" @selected($jenisId === $option['id'])>{{ $option['nama'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <x-cuti.employee-combobox
+                        id="laporan-pegawai"
+                        :action="route('cuti.laporan')"
+                        name="pegawai"
+                        :selected-id="$pegawaiId"
+                        :selected-label="$selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : null"
+                        label="Pegawai"
+                        help="Ketik minimal 2 karakter lalu pilih pegawai dari hasil pencarian."
+                        :embedded="true"
+                        :auto-submit="false"
+                    />
+                </div>
+
+                <div class="flex flex-wrap gap-2 border-t border-border pt-4">
+                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Terapkan Filter</button>
+                    <a data-filter-reset href="{{ route('cuti.laporan') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 py-2 text-sm font-semibold text-ink hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Reset</a>
+                </div>
+            </form>
+        </section>
 
         <x-ui.card padding="none" class="overflow-hidden">
             <div class="overflow-x-auto">
@@ -21,7 +73,7 @@
                     <caption class="sr-only">Daftar pengajuan cuti sesuai filter laporan</caption>
                     <thead class="bg-soft/70">
                         <tr>
-                            @foreach(['No', 'NIP', 'Nama', 'Jenis Cuti', 'Tanggal Mulai', 'Tanggal Selesai', 'Hari Kerja', 'Status'] as $heading)
+                            @foreach(['No', 'NIP', 'Nama', 'Jenis Cuti', 'Tanggal Mulai', 'Tanggal Selesai', 'Hari Kerja', 'Sumber', 'Status'] as $heading)
                                 <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ $heading }}</th>
                             @endforeach
                         </tr>
@@ -30,17 +82,18 @@
                         @forelse($rows as $row)
                             <tr>
                                 <td class="px-4 py-3 text-sm text-muted">{{ $rows->firstItem() + $loop->index }}</td>
-                                <td class="px-4 py-3 font-mono text-sm text-ink">{{ $row->employee?->nip ?? '-' }}</td>
-                                <td class="px-4 py-3 text-sm font-semibold text-ink">{{ $row->employee?->nama_lengkap ?? '-' }}</td>
-                                <td class="px-4 py-3 text-sm text-ink">{{ $row->jenisCuti?->nama ?? '-' }}</td>
-                                <td class="px-4 py-3 text-sm text-muted">{{ $row->tanggal_mulai?->format('d-m-Y') ?? '-' }}</td>
-                                <td class="px-4 py-3 text-sm text-muted">{{ $row->tanggal_selesai?->format('d-m-Y') ?? '-' }}</td>
-                                <td class="px-4 py-3 text-right font-mono text-sm text-ink">{{ $row->jumlah_hari_kerja }}</td>
-                                <td class="px-4 py-3 text-sm text-ink">{{ $row->report_status }}</td>
+                                <td class="px-4 py-3 font-mono text-sm text-ink">{{ $row->nip }}</td>
+                                <td class="px-4 py-3 text-sm font-semibold text-ink">{{ $row->nama }}</td>
+                                <td class="px-4 py-3 text-sm text-ink">{{ $row->jenis }}</td>
+                                <td class="px-4 py-3 text-sm text-muted">{{ $row->tanggalMulai->format('d-m-Y') }}</td>
+                                <td class="px-4 py-3 text-sm text-muted">{{ $row->tanggalSelesai->format('d-m-Y') }}</td>
+                                <td class="px-4 py-3 text-right font-mono text-sm text-ink">{{ $row->hari }}</td>
+                                <td class="px-4 py-3 text-sm text-ink">{{ $row->sourceLabel }}</td>
+                                <td class="px-4 py-3 text-sm text-ink">{{ $row->statusLabel }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-5 py-10 text-center text-sm text-muted">Tidak ada data cuti sesuai filter.</td>
+                                <td colspan="9" class="px-5 py-10 text-center text-sm text-muted">Tidak ada data cuti sesuai filter.</td>
                             </tr>
                         @endforelse
                     </tbody>

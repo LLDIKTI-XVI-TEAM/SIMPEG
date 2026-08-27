@@ -5,23 +5,35 @@ namespace App\Actions\Employees;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\LeaveBalance;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
+use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\AnnualLeaveBusinessClock;
+use App\Services\Cuti\AnnualLeaveCeilingService;
+use App\Services\Cuti\EmploymentStartDateResolver;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class UpdateEmployeeAction
 {
     public function __construct(
         private readonly EmployeeFileStorageService $files,
         private readonly TmtCalculatorService $tmtCalculator,
+        private readonly EmploymentStartDateResolver $employmentStartDate,
+        private readonly LeaveBalanceRecalculationService $leaveBalanceRecalculation,
+        private readonly AnnualLeaveCeilingService $annualLeaveCeiling,
+        private readonly AnnualLeaveBusinessClock $annualLeaveBusinessClock,
     ) {}
 
     /**
@@ -39,6 +51,18 @@ class UpdateEmployeeAction
             $validated = $this->normalizeEmployeeContract($validated, $employee);
             $pppkContractChanged = array_key_exists('tanggal_akhir_kontrak', $validated)
                 && $this->dateChanged($employee->tanggal_akhir_kontrak?->toDateString(), $validated['tanggal_akhir_kontrak']);
+            $employeeTypeChanged = array_key_exists('jenis_pegawai_id', $validated)
+                && (string) $employee->jenis_pegawai_id !== (string) $validated['jenis_pegawai_id'];
+            $employmentTermsMayChange = $pppkContractChanged
+                || $employeeTypeChanged
+                || $request->filled('pengangkatan_jenis_pengangkatan')
+                || $request->filled('pppk_tmt_pengangkatan');
+            $effectiveAppointmentTmtBefore = $employmentTermsMayChange
+                ? $this->employmentStartDate->earliestAppointmentTmt($employee)
+                : null;
+            $annualLeaveCeilingsBefore = $employmentTermsMayChange
+                ? $this->annualLeaveCeilingSnapshot($employee)
+                : null;
 
             $oldPensionDate = $employee->tanggal_pensiun?->toDateString();
             $oldBirthDate = $employee->tanggal_lahir?->toDateString();
@@ -58,7 +82,7 @@ class UpdateEmployeeAction
                 unset($validated['foto']);
             }
 
-            // Update Employee Basic Info
+            // Data utama diperbarui sebelum histori turunannya agar snapshot akhir tetap konsisten.
             $employee->update($validated);
 
             // 1. Pangkat (RankHistory)
@@ -283,8 +307,18 @@ class UpdateEmployeeAction
                 if ($pppkAppointment && $pppkAppointment->tmt_pengangkatan?->toDateString() !== $validated['pppk_tmt_pengangkatan']) {
                     $pppkAppointment->update(['tmt_pengangkatan' => $validated['pppk_tmt_pengangkatan']]);
                     $pppkContractChanged = true;
-                    $appointmentChanged = true;  // Track PPPK TMT changes for Satyalancana milestone
+                    // Perubahan TMT PPPK juga menjadi sumber sinkronisasi milestone Satyalancana.
+                    $appointmentChanged = true;
                 }
+            }
+
+            if ($annualLeaveCeilingsBefore !== null) {
+                $this->replayAnnualLeaveProjectionAfterEmploymentTermsChange(
+                    $employee,
+                    $effectiveAppointmentTmtBefore,
+                    $annualLeaveCeilingsBefore,
+                    $request,
+                );
             }
 
             if ($pppkContractChanged) {
@@ -335,8 +369,7 @@ class UpdateEmployeeAction
     }
 
     /**
-     * Compare two date values normalizing to Y-m-d to avoid false positives from
-     * format differences (e.g. toArray() returns Y-m-d H:i:s, validated sends Y-m-d).
+     * Membandingkan tanggal dalam format Y-m-d agar perbedaan format waktu tidak dianggap perubahan.
      */
     private function dateChanged(mixed $old, mixed $new): bool
     {
@@ -345,6 +378,90 @@ class UpdateEmployeeAction
             : null;
 
         return $normalize($old) !== $normalize($new);
+    }
+
+    /**
+     * Menjaga proyeksi saldo selaras ketika TMT efektif atau plafon kontrak benar-benar berubah.
+     *
+     * @param  array<int, int>  $annualLeaveCeilingsBefore
+     */
+    private function replayAnnualLeaveProjectionAfterEmploymentTermsChange(
+        Employee $employee,
+        ?Carbon $effectiveTmtBefore,
+        array $annualLeaveCeilingsBefore,
+        Request $request,
+    ): void {
+        // Relasi sebelum mutasi sudah dimuat untuk pembanding dan wajib dibaca ulang setelah penulisan.
+        $employee->unsetRelation('appointments')->unsetRelation('jenisPegawai');
+        $effectiveTmtAfter = $this->employmentStartDate->earliestAppointmentTmt($employee);
+        $annualLeaveCeilingsAfter = $this->annualLeaveCeilingSnapshot($employee);
+        $effectiveTmtChanged = $this->dateChanged(
+            $effectiveTmtBefore?->toDateString(),
+            $effectiveTmtAfter?->toDateString(),
+        );
+        $annualLeaveCeilingChanged = $annualLeaveCeilingsBefore !== $annualLeaveCeilingsAfter;
+
+        if (! $effectiveTmtChanged && ! $annualLeaveCeilingChanged) {
+            return;
+        }
+
+        $actor = $request->user();
+        if (! $actor instanceof User) {
+            throw ValidationException::withMessages([
+                'actor' => 'Aktor perubahan TMT pengangkatan tidak dapat diverifikasi.',
+            ]);
+        }
+
+        $changeReasons = [];
+        if ($effectiveTmtChanged) {
+            $beforeLabel = $effectiveTmtBefore?->toDateString() ?? 'kosong';
+            $afterLabel = $effectiveTmtAfter?->toDateString() ?? 'kosong';
+            $changeReasons[] = "TMT pengangkatan efektif berubah dari {$beforeLabel} menjadi {$afterLabel}";
+        }
+        if ($annualLeaveCeilingChanged) {
+            $changeReasons[] = 'plafon kontrak cuti tahunan berubah';
+        }
+
+        $this->leaveBalanceRecalculation->recalculateForEmploymentTermsChange(
+            $employee,
+            $this->annualLeaveReplayStartYear($employee),
+            $effectiveTmtBefore,
+            $actor,
+            'Proyeksi saldo cuti tahunan direkalkulasi karena '.implode(' dan ', $changeReasons).'.',
+            $request,
+        );
+    }
+
+    /**
+     * Membandingkan hasil plafon hanya pada horizon material N-2 sampai tahun bisnis berjalan.
+     *
+     * @return array<int, int>
+     */
+    private function annualLeaveCeilingSnapshot(Employee $employee): array
+    {
+        $currentYear = $this->annualLeaveBusinessClock->currentYear();
+        $snapshot = [];
+
+        for ($year = max(1900, $currentYear - 2); $year <= $currentYear; $year++) {
+            $snapshot[$year] = $this->annualLeaveCeiling->maximumFor($employee, $year, 0, 0);
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Memulai replay dari projection material; service memakai tepat satu predecessor sebagai opening bounded.
+     */
+    private function annualLeaveReplayStartYear(Employee $employee): int
+    {
+        $currentYear = $this->annualLeaveBusinessClock->currentYear();
+        $windowStart = $currentYear - 2;
+        $materialStart = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->whereBetween('tahun', [$windowStart, $currentYear])
+            ->min('tahun');
+
+        return $materialStart === null ? $currentYear : (int) $materialStart;
     }
 
     private function normalizeEmployeeContract(array $data, ?Employee $employee = null): array

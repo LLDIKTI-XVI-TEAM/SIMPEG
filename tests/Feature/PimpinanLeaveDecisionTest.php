@@ -97,7 +97,8 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($fixture['user'])
             ->get(route('pimpinan.cuti.show', $fixture['leave']))
             ->assertOk()
-            ->assertSee('Tunda Sementara')
+            ->assertSee('Ditangguhkan')
+            ->assertDontSee('Tunda Sementara')
             ->assertSee('Tangguhkan karena Tugas Dinas')
             ->assertSee(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), false)
             ->assertSee('name="alasan"', false)
@@ -133,7 +134,8 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($fixture['user'])
             ->get(route('pimpinan.cuti.show', $fixture['leave']))
             ->assertOk()
-            ->assertSee('Tunda Sementara')
+            ->assertSee('Ditangguhkan')
+            ->assertDontSee('Tunda Sementara')
             ->assertDontSee(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
 
         $fixture['leave']->forceFill(['jenis_cuti_id' => $annualTypeId])->save();

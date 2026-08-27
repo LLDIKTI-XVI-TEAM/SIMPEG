@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
@@ -21,6 +22,7 @@ use Tests\TestCase;
  * memblokir penghapusan dan justru mengosongkan kolom jabatan pada riwayat
  * pegawai, sehingga jejak penugasan hilang tanpa pesan kesalahan apa pun.
  */
+#[Group('serial')]
 class ReferenceDeleteConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;

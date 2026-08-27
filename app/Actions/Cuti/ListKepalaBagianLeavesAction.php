@@ -6,6 +6,7 @@ use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\Employees\KepalaBagianScopeService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 
 class ListKepalaBagianLeavesAction
 {
@@ -14,12 +15,21 @@ class ListKepalaBagianLeavesAction
     public function execute(User $user, array $filters): LengthAwarePaginator
     {
         $perPage = (int) ($filters['per_page'] ?? 10);
-        $reportIds = $this->scope->directReportIds($user);
+        $reportIds = $this->scope->directReports($user)->select('employees.id');
 
         return LeaveRequest::query()
             ->with(['employee:id,nama_lengkap,nip', 'jenisCuti:id,nama'])
             ->whereIn('employee_id', $reportIds)
-            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['status'] ?? null, function (Builder $query, string $status) use ($user): void {
+                $query->where('status', $status);
+
+                if ($status === 'menunggu_approval') {
+                    // Queue keputusan hanya memuat tahap aktif yang memang ditugaskan kepada actor.
+                    $query->whereHas('steps', fn (Builder $steps): Builder => $steps
+                        ->where('status', 'active')
+                        ->where('approver_employee_id', $user->employee_id));
+                }
+            })
             ->when($filters['search'] ?? null, function ($query, string $search): void {
                 $keyword = '%'.mb_strtolower(trim($search)).'%';
                 $query->whereHas('employee', fn ($employees) => $employees

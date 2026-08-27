@@ -65,10 +65,16 @@
         {{-- Navigation --}}
         <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
-            $authUser = auth()->user();
+            $currentUser = auth()->user();
+            $authUser = $currentUser;
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
+            $canRestoreEmployees = in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true)
+                && ($layoutCapabilities['employees.restore'] ?? false);
+            $canAdministerLeaveBalance = $activeRole === 'admin_kepegawaian'
+                && (($layoutCapabilities['cuti.balance.reconcile'] ?? false)
+                    || ($layoutCapabilities['cuti.manual.manage'] ?? false));
 
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
@@ -145,7 +151,7 @@
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         // Route Data Backup mensyaratkan permission employees.restore, sehingga
                         // menunya hanya ditampilkan bila permission itu benar-benar dimiliki.
-                        auth()->user()?->hasPermission('employees.restore')
+                        $canRestoreEmployees
                             ? ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus']
                             : null,
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
@@ -158,7 +164,9 @@
                         $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true) ? ['label' => 'Administrasi Saldo Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal'] : null,
+                        $canAdministerLeaveBalance
+                            ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                            : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                         $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
                     ])
@@ -405,6 +413,9 @@
                         $searchWidth = 'max-width: 370px;';
                         $searchPlaceholder = 'Cari pegawai, NIP, cuti, atau laporan.';
                     }
+                    $searchEndpoint = $activeRole === 'kepala_bagian'
+                        ? route('kepala-bagian.search')
+                        : route('global.search');
                 @endphp
             <div class="flex items-center gap-4 w-full max-w-sm" style="{{ $searchWidth }}">
                 <button
@@ -420,7 +431,11 @@
 
                 @if (in_array($activeRole, ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian'], true))
                 {{-- Search Bar --}}
-                <div class="relative w-full hidden sm:block" x-data="globalSearch()">
+                <div
+                    class="relative hidden w-full sm:block"
+                    data-search-url="{{ $searchEndpoint }}"
+                    x-data="globalSearch($el.dataset.searchUrl)"
+                >
                     <input
                         type="text"
                         x-model="searchQuery"
@@ -684,7 +699,7 @@
 @stack('scripts')
 <script>
     document.addEventListener('alpine:init', () => {
-        Alpine.data('globalSearch', () => ({
+        Alpine.data('globalSearch', (searchUrl) => ({
             searchQuery: '',
             searchResults: {},
             isSearching: false,
@@ -709,13 +724,21 @@
             },
 
             fetchResults() {
-                let searchUrl = '/admin/search';
-                @if($activeRole === 'kepala_bagian')
-                    searchUrl = '/kepala-bagian/search';
-                @endif
-                
-                fetch(searchUrl + '?q=' + this.searchQuery)
-                    .then(r => r.json())
+                const url = new URL(searchUrl, window.location.origin);
+                url.searchParams.set('q', this.searchQuery);
+
+                // Pencarian AJAX tidak boleh mengganti URL sebelumnya untuk redirect validasi Laravel.
+                fetch(url.toString(), {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(r => {
+                        if (!r.ok) throw new Error('Pencarian gagal');
+
+                        return r.json();
+                    })
                     .then(data => {
                         this.searchResults = data;
                         this.isSearching = false;

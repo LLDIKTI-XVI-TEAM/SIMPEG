@@ -42,7 +42,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
     /**
      * Membuat state yang sengaja memanggil Action langsung agar batas domain diuji tanpa FormRequest.
      *
-     * @return array{user: User, employee: Employee, type: RefJenisCuti, request: LeaveRequest, reservation_event_count: int}
+     * @return array{user: User, employee: Employee, type: RefJenisCuti, balance: LeaveBalance, request: LeaveRequest, reservation_event_count: int}
      */
     private function fixture(string $code): array
     {
@@ -134,6 +134,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
             'user' => $user,
             'employee' => $employee,
             'type' => $type,
+            'balance' => $balance,
             'request' => $request,
             'reservation_event_count' => $reservationEventCount,
         ];
@@ -147,6 +148,91 @@ class LeaveActionCalendarBoundaryTest extends TestCase
             'resubmit tahunan' => ['resubmit', 'tahunan'],
             'resubmit cuti besar' => ['resubmit', 'besar'],
         ];
+    }
+
+    public static function zeroWorkdayActionCases(): array
+    {
+        return [
+            'submit tahunan' => ['submit', 'tahunan'],
+            'submit cuti besar' => ['submit', 'besar'],
+            'resubmit tahunan' => ['resubmit', 'tahunan'],
+            'resubmit cuti besar' => ['resubmit', 'besar'],
+        ];
+    }
+
+    #[DataProvider('zeroWorkdayActionCases')]
+    public function test_direct_action_menolak_nol_hari_kerja_sebelum_file_dan_mutasi(string $operation, string $code): void
+    {
+        $fixture = $this->fixture($code);
+        $payload = [
+            'jenis_cuti_id' => $fixture['type']->id,
+            // 4-5 Juli 2026 adalah akhir pekan, sehingga tidak ada hari kerja pada rentang ini.
+            'tanggal_mulai' => '2026-07-04',
+            'tanggal_selesai' => '2026-07-05',
+            'alasan' => 'Direct Action tanpa hari kerja.',
+            'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 1',
+            'nomor_telepon' => '+62 431 123456',
+        ];
+        $httpRequest = Request::create('/direct-action', 'POST', $payload, [], [
+            'lampiran' => UploadedFile::fake()->create('nol-hari-kerja.pdf', 100, 'application/pdf'),
+        ]);
+        $httpRequest->setUserResolver(fn () => $fixture['user']);
+        Storage::fake('public');
+        $beforeRequestCount = LeaveRequest::query()->count();
+        $beforeRequest = LeaveRequest::query()->findOrFail($fixture['request']->id)->getAttributes();
+        $beforeRequestWorkdays = $beforeRequest['jumlah_hari_kerja'];
+        $beforeBalance = LeaveBalance::query()->findOrFail($fixture['balance']->id)->getAttributes();
+        $beforeReservationEvents = LeaveBalanceReservationEvent::query()
+            ->orderBy('id')
+            ->get()
+            ->map(fn (LeaveBalanceReservationEvent $event): array => $event->getAttributes())
+            ->all();
+        $beforeAuditCount = AuditLog::query()->count();
+        $beforeNotificationCount = SimpegNotification::query()->count();
+
+        $this->mock(EmployeeFileStorageService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('storeLampiran');
+        });
+
+        try {
+            if ($operation === 'submit') {
+                app(SubmitLeaveRequestAction::class)->execute($fixture['employee'], $payload, $httpRequest);
+            } else {
+                app(ResubmitLeaveRequestAction::class)->execute($fixture['request'], $payload, $httpRequest);
+            }
+            $this->fail('Direct Action tanpa hari kerja harus ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Rentang tanggal pengajuan tidak memiliki hari kerja. Pilih periode yang mencakup setidaknya satu hari kerja.',
+                $exception->errors()['tanggal_selesai'][0],
+            );
+        }
+
+        $this->assertSame($beforeRequestCount, LeaveRequest::query()->count());
+        $this->assertSame([], Storage::disk('public')->allFiles('cuti'));
+        $this->assertSame($fixture['reservation_event_count'], LeaveBalanceReservationEvent::query()->count());
+        $this->assertSame($beforeRequest, LeaveRequest::query()->findOrFail($fixture['request']->id)->getAttributes());
+        $this->assertSame($beforeBalance, LeaveBalance::query()->findOrFail($fixture['balance']->id)->getAttributes());
+        $this->assertSame(
+            $beforeReservationEvents,
+            LeaveBalanceReservationEvent::query()
+                ->orderBy('id')
+                ->get()
+                ->map(fn (LeaveBalanceReservationEvent $event): array => $event->getAttributes())
+                ->all(),
+        );
+        $this->assertSame($beforeAuditCount, AuditLog::query()->count());
+        $this->assertSame($beforeNotificationCount, SimpegNotification::query()->count());
+
+        if ($operation === 'resubmit') {
+            $fixture['request']->refresh();
+            $this->assertSame('perlu_perubahan', $fixture['request']->status);
+            $this->assertSame('2026-07-06', $fixture['request']->tanggal_mulai->toDateString());
+            $this->assertSame('2026-07-10', $fixture['request']->tanggal_selesai->toDateString());
+            $this->assertSame($beforeRequestWorkdays, $fixture['request']->jumlah_hari_kerja);
+            $this->assertSame('Fixture resubmit direct Action.', $fixture['request']->alasan);
+            $this->assertNull($fixture['request']->lampiran_path);
+        }
     }
 
     #[DataProvider('crossYearActionCases')]

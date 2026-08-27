@@ -3,6 +3,7 @@
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\User;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\LeaveApprovalService;
@@ -22,18 +23,16 @@ try {
     if ($input['mode'] === 'approve_large') {
         $request = LeaveRequest::query()->findOrFail($input['request_id']);
         $approver = Employee::query()->findOrFail($input['approver_id']);
-        app(LeaveApprovalService::class)->approve($request, $approver);
+        $actingUser = User::query()->findOrFail($input['actor_user_id']);
+        app(LeaveApprovalService::class)->approve($request, $approver, null, $actingUser);
     } else {
         DB::transaction(function () use ($input): void {
-            // Lock employee FIRST before creating LeaveRequest to ensure proper serialization
-            // with concurrent Cuti Besar approval. This ensures Rule 5 checks see a consistent
-            // state of either: (1) approved Cuti Besar + no annual leave, or (2) active annual
-            // leave + no approved Cuti Besar. Without this lock order, both could succeed.
+            // Pengajuan baru belum memiliki request untuk dikunci, sehingga mutex pegawai
+            // menyerialisasi pemeriksaan Rule 5 dengan persetujuan Cuti Besar yang bersaing.
             $employee = Employee::query()->whereKey($input['employee_id'])->lockForUpdate()->firstOrFail();
 
             $annual = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
 
-            // Check for approved Cuti Besar while holding the employee lock
             $service = app(LeaveBalanceService::class);
             $service->assertAnnualLeaveAllowed($employee, 2026);
 

@@ -8,11 +8,11 @@
             'menunggu_approval' => 'text-warning',
             'disetujui' => 'text-success',
             'ditangguhkan' => 'text-warning',
+            'ditangguhkan_tugas_dinas' => 'text-warning',
             'dikembalikan_karena_rollover' => 'text-warning',
             'perlu_perubahan' => 'text-danger',
             'tidak_disetujui' => 'text-danger',
         ];
-
     @endphp
 
     <div class="space-y-6">
@@ -27,7 +27,7 @@
             </div>
             <div class="flex shrink-0 items-center gap-2">
                 <a href="{{ route('cuti.laporan', array_filter(['periode' => $periode, 'unit' => $unit, 'pegawai' => $pegawaiId, 'jenis' => $jenisId])) }}"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                    class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                     </svg>
@@ -37,23 +37,46 @@
         </div>
 
         <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Filter rekap cuti">
-            <x-cuti.employee-combobox
-                id="rekap-pegawai"
-                :action="route('cuti.rekap')"
-                name="pegawai"
-                query-name="search"
-                :selected-id="$pegawaiId"
-                :selected-label="$selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : null"
-                :preserved="['periode' => $periode, 'unit' => $unit, 'jenis' => $jenisId]"
-                :clear-url="route('cuti.rekap', array_filter(['periode' => $periode, 'unit' => $unit, 'jenis' => $jenisId]))"
-                :fallback-options="$selectedEmployee ? collect([$selectedEmployee]) : collect()"
-                fallback-name="pegawai"
-                fallback-label="ID Pegawai"
-                fallback-placeholder="Masukkan UUID pegawai"
-                label="Filter Pegawai"
-                help="Ketik minimal 2 karakter untuk memantau saldo dan penggunaan cuti pegawai."
-                submit-label="Terapkan Filter"
-            />
+            <form id="rekap-filter" method="GET" action="{{ route('cuti.rekap') }}" class="space-y-5">
+                <x-cuti.period-filter :period="$periode" id-prefix="rekap" />
+
+                <div class="grid gap-4 md:grid-cols-3">
+                    <div class="space-y-1">
+                        <label for="rekap-unit" class="text-xs font-bold uppercase tracking-wider text-ink">Unit Kerja</label>
+                        <select id="rekap-unit" name="unit" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option value="">Semua unit kerja</option>
+                            @foreach($unitOptions as $option)
+                                <option value="{{ $option['id'] }}" @selected($unit === $option['id'])>{{ $option['nama'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label for="rekap-jenis" class="text-xs font-bold uppercase tracking-wider text-ink">Jenis Cuti</label>
+                        <select id="rekap-jenis" name="jenis" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <option value="">Semua jenis cuti</option>
+                            @foreach($jenisOptions as $option)
+                                <option value="{{ $option['id'] }}" @selected($jenisId === $option['id'])>{{ $option['nama'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <x-cuti.employee-combobox
+                        id="rekap-pegawai"
+                        :action="route('cuti.rekap')"
+                        name="pegawai"
+                        :selected-id="$pegawaiId"
+                        :selected-label="$selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : null"
+                        label="Pegawai"
+                        help="Ketik minimal 2 karakter lalu pilih pegawai dari hasil pencarian."
+                        :embedded="true"
+                        :auto-submit="false"
+                    />
+                </div>
+
+                <div class="flex flex-wrap gap-2 border-t border-border pt-4">
+                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Terapkan Filter</button>
+                    <a data-filter-reset href="{{ route('cuti.rekap') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 py-2 text-sm font-semibold text-ink hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Reset</a>
+                </div>
+            </form>
         </section>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -128,9 +151,9 @@
                                                 class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm">
-                                            @if(auth()->user()?->hasPermission('cuti.balance.adjust'))
+                                            @if($canAdministerBalance)
                                                 <a href="{{ route('cuti.saldo.administrasi', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']])) }}"
-                                                    class="text-xs font-semibold text-primary hover:underline">Administrasi Saldo</a>
+                                                    class="text-xs font-semibold text-primary hover:underline">Administrasi Pemakaian</a>
                                             @endif
                                         </x-ui.table-td>
                                     </x-ui.table-row>
@@ -175,6 +198,8 @@
                                     <x-ui.table-th align="right">
                                         Hari</x-ui.table-th>
                                     <x-ui.table-th>
+                                        Sumber</x-ui.table-th>
+                                    <x-ui.table-th>
                                         Status</x-ui.table-th>
                                 </x-ui.table-row>
                             </x-ui.table-head>
@@ -183,16 +208,17 @@
                                     <x-ui.table-row :interactive="true">
                                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
-                                            <p class="text-sm font-semibold text-ink">{{ $row['nama'] }}</p>
-                                            <p class="text-xs text-muted">{{ $row['nip'] }}</p>
+                                            <p class="text-sm font-semibold text-ink">{{ $row->nama }}</p>
+                                            <p class="text-xs text-muted">{{ $row->nip }}</p>
                                         </x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row['jenis'] }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row['mulai'] }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row['selesai'] }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['hari'] }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row->jenis }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row->tanggalMulai->translatedFormat('d M Y') }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row->tanggalSelesai->translatedFormat('d M Y') }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row->hari }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row->sourceLabel }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
                                             <span
-                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
+                                                class="text-xs font-semibold {{ $statusClass[$row->status] ?? 'text-muted' }}">{{ $row->statusLabel }}</span>
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @endforeach

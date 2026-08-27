@@ -1,22 +1,32 @@
 name: CI
 
-# Jalankan gerbang kualitas (composer qa) pada setiap pull request dan push ke
-# branch integrasi development. Ini mencegah regresi format, analisis statis,
-# dan test masuk tanpa terverifikasi otomatis.
+# Jalankan gerbang kualitas penuh pada pull request sebelum perubahan digabung.
+# Push hasil squash merge ke development cukup menjalankan smoke PostgreSQL agar
+# gate penuh yang sudah lulus pada head PR tidak dibayar ulang. Push langsung,
+# lookup API gagal, atau metadata ambigu tetap menjalankan full QA.
 on:
   pull_request:
     branches: [development, main]
+  merge_group:
+    branches: [development, main]
   push:
     branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Push development memakai SHA agar fallback full QA tidak dibatalkan oleh push berikutnya.
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
   qa:
-    name: Pint + PHPStan + Test
+    name: ${{ github.event_name != 'push' && 'Pint + PHPStan + JavaScript + Test' || 'Development squash verification' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     services:
       postgres:
@@ -42,6 +52,31 @@ jobs:
       DB_PASSWORD: postgres
 
     steps:
+      - name: Verify development squash merge
+        id: development_push
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PUSH_SHA: ${{ github.sha }}
+          TARGET_BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          mode=full
+
+          # Hanya squash commit hasil merge PR ke branch tujuan yang boleh memakai smoke.
+          if matched_pr="$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${REPOSITORY}/commits/${PUSH_SHA}/pulls?per_page=100" \
+            --jq ".[] | select(.merged_at != null and .merge_commit_sha == \"${PUSH_SHA}\" and .base.ref == \"${TARGET_BRANCH}\") | .number" \
+            2>/dev/null)" \
+            && [[ -n "${matched_pr}" ]]; then
+            mode=smoke
+          fi
+
+          echo "mode=${mode}" >> "${GITHUB_OUTPUT}"
+          echo "Development push mode: ${mode}"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -68,6 +103,17 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: Verify PostgreSQL connection
+        run: php artisan db:show --database=pgsql
+
+      - name: Run Pint format check
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: composer format:check
+
+      - name: Run PHPStan static analysis
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: composer analyse
+
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
@@ -77,16 +123,33 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      - name: Run JavaScript tests
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: npm run test:js
+
       - name: Build frontend assets
         # Sebagian view Blade memakai @vite() yang butuh public/build/manifest.json.
         # Tanpa build ini, test yang merender view gagal 500 (ViteManifestNotFoundException).
         run: npm run build
 
-      - name: Run Pint format check
-        run: composer format:check
+      - name: Run safe Laravel tests in parallel
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: composer test:ci:parallel
 
-      - name: Run PHPStan static analysis
-        run: composer analyse
+      - name: Run serial Laravel tests
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        run: composer test:ci:serial
 
-      - name: Run Laravel tests
-        run: composer test
+      - name: Run guarded destructive migration tests
+        # Step terakhir pada jalur full sengaja mereset simpeg_test setelah suite utama selesai.
+        if: github.event_name != 'push' || steps.development_push.outputs.mode != 'smoke'
+        env:
+          SIMPEG_ALLOW_DESTRUCTIVE_MIGRATION_TESTS: 'true'
+        run: composer test:ci:guarded
+
+      - name: Run development smoke tests
+        if: github.event_name == 'push' && steps.development_push.outputs.mode == 'smoke'
+        run: >-
+          php -d memory_limit=-1 artisan test
+          tests/Feature/ExampleTest.php
+          --fail-on-skipped

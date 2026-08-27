@@ -1,25 +1,23 @@
 <x-pegawai.detail.panel tab="docs" id-prefix="admin">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-            <h3 class="text-sm font-bold text-ink font-sans">Dokumen &amp; SK</h3>
-            <p class="mt-0.5 text-xs text-muted font-sans">
-                Dokumen SK ditampilkan terpisah dari KTP/KK, ijazah, dan berkas tambahan lainnya.
-            </p>
-        </div>
-
+    <x-pegawai.detail.section-header
+        title="Dokumen & SK"
+        description="Dokumen SK ditampilkan terpisah dari KTP/KK, ijazah, dan berkas tambahan lainnya."
+    >
         @if($canManageDocuments)
-            <button
-                type="button"
-                @click="showUploadBerkas = true; uploadBerkasError = ''; uploadBerkasErrors = {}"
-                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90"
-            >
-                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Unggah Berkas Lainnya
-            </button>
+            <x-slot:actions>
+                <button
+                    type="button"
+                    @click="showUploadBerkas = true; uploadBerkasError = ''; uploadBerkasErrors = {}"
+                    class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
+                >
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Unggah Berkas Lainnya
+                </button>
+            </x-slot:actions>
         @endif
-    </div>
+    </x-pegawai.detail.section-header>
 
     @if($canManageDocuments)
         <x-ui.modal
@@ -301,38 +299,169 @@
         </x-ui.modal>
     @endif
 
-    <section class="space-y-3" aria-labelledby="dokumen-sk-heading">
+    @php
+        $documentStatusLabels = [
+            'tidak_dinilai' => 'Tidak Dinilai',
+            'belum_ada' => 'Belum Ada',
+            'belum_lengkap' => 'Belum Lengkap',
+            'lengkap' => 'Lengkap',
+            'perlu_perbaikan' => 'Perlu Perbaikan',
+        ];
+        $documentStatusBadgeClasses = [
+            'tidak_dinilai' => 'bg-soft text-muted',
+            'belum_ada' => 'bg-soft text-muted',
+            'belum_lengkap' => 'bg-warning/10 text-warning',
+            'lengkap' => 'bg-success/10 text-success',
+            'perlu_perbaikan' => 'bg-danger/10 text-danger',
+        ];
+        $requiredSkTabs = [
+            'sk_pengangkatan' => 'pengangkatan',
+            'sk_pangkat' => 'kepangkatan',
+            'sk_jabatan' => 'jabatan',
+            'sk_kgb' => 'kgb',
+        ];
+        $statusKey = $documentStatus['status_kelengkapan'];
+    @endphp
+
+    <section
+        class="space-y-3"
+        aria-labelledby="dokumen-sk-heading"
+        data-document-status="{{ $statusKey }}"
+        data-document-is-dinilai="{{ $documentStatus['is_dinilai'] ? 'true' : 'false' }}"
+        data-document-tersedia="{{ $documentStatus['tersedia_count'] }}"
+        data-document-total-wajib="{{ $documentStatus['total_wajib'] }}"
+    >
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+                <h4 id="dokumen-sk-heading" class="text-sm font-semibold text-ink">Dokumen SK</h4>
+                <p class="text-xs text-muted">Daftar dan status berikut mengikuti matriks SK wajib aktif untuk jenis pegawai ini.</p>
+            </div>
+            <span class="inline-flex w-fit shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $documentStatusBadgeClasses[$statusKey] ?? 'bg-soft text-muted' }}">
+                {{ $documentStatusLabels[$statusKey] ?? 'Status Tidak Dikenal' }}
+                @if($documentStatus['is_dinilai'])
+                    ({{ $documentStatus['tersedia_count'] }}/{{ $documentStatus['total_wajib'] }})
+                @endif
+            </span>
+        </div>
+
+        @if(! $documentStatus['is_dinilai'])
+            <div class="rounded-lg border border-border bg-soft/40 p-4" role="status">
+                <p class="text-sm font-semibold text-ink">Matriks SK wajib belum dikonfigurasi</p>
+                <p class="mt-1 text-xs text-muted">Kelengkapan tidak dinilai sampai jenis pegawai ini memiliki sedikitnya satu kategori SK wajib aktif.</p>
+            </div>
+
+            <x-pegawai.detail.table
+                name="dokumen-sk"
+                :headings="['SK Wajib', 'Status', 'Nomor', 'Tanggal']"
+                :show-actions="true"
+            >
+                <tr>
+                    <td colspan="5" class="px-4 py-6 text-center text-muted">
+                        Belum ada kategori SK wajib aktif untuk jenis pegawai ini.
+                    </td>
+                </tr>
+            </x-pegawai.detail.table>
+        @else
+            <p class="text-xs text-muted">
+                {{ $documentStatus['tersedia_count'] }} dari {{ $documentStatus['total_wajib'] }} SK tersedia dan valid.
+            </p>
+
+            <x-pegawai.detail.table
+                name="dokumen-sk"
+                :headings="['SK Wajib', 'Status', 'Nomor', 'Tanggal']"
+                :show-actions="true"
+            >
+                @foreach($documentStatus['required_sks'] as $requiredSk)
+                    @php
+                        $requiredStatusClass = match ($requiredSk['status']) {
+                            'tersedia' => 'bg-success/10 text-success',
+                            'perlu_perbaikan' => 'bg-danger/10 text-danger',
+                            default => 'bg-soft text-muted',
+                        };
+                        $managementTab = $requiredSkTabs[$requiredSk['jenis']] ?? 'docs';
+                    @endphp
+                    <tr
+                        class="transition-colors hover:bg-soft/30"
+                        data-required-sk="{{ $requiredSk['jenis'] }}"
+                        data-required-sk-status="{{ $requiredSk['status'] }}"
+                    >
+                        <td class="px-4 py-3 font-semibold text-ink">{{ $requiredSk['label'] }}</td>
+                        <td class="px-4 py-3">
+                            <span class="inline-flex rounded-md px-2 py-1 text-xs font-semibold {{ $requiredStatusClass }}">
+                                {{ $requiredSk['status_label'] }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 font-mono text-muted">{{ $requiredSk['nomor_sk'] ?: '-' }}</td>
+                        <td class="px-4 py-3 text-muted">
+                            {{ filled($requiredSk['tanggal_sk']) ? \Illuminate\Support\Carbon::parse($requiredSk['tanggal_sk'])->format('d-m-Y') : '-' }}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                @if($requiredSk['file_url'])
+                                    <a
+                                        href="{{ $requiredSk['file_url'] }}"
+                                        class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-soft"
+                                        aria-label="Unduh {{ $requiredSk['label'] }}"
+                                    >Unduh</a>
+                                @endif
+                                <a
+                                    href="{{ route('pegawai.show', $p).'?tab='.$managementTab }}"
+                                    class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-soft"
+                                    aria-label="Kelola {{ $requiredSk['label'] }} dari data sumber"
+                                >Kelola</a>
+                            </div>
+                        </td>
+                    </tr>
+                @endforeach
+            </x-pegawai.detail.table>
+        @endif
+    </section>
+
+    <section class="space-y-3" aria-labelledby="arsip-sk-heading">
         <div>
-            <h4 id="dokumen-sk-heading" class="text-sm font-semibold text-ink">Dokumen SK</h4>
-            <p class="text-xs text-muted">Dokumen yang berasal dari data dan riwayat kepegawaian.</p>
+            <h4 id="arsip-sk-heading" class="text-sm font-semibold text-ink">Arsip SK</h4>
+            <p class="text-xs text-muted">Seluruh record arsip SK tetap tersedia untuk dilihat dan diunduh tanpa memengaruhi penilaian matriks aktif.</p>
         </div>
 
         <x-pegawai.detail.table
-            name="dokumen-sk"
+            name="arsip-sk"
             :headings="['Nama Dokumen', 'Kategori', 'Nomor', 'Tanggal', 'Ukuran']"
             :show-actions="true"
         >
-            <template x-if="skList.length === 0">
-                <tr>
-                    <td colspan="6" class="px-4 py-6 text-center text-muted">Belum ada dokumen SK.</td>
-                </tr>
-            </template>
-            <template x-for="doc in skList" :key="doc.id">
-                <tr class="transition-colors hover:bg-soft/30">
-                    <td class="px-4 py-3 font-semibold text-ink" x-text="doc.nama_dokumen"></td>
-                    <td class="px-4 py-3 text-muted" x-text="doc.kategori_label"></td>
-                    <td class="px-4 py-3 font-mono text-muted" x-text="doc.nomor_dokumen || '-'"></td>
-                    <td class="px-4 py-3 text-muted" x-text="doc.tanggal_dokumen || '-'"></td>
-                    <td class="px-4 py-3 text-muted" x-text="doc.file_size"></td>
-                    <td class="px-4 py-3">
-                        <div class="flex items-center gap-1.5">
-                            <a :href="doc.detail_url" class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-soft" :aria-label="'Lihat detail ' + doc.nama_dokumen">Detail</a>
-                            <a x-show="doc.file_tersedia" :href="doc.download_url" class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-soft" :aria-label="'Unduh ' + doc.nama_dokumen">Unduh</a>
-                            <span x-show="!doc.file_tersedia" class="text-xs font-semibold text-danger">File tidak ditemukan</span>
+            @forelse($archivedSkRows as $archive)
+                <tr
+                    class="transition-colors hover:bg-soft/30"
+                    data-archived-sk="{{ $archive['id'] }}"
+                >
+                    <td class="px-4 py-3 font-semibold text-ink">{{ $archive['nama_dokumen'] }}</td>
+                    <td class="px-4 py-3 text-muted">{{ $archive['kategori_label'] }}</td>
+                    <td class="px-4 py-3 font-mono text-muted">{{ $archive['nomor_dokumen'] ?: '-' }}</td>
+                    <td class="px-4 py-3 text-muted">{{ $archive['tanggal_dokumen'] ?: '-' }}</td>
+                    <td class="px-4 py-3 text-muted">{{ $archive['file_size'] }}</td>
+                    <td class="px-4 py-3 text-right">
+                        <div class="flex flex-wrap items-center justify-end gap-1.5">
+                            <a
+                                href="{{ $archive['detail_url'] }}"
+                                class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-soft"
+                                aria-label="Lihat detail {{ $archive['nama_dokumen'] }}"
+                            >Detail</a>
+                            @if($archive['file_tersedia'])
+                                <a
+                                    href="{{ $archive['download_url'] }}"
+                                    class="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-soft"
+                                    aria-label="Unduh {{ $archive['nama_dokumen'] }}"
+                                >Unduh</a>
+                            @else
+                                <span class="text-xs font-semibold text-danger">File tidak ditemukan</span>
+                            @endif
                         </div>
                     </td>
                 </tr>
-            </template>
+            @empty
+                <tr>
+                    <td colspan="6" class="px-4 py-6 text-center text-muted">Belum ada arsip SK.</td>
+                </tr>
+            @endforelse
         </x-pegawai.detail.table>
     </section>
 

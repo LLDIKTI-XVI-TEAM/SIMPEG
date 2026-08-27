@@ -10,8 +10,10 @@ use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
+use App\Models\StorageRecoveryTask;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
+use App\Services\StorageRecoveryService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Events\Dispatcher;
@@ -19,6 +21,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tests\TestCase;
 
 class CutiFormulirPdfTest extends TestCase
@@ -205,6 +210,126 @@ class CutiFormulirPdfTest extends TestCase
         $this->actingAs($viewer)
             ->get($this->formUrl($fixture['leave_request']))
             ->assertOk();
+    }
+
+    public function test_stored_final_official_form_serves_identical_immutable_bytes_to_every_authorized_audience(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $leaveRequest = $fixture['leave_request'];
+        $storedBytes = "%PDF-1.4\n% snapshot resmi saat persetujuan final\n%%EOF\n";
+        $storedPath = 'leave-proofs/'.$leaveRequest->id.'/00000000-0000-4000-8000-000000000f01.pdf';
+        $this->assertTrue(Storage::disk('local')->put($storedPath, $storedBytes));
+        $fixture['proof']->update([
+            'document_path' => $storedPath,
+            'document_mime' => 'application/pdf',
+        ]);
+        $this->adoptStoredProofArtifact($leaveRequest, $storedPath, $storedBytes);
+
+        // Perubahan administratif setelah persetujuan tidak boleh menulis ulang isi bukti final yang sudah diterbitkan.
+        $leaveRequest->employee->positionHistories()->where('is_latest', true)->update([
+            'nama_jabatan' => 'Jabatan Setelah Persetujuan',
+        ]);
+        $leaveRequest->employee->leaveBalances()->where('tahun', 2026)->update([
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 1,
+        ]);
+
+        $readAllViewer = User::factory()->adminKepegawaian()->create();
+        foreach ([
+            'pemohon' => $fixture['requester_user'],
+            'approver dari snapshot' => $fixture['approver_users'][0],
+            'pemilik permission cuti.read_all' => $readAllViewer,
+        ] as $scenario => $user) {
+            $response = $this->actingAs($user)
+                ->get($this->formUrl($leaveRequest));
+
+            $response->assertOk()
+                ->assertHeader('content-type', 'application/pdf')
+                ->assertHeader(
+                    'content-disposition',
+                    'attachment; filename=Formulir_Cuti_'.$leaveRequest->id.'.pdf',
+                );
+            $this->assertSame($storedBytes, $this->responseBytes($response), $scenario);
+        }
+    }
+
+    public function test_official_form_fails_closed_when_adopted_stored_artifact_bytes_change(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $leaveRequest = $fixture['leave_request'];
+        $originalBytes = "%PDF-1.4\n% artifact resmi asli\n%%EOF\n";
+        $changedBytes = "%PDF-1.4\n% artifact berubah setelah adopsi\n%%EOF\n";
+        $path = 'leave-proofs/'.$leaveRequest->id.'/00000000-0000-4000-8000-000000000f05.pdf';
+
+        $this->assertTrue(Storage::disk('local')->put($path, $originalBytes));
+        $fixture['proof']->update([
+            'document_path' => $path,
+            'document_mime' => 'application/pdf',
+        ]);
+        $task = $this->adoptStoredProofArtifact($leaveRequest, $path, $originalBytes);
+        $this->assertTrue(Storage::disk('local')->put($path, $changedBytes));
+
+        $this->actingAs($fixture['requester_user'])
+            ->get($this->formUrl($leaveRequest))
+            ->assertNotFound()
+            ->assertDontSee('artifact berubah setelah adopsi');
+        $this->assertSame(StorageRecoveryTask::STATUS_MANUAL_REVIEW, $task->fresh()->status);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function invalidStoredOfficialFormCases(): array
+    {
+        return [
+            'file tidak tersedia' => ['missing'],
+            'MIME bukan PDF' => ['wrong_mime'],
+            'folder milik pengajuan lain' => ['cross_request'],
+        ];
+    }
+
+    #[DataProvider('invalidStoredOfficialFormCases')]
+    public function test_official_form_fails_closed_when_stored_artifact_is_invalid(string $case): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $leaveRequest = $fixture['leave_request'];
+        $canonicalPath = 'leave-proofs/'.$leaveRequest->id.'/00000000-0000-4000-8000-000000000f02.pdf';
+        $path = $case === 'cross_request'
+            ? 'leave-proofs/00000000-0000-4000-8000-000000000f03/00000000-0000-4000-8000-000000000f04.pdf'
+            : $canonicalPath;
+
+        if ($case !== 'missing') {
+            $this->assertTrue(Storage::disk('local')->put($path, "%PDF-1.4\n% artifact tidak sah\n%%EOF\n"));
+        }
+
+        $fixture['proof']->update([
+            'document_path' => $path,
+            'document_mime' => $case === 'wrong_mime' ? 'image/png' : 'application/pdf',
+        ]);
+
+        $this->actingAs($fixture['requester_user'])
+            ->get($this->formUrl($leaveRequest))
+            ->assertNotFound()
+            ->assertDontSee('artifact tidak sah');
+    }
+
+    public function test_legacy_final_proof_without_document_path_still_renders_dynamic_official_pdf(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $fixture['proof']->update([
+            'document_path' => null,
+            'document_mime' => null,
+        ]);
+
+        $response = $this->actingAs($fixture['requester_user'])
+            ->get($this->formUrl($fixture['leave_request']));
+
+        $response->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF-', $this->responseBytes($response));
     }
 
     public function test_unrelated_user_is_forbidden_even_when_knowing_proof_token(): void
@@ -573,7 +698,15 @@ class CutiFormulirPdfTest extends TestCase
     public function test_nonannual_leave_hides_all_balance_buckets(): void
     {
         $fixture = $this->makeOfficialFormFixture();
-        $fixture['leave_request']->jenisCuti()->update(['mengurangi_saldo_tahunan' => false]);
+        $nonAnnual = RefJenisCuti::firstOrCreate([
+            'code' => 'sakit',
+        ], [
+            'nama' => 'Cuti Sakit',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $fixture['leave_request']->forceFill(['jenis_cuti_id' => $nonAnnual->id])->save();
+        $fixture['leave_request']->unsetRelation('jenisCuti');
 
         $data = $this->viewDataFor($fixture['leave_request']);
 
@@ -704,6 +837,53 @@ class CutiFormulirPdfTest extends TestCase
         return route('cuti.formulir-pdf', $leaveRequest);
     }
 
+    /** Membentuk manifest realistis tanpa memakai koneksi intent independen di dalam transaksi test. */
+    private function adoptStoredProofArtifact(
+        LeaveRequest $leaveRequest,
+        string $path,
+        string $bytes,
+    ): StorageRecoveryTask {
+        $sha256 = hash('sha256', $bytes);
+        $task = StorageRecoveryTask::query()->create([
+            'idempotency_key' => hash('sha256', 'fixture|'.$leaveRequest->id.'|'.$path.'|'.$sha256),
+            'operation' => StorageRecoveryTask::OPERATION_CREATION_TARGET,
+            'status' => StorageRecoveryTask::STATUS_PREPARED,
+            'category' => StorageRecoveryService::CATEGORY_LEAVE_PROOF,
+            'disk' => 'local',
+            'path' => $path,
+            'owner_id' => $leaveRequest->id,
+            'source_disk' => null,
+            'source_path' => null,
+            'sha256' => $sha256,
+            'attempts' => 0,
+            'last_error' => null,
+            'last_attempted_at' => null,
+            'completed_at' => null,
+        ]);
+
+        // Adoption produksi membuktikan metadata proof sudah mereferensikan byte yang hash-nya dipin.
+        app(StorageRecoveryService::class)->markLeaveProofCreationTargetAdopted(
+            $task->id,
+            $leaveRequest->id,
+            $path,
+        );
+        $this->assertSame(StorageRecoveryTask::STATUS_ADOPTED, $task->fresh()->status);
+
+        return $task;
+    }
+
+    private function responseBytes(TestResponse $response): string
+    {
+        if ($response->baseResponse instanceof StreamedResponse) {
+            return $response->streamedContent();
+        }
+
+        $content = $response->getContent();
+        $this->assertIsString($content);
+
+        return $content;
+    }
+
     private function makeUnrelatedUser(): User
     {
         return User::factory()->pegawai()->create([
@@ -797,6 +977,7 @@ class CutiFormulirPdfTest extends TestCase
             $fixture['leave_request']->jenisCuti()->update([
                 'code' => $leaveTypeCode,
                 'nama' => $leaveTypeCode === 'cltn' ? 'Cuti Luar Tanggungan Negara (CLTN)' : 'Nama yang dapat berubah',
+                'mengurangi_saldo_tahunan' => $leaveTypeCode === 'tahunan',
             ]);
 
             $html = $this->renderFormHtml($this->viewDataFor($fixture['leave_request']));

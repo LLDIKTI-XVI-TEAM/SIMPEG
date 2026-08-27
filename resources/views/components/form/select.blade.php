@@ -10,6 +10,8 @@
     'disabled' => false,
     'help' => null,
     'errorKey' => null,
+    'errorBag' => null,
+    'useOldInput' => true,
     'size' => 'md',
     'labelSrOnly' => false,
     'wrapperClass' => '',
@@ -18,10 +20,12 @@
 @php
     $fieldId = $id ?? ($name ? str_replace(['.', '[', ']'], ['_', '_', ''], $name) : null);
     $fieldErrorKey = $errorKey ?? $name;
+    $fieldErrors = $errorBag ? $errors->getBag($errorBag) : $errors;
     $errorId = ($fieldId ?? 'select') . '_error';
     $helpId = ($fieldId ?? 'select') . '_help';
-    $hasError = $fieldErrorKey ? $errors->has($fieldErrorKey) : false;
+    $hasError = $fieldErrorKey ? $fieldErrors->has($fieldErrorKey) : false;
     $describedBy = trim(($help ? $helpId : '') . ' ' . ($hasError ? $errorId : ''));
+    $shouldUseOldInput = filter_var($useOldInput, FILTER_VALIDATE_BOOL);
 
     $sizes = [
         'sm' => 'pl-3 pr-10 py-1.5 text-xs',
@@ -29,8 +33,8 @@
         'lg' => 'pl-4 pr-10 py-2.5 text-sm',
     ];
 
-    $hasOldValue = $fieldErrorKey ? old($fieldErrorKey, null) !== null : false;
-    $selectedValue = $fieldErrorKey ? old($fieldErrorKey, $value) : $value;
+    $hasOldValue = $shouldUseOldInput && $fieldErrorKey ? old($fieldErrorKey, null) !== null : false;
+    $selectedValue = $shouldUseOldInput && $fieldErrorKey ? old($fieldErrorKey, $value) : $value;
     $normalizedOptions = $options instanceof \Illuminate\Support\Collection ? $options->all() : $options;
     $slotHtml = (string) $slot;
 
@@ -50,7 +54,7 @@
 
 <div @class(['space-y-1', $wrapperClass])>
     @if ($label)
-        <label @if ($fieldId) for="{{ $fieldId }}" @endif class="{{ $labelSrOnly ? 'sr-only' : 'text-xs font-bold text-ink uppercase tracking-wider font-sans' }}">
+        <label @if ($fieldId)for="{{ $fieldId }}"@endif class="{{ $labelSrOnly ? 'sr-only' : 'text-xs font-bold text-ink uppercase tracking-wider font-sans' }}">
             {{ $label }}
             @if (filter_var($required, FILTER_VALIDATE_BOOL))
                 <span class="text-danger">*</span>
@@ -101,8 +105,8 @@
     @endif
 
     @if ($fieldErrorKey)
-        @error($fieldErrorKey)
-            <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $message }}</p>
-        @enderror
+        @if ($hasError)
+            <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
+        @endif
     @endif
 </div>

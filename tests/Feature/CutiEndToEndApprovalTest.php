@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
@@ -14,6 +15,7 @@ use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 /**
@@ -47,9 +49,9 @@ class CutiEndToEndApprovalTest extends TestCase
         Appointment::create([
             'employee_id' => $pemohon->id,
             'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan' => '2024-01-01',
+            'tmt_pengangkatan' => '2020-01-01',
             'no_sk' => 'SK-E2E-001',
-            'tanggal_sk' => '2024-01-01',
+            'tanggal_sk' => '2020-01-01',
         ]);
         SupervisorAssignment::create([
             'employee_id' => $pemohon->id,
@@ -82,15 +84,6 @@ class CutiEndToEndApprovalTest extends TestCase
             ],
         ]);
 
-        LeaveBalance::create([
-            'employee_id' => $pemohon->id,
-            'tahun' => 2026,
-            'jatah_awal' => 12,
-            'carry_over' => 0,
-            'terpakai' => 0,
-            'sisa' => 12,
-        ]);
-
         $pegawaiUser = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
         $kabagUser = User::factory()->kepalaBagian()->create(['employee_id' => $kabagEmployee->id]);
         $pimpinanUser = User::factory()->pimpinan()->create(['employee_id' => $pybmcEmployee->id]);
@@ -101,6 +94,19 @@ class CutiEndToEndApprovalTest extends TestCase
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
+        $admin = User::factory()->adminKepegawaian()->create();
+        app(ReconcileAnnualLeaveUsageAction::class)->execute(
+            $pemohon->id,
+            [
+                'balance_year' => 2026,
+                'usage_n2' => 12,
+                'usage_n1' => 12,
+                'usage_current' => 0,
+                'administrative_note' => 'Rekonsiliasi saldo awal fixture alur lengkap.',
+            ],
+            $admin,
+            $this->actorRequest($admin),
+        );
 
         // === Tahap 1: pegawai mengajukan cuti (3-7 Agustus 2026 = 5 hari kerja) ===
         $this->actingAs($pegawaiUser)
@@ -147,7 +153,11 @@ class CutiEndToEndApprovalTest extends TestCase
         ]);
         $this->assertSame('menunggu_approval', $leave->refresh()->status);
         // Saldo belum boleh terpotong sebelum keputusan final.
-        $this->assertSame(0, LeaveBalance::query()->firstOrFail()->terpakai);
+        $this->assertSame(0, LeaveBalance::query()
+            ->where('employee_id', $pemohon->id)
+            ->where('tahun', 2026)
+            ->firstOrFail()
+            ->terpakai);
         // PYBMC menerima notifikasi giliran memutus.
         $this->assertTrue(SimpegNotification::query()->where('user_id', $pybmcEmployee->id)->exists());
 
@@ -178,7 +188,10 @@ class CutiEndToEndApprovalTest extends TestCase
         ]);
 
         // === Hasil akhir: saldo terpotong otomatis, ledger dan bukti QR tercatat ===
-        $balance = LeaveBalance::query()->firstOrFail();
+        $balance = LeaveBalance::query()
+            ->where('employee_id', $pemohon->id)
+            ->where('tahun', 2026)
+            ->firstOrFail();
         $this->assertSame(5, $balance->terpakai);
         $this->assertSame(7, $balance->sisa);
         $this->assertDatabaseHas('leave_balance_ledger', [
@@ -189,5 +202,13 @@ class CutiEndToEndApprovalTest extends TestCase
         ]);
         // Pemohon menerima notifikasi hasil keputusan final.
         $this->assertTrue(SimpegNotification::query()->where('user_id', $pemohon->id)->exists());
+    }
+
+    private function actorRequest(User $actor): Request
+    {
+        $request = Request::create('/cuti/reconciliation', 'POST');
+        $request->setUserResolver(fn (): User => $actor);
+
+        return $request;
     }
 }

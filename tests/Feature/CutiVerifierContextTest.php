@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\BuildVerifierLeaveContextAction;
+use App\Data\Cuti\VerifierLeaveHistoryRow;
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefHariLibur;
 use App\Models\RefJenisCuti;
 use App\Models\User;
@@ -33,7 +36,7 @@ class CutiVerifierContextTest extends TestCase
     public function test_approver_aktif_melihat_konteks_saldo_cuti_bersama_dan_riwayat_pemohon(): void
     {
         $jenis = $this->jenisTahunan();
-        $employee = Employee::factory()->create();
+        $employee = $this->eligibleEmployee();
         $approver = Employee::factory()->create();
         $approverUser = User::factory()->kepalaBagian()->create(['employee_id' => $approver->id]);
 
@@ -140,7 +143,7 @@ class CutiVerifierContextTest extends TestCase
     public function test_saldo_verifikator_mengecualikan_reservasi_pengajuan_yang_sedang_diperiksa(): void
     {
         $jenis = $this->jenisTahunan();
-        $employee = Employee::factory()->create();
+        $employee = $this->eligibleEmployee();
         $approver = Employee::factory()->create();
         $approverUser = User::factory()->kepalaBagian()->create(['employee_id' => $approver->id]);
 
@@ -275,12 +278,73 @@ class CutiVerifierContextTest extends TestCase
         $context = app(BuildVerifierLeaveContextAction::class)
             ->execute($employee, now()->setDate(2026, 8, 10));
         $years = $context['riwayatTahunan']
-            ->map(fn (LeaveRequest $request): int => $request->tanggal_mulai->year)
+            ->map(fn (VerifierLeaveHistoryRow $request): int => $request->tanggal_mulai->year)
             ->unique()
             ->values()
             ->all();
 
         $this->assertSame([2026, 2025, 2024], $years);
+    }
+
+    public function test_riwayat_verifikator_memuat_fakta_manual_aktif_tanpa_metadata_privat(): void
+    {
+        $annual = $this->jenisTahunan();
+        $nonAnnual = RefJenisCuti::query()->create([
+            'nama' => 'Cuti Sakit Riwayat',
+            'code' => 'sakit_riwayat',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->adminKepegawaian()->create();
+        $active = LeaveUsageRecord::query()->create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $annual->id,
+            'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+            'usage_year' => 2025,
+            'effective_date' => '2025-06-02',
+            'start_date' => '2025-06-02',
+            'end_date' => '2025-06-04',
+            'workdays' => 3,
+            'administrative_note' => 'CATATAN-PRIVAT-TIDAK-BOLEH-TAMPIL',
+            'approval_document_number' => 'NOMOR-PRIVAT-TIDAK-BOLEH-TAMPIL',
+            'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+            'recorded_by' => $actor->id,
+        ]);
+        $this->attachValidManualApprovalSnapshot($active);
+        foreach ([
+            [$annual, LeaveUsageRecord::STATUS_CANCELLED, '2025-07-01'],
+            [$nonAnnual, LeaveUsageRecord::STATUS_ACTIVE, '2025-08-01'],
+        ] as [$type, $status, $date]) {
+            $excluded = LeaveUsageRecord::query()->create([
+                'employee_id' => $employee->id,
+                'leave_type_id' => $type->id,
+                'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+                'usage_year' => 2025,
+                'effective_date' => $date,
+                'start_date' => $date,
+                'end_date' => $date,
+                'workdays' => 1,
+                'administrative_note' => 'Fakta yang wajib dikecualikan.',
+                'record_status' => $status,
+                'correction_reason' => $status === LeaveUsageRecord::STATUS_CANCELLED
+                    ? 'Dibatalkan untuk fixture riwayat.'
+                    : null,
+                'recorded_by' => $actor->id,
+            ]);
+            $this->attachValidManualApprovalSnapshot($excluded);
+        }
+
+        $history = app(BuildVerifierLeaveContextAction::class)
+            ->execute($employee, now()->setDate(2026, 8, 10))['riwayatTahunan'];
+
+        $this->assertCount(1, $history);
+        $this->assertSame('2025-06-02', $history->sole()->tanggal_mulai->toDateString());
+        $this->assertSame('2025-06-04', $history->sole()->tanggal_selesai->toDateString());
+        $this->assertSame(3, $history->sole()->jumlah_hari_kerja);
+        $serialized = json_encode($history->toArray(), JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('CATATAN-PRIVAT', $serialized);
+        $this->assertStringNotContainsString('NOMOR-PRIVAT', $serialized);
     }
 
     private function jenisTahunan(): RefJenisCuti
@@ -291,5 +355,17 @@ class CutiVerifierContextTest extends TestCase
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
+    }
+
+    private function eligibleEmployee(): Employee
+    {
+        $employee = Employee::factory()->create();
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+        ]);
+
+        return $employee;
     }
 }

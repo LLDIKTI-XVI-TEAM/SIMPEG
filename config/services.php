@@ -43,6 +43,52 @@ return [
         'client_secret' => env('KEYCLOAK_CLIENT_SECRET'),
         'redirect' => env('KEYCLOAK_REDIRECT_URI'),
         'employee_match_field' => env('SSO_EMPLOYEE_MATCH_FIELD', 'email'),
+        'dev_usernames' => in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)
+            ? array_filter(array_map('trim', explode(',', env('SSO_DEV_USERNAMES', 'demo-klabat,demo-klabat-kepeg,demo-klabat-kabag,demo-klabat-pimpinan,demo-klabat-pegawai'))))
+            : [],
+        'test_username' => env('KEYCLOAK_TEST_USERNAME', 'demo-klabat'),
+        'demo_users' => [
+            [
+                'username' => 'demo-klabat',
+                'password' => 'demo-klabat',
+                'name' => 'Demo Klabat (Super Admin)',
+                'email' => 'demo-klabat@example.test',
+                'role' => 'super_admin',
+                'label' => 'Super Admin',
+            ],
+            [
+                'username' => 'demo-klabat-kepeg',
+                'password' => 'demo-klabat-kepeg',
+                'name' => 'Demo Klabat (Admin Kepegawaian)',
+                'email' => 'demo-klabat-kepeg@example.test',
+                'role' => 'admin_kepegawaian',
+                'label' => 'Admin Kepegawaian',
+            ],
+            [
+                'username' => 'demo-klabat-kabag',
+                'password' => 'demo-klabat-kabag',
+                'name' => 'Demo Klabat (Kepala Bagian)',
+                'email' => 'demo-klabat-kabag@example.test',
+                'role' => 'kepala_bagian',
+                'label' => 'Kepala Bagian',
+            ],
+            [
+                'username' => 'demo-klabat-pimpinan',
+                'password' => 'demo-klabat-pimpinan',
+                'name' => 'Demo Klabat (Pimpinan)',
+                'email' => 'demo-klabat-pimpinan@example.test',
+                'role' => 'pimpinan',
+                'label' => 'Pimpinan',
+            ],
+            [
+                'username' => 'demo-klabat-pegawai',
+                'password' => 'demo-klabat-pegawai',
+                'name' => 'Demo Klabat (Pegawai)',
+                'email' => 'demo-klabat-pegawai@example.test',
+                'role' => 'pegawai',
+                'label' => 'Pegawai',
+            ],
+        ],
         // Email SSO (terverifikasi) yang saat login pertama di-bootstrap ke role internal SIMPEG.
         // Berlaku hanya untuk akun baru / role internal masih kosong; role yang sudah ditetapkan
         // tidak pernah dioverwrite oleh pemetaan ini.

@@ -23,7 +23,6 @@ class PreviewLeaveBalanceAction
      *     jatah_dasar:int,
      *     carry_over:int,
      *     terpakai_final:int,
-     *     koreksi_administratif:int,
      *     saldo_aktual:int,
      *     dialokasikan_aktif:int,
      *     dilindungi_penangguhan_dinas:int,

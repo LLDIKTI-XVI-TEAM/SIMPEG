@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Pegawai;
 
+use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Models\Employee;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -10,6 +11,7 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Services\Documents\SkRequirementMatrixVersionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -21,7 +23,7 @@ use Livewire\Component;
 #[Title('Data Pegawai')]
 class Index extends Component
 {
-    public function render(Request $request)
+    public function render(Request $request, SkRequirementMatrixVersionService $matrixVersion)
     {
         $perPage = (int) $request->query('per_page', 10);
         $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
@@ -157,6 +159,12 @@ class Index extends Component
         $openStatusModal = session('open_status_modal', false)
             || ($statusErrorBag !== null && $statusErrorBag->hasAny($statusFormErrors));
 
+        $canManageSkRequirements = $request->user()?->hasPermission('sk_requirements.manage') ?? false;
+        $skRequirementMatrix = $canManageSkRequirements
+            ? app(ShowSkRequirementMatrixAction::class)->execute()
+            : ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
+        $skRequirementVersion = $matrixVersion->current();
+
         return view('admin.pegawai.index', compact(
             'perPage',
             'sort',
@@ -175,7 +183,10 @@ class Index extends Component
             'canChangeStatus',
             'statusChangeOptions',
             'statusFormEmployee',
-            'openStatusModal'
+            'openStatusModal',
+            'canManageSkRequirements',
+            'skRequirementMatrix',
+            'skRequirementVersion'
         ));
     }
 }

@@ -2,14 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
+use App\Services\Cuti\LeaveUsageRecordService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 class PegawaiDashboardTest extends TestCase
@@ -62,24 +67,19 @@ class PegawaiDashboardTest extends TestCase
     public function test_dashboard_pegawai_menampilkan_saldo_cuti_dari_database(): void
     {
         [$user, $employee] = $this->pegawaiWithEmployee();
+        $this->setEmployeeAsPns($employee);
 
-        LeaveBalance::create([
-            'employee_id' => $employee->id,
-            'tahun' => (int) date('Y'),
-            'jatah_awal' => 18,
-            'carry_over' => 3,
-            'terpakai' => 4,
-            'sisa' => 17,
-        ]);
+        $this->reconcileAnnualUsage($employee, usageN2: 12, usageN1: 9, usageCurrent: 4);
 
         $response = $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk();
 
         $response->assertViewHas('saldoCuti', fn ($saldo): bool => $saldo !== null
-            && $saldo['jatah_dasar'] === 18
-            && $saldo['carry_over'] === 3
-            && $saldo['saldo_dapat_diajukan'] === 17);
+            && $saldo['jatah_dasar'] === 12
+            && $saldo['carry_over'] === 0
+            && $saldo['terpakai_final'] === 4
+            && $saldo['saldo_dapat_diajukan'] === 11);
     }
 
     public function test_dashboard_pegawai_tanpa_saldo_mengirim_saldo_null_ke_view(): void
@@ -102,7 +102,7 @@ class PegawaiDashboardTest extends TestCase
         [$user, $employee] = $this->pegawaiWithEmployee();
         $leaveType = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan',
-            'code' => 'CUTI_TAHUNAN',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -150,26 +150,15 @@ class PegawaiDashboardTest extends TestCase
     public function test_dashboard_pegawai_rule_5_menampilkan_sisa_efektif_nol_tanpa_mengubah_saldo_tercatat(): void
     {
         [$user, $employee] = $this->pegawaiWithEmployee();
-        $balance = LeaveBalance::create([
-            'employee_id' => $employee->id,
-            'tahun' => now()->year,
-            'jatah_awal' => 12,
-            'carry_over' => 6,
-            'terpakai' => 0,
-            'sisa' => 18,
-            'sisa_n2' => 0,
-            'sisa_n1' => 6,
-            'sisa_tahun_berjalan' => 12,
-            'terpakai_tahun_berjalan' => 0,
-            'hangus' => 0,
-        ]);
+        $this->setEmployeeAsPns($employee);
+        $this->reconcileAnnualUsage($employee, usageN2: 12, usageN1: 6, usageCurrent: 0);
         $large = RefJenisCuti::create([
             'nama' => 'Cuti Besar',
             'code' => 'besar',
             'mengurangi_saldo_tahunan' => false,
             'khusus_pns' => true,
         ]);
-        LeaveRequest::create([
+        $largeRequest = LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => $large->id,
             'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
@@ -178,6 +167,17 @@ class PegawaiDashboardTest extends TestCase
             'alasan' => 'Cuti Besar final.',
             'status' => 'disetujui',
         ]);
+        $approverEmployee = Employee::factory()->create();
+        $approver = User::factory()->pimpinan()->create(['employee_id' => $approverEmployee->id]);
+        app(LeaveUsageRecordService::class)->recordApprovedRequest(
+            $largeRequest,
+            $approver,
+            $this->actorRequest($approver),
+        );
+        $balance = LeaveBalance::query()
+            ->where('employee_id', $employee->id)
+            ->where('tahun', now()->year)
+            ->firstOrFail();
 
         $response = $this->actingAs($user)->get(route('dashboard'));
 
@@ -200,6 +200,56 @@ class PegawaiDashboardTest extends TestCase
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
 
         return [$user, $employee];
+    }
+
+    private function setEmployeeAsPns(Employee $employee): void
+    {
+        $pns = RefJenisPegawai::query()->firstOrCreate(['nama' => 'PNS']);
+        $employee->forceFill(['jenis_pegawai_id' => $pns->id])->save();
+    }
+
+    private function reconcileAnnualUsage(
+        Employee $employee,
+        int $usageN2,
+        int $usageN1,
+        int $usageCurrent,
+    ): void {
+        Appointment::query()->updateOrCreate(
+            ['employee_id' => $employee->id],
+            [
+                'jenis_pengangkatan' => 'PNS',
+                'tmt_pengangkatan' => '2020-01-01',
+            ],
+        );
+        RefJenisCuti::query()->firstOrCreate(
+            ['code' => 'tahunan'],
+            [
+                'nama' => 'Cuti Tahunan',
+                'mengurangi_saldo_tahunan' => true,
+                'khusus_pns' => false,
+            ],
+        );
+        $admin = User::factory()->adminKepegawaian()->create();
+        app(ReconcileAnnualLeaveUsageAction::class)->execute(
+            $employee->id,
+            [
+                'balance_year' => now()->year,
+                'usage_n2' => $usageN2,
+                'usage_n1' => $usageN1,
+                'usage_current' => $usageCurrent,
+                'administrative_note' => 'Rekonsiliasi fixture dashboard pegawai.',
+            ],
+            $admin,
+            $this->actorRequest($admin),
+        );
+    }
+
+    private function actorRequest(User $actor): Request
+    {
+        $request = Request::create('/cuti/usage', 'POST');
+        $request->setUserResolver(fn (): User => $actor);
+
+        return $request;
     }
 
     /**

@@ -62,7 +62,7 @@ class CutiContactSnapshotTest extends TestCase
         $pemohon = Employee::factory()->create();
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Legacy',
-            'code' => 'tahunan_legacy',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -423,6 +423,13 @@ class CutiContactSnapshotTest extends TestCase
     public function test_resubmit_mengganti_snapshot_kontak_terpangkas_tanpa_mengubah_snapshot_step_dan_audit_tanpa_pii_mentah(): void
     {
         [$aktor, $leave] = $this->makePerluPerubahan();
+        $piiProfil = [
+            'nip' => '198001012006041999',
+            'email_pribadi' => 'audit-rahasia@example.test',
+            'alamat' => 'Alamat profil tidak boleh masuk audit resubmit.',
+            'no_hp' => '081299998888',
+        ];
+        $aktor['employee']->forceFill($piiProfil)->save();
         $stepSnapshot = $leave->steps()
             ->orderBy('step_order')
             ->get(['id', 'step_order'])
@@ -448,27 +455,52 @@ class CutiContactSnapshotTest extends TestCase
             ->all());
 
         $audit = $this->auditFor($leave, 'UPDATE');
-        $this->assertSame('perlu_perubahan', $audit->old_values['status']);
-        $this->assertSame('Keperluan keluarga.', $audit->old_values['alasan']);
-        $this->assertSame('2026-07-06', $this->auditDate($audit->old_values['tanggal_mulai']));
-        $this->assertSame('2026-07-10', $this->auditDate($audit->old_values['tanggal_selesai']));
-        $this->assertSame('menunggu_approval', $audit->new_values['status']);
-        $this->assertSame('Revisi tanggal sesuai arahan approver.', $audit->new_values['alasan']);
-        $this->assertSame('2026-07-13', $this->auditDate($audit->new_values['tanggal_mulai']));
-        $this->assertSame('2026-07-15', $this->auditDate($audit->new_values['tanggal_selesai']));
-        $this->assertTrue($audit->old_values['alamat_selama_cuti_diubah']);
-        $this->assertTrue($audit->old_values['nomor_telepon_diubah']);
-        $this->assertTrue($audit->new_values['alamat_selama_cuti_diubah']);
-        $this->assertTrue($audit->new_values['nomor_telepon_diubah']);
+        $oldValues = $audit->old_values;
+        $newValues = $audit->new_values;
+        $oldKeys = array_keys($oldValues);
+        $newKeys = array_keys($newValues);
+        sort($oldKeys);
+        sort($newKeys);
 
-        foreach ([$audit->old_values, $audit->new_values] as $auditValues) {
+        $this->assertSame($oldKeys, $newKeys, 'Snapshot before/after audit UPDATE wajib memakai kontrak key yang simetris.');
+        foreach (['employee_id', 'jenis_cuti_id', 'leave_request_case_id'] as $contextKey) {
+            $this->assertArrayHasKey($contextKey, $oldValues);
+            $this->assertSame($oldValues[$contextKey], $newValues[$contextKey]);
+        }
+        $this->assertSame($leave->employee_id, $oldValues['employee_id']);
+        $this->assertSame($leave->jenis_cuti_id, $oldValues['jenis_cuti_id']);
+        $this->assertSame('perlu_perubahan', $oldValues['status']);
+        $this->assertSame('Keperluan keluarga.', $oldValues['alasan']);
+        $this->assertSame('2026-07-06', $this->auditDate($oldValues['tanggal_mulai']));
+        $this->assertSame('2026-07-10', $this->auditDate($oldValues['tanggal_selesai']));
+        $this->assertSame('menunggu_approval', $newValues['status']);
+        $this->assertSame('Revisi tanggal sesuai arahan approver.', $newValues['alasan']);
+        $this->assertSame('2026-07-13', $this->auditDate($newValues['tanggal_mulai']));
+        $this->assertSame('2026-07-15', $this->auditDate($newValues['tanggal_selesai']));
+        foreach ([$oldValues, $newValues] as $auditValues) {
+            $this->assertTrue($auditValues['alamat_selama_cuti_diisi']);
+            $this->assertTrue($auditValues['nomor_telepon_diisi']);
+            $this->assertFalse($auditValues['lampiran_diisi']);
+            $this->assertTrue($auditValues['alamat_selama_cuti_diubah']);
+            $this->assertTrue($auditValues['nomor_telepon_diubah']);
+            $this->assertFalse($auditValues['lampiran_diubah']);
+        }
+
+        foreach ([$oldValues, $newValues] as $auditValues) {
             $serialized = json_encode($auditValues, JSON_THROW_ON_ERROR);
-            $this->assertArrayNotHasKey('alamat_selama_cuti', $auditValues);
-            $this->assertArrayNotHasKey('nomor_telepon', $auditValues);
-            $this->assertStringNotContainsString(self::ALAMAT_VALID, $serialized);
-            $this->assertStringNotContainsString(self::TELEPON_VALID, $serialized);
-            $this->assertStringNotContainsString(trim($alamat), $serialized);
-            $this->assertStringNotContainsString(trim($telepon), $serialized);
+            foreach (['employee', 'jenis_cuti', 'alamat_selama_cuti', 'nomor_telepon', 'lampiran_path'] as $forbiddenKey) {
+                $this->assertArrayNotHasKey($forbiddenKey, $auditValues);
+            }
+            foreach ([
+                self::ALAMAT_VALID,
+                self::TELEPON_VALID,
+                trim($alamat),
+                trim($telepon),
+                ...array_values($piiProfil),
+                'cuti/lampiran/',
+            ] as $forbiddenValue) {
+                $this->assertStringNotContainsString($forbiddenValue, $serialized);
+            }
         }
     }
 

@@ -17,6 +17,9 @@
             this.load();
             this.pollingTimer = setInterval(() => this.load(), 30000);
         },
+        destroy() {
+            this.stopPolling();
+        },
         stopPolling() {
             clearInterval(this.pollingTimer);
             this.pollingTimer = false;
@@ -34,8 +37,12 @@
             this.requestInFlight = true;
             this.loading = true;
             try {
+                // Polling AJAX tidak boleh menimpa URL sebelumnya yang dipakai redirect validasi Laravel.
                 const response = await fetch(this.endpoint, {
-                    headers: { Accept: 'application/json' },
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     credentials: 'same-origin',
                     redirect: 'manual'
                 });

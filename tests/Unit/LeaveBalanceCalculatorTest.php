@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Unit murni untuk aturan matematis saldo cuti tahunan.
  * Tidak menyentuh database, transaksi, audit, atau RBAC: hanya kalkulasi bucket N-2/N-1/tahun berjalan,
- * urutan potong N-2 -> N-1 -> tahun berjalan, larangan potong sebagian, clamp koreksi, dan cap rollover 18/24.
+ * urutan potong N-2 -> N-1 -> tahun berjalan, larangan potong sebagian, serta cap rollover 18/24.
  */
 class LeaveBalanceCalculatorTest extends TestCase
 {
@@ -32,6 +32,31 @@ class LeaveBalanceCalculatorTest extends TestCase
         $total = $this->calculator->availableTotal(['n2' => 3, 'n1' => 2, 'current' => 5]);
 
         $this->assertSame(10, $total);
+    }
+
+    public function test_fifo_mengonsumsi_n2_n1_lalu_tahun_berjalan(): void
+    {
+        $result = $this->calculator->allocateDeduction(
+            ['n2' => 4, 'n1' => 6, 'current' => 12],
+            5,
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(['n2' => 4, 'n1' => 1, 'current' => 0], $result['allocations']);
+        $this->assertSame(['n2' => 0, 'n1' => 5, 'current' => 12], $result['remaining']);
+        $this->assertSame(17, $this->calculator->availableTotal($result['remaining']));
+    }
+
+    public function test_replay_backdated_dua_hari_menghasilkan_total_lima_belas(): void
+    {
+        $result = $this->calculator->allocateDeduction(
+            ['n2' => 4, 'n1' => 6, 'current' => 12],
+            7,
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(['n2' => 0, 'n1' => 3, 'current' => 12], $result['remaining']);
+        $this->assertSame(15, $this->calculator->availableTotal($result['remaining']));
     }
 
     public function test_insufficient_when_available_less_than_requested(): void
@@ -180,28 +205,58 @@ class LeaveBalanceCalculatorTest extends TestCase
         ];
     }
 
-    public function test_debit_correction_is_clamped_to_zero_and_records_applied_portion(): void
-    {
-        $result = $this->calculator->clampCorrection(2, -10);
-
-        $this->assertSame(-2, $result['applied']);
-        $this->assertSame(0, $result['newAvailable']);
+    /**
+     * @param  array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}  $expected
+     */
+    #[DataProvider('usageBasedRolloverProvider')]
+    public function test_rollover_berdasarkan_total_pemakaian_faktual(
+        int $previousN1,
+        int $previousCurrent,
+        int $usageN2,
+        int $usageN1,
+        int $ceiling,
+        array $expected,
+    ): void {
+        $this->assertSame($expected, $this->calculator->calculateRolloverFromUsage(
+            previousN1: $previousN1,
+            previousCurrent: $previousCurrent,
+            usageN2: $usageN2,
+            usageN1: $usageN1,
+            maximumCeiling: $ceiling,
+        ));
     }
 
-    public function test_debit_correction_within_balance_applies_fully(): void
+    /**
+     * @return array<string, array{int, int, int, int, int, array{n2:int, n1:int, current:int, hangus:int, maxUsable:int}}>
+     */
+    public static function usageBasedRolloverProvider(): array
     {
-        $result = $this->calculator->clampCorrection(5, -3);
-
-        $this->assertSame(-3, $result['applied']);
-        $this->assertSame(2, $result['newAvailable']);
-    }
-
-    public function test_credit_correction_applies_fully(): void
-    {
-        $result = $this->calculator->clampCorrection(5, 4);
-
-        $this->assertSame(4, $result['applied']);
-        $this->assertSame(9, $result['newAvailable']);
+        return [
+            'nol nol dapat mempertahankan dua carry maksimal enam' => [
+                9, 8, 0, 0, 24,
+                ['n2' => 6, 'n1' => 6, 'current' => 12, 'hangus' => 5, 'maxUsable' => 24],
+            ],
+            'nol positif hanya memakai ceiling delapan belas' => [
+                9, 8, 0, 1, 18,
+                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 11, 'maxUsable' => 18],
+            ],
+            'positif nol hanya memakai ceiling delapan belas' => [
+                9, 8, 1, 0, 18,
+                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 11, 'maxUsable' => 18],
+            ],
+            'positif positif hanya memakai ceiling delapan belas' => [
+                9, 8, 1, 1, 18,
+                ['n2' => 0, 'n1' => 6, 'current' => 12, 'hangus' => 11, 'maxUsable' => 18],
+            ],
+            'ceiling adalah batas dan tidak mengisi carry yang tidak tersedia' => [
+                0, 2, 0, 0, 24,
+                ['n2' => 0, 'n1' => 2, 'current' => 12, 'hangus' => 0, 'maxUsable' => 14],
+            ],
+            'bucket n2 kedaluwarsa ketika dua tahun tidak sama-sama nol' => [
+                6, 0, 0, 2, 18,
+                ['n2' => 0, 'n1' => 0, 'current' => 12, 'hangus' => 6, 'maxUsable' => 12],
+            ],
+        ];
     }
 
     /**

@@ -66,4 +66,10 @@ class LeaveRequestCase extends Model
     {
         return $this->hasMany(LeaveRequest::class, 'leave_request_case_id');
     }
+
+    /** @return HasMany<LeaveUsageRecord, $this> */
+    public function leaveUsageRecords(): HasMany
+    {
+        return $this->hasMany(LeaveUsageRecord::class, 'leave_request_case_id');
+    }
 }

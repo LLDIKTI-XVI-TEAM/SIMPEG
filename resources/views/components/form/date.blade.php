@@ -7,6 +7,8 @@
     'disabled' => false,
     'help' => null,
     'errorKey' => null,
+    'errorBag' => null,
+    'useOldInput' => true,
     'size' => 'md',
     'labelSrOnly' => false,
     'wrapperClass' => '',
@@ -17,10 +19,12 @@
 @php
     $fieldId = $id ?? ($name ? str_replace(['.', '[', ']'], ['_', '_', ''], $name) : null);
     $fieldErrorKey = $errorKey ?? $name;
+    $fieldErrors = $errorBag ? $errors->getBag($errorBag) : $errors;
     $errorId = ($fieldId ?? 'date') . '_error';
     $helpId = ($fieldId ?? 'date') . '_help';
-    $hasError = $fieldErrorKey ? $errors->has($fieldErrorKey) : false;
+    $hasError = $fieldErrorKey ? $fieldErrors->has($fieldErrorKey) : false;
     $describedBy = trim(($help ? $helpId : '') . ' ' . ($hasError ? $errorId : ''));
+    $shouldUseOldInput = filter_var($useOldInput, FILTER_VALIDATE_BOOL);
 
     $sizes = [
         'sm' => 'px-3 py-2 text-xs',
@@ -28,7 +32,7 @@
         'lg' => 'px-4 py-2.5 text-sm',
     ];
 
-    $inputValue = $fieldErrorKey ? old($fieldErrorKey, $value) : $value;
+    $inputValue = $shouldUseOldInput && $fieldErrorKey ? old($fieldErrorKey, $value) : $value;
 @endphp
 
 <div @class(['space-y-1', $wrapperClass])>
@@ -68,8 +72,8 @@
     @endif
 
     @if ($fieldErrorKey)
-        @error($fieldErrorKey)
-            <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $message }}</p>
-        @enderror
+        @if ($hasError)
+            <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
+        @endif
     @endif
 </div>

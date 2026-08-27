@@ -8,6 +8,7 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -200,9 +201,17 @@ class LeaveBalanceReservationService
     /**
      * Menghapus alokasi aktif setelah final approval, tepat ketika pemotongan saldo final dilakukan.
      */
-    public function convertForFinalApproval(LeaveRequest $leaveRequest, ?User $actor = null): void
-    {
-        $this->releaseReservation($leaveRequest, $actor, LeaveBalanceReservationEvent::EVENT_CONVERTED);
+    public function convertForFinalApproval(
+        LeaveRequest $leaveRequest,
+        ?User $actor = null,
+        ?Request $httpRequest = null,
+    ): void {
+        $this->releaseReservation(
+            $leaveRequest,
+            $actor,
+            LeaveBalanceReservationEvent::EVENT_CONVERTED,
+            $httpRequest,
+        );
     }
 
     /** Menghapus alokasi aktif setelah pengajuan berstatus Tidak Disetujui. */
@@ -411,15 +420,19 @@ class LeaveBalanceReservationService
         });
     }
 
-    private function releaseReservation(LeaveRequest $leaveRequest, ?User $actor, string $eventType): void
-    {
+    private function releaseReservation(
+        LeaveRequest $leaveRequest,
+        ?User $actor,
+        string $eventType,
+        ?Request $httpRequest = null,
+    ): void {
         $this->loadLeaveRelations($leaveRequest);
 
         if (! $this->isAnnualLeave($leaveRequest)) {
             return;
         }
 
-        DB::transaction(function () use ($leaveRequest, $actor, $eventType): void {
+        DB::transaction(function () use ($leaveRequest, $actor, $eventType, $httpRequest): void {
             $employee = $this->lockEmployee($leaveRequest->employee_id);
             $reservedByYear = $this->reservedByYearForRequest($leaveRequest->id);
 
@@ -457,6 +470,7 @@ class LeaveBalanceReservationService
                     metadata: [
                         'requested_days' => (int) $leaveRequest->jumlah_hari_kerja,
                     ],
+                    httpRequest: $httpRequest,
                 );
             }
         });
@@ -471,9 +485,7 @@ class LeaveBalanceReservationService
         ksort($datesByYear);
         $balances = [];
 
-        foreach ($datesByYear as $tahun => $asOf) {
-            // Menjaga entitlement lazy tetap konsisten dengan alur submit yang sudah ada.
-            $this->balances->availableFor($employee, (int) $tahun, $asOf);
+        foreach (array_keys($datesByYear) as $tahun) {
             $balance = LeaveBalance::query()
                 ->where('employee_id', $employee->id)
                 ->where('tahun', $tahun)
@@ -543,6 +555,7 @@ class LeaveBalanceReservationService
         string $dedupKey,
         string $reason,
         array $metadata,
+        ?Request $httpRequest = null,
     ): void {
         $authenticatedActor = Auth::user();
         $auditActor = $actor ?? ($authenticatedActor instanceof User ? $authenticatedActor : null);
@@ -581,6 +594,8 @@ class LeaveBalanceReservationService
             'auditable_id' => $event->id,
             'old_values' => array_merge($auditPayload, ['allocated_days' => $reservationBefore]),
             'new_values' => array_merge($auditPayload, ['allocated_days' => $reservationAfter]),
+            'ip_address' => $httpRequest?->ip(),
+            'user_agent' => $httpRequest?->userAgent(),
         ]);
     }
 
@@ -662,7 +677,7 @@ class LeaveBalanceReservationService
 
     private function isAnnualLeave(LeaveRequest $leaveRequest): bool
     {
-        return (bool) $leaveRequest->jenisCuti?->mengurangi_saldo_tahunan;
+        return $leaveRequest->jenisCuti?->reducesAnnualBalance() ?? false;
     }
 
     private function loadLeaveRelations(LeaveRequest $leaveRequest): void

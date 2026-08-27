@@ -14,7 +14,6 @@
             'jenjang_pendidikan' => 'Jenjang Pendidikan',
             'program_studi' => 'Program Studi',
             'unit_kerja' => 'Unit Kerja',
-            'hari_libur' => 'Hari Libur / Cuti Bersama',
         ];
 
         $dataJenisCuti = [
@@ -47,13 +46,6 @@
             ['id' => 4, 'nama' => 'Cerai Mati'],
         ];
 
-        $dataHariLibur = [
-            ['tanggal' => '2026-01-01', 'nama' => 'Tahun Baru Masehi', 'jenis' => 'Hari Libur Nasional'],
-            ['tanggal' => '2026-05-24', 'nama' => 'Hari Raya Idul Fitri 1447 H', 'jenis' => 'Hari Libur Nasional'],
-            ['tanggal' => '2026-05-25', 'nama' => 'Cuti Bersama Idul Fitri', 'jenis' => 'Cuti Bersama'],
-            ['tanggal' => '2026-08-17', 'nama' => 'Hari Kemerdekaan RI', 'jenis' => 'Hari Libur Nasional'],
-            ['tanggal' => '2026-12-25', 'nama' => 'Hari Raya Natal', 'jenis' => 'Hari Libur Nasional'],
-        ];
     @endphp
 
 
@@ -425,72 +417,6 @@
             {{-- TAB: UNIT KERJA --}}
             @include('admin.data-master.partials.tab-unit-kerja')
 
-            {{-- TAB: HARI LIBUR / CUTI BERSAMA --}}
-            <div x-show="activeTab === 'hari_libur'"
-                class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Hari Libur / Cuti Bersama</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi kalender hari libur nasional dan cuti bersama.</p>
-                    </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah
-                    </button>
-                </div>
-                <div class="rounded-lg overflow-hidden">
-                    <x-ui.table>
-                        <x-ui.table-head>
-                            <x-ui.table-row>
-                                <x-ui.table-th>Tanggal</x-ui.table-th>
-                                <x-ui.table-th>Nama Hari Libur / Cuti Bersama</x-ui.table-th>
-                                <x-ui.table-th align="center">Jenis</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
-                            </x-ui.table-row>
-                        </x-ui.table-head>
-                        <x-ui.table-body>
-                            @foreach($dataHariLibur as $item)
-                                <x-ui.table-row :interactive="true">
-                                    <x-ui.table-td padding="sm" class="text-sm font-medium">{{ \Carbon\Carbon::parse($item['tanggal'])->format('d M Y') }}</x-ui.table-td>
-                                    <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="center" padding="sm" class="text-sm">
-                                        @if($item['jenis'] === 'Cuti Bersama')
-                                            <span class="text-[11px] font-semibold text-secondary">Cuti Bersama</span>
-                                        @else
-                                            <span class="text-[11px] font-semibold text-danger">Libur Nasional</span>
-                                        @endif
-                                    </x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
-                                                </svg>
-                                            </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
-                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </x-ui.button>
-                                        </div>
-                                    </x-ui.table-td>
-                                </x-ui.table-row>
-                            @endforeach
-                        </x-ui.table-body>
-                    </x-ui.table>
-                </div>
-            </div>
-
         </main>
 
         {{-- MODAL OVERLAY --}}
@@ -572,29 +498,6 @@
                             <input type="text"
                                 class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
                                 placeholder="Contoh: Menikah">
-                        </div>
-                    </div>
-
-                    {{-- Form Hari Libur --}}
-                    <div x-show="activeTab === 'hari_libur'" class="space-y-4">
-                        <x-form.date
-                            label="Tanggal"
-                            size="lg"
-                            class="border-primary/15 bg-transparent focus:ring-1 focus:ring-primary/30"
-                        />
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Nama Hari Libur / Cuti Bersama</label>
-                            <input type="text"
-                                class="w-full rounded-lg border border-primary/15 bg-transparent px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30"
-                                placeholder="Contoh: Hari Raya Idul Fitri">
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-semibold text-ink">Jenis</label>
-                            <x-form.select
-                               >
-                                <option value="Hari Libur Nasional">Hari Libur Nasional</option>
-                                <option value="Cuti Bersama">Cuti Bersama</option>
-                            </x-form.select>
                         </div>
                     </div>
 

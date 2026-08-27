@@ -99,10 +99,10 @@
                     <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Alasan / Keterangan</span>
                     <p class="text-sm text-ink font-sans leading-relaxed bg-soft/50 rounded-lg p-3 border border-border">{{ $cuti->alasan }}</p>
                 </div>
-                @if ($cuti->lampiran_path)
+                @if ($attachmentAvailable)
                     <div class="space-y-1 sm:col-span-2">
                         <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Lampiran</span>
-                        <a href="{{ asset('storage/' . $cuti->lampiran_path) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+                        <a href="{{ route('cuti.attachment.download', $cuti) }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
                             </svg>
@@ -229,7 +229,7 @@
                      open(key, ev) { this.lastTrigger = ev?.currentTarget ?? null; this.decisionForm = key; this.$nextTick(() => document.getElementById(key === 'dutyPostponement' ? 'alasan-duty-postponement' : `komentar-${key}`)?.focus()); },
                      close() { this.decisionForm = null; this.$nextTick(() => this.lastTrigger?.focus()); } }"
                  @if ($errors->dutyPostponement->has('alasan')) x-init="$nextTick(() => document.getElementById('alasan-duty-postponement')?.focus())" @endif
-                 @keydown.escape.window="close()">
+                 @keydown.escape.window="if (decisionForm !== null) close()">
                 @if (session('success'))
                     <x-ui.alert variant="success" size="sm">{{ session('success') }}</x-ui.alert>
                 @endif
@@ -355,7 +355,7 @@
                 @if ($canAct)
                     {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}
                     @foreach ([
-                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Tunda Sementara', 'variant' => 'warning'],
+                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Ditangguhkan', 'variant' => 'warning'],
                         'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Minta Perubahan', 'variant' => 'danger'],
                         'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger'],
                     ] as $formKey => $form)
@@ -391,7 +391,7 @@
                                 @csrf
                                 <div>
                                     <label for="alasan-duty-postponement" class="block text-xs font-bold uppercase tracking-wider text-ink">Alasan Tugas Dinas <span class="text-danger">*</span></label>
-                                    <textarea id="alasan-duty-postponement" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" aria-describedby="decision-description-duty-postponement alasan-duty-postponement-help @error('alasan', 'dutyPostponement') alasan-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
+                                    <textarea id="alasan-duty-postponement" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-modal-initial-focus="true" aria-describedby="decision-description-duty-postponement alasan-duty-postponement-help @error('alasan', 'dutyPostponement') alasan-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
                                     <p id="alasan-duty-postponement-help" class="mt-1 text-xs text-muted">Jelaskan tugas dinas mendesak yang menjadi dasar penangguhan.</p>
                                     @error('alasan', 'dutyPostponement')<p id="alasan-duty-postponement-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
                                 </div>
@@ -418,7 +418,7 @@
 
                     @if ($canAct)
                         <x-ui.button type="button" variant="secondary" data-action-visual="temporary-secondary" @click="open('postpone', $event)">
-                            Tunda Sementara
+                            Ditangguhkan
                         </x-ui.button>
                         @if ($cuti->jenisCuti?->code === 'tahunan')
                             <div class="w-full sm:w-auto">

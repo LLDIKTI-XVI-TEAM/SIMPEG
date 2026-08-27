@@ -5,6 +5,7 @@ namespace App\Http\Requests\Cuti;
 use App\Models\Employee;
 use App\Models\RefJenisCuti;
 use App\Services\Cuti\ApprovalChainResolver;
+use App\Services\Cuti\EmploymentStartDateResolver;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
@@ -170,7 +171,7 @@ class StoreLeaveRequestRequest extends FormRequest
             }
 
             // Hanya Cuti Tahunan yang memotong saldo; saldo tidak cukup berarti pengajuan ditolak otomatis dan tidak tersimpan.
-            if ($jenis->mengurangi_saldo_tahunan) {
+            if ($jenis->reducesAnnualBalance()) {
                 $this->validateSaldoTahunan($validator, $employee);
             }
         });
@@ -186,7 +187,7 @@ class StoreLeaveRequestRequest extends FormRequest
         $mulai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_mulai'))->startOfDay();
         $selesai = Carbon::createFromFormat('Y-m-d', (string) $this->input('tanggal_selesai'))->startOfDay();
 
-        if ($employee->appointment?->tmt_pengangkatan === null) {
+        if (app(EmploymentStartDateResolver::class)->earliestAppointmentTmt($employee) === null) {
             $validator->errors()->add(
                 'tanggal_mulai',
                 'Data TMT pengangkatan pegawai belum tersedia sehingga hak cuti tahunan belum dapat dihitung.',

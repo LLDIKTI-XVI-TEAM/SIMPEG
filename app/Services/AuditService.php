@@ -8,9 +8,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class AuditService
 {
+    public const SYSTEM_DATABASE_UPGRADE = 'SIMPEG Database Upgrade';
+
+    public const SYSTEM_SCHEDULER = 'SIMPEG Scheduler';
+
     /**
      * Write an audit log entry.
      *
@@ -151,6 +156,85 @@ class AuditService
             $userAgent,
             $simulationContext,
         ));
+    }
+
+    /**
+     * Menulis audit scheduler tanpa meminjam identitas user database.
+     * Label dibatasi agar caller internal tidak dapat menyamarkan proses arbitrer sebagai sistem.
+     */
+    public static function logSystemOrFail(
+        string $systemActor,
+        string $event,
+        string $auditableType,
+        ?string $auditableId = null,
+        ?array $oldValues = null,
+        ?array $newValues = null,
+        ?string $ipAddress = null,
+        ?string $userAgent = null,
+    ): void {
+        if ($systemActor !== self::SYSTEM_SCHEDULER) {
+            throw ValidationException::withMessages([
+                'system_actor' => 'Aktor sistem tidak diizinkan.',
+            ]);
+        }
+
+        self::createSystemAuditOrFail(
+            $systemActor,
+            $event,
+            $auditableType,
+            $auditableId,
+            $oldValues,
+            $newValues,
+            $ipAddress,
+            $userAgent,
+        );
+    }
+
+    /** Menulis audit khusus cutover database tanpa memperluas kontrak aktor scheduler. */
+    public static function logDatabaseUpgradeOrFail(
+        string $event,
+        string $auditableType,
+        ?string $auditableId = null,
+        ?array $oldValues = null,
+        ?array $newValues = null,
+    ): void {
+        self::createSystemAuditOrFail(
+            self::SYSTEM_DATABASE_UPGRADE,
+            $event,
+            $auditableType,
+            $auditableId,
+            $oldValues,
+            $newValues,
+            null,
+            null,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $oldValues
+     * @param  array<string, mixed>|null  $newValues
+     */
+    private static function createSystemAuditOrFail(
+        string $systemActor,
+        string $event,
+        string $auditableType,
+        ?string $auditableId,
+        ?array $oldValues,
+        ?array $newValues,
+        ?string $ipAddress,
+        ?string $userAgent,
+    ): void {
+        AuditLog::create([
+            'user_id' => null,
+            'user_name' => $systemActor,
+            'event' => $event,
+            'auditable_type' => $auditableType,
+            'auditable_id' => $auditableId,
+            'old_values' => $oldValues,
+            'new_values' => array_merge($newValues ?? [], ['actor_type' => 'system']),
+            'ip_address' => $ipAddress,
+            'user_agent' => $userAgent,
+        ]);
     }
 
     /**

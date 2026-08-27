@@ -13,7 +13,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class DownloadOfficialLeavePdfAction
 {
-    public function __construct(private readonly LeaveProofService $proofs) {}
+    public function __construct(
+        private readonly LeaveProofService $proofs,
+        private readonly DownloadStoredLeaveProofAction $storedProofs,
+    ) {}
 
     /**
      * Memusatkan otorisasi rekam formulir resmi agar snapshot approver lama tetap berhak mengaksesnya.
@@ -57,6 +60,17 @@ class DownloadOfficialLeavePdfAction
 
         abort_unless($this->canDownloadLoaded($leaveRequest, $user), 403);
 
+        // Artifact final yang sudah diterbitkan menjadi sumber resmi tunggal; validator storage menolak
+        // path, MIME, kepemilikan folder, atau file fisik yang tidak sah tanpa render ulang dari data hidup.
+        if ($leaveRequest->proof->document_path !== null) {
+            return $this->storedProofs->execute(
+                $leaveRequest,
+                false,
+                'Formulir_Cuti_'.$leaveRequest->id.'.pdf',
+            );
+        }
+
+        // Proof legacy belum memiliki artifact privat sehingga tetap memakai render dinamis yang kompatibel.
         $response = Pdf::loadView('admin.cuti.pdf.formulir-cuti', $this->viewData($leaveRequest))
             ->setPaper([0, 0, 612, 1008], 'portrait')
             ->download('Formulir_Cuti_'.$leaveRequest->id.'.pdf');
@@ -102,6 +116,7 @@ class DownloadOfficialLeavePdfAction
         $serviceAppointment = $employee->appointments->first();
         $latestPosition = $employee->positionHistories->first();
         $balance = $employee->leaveBalances->first();
+        $isAnnual = $leaveRequest->jenisCuti?->reducesAnnualBalance() ?? false;
         $finalStep = $leaveRequest->steps
             ->where('is_final', true)
             ->where('status', 'approved')
@@ -128,9 +143,9 @@ class DownloadOfficialLeavePdfAction
             'workdayCount' => $leaveRequest->jumlah_hari_kerja,
             'addressDuringLeave' => $this->value($leaveRequest->alamat_selama_cuti),
             'phoneDuringLeave' => $this->value($leaveRequest->nomor_telepon),
-            'balanceN2' => $leaveRequest->jenisCuti?->mengurangi_saldo_tahunan && $balance !== null ? $balance->sisa_n2 : '-',
-            'balanceN1' => $leaveRequest->jenisCuti?->mengurangi_saldo_tahunan && $balance !== null ? $balance->sisa_n1 : '-',
-            'balanceN' => $leaveRequest->jenisCuti?->mengurangi_saldo_tahunan && $balance !== null ? $balance->sisa_tahun_berjalan : '-',
+            'balanceN2' => $isAnnual && $balance !== null ? $balance->sisa_n2 : '-',
+            'balanceN1' => $isAnnual && $balance !== null ? $balance->sisa_n1 : '-',
+            'balanceN' => $isAnnual && $balance !== null ? $balance->sisa_tahun_berjalan : '-',
             'steps' => $leaveRequest->steps->map(fn ($step): array => [
                 'order' => $step->step_order,
                 'role' => $this->value($step->role_label),

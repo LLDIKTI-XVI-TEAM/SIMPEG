@@ -104,6 +104,26 @@ class EmployeeShowTest extends TestCase
             ->assertSee("activeTab: 'keluarga'", false);
     }
 
+    public function test_admin_roles_receive_the_shared_responsive_detail_section_layout(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        foreach ([
+            User::factory()->adminKepegawaian()->create(),
+            User::factory()->superAdmin()->create(),
+        ] as $user) {
+            $this->actingAs($user)
+                ->get(route('pegawai.show', $employee))
+                ->assertOk()
+                ->assertSee('data-employee-detail-section-header', false)
+                ->assertSee('Dokumen &amp; SK', false)
+                ->assertSee('role="tablist"', false)
+                ->assertSee('aria-label="Navigasi detail pegawai"', false)
+                ->assertSee('role="status"', false)
+                ->assertSee('focus-visible:ring-2', false);
+        }
+    }
+
     public function test_employee_detail_page_prioritizes_manual_retirement_date_and_falls_back_to_bup(): void
     {
         EwsConfig::setVal('pensiun_required_age_years', '60');
@@ -533,6 +553,52 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('Tambah Riwayat KGB', false);
     }
 
+    public function test_detail_page_menjadikan_catatan_satyalancana_baca_saja_tanpa_permission_pembaruan(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.update')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $noteTextarea = Str::between($content, '<textarea id="satyalancana-note"', '</textarea>');
+
+        $this->assertStringContainsString('readonly', $noteTextarea);
+        $this->assertStringNotContainsString('placeholder="Catatan kelayakan Satyalancana"', $noteTextarea);
+    }
+
+    public function test_detail_page_menyesuaikan_colspan_tabel_saat_kolom_aksi_tidak_tersedia(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+
+        $role->permissions()->detach(Permission::where('name', 'employee_families.delete')->firstOrFail()->id);
+        $role->permissions()->detach(Permission::where('name', 'employee_histories.create')->firstOrFail()->id);
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $familyTable = Str::of($content)
+            ->after('data-employee-detail-table="keluarga"')
+            ->before('data-employee-detail-panel="kepangkatan"')
+            ->toString();
+        $educationTable = Str::of($content)
+            ->after('data-employee-detail-table="pendidikan"')
+            ->before('data-employee-detail-panel="pengangkatan"')
+            ->toString();
+
+        $this->assertStringContainsString('colspan="5"', $familyTable);
+        $this->assertStringNotContainsString('colspan="6"', $familyTable);
+        $this->assertStringContainsString('colspan="6"', $educationTable);
+        $this->assertStringNotContainsString('colspan="7"', $educationTable);
+    }
+
     public function test_detail_page_uses_created_history_payload_for_rank_and_position_rows(): void
     {
         $employee = $this->employeeWithReferences();
@@ -543,6 +609,27 @@ class EmployeeShowTest extends TestCase
             ->assertSee("golongan: h.golongan?.nama ?? '-',", false)
             ->assertSee("jabatan: h.jabatan?.nama ?? h.nama_jabatan ?? '-',", false)
             ->assertSee("unit: h.unit_kerja?.nama ?? '-',", false);
+    }
+
+    public function test_detail_page_refreshes_document_matrix_after_relevant_history_is_created(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $content = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('pegawai.show', $employee->id))
+            ->assertOk()
+            ->getContent();
+
+        $submitForm = Str::of($content)
+            ->after('async submitForm()')
+            ->before('} catch (error)')
+            ->toString();
+
+        $this->assertStringContainsString(
+            "if (['kgb', 'jabatan', 'pangkat'].includes(this.modalType)) {",
+            $submitForm,
+        );
+        $this->assertStringContainsString('await this.$wire.$refresh();', $submitForm);
     }
 
     public function test_detail_page_formats_position_history_dates_in_table(): void

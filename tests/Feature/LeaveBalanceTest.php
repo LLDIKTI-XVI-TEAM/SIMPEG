@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -33,6 +35,11 @@ class LeaveBalanceTest extends TestCase
     public function test_employee_can_view_own_leave_balance_via_api(): void
     {
         $employee = Employee::factory()->create();
+        Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+        ]);
         $user = User::factory()->pegawai()->create([
             'employee_id' => $employee->id,
         ]);
@@ -44,6 +51,11 @@ class LeaveBalanceTest extends TestCase
             'carry_over' => 2,
             'terpakai' => 4,
             'sisa' => 10,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 10,
+            'terpakai_tahun_berjalan' => 4,
+            'hangus' => 0,
         ]);
 
         $this->actingAs($user);
@@ -188,7 +200,7 @@ class LeaveBalanceTest extends TestCase
             'terpakai_tahun_berjalan' => 0,
             'hangus' => 0,
         ]);
-        LeaveRequest::create([
+        $largeRequest = LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => RefJenisCuti::query()->where('code', 'besar')->firstOrFail()->id,
             'tanggal_mulai' => now()->startOfYear()->addMonths(2)->toDateString(),
@@ -196,6 +208,20 @@ class LeaveBalanceTest extends TestCase
             'jumlah_hari_kerja' => 20,
             'alasan' => 'Cuti Besar final.',
             'status' => 'disetujui',
+        ]);
+        LeaveUsageRecord::query()->create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $largeRequest->jenis_cuti_id,
+            'source_type' => LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
+            'leave_request_id' => $largeRequest->id,
+            'usage_year' => now()->year,
+            'effective_date' => $largeRequest->tanggal_mulai,
+            'start_date' => $largeRequest->tanggal_mulai,
+            'end_date' => $largeRequest->tanggal_selesai,
+            'workdays' => $largeRequest->jumlah_hari_kerja,
+            'administrative_note' => 'Fixture fakta Cuti Besar final untuk Rule 5.',
+            'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+            'recorded_by' => $user->id,
         ]);
 
         $this->actingAs($user)

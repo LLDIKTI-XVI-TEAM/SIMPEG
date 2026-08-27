@@ -9,8 +9,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
+#[Group('serial')]
 class MigrationRollbackTest extends TestCase
 {
     // Note: Not using RefreshDatabase trait because SQLite VACUUM cannot run within transactions.

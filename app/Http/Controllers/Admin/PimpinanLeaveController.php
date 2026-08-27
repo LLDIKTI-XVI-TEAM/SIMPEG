@@ -8,8 +8,8 @@ use App\Http\Requests\Cuti\PimpinanLeaveFilterRequest;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefUnitKerja;
+use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class PimpinanLeaveController extends Controller
 {
@@ -26,7 +26,7 @@ class PimpinanLeaveController extends Controller
         ]));
     }
 
-    public function show(Request $request, LeaveRequest $leave)
+    public function show(Request $request, LeaveRequest $leave, EmployeeFileStorageService $files)
     {
         $leave->load([
             'employee.leaveBalances',
@@ -39,8 +39,7 @@ class PimpinanLeaveController extends Controller
         $canDecide = $activeStep !== null
             && $activeStep->approver_employee_id === $request->user()?->employee_id
             && in_array($leave->status, ['menunggu_approval', 'ditangguhkan'], true);
-        $attachmentAvailable = $leave->lampiran_path !== null
-            && Storage::disk('public')->exists($leave->lampiran_path);
+        $attachmentAvailable = $files->hasLeaveAttachment($leave->lampiran_path, $leave->employee_id);
 
         return view('pimpinan.cuti.show', [
             'leave' => $leave,

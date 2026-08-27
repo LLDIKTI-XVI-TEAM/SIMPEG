@@ -10,7 +10,6 @@
             'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
             default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],
         };
-        $attachmentAvailable = $leave->lampiran && \Illuminate\Support\Facades\Storage::disk('public')->exists($leave->lampiran);
     @endphp
 
     <div class="space-y-6">
@@ -192,57 +191,64 @@
                                 action="{{ route('kepala-bagian.cuti.decision', $leave) }}" class="space-y-4"
                                 @submit="submitting = true">
                                 @csrf
-                                <div>
-                                    <label
-                                        class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keputusan
-                                        Resmi</label>
+                                <fieldset aria-describedby="{{ $errors->has('keputusan') ? 'kabag-decision-help kabag-decision-error' : 'kabag-decision-help' }}">
+                                    <legend
+                                        class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-ink font-sans">Keputusan
+                                        Resmi</legend>
                                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="DISETUJUI" x-model="decision"
+                                        <label for="kabag-decision-approved" class="cursor-pointer relative block">
+                                            <input id="kabag-decision-approved" type="radio" name="keputusan" value="DISETUJUI" x-model="decision"
+                                                aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}"
                                                 class="peer sr-only" />
                                             <div
-                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-success peer-checked:bg-success/10 peer-checked:text-success-dark">
+                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-success peer-checked:bg-success/10 peer-checked:text-success-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
                                                 <span class="text-sm font-bold font-sans">Disetujui</span>
                                             </div>
                                         </label>
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="PERUBAHAN" x-model="decision"
+                                        <label for="kabag-decision-changes" class="cursor-pointer relative block">
+                                            <input id="kabag-decision-changes" type="radio" name="keputusan" value="PERUBAHAN" x-model="decision"
+                                                aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}"
                                                 class="peer sr-only" />
                                             <div
-                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-warning peer-checked:bg-warning/10 peer-checked:text-warning-dark">
+                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-warning peer-checked:bg-warning/10 peer-checked:text-warning-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
                                                 <span class="text-sm font-bold font-sans">Perubahan</span>
                                             </div>
                                         </label>
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="DITANGGUHKAN" x-model="decision"
+                                        <label for="kabag-decision-postponed" class="cursor-pointer relative block">
+                                            <input id="kabag-decision-postponed" type="radio" name="keputusan" value="DITANGGUHKAN" x-model="decision"
+                                                aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}"
                                                 class="peer sr-only" />
                                             <div
-                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark">
-                                                <span class="text-sm font-bold font-sans">Tunda Sementara</span>
+                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
+                                                <span class="text-sm font-bold font-sans">Ditangguhkan</span>
                                             </div>
                                         </label>
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="TIDAK_DISETUJUI" x-model="decision"
+                                        <label for="kabag-decision-not-approved" class="cursor-pointer relative block">
+                                            <input id="kabag-decision-not-approved" type="radio" name="keputusan" value="TIDAK_DISETUJUI" x-model="decision"
+                                                aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}"
                                                 class="peer sr-only" />
                                             <div
-                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-danger peer-checked:bg-danger/10 peer-checked:text-danger-dark">
+                                                class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-danger peer-checked:bg-danger/10 peer-checked:text-danger-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
                                                 <span class="text-sm font-bold font-sans">Tidak Disetujui</span>
                                             </div>
                                         </label>
                                     </div>
-                                    <p class="text-xs text-muted font-sans mt-2">Pilih salah satu tindakan. Keputusan Anda
+                                    <p id="kabag-decision-help" class="text-xs text-muted font-sans mt-2">Pilih salah satu tindakan. Keputusan Anda
                                         akan dicatat ke dalam timeline.</p>
-                                    @error('keputusan')<p class="mt-2 text-sm text-danger">{{ $message }}</p>@enderror
-                                </div>
+                                    @error('keputusan')<p id="kabag-decision-error" class="mt-2 text-sm text-danger" role="alert">{{ $message }}</p>@enderror
+                                </fieldset>
 
                                 <div x-show="decision !== 'DISETUJUI'" x-cloak>
-                                    <label
+                                    <label for="kabag-decision-note"
                                         class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan
                                         / Catatan Tambahan <span class="text-danger">*</span></label>
-                                    <textarea rows="3" name="catatan" required minlength="5" maxlength="500"
-                                        placeholder="Wajib diisi jika memilih Perubahan, Tunda Sementara, atau Tidak Disetujui..."
-                                        class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
-                                    @error('catatan')<p class="mt-1 text-sm text-danger">{{ $message }}</p>@enderror
+                                    <textarea id="kabag-decision-note" rows="3" name="catatan" required minlength="5" maxlength="500"
+                                        aria-invalid="{{ $errors->has('catatan') ? 'true' : 'false' }}"
+                                        aria-describedby="{{ $errors->has('catatan') ? 'kabag-decision-note-help kabag-decision-note-error' : 'kabag-decision-note-help' }}"
+                                        placeholder="Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui..."
+                                        class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary focus-visible:ring-2 focus-visible:ring-primary/30 shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
+                                    <p id="kabag-decision-note-help" class="mt-1 text-xs text-muted">Wajib untuk Perubahan, Ditangguhkan, dan Tidak Disetujui.</p>
+                                    @error('catatan')<p id="kabag-decision-note-error" class="mt-1 text-sm text-danger" role="alert">{{ $message }}</p>@enderror
                                 </div>
 
                                 <div class="flex justify-end gap-3 pt-2">
@@ -276,7 +282,7 @@
                                         @csrf
                                         <div>
                                             <label for="kabag-duty-postponement-reason" class="block text-xs font-bold uppercase tracking-wider text-ink">Alasan Tugas Dinas <span class="text-danger">*</span></label>
-                                            <textarea id="kabag-duty-postponement-reason" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" aria-describedby="kabag-duty-postponement-description kabag-duty-postponement-help @error('alasan', 'dutyPostponement') kabag-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
+                                            <textarea id="kabag-duty-postponement-reason" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-modal-initial-focus="true" aria-describedby="kabag-duty-postponement-description kabag-duty-postponement-help @error('alasan', 'dutyPostponement') kabag-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
                                             <p id="kabag-duty-postponement-help" class="mt-1 text-xs text-muted">Jelaskan tugas dinas mendesak yang menjadi dasar penangguhan.</p>
                                             @error('alasan', 'dutyPostponement')<p id="kabag-duty-postponement-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
                                         </div>
@@ -289,11 +295,12 @@
                             @endif
 
                             <x-ui.modal show="confirmOpen" close-action="confirmOpen = false"
-                                title="Konfirmasi Persetujuan">
-                                <p class="text-sm text-ink">Setujui pengajuan cuti ini? Pengajuan akan diteruskan ke
+                                title="Konfirmasi Persetujuan" description-id="kabag-approval-confirmation-description">
+                                <p id="kabag-approval-confirmation-description" class="text-sm text-ink">Setujui pengajuan cuti ini? Pengajuan akan diteruskan ke
                                     approver berikutnya atau diselesaikan bila ini adalah tahap final.</p>
                                 <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                                    <x-ui.button type="button" @click="confirmOpen = false"
+                                    <x-ui.button id="kabag-approval-confirmation-cancel" type="button" @click="confirmOpen = false"
+                                        data-modal-initial-focus="true"
                                         variant="secondary">Batal</x-ui.button>
                                     <form method="POST" action="{{ route('kepala-bagian.cuti.decision', $leave) }}"
                                         @submit="submitting = true">

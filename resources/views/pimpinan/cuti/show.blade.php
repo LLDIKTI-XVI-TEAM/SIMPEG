@@ -165,7 +165,7 @@
                                         <label class="cursor-pointer relative block">
                                             <input type="radio" name="keputusan" value="DITANGGUHKAN" x-model="decision" class="peer sr-only" />
                                             <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark">
-                                                <span class="text-sm font-bold font-sans">Tunda Sementara</span>
+                                                <span class="text-sm font-bold font-sans">Ditangguhkan</span>
                                             </div>
                                         </label>
                                         <label class="cursor-pointer relative block">
@@ -181,7 +181,7 @@
 
                                 <div x-show="decision !== 'DISETUJUI'" x-cloak>
                                     <label class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan / Catatan Tambahan <span class="text-danger">*</span></label>
-                                    <textarea rows="3" name="catatan" :required="decision !== 'DISETUJUI'" minlength="5" maxlength="500" placeholder="Wajib diisi jika memilih Perubahan, Tunda Sementara, atau Tidak Disetujui..." class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
+                                    <textarea rows="3" name="catatan" :required="decision !== 'DISETUJUI'" minlength="5" maxlength="500" placeholder="Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui..." class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
                                     @error('catatan')<p class="mt-1 text-sm text-danger">{{ $message }}</p>@enderror
                                 </div>
 
@@ -212,7 +212,7 @@
                                         @csrf
                                         <div>
                                             <label for="pimpinan-duty-postponement-reason" class="block text-xs font-bold uppercase tracking-wider text-ink">Alasan Tugas Dinas <span class="text-danger">*</span></label>
-                                            <textarea id="pimpinan-duty-postponement-reason" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" aria-describedby="pimpinan-duty-postponement-description pimpinan-duty-postponement-help @error('alasan', 'dutyPostponement') pimpinan-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
+                                            <textarea id="pimpinan-duty-postponement-reason" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-modal-initial-focus="true" aria-describedby="pimpinan-duty-postponement-description pimpinan-duty-postponement-help @error('alasan', 'dutyPostponement') pimpinan-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
                                             <p id="pimpinan-duty-postponement-help" class="mt-1 text-xs text-muted">Jelaskan tugas dinas mendesak yang menjadi dasar penangguhan.</p>
                                             @error('alasan', 'dutyPostponement')<p id="pimpinan-duty-postponement-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
                                         </div>
@@ -224,10 +224,10 @@
                                 </x-ui.modal>
                             @endif
 
-                            <x-ui.modal show="confirmOpen" close-action="confirmOpen = false" title="Konfirmasi Persetujuan">
-                                <p class="text-sm text-ink">Setujui pengajuan cuti ini? Pengajuan akan diteruskan ke approver berikutnya atau diselesaikan bila ini adalah tahap final.</p>
+                            <x-ui.modal show="confirmOpen" close-action="confirmOpen = false" title="Konfirmasi Persetujuan" description-id="pimpinan-approval-confirmation-description">
+                                <p id="pimpinan-approval-confirmation-description" class="text-sm text-ink">Setujui pengajuan cuti ini? Pengajuan akan diteruskan ke approver berikutnya atau diselesaikan bila ini adalah tahap final.</p>
                                 <div class="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                                    <x-ui.button type="button" @click="confirmOpen = false" variant="secondary">Batal</x-ui.button>
+                                    <x-ui.button id="pimpinan-approval-confirmation-cancel" type="button" @click="confirmOpen = false" data-modal-initial-focus="true" variant="secondary">Batal</x-ui.button>
                                     <form method="POST" action="{{ route('pimpinan.cuti.decision', $leave) }}" @submit="submitting = true">
                                         @csrf
                                         <input type="hidden" name="keputusan" value="DISETUJUI">

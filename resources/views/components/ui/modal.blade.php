@@ -10,6 +10,7 @@
     'headerClass' => '',
     'footerClass' => '',
     'overlayClass' => '',
+    'id' => null,
 ])
 
 @php
@@ -27,11 +28,64 @@
 @endphp
 
 <div
+    @if ($id) id="{{ $id }}" @endif
+    x-data="{
+        modalWasOpen: false,
+        modalTrigger: null,
+        trapModalFocus(event) {
+            const selector = 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [contenteditable=true]';
+            const focusable = Array.from(event.currentTarget.querySelectorAll(selector))
+                .filter((element) => element.offsetParent !== null && element.getAttribute('aria-hidden') !== 'true');
+
+            if (focusable.length === 0) {
+                event.preventDefault();
+                event.currentTarget.focus();
+                return;
+            }
+
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            const outside = !event.currentTarget.contains(document.activeElement);
+
+            if (event.shiftKey && (outside || document.activeElement === first)) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && (outside || document.activeElement === last)) {
+                event.preventDefault();
+                first.focus();
+            }
+        },
+    }"
     @if ($show) x-show="{{ $show }}" @endif
-    @if ($closeAction) @keydown.escape.window="{{ $closeAction }}" @endif
+    @if ($show)
+        x-effect="
+            const modalIsOpen = Boolean({{ $show }});
+            if (modalIsOpen && !modalWasOpen) {
+                modalTrigger = document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+                    ? document.activeElement
+                    : null;
+                $nextTick(() => {
+                    const errorTarget = $el.querySelector('[data-error-autofocus=true]');
+                    const explicitTarget = $el.querySelector('[data-modal-initial-focus=true]');
+                    const genericTarget = $el.querySelector('input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), a[href]');
+                    const initial = errorTarget ?? explicitTarget ?? genericTarget ?? $el;
+                    initial.focus();
+                });
+            } else if (!modalIsOpen && modalWasOpen) {
+                const trigger = modalTrigger;
+                $nextTick(() => {
+                    if (trigger?.isConnected) trigger.focus();
+                });
+            }
+            modalWasOpen = modalIsOpen;
+        "
+    @endif
+    @if ($show && $closeAction) @keydown.escape.window="if ({{ $show }}) { {{ $closeAction }} }" @endif
+    @keydown.tab="trapModalFocus($event)"
     class="fixed inset-0 z-50 overflow-y-auto"
     style="display: none;"
     x-transition
+    tabindex="-1"
     role="dialog"
     aria-modal="true"
     @if ($title) aria-labelledby="{{ $modalTitleId }}" @endif

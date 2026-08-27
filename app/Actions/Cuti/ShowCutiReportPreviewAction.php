@@ -2,14 +2,13 @@
 
 namespace App\Actions\Cuti;
 
+use App\Models\Employee;
 use App\Queries\Cuti\CutiRekapQuery;
-use App\Support\Cuti\CutiReportStatusFormatter;
 
 class ShowCutiReportPreviewAction
 {
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
-        private readonly CutiReportStatusFormatter $statusFormatter,
     ) {}
 
     /**
@@ -20,15 +19,28 @@ class ShowCutiReportPreviewAction
      */
     public function execute(array $filters): array
     {
-        $rows = $this->rekapQuery->detailRows($filters)
-            ->paginate(15)
-            ->withQueryString();
-        $rows->through(function ($row): mixed {
-            $row->setAttribute('report_status', $this->statusFormatter->format($row));
+        $periode = $this->stringFilter($filters, 'periode');
+        $unit = $this->stringFilter($filters, 'unit');
+        $pegawaiId = $this->stringFilter($filters, 'pegawai');
+        $jenisId = $this->stringFilter($filters, 'jenis');
+        $rows = $this->rekapQuery->paginateDetailRows($filters, 15, 'page');
+        $selectedEmployee = $pegawaiId === null
+            ? null
+            : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
+        $unitOptions = $this->rekapQuery->unitOptions($unit);
+        $jenisOptions = $this->rekapQuery->leaveTypeOptions($jenisId);
 
-            return $row;
-        });
+        return compact(
+            'rows', 'filters', 'periode', 'unit', 'pegawaiId', 'jenisId',
+            'selectedEmployee', 'unitOptions', 'jenisOptions',
+        );
+    }
 
-        return ['rows' => $rows, 'filters' => $filters];
+    /** @param array<string, mixed> $filters */
+    private function stringFilter(array $filters, string $key): ?string
+    {
+        $value = $filters[$key] ?? null;
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 }

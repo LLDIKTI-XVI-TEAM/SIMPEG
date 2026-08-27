@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Permission;
 use App\Models\RefHariLibur;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\WorkdayCalculator;
 use Database\Seeders\RbacSeeder;
@@ -62,7 +64,83 @@ class HariLiburWebPageTest extends TestCase
         $response->assertSee('Cuti Bersama Idul Fitri');
         $response->assertSee('Libur Nasional');
         $response->assertSee('Cuti Bersama');
+        $response->assertSee('Kalender Hari Libur &amp; Cuti Bersama', false);
+        $response->assertSee('kalender-hari-libur-container');
         $response->assertDontSee(self::NAMA_DATA_STATIS_LAMA);
+        $response->assertDontSee('aria-label="Pagination Navigation"', false);
+    }
+
+    public function test_hari_libur_tidak_lagi_tersedia_di_halaman_data_master(): void
+    {
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('data-master'));
+
+        $response->assertOk();
+        $response->assertDontSee('Hari Libur / Cuti Bersama');
+        $response->assertDontSee("activeTab === 'hari_libur'", false);
+    }
+
+    public function test_halaman_menyediakan_kontrol_kalender_dan_filter_yang_aksesibel(): void
+    {
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('hari-libur'));
+
+        $response->assertOk();
+        $response->assertSee('aria-controls="modal-tambah-hari-libur"', false);
+        $response->assertSee('id="modal-tambah-hari-libur"', false);
+        $response->assertSee('<label for="tipe" class="sr-only">', false);
+        $response->assertSee('Tipe Libur', false);
+        $response->assertSee('Buka detail hari libur.', false);
+        $response->assertSee('role="dialog"', false);
+        $response->assertSee('@keydown.escape.window="if (selectedEvent !== null) { closeCalendarDetail() }"', false);
+        $response->assertDontSee('@keydown.escape.window="closeCalendarDetail()"', false);
+        $response->assertSee('trapCalendarDetailFocus($event)', false);
+        $response->assertSee('openAddHariLibur()', false);
+        $response->assertSee('closeAddHariLibur()', false);
+        $response->assertSee('closeEditHariLibur()', false);
+        $response->assertSee("trapModalFocus(\$event, 'addHariLiburModal')", false);
+        $response->assertSee('if (this.selectedEvent === null)', false);
+        $response->assertSee(':disabled="bulan === 0"', false);
+        $response->assertSee(':disabled="bulan === 11"', false);
+        $response->assertSee('if (this.bulan > 0)', false);
+        $response->assertSee('if (this.bulan < 11)', false);
+    }
+
+    public function test_kontrol_mutasi_hari_libur_hanya_dirender_sesuai_permission_efektif(): void
+    {
+        $this->buatHariLibur('2026-01-01', 'Tahun Baru Masehi');
+        $this->cabutPermissionSuperAdmin('hari_libur.create');
+
+        $tanpaCreate = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('hari-libur', ['tahun' => 2026]));
+
+        $tanpaCreate->assertOk();
+        $tanpaCreate->assertDontSee('data-hari-libur-action="create"', false);
+        $tanpaCreate->assertSee('data-hari-libur-action="update"', false);
+        $tanpaCreate->assertSee('data-hari-libur-action="delete"', false);
+        $tanpaCreate->assertDontSee('id="modal-tambah-hari-libur"', false);
+
+        $this->cabutPermissionSuperAdmin('hari_libur.update');
+
+        $tanpaCreateDanUpdate = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('hari-libur', ['tahun' => 2026]));
+
+        $tanpaCreateDanUpdate->assertOk();
+        $tanpaCreateDanUpdate->assertDontSee('data-hari-libur-action="create"', false);
+        $tanpaCreateDanUpdate->assertDontSee('data-hari-libur-action="update"', false);
+        $tanpaCreateDanUpdate->assertSee('data-hari-libur-action="delete"', false);
+        $tanpaCreateDanUpdate->assertDontSee('id="modal-edit-hari-libur"', false);
+
+        $this->cabutPermissionSuperAdmin('hari_libur.delete');
+
+        $tanpaSemuaMutasi = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('hari-libur', ['tahun' => 2026]));
+
+        $tanpaSemuaMutasi->assertOk();
+        $tanpaSemuaMutasi->assertDontSee('data-hari-libur-action="create"', false);
+        $tanpaSemuaMutasi->assertDontSee('data-hari-libur-action="update"', false);
+        $tanpaSemuaMutasi->assertDontSee('data-hari-libur-action="delete"', false);
+        $tanpaSemuaMutasi->assertDontSee('data-hari-libur-column="actions"', false);
     }
 
     public function test_halaman_menampilkan_empty_state_saat_tabel_referensi_kosong(): void
@@ -73,6 +151,7 @@ class HariLiburWebPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Belum ada hari libur untuk filter yang dipilih.');
         $response->assertDontSee(self::NAMA_DATA_STATIS_LAMA);
+        $response->assertDontSee('aria-label="Pagination Navigation"', false);
     }
 
     public function test_filter_tahun_membatasi_baris_yang_tampil(): void
@@ -97,8 +176,10 @@ class HariLiburWebPageTest extends TestCase
             ->get(route('hari-libur', ['tahun' => 2026, 'tipe' => 'cuti_bersama']));
 
         $response->assertOk();
-        $response->assertSee('Cuti Bersama Idul Fitri');
-        $response->assertDontSee('Tahun Baru Masehi');
+        $this->assertSame(
+            ['Cuti Bersama Idul Fitri'],
+            $this->namaHariLiburDalamTabel($response),
+        );
     }
 
     public function test_pencarian_nama_berjalan_di_server_dan_tidak_peka_huruf(): void
@@ -110,8 +191,10 @@ class HariLiburWebPageTest extends TestCase
             ->get(route('hari-libur', ['tahun' => 2026, 'search' => 'natal']));
 
         $response->assertOk();
-        $response->assertSee('Hari Raya Natal');
-        $response->assertDontSee('Tahun Baru Masehi');
+        $this->assertSame(
+            ['Hari Raya Natal'],
+            $this->namaHariLiburDalamTabel($response),
+        );
     }
 
     public function test_paginasi_dijalankan_di_server(): void
@@ -126,17 +209,19 @@ class HariLiburWebPageTest extends TestCase
             ->get(route('hari-libur', ['tahun' => 2026, 'per_page' => 10]));
 
         $halamanPertama->assertOk();
-        $halamanPertama->assertSee('Libur Uji 1');
-        $halamanPertama->assertDontSee('Libur Uji 11');
+        $this->assertContains('Libur Uji 1', $this->namaHariLiburDalamTabel($halamanPertama));
+        $this->assertNotContains('Libur Uji 11', $this->namaHariLiburDalamTabel($halamanPertama));
         $halamanPertama->assertSee('dari');
+        $halamanPertama->assertSee('aria-label="Pagination Navigation"', false);
 
         $halamanKedua = $this->actingAs($user)
             ->get(route('hari-libur', ['tahun' => 2026, 'per_page' => 10, 'page' => 2]));
 
         $halamanKedua->assertOk();
-        $halamanKedua->assertSee('Libur Uji 11');
-        $halamanKedua->assertSee('Libur Uji 12');
-        $halamanKedua->assertDontSee('Libur Uji 1<');
+        $this->assertSame(
+            ['Libur Uji 11', 'Libur Uji 12'],
+            $this->namaHariLiburDalamTabel($halamanKedua),
+        );
     }
 
     public function test_per_page_di_luar_allowlist_ditolak(): void
@@ -144,6 +229,17 @@ class HariLiburWebPageTest extends TestCase
         $this->actingAs(User::factory()->superAdmin()->create())
             ->get(route('hari-libur', ['per_page' => 1000]))
             ->assertSessionHasErrors(['per_page']);
+    }
+
+    public function test_filter_tidak_valid_tidak_membuka_modal_tambah_hari_libur(): void
+    {
+        $response = $this->from(route('hari-libur'))
+            ->actingAs(User::factory()->superAdmin()->create())
+            ->followingRedirects()
+            ->get(route('hari-libur', ['per_page' => 1000]));
+
+        $response->assertOk();
+        $response->assertSee('showAddForm: false', false);
     }
 
     public function test_tipe_filter_tidak_valid_ditolak(): void
@@ -201,7 +297,7 @@ class HariLiburWebPageTest extends TestCase
                 'nama' => 'Tahun Baru Duplikat',
                 'tipe' => 'libur_nasional',
             ])
-            ->assertSessionHasErrors(['tanggal']);
+            ->assertSessionHasErrorsIn('hariLiburAdd', ['tanggal']);
 
         $this->assertSame(1, RefHariLibur::query()->count());
     }
@@ -214,9 +310,67 @@ class HariLiburWebPageTest extends TestCase
                 'nama' => '',
                 'tipe' => 'libur_daerah',
             ])
-            ->assertSessionHasErrors(['tanggal', 'nama', 'tipe']);
+            ->assertSessionHasErrorsIn('hariLiburAdd', ['tanggal', 'nama', 'tipe']);
 
         $this->assertSame(0, RefHariLibur::query()->count());
+    }
+
+    public function test_validasi_edit_tidak_mencemari_state_modal_tambah(): void
+    {
+        $hariLibur = $this->buatHariLibur('2026-08-17', 'Hari Kemerdekaan Republik Indonesia');
+        $halamanHariLibur = route('hari-libur', ['tahun' => 2026]);
+
+        $this->from($halamanHariLibur)
+            ->actingAs(User::factory()->superAdmin()->create())
+            ->putWithCsrf(route('hari-libur.update', $hariLibur), [
+                'tanggal' => '2026-08-17',
+                'nama' => '',
+                'tipe' => 'libur_nasional',
+                'form_context' => 'edit',
+                'hari_libur_id' => $hariLibur->id,
+            ])
+            ->assertRedirect($halamanHariLibur)
+            ->assertSessionHasErrorsIn('hariLiburEdit', ['nama']);
+
+        $response = $this->get($halamanHariLibur);
+        $html = $response->getContent();
+
+        $response->assertOk();
+        $response->assertSee('showAddForm: false', false);
+        $response->assertSee('window.hariLiburEditInput =', false);
+        $response->assertSee('id="edit_nama_error"', false);
+        $response->assertDontSee('id="nama_error"', false);
+        $this->assertDoesNotMatchRegularExpression('/<input\\b(?=[^>]*\\bid="tanggal")(?=[^>]*\\bvalue=)/s', $html);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="nama")(?=[^>]*\\bvalue="")/s', $html);
+        $response->assertSee('<option value="libur_nasional" selected>', false);
+    }
+
+    public function test_validasi_tambah_tidak_mencemari_state_modal_edit(): void
+    {
+        $hariLibur = $this->buatHariLibur('2026-08-17', 'Hari Kemerdekaan Republik Indonesia');
+        $halamanHariLibur = route('hari-libur', ['tahun' => 2026]);
+
+        $this->from($halamanHariLibur)
+            ->actingAs(User::factory()->superAdmin()->create())
+            ->postWithCsrf(route('hari-libur.store'), [
+                'tanggal' => '2026-09-15',
+                'nama' => '',
+                'tipe' => 'libur_nasional',
+                'form_context' => 'add',
+            ])
+            ->assertRedirect($halamanHariLibur)
+            ->assertSessionHasErrorsIn('hariLiburAdd', ['nama']);
+
+        $response = $this->get($halamanHariLibur);
+        $html = $response->getContent();
+
+        $response->assertOk();
+        $response->assertSee('showAddForm: true', false);
+        $response->assertSee('Hari Kemerdekaan Republik Indonesia');
+        $response->assertSee('id="nama_error"', false);
+        $response->assertDontSee('id="edit_nama_error"', false);
+        $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="edit_nama")(?=[^>]*\\bvalue="")/s', $html);
+        $this->assertDoesNotMatchRegularExpression('/<input\\b(?=[^>]*\\bid="edit_tanggal")(?=[^>]*\\bvalue=)/s', $html);
     }
 
     public function test_admin_kepegawaian_tidak_dapat_menambah_hari_libur_dari_web(): void
@@ -242,6 +396,30 @@ class HariLiburWebPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Hari Raya Natal');
         $response->assertSee('2026-12-25');
+    }
+
+    public function test_halaman_edit_menampilkan_validasi_dari_error_bag_edit(): void
+    {
+        $hariLibur = $this->buatHariLibur('2026-12-25', 'Hari Raya Natal');
+        $halamanEdit = route('hari-libur.edit', $hariLibur);
+
+        $this->from($halamanEdit)
+            ->actingAs(User::factory()->superAdmin()->create())
+            ->putWithCsrf(route('hari-libur.update', $hariLibur), [
+                'tanggal' => '2026-12-25',
+                'nama' => '',
+                'tipe' => 'libur_nasional',
+            ])
+            ->assertRedirect($halamanEdit)
+            ->assertSessionHasErrorsIn('hariLiburEdit', ['nama']);
+
+        $response = $this->get($halamanEdit);
+
+        $response->assertOk();
+        $response->assertSee('Perubahan belum tersimpan');
+        $response->assertSee('id="nama_error"', false);
+        $response->assertSee('aria-invalid="true"', false);
+        $response->assertSee('value="2026-12-25"', false);
     }
 
     public function test_halaman_edit_menolak_uuid_tidak_valid(): void
@@ -288,7 +466,7 @@ class HariLiburWebPageTest extends TestCase
                 'nama' => 'Duplikat Tanggal',
                 'tipe' => 'libur_nasional',
             ])
-            ->assertSessionHasErrors(['tanggal']);
+            ->assertSessionHasErrorsIn('hariLiburEdit', ['tanggal']);
 
         $this->assertSame('2026-03-20', $hariLibur->refresh()->tanggal->format('Y-m-d'));
     }
@@ -354,6 +532,24 @@ class HariLiburWebPageTest extends TestCase
             'tahun' => (int) Carbon::parse($tanggal)->format('Y'),
             'is_cuti_bersama' => $cutiBersama,
         ]);
+    }
+
+    private function cabutPermissionSuperAdmin(string $permission): void
+    {
+        $role = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $permissionId = Permission::query()->where('name', $permission)->value('id');
+
+        $role->permissions()->detach($permissionId);
+    }
+
+    /** @return list<string> */
+    private function namaHariLiburDalamTabel(TestResponse $response): array
+    {
+        return $response->viewData('hariLibur')
+            ->getCollection()
+            ->pluck('nama')
+            ->values()
+            ->all();
     }
 
     private function postWithCsrf(string $uri, array $data): TestResponse

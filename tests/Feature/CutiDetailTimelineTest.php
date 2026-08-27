@@ -119,7 +119,8 @@ class CutiDetailTimelineTest extends TestCase
             ->get(route('cuti.show', $leaveRequest->id))
             ->assertOk()
             ->assertSee('role="dialog"', false)
-            ->assertSee('@keydown.escape.window="close()"', false)
+            ->assertSee('@keydown.escape.window="if (decisionForm !== null) close()"', false)
+            ->assertDontSee('@keydown.escape.window="close()"', false)
             ->assertSee("@click=\"open('postpone', \$event)\"", false)
             ->assertSee("@click=\"open('decline', \$event)\"", false)
             ->assertDontSee("@click=\"open('reject', \$event)\"", false);
@@ -283,7 +284,7 @@ class CutiDetailTimelineTest extends TestCase
     {
         $jenis = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Rollover Approver',
-            'code' => 'tahunan_rollover_approver',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
@@ -402,7 +403,7 @@ class CutiDetailTimelineTest extends TestCase
     {
         $jenis = RefJenisCuti::create([
             'nama' => 'Cuti Tahunan Rollover Tanpa Target',
-            'code' => 'tahunan_tanpa_target',
+            'code' => 'tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);

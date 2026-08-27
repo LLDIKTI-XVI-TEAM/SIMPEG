@@ -13,7 +13,9 @@ use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
+use App\Models\User;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveUsageRecordService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,6 +31,10 @@ class Rule5CutiBesarTest extends TestCase
     use RefreshDatabase;
 
     private string $rollbackProbeLeaveRequestId;
+
+    private int $rollbackAuditCount;
+
+    private int $rollbackNotificationCount;
 
     protected function setUp(): void
     {
@@ -82,6 +88,22 @@ class Rule5CutiBesarTest extends TestCase
         ]);
     }
 
+    private function recordApprovedUsage(
+        Employee $employee,
+        RefJenisCuti $type,
+        string $start = '2026-08-03',
+        string $end = '2026-08-07',
+        int $workdays = 5,
+    ): LeaveRequest {
+        $leaveRequest = $this->request($employee, $type, 'disetujui', $start, $end, $workdays);
+        app(LeaveUsageRecordService::class)->recordApprovedRequest(
+            $leaveRequest,
+            User::factory()->adminKepegawaian()->create(),
+        );
+
+        return $leaveRequest;
+    }
+
     /** @param array{employee: Employee, approver1: Employee, approver2: Employee} $actors */
     private function pendingFinalRequest(array $actors, RefJenisCuti $type, string $start = '2026-08-03', string $end = '2026-08-07'): LeaveRequest
     {
@@ -128,6 +150,8 @@ class Rule5CutiBesarTest extends TestCase
             'body' => 'Bukti notifikasi sudah ada sebelum guard persetujuan final dijalankan.',
             'data' => ['leave_request_id' => $this->rollbackProbeLeaveRequestId],
         ]);
+        $this->rollbackAuditCount = AuditLog::query()->count();
+        $this->rollbackNotificationCount = SimpegNotification::query()->count();
     }
 
     private function balance(Employee $employee, array $overrides = []): LeaveBalance
@@ -157,8 +181,8 @@ class Rule5CutiBesarTest extends TestCase
         $this->assertTrue(SimpegNotification::query()
             ->where('data->leave_request_id', $this->rollbackProbeLeaveRequestId)
             ->exists());
-        $this->assertSame(1, AuditLog::query()->count());
-        $this->assertSame(1, SimpegNotification::query()->count());
+        $this->assertSame($this->rollbackAuditCount, AuditLog::query()->count());
+        $this->assertSame($this->rollbackNotificationCount, SimpegNotification::query()->count());
         $this->assertSame('menunggu_approval', $large->fresh()->status);
         $this->assertDatabaseHas('leave_request_steps', [
             'leave_request_id' => $large->id,
@@ -188,11 +212,15 @@ class Rule5CutiBesarTest extends TestCase
     /** Menjalankan jalur Action nyata agar rollback meliputi orkestrasi audit dan notifikasi. */
     private function approveFinal(LeaveRequest $large, Employee $actor): LeaveRequest
     {
+        $actingUser = User::factory()->create(['employee_id' => $actor->id]);
+        $request = Request::create('/cuti/approval', 'POST');
+        $request->setUserResolver(fn (): User => $actingUser);
+
         return app(ApproveLeaveAction::class)->execute(
             $large,
             $actor,
             null,
-            Request::create('/cuti/approval', 'POST'),
+            $request,
         );
     }
 
@@ -235,10 +263,10 @@ class Rule5CutiBesarTest extends TestCase
         $this->assertFinalApprovalRolledBack($large);
     }
 
-    public function test_final_cuti_besar_ditolak_oleh_request_tahunan_disetujui_tanpa_ledger(): void
+    public function test_final_cuti_besar_ditolak_oleh_fakta_pemakaian_tahunan_aktif(): void
     {
         $actors = $this->actors();
-        $this->request($actors['employee'], $this->leaveType('tahunan'), 'disetujui');
+        $this->recordApprovedUsage($actors['employee'], $this->leaveType('tahunan'));
         $large = $this->pendingFinalRequest($actors, $this->leaveType('besar'));
 
         $this->assertValidationError(
@@ -249,21 +277,16 @@ class Rule5CutiBesarTest extends TestCase
         $this->assertFinalApprovalRolledBack($large);
     }
 
-    public function test_final_cuti_besar_ditolak_oleh_deduction_tahun_penggunaan_walau_source_year_n_minus_two(): void
+    public function test_final_cuti_besar_ditolak_oleh_fakta_tahunan_pada_tahun_penggunaan(): void
     {
         $actors = $this->actors();
-        $balance = $this->balance($actors['employee']);
-        LeaveBalanceLedger::create([
-            'employee_id' => $actors['employee']->id,
-            'leave_balance_id' => $balance->id,
-            'tahun' => 2026,
-            'event_type' => LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED,
-            'amount' => -2,
-            'source_year' => 2024,
-            'reason' => 'Pemakaian bucket N-2 pada tahun 2026.',
-            'dedup_key' => "rule5:n2:{$actors['employee']->id}",
-            'occurred_at' => Carbon::parse('2026-02-02'),
-        ]);
+        $this->recordApprovedUsage(
+            $actors['employee'],
+            $this->leaveType('tahunan'),
+            '2026-02-02',
+            '2026-02-03',
+            2,
+        );
         $large = $this->pendingFinalRequest($actors, $this->leaveType('besar'));
 
         $this->assertValidationError(
@@ -301,36 +324,61 @@ class Rule5CutiBesarTest extends TestCase
         $this->assertFinalApprovalRolledBack($large);
     }
 
-    public function test_final_cuti_besar_ditolak_oleh_reservasi_jenis_alternatif_yang_mengurangi_saldo_tahunan(): void
+    public function test_final_cuti_besar_mengabaikan_reservasi_jenis_alternatif_non_tahunan(): void
     {
         $actors = $this->actors();
         $balance = $this->balance($actors['employee']);
-        $alternativeAnnual = RefJenisCuti::create([
-            'nama' => 'Cuti Alternatif Berflag Tahunan',
-            'code' => 'alternatif_berflag_tahunan',
-            'mengurangi_saldo_tahunan' => true,
+        $alternative = RefJenisCuti::create([
+            'nama' => 'Cuti Alternatif Non Tahunan',
+            'code' => 'alternatif_non_tahunan',
+            'mengurangi_saldo_tahunan' => false,
             'khusus_pns' => false,
         ]);
-        $annual = $this->request($actors['employee'], $alternativeAnnual, 'tidak_disetujui');
+        $request = $this->request($actors['employee'], $alternative, 'tidak_disetujui');
         LeaveBalanceReservationEvent::create([
             'employee_id' => $actors['employee']->id,
-            'leave_request_id' => $annual->id,
+            'leave_request_id' => $request->id,
             'leave_balance_id' => $balance->id,
             'tahun' => 2026,
             'event_type' => LeaveBalanceReservationEvent::EVENT_RESERVED,
             'amount' => 5,
-            'reason' => 'Reservasi jenis alternatif yang tetap mengurangi saldo tahunan.',
-            'dedup_key' => "rule5:alternative-annual-reservation:{$annual->id}",
+            'reason' => 'Fixture reservasi alternatif non-tahunan.',
+            'dedup_key' => "rule5:alternative-non-annual-reservation:{$request->id}",
             'occurred_at' => now(),
         ]);
         $large = $this->pendingFinalRequest($actors, $this->leaveType('besar'));
 
-        $this->assertValidationError(
-            fn () => $this->approveFinal($large, $actors['approver2']),
-            'status',
-            'Cuti Besar tidak dapat disetujui karena saldo Cuti Tahunan masih dialokasikan pada tahun yang sama.',
-        );
-        $this->assertFinalApprovalRolledBack($large);
+        $this->approveFinal($large, $actors['approver2']);
+
+        $this->assertSame('disetujui', $large->fresh()->status);
+    }
+
+    public function test_final_jenis_alternatif_non_tahunan_mengabaikan_marker_rollover(): void
+    {
+        $actors = $this->actors();
+        $balance = $this->balance($actors['employee']);
+        $alternative = RefJenisCuti::create([
+            'nama' => 'Cuti Alternatif Non Tahunan',
+            'code' => 'alternatif_non_tahunan',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        LeaveBalanceLedger::create([
+            'employee_id' => $actors['employee']->id,
+            'leave_balance_id' => $balance->id,
+            'tahun' => 2027,
+            'event_type' => LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
+            'amount' => 0,
+            'source_year' => 2026,
+            'reason' => 'Marker penutupan tahun sumber.',
+            'dedup_key' => "rule5:alternative-annual-rollover:{$actors['employee']->id}",
+            'occurred_at' => now(),
+        ]);
+        $request = $this->pendingFinalRequest($actors, $alternative);
+
+        $this->approveFinal($request, $actors['approver2']);
+
+        $this->assertSame('disetujui', $request->fresh()->status);
     }
 
     public function test_final_cuti_besar_mengabaikan_reservasi_non_tahunan(): void
@@ -437,21 +485,16 @@ class Rule5CutiBesarTest extends TestCase
         $this->assertSame('disetujui', $large->fresh()->status);
     }
 
-    public function test_final_cuti_besar_mengabaikan_deduction_tahun_sebelumnya(): void
+    public function test_final_cuti_besar_mengabaikan_fakta_tahunan_tahun_sebelumnya(): void
     {
         $actors = $this->actors();
-        $balance = $this->balance($actors['employee'], ['tahun' => 2025]);
-        LeaveBalanceLedger::create([
-            'employee_id' => $actors['employee']->id,
-            'leave_balance_id' => $balance->id,
-            'tahun' => 2025,
-            'event_type' => LeaveBalanceLedger::EVENT_LEAVE_DEDUCTED,
-            'amount' => -2,
-            'source_year' => 2025,
-            'reason' => 'Pemakaian Cuti Tahunan tahun sebelumnya.',
-            'dedup_key' => "rule5:previous-year-deduction:{$actors['employee']->id}",
-            'occurred_at' => Carbon::parse('2025-12-01'),
-        ]);
+        $this->recordApprovedUsage(
+            $actors['employee'],
+            $this->leaveType('tahunan'),
+            '2025-12-01',
+            '2025-12-02',
+            2,
+        );
         $large = $this->pendingFinalRequest($actors, $this->leaveType('besar'));
 
         $this->approveFinal($large, $actors['approver2']);
@@ -493,6 +536,7 @@ class Rule5CutiBesarTest extends TestCase
     public function test_final_cuti_besar_membuat_seluruh_bucket_tahunan_tidak_tersedia_tanpa_zeroing(): void
     {
         $actors = $this->actors();
+        $large = $this->recordApprovedUsage($actors['employee'], $this->leaveType('besar'));
         $balance = $this->balance($actors['employee'], [
             'carry_over' => 10,
             'sisa' => 22,
@@ -500,8 +544,6 @@ class Rule5CutiBesarTest extends TestCase
             'sisa_n1' => 6,
             'sisa_tahun_berjalan' => 12,
         ]);
-        $large = $this->request($actors['employee'], $this->leaveType('besar'), 'disetujui');
-
         $this->assertSame(
             0,
             app(LeaveBalanceService::class)->availableFor($actors['employee'], 2026, Carbon::parse('2026-08-10')),
@@ -513,7 +555,7 @@ class Rule5CutiBesarTest extends TestCase
         $this->assertSame(12, $balance->sisa_tahun_berjalan);
         $this->assertSame(22, $balance->sisa);
         $this->assertDatabaseHas('leave_requests', ['id' => $large->id, 'status' => 'disetujui']);
-        $this->assertDatabaseCount('leave_balance_ledger', 0);
+        $this->assertDatabaseMissing('leave_balance_ledger', ['event_type' => 'leave_deducted']);
     }
 
     public function test_cuti_besar_non_final_tidak_membuat_saldo_tahunan_efektif_nol(): void
@@ -537,7 +579,7 @@ class Rule5CutiBesarTest extends TestCase
     public function test_assert_annual_leave_allowed_menolak_tahun_cuti_besar_final_dan_tidak_menolak_tahun_lain(): void
     {
         $actors = $this->actors();
-        $this->request($actors['employee'], $this->leaveType('besar'), 'disetujui');
+        $this->recordApprovedUsage($actors['employee'], $this->leaveType('besar'));
         $balances = app(LeaveBalanceService::class);
 
         $this->assertValidationError(

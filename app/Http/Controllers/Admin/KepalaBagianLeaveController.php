@@ -2,76 +2,43 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Actions\Cuti\ListKepalaBagianLeavesAction;
+use App\Actions\Cuti\DownloadLeaveAttachmentAction;
+use App\Actions\Cuti\ShowKepalaBagianLeaveDetailAction;
+use App\Actions\Cuti\ShowKepalaBagianLeaveIndexAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\KepalaBagianLeaveFilterRequest;
 use App\Models\LeaveRequest;
-use App\Models\RefJenisCuti;
-use App\Services\Employees\KepalaBagianScopeService;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class KepalaBagianLeaveController extends Controller
 {
-    public function index(KepalaBagianLeaveFilterRequest $request, ListKepalaBagianLeavesAction $action)
+    public function index(KepalaBagianLeaveFilterRequest $request, ShowKepalaBagianLeaveIndexAction $action)
     {
         abort_if($request->user()?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
 
-        $filters = $request->validated();
-        if (! $request->has('status')) {
-            $filters['status'] = 'menunggu_approval';
-        } elseif (($filters['status'] ?? null) === 'all') {
-            $filters['status'] = null;
-        }
+        /** @var User $actor */
+        $actor = $request->user();
 
-        return view('kabag.cuti.index', [
-            'leaves' => $action->execute($request->user(), $filters),
-            'filters' => $filters,
-            'jenisCutiOptions' => RefJenisCuti::query()->orderBy('nama')->get(['id', 'nama']),
-        ]);
+        return view('kabag.cuti.index', $action->execute($actor, $request->validated()));
     }
 
-    public function show(Request $request, LeaveRequest $leave, KepalaBagianScopeService $scope)
-    {
-        $user = $request->user();
-        abort_if($user?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
-        abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
+    public function show(
+        Request $request,
+        LeaveRequest $leave,
+        ShowKepalaBagianLeaveDetailAction $action,
+    ) {
+        /** @var User|null $actor */
+        $actor = $request->user();
 
-        $leave->load([
-            'employee:id,nama_lengkap,nip,jabatan_terakhir,golongan_terakhir',
-            'jenisCuti:id,nama,code',
-            'steps.approver:id,nama_lengkap',
-            'approvals.approver:id,nama_lengkap',
-        ]);
-        $activeStep = $leave->steps->firstWhere('status', 'active');
-        $attachmentAvailable = $leave->lampiran_path !== null
-            && Storage::disk('public')->exists($leave->lampiran_path);
-
-        return view('kabag.cuti.show', [
-            'leave' => $leave,
-            'activeStep' => $activeStep,
-            'canDecide' => $activeStep !== null
-                && $activeStep->approver_employee_id === $user->employee_id
-                && in_array($leave->status, ['menunggu_approval', 'ditangguhkan'], true),
-            'attachmentAvailable' => $attachmentAvailable,
-        ]);
+        return view('kabag.cuti.show', $action->execute($actor, $leave));
     }
 
-    public function downloadAttachment(Request $request, LeaveRequest $leave, KepalaBagianScopeService $scope)
+    public function downloadAttachment(Request $request, LeaveRequest $leave, DownloadLeaveAttachmentAction $action)
     {
+        /** @var User $user */
         $user = $request->user();
-        abort_if($user?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
-        abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
-        abort_if(
-            $leave->lampiran_path === null || ! Storage::disk('public')->exists($leave->lampiran_path),
-            404,
-        );
 
-        $extension = pathinfo($leave->lampiran_path, PATHINFO_EXTENSION) ?: 'file';
-
-        return Storage::disk('public')->download(
-            $leave->lampiran_path,
-            'Lampiran_Cuti_'.strtoupper(substr($leave->id, 0, 8)).'.'.$extension,
-        );
+        return $action->forKepalaBagian($leave, $user);
     }
 }

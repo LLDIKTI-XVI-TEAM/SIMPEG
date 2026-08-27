@@ -3,9 +3,17 @@
     @php
         $canManageDocuments = \App\Support\Documents\DocumentAuthorization::canManage(auth()->user());
 
-        $canAssignSupervisor = auth()->check()
-            && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true)
+        $canUpdateEmployee = auth()->check()
             && auth()->user()->hasPermission('employees.update');
+        $canCreateFamily = auth()->check()
+            && auth()->user()->hasPermission('employee_families.create');
+        $canDeleteFamily = auth()->check()
+            && auth()->user()->hasPermission('employee_families.delete');
+        $canCreateDiscipline = auth()->check()
+            && auth()->user()->hasPermission('discipline_records.create');
+
+        $canAssignSupervisor = $canUpdateEmployee
+            && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true);
         $canDeactivateEmployee = auth()->check()
             && auth()->user()->hasPermission('employees.deactivate');
 
@@ -21,7 +29,7 @@
             'disiplin' => 'Hukuman Disiplin',
             'pendidikan' => 'Pendidikan',
             'pengangkatan' => 'Pengangkatan',
-            'docs' => 'Dokumen',
+            'docs' => 'Dokumen & SK',
         ];
         $requestedDetailTab = request()->query('tab');
 
@@ -118,7 +126,6 @@
         isDeletingBerkas: false,
         deleteBerkasError: '',
         deletingBerkas: null,
-        skList: {{ \Illuminate\Support\Js::from($documentSkRows) }},
         berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
 
         clearDocumentArchiveCache() {
@@ -912,6 +919,12 @@
                     if (['disiplin', 'kgb', 'jabatan', 'pangkat', 'pendidikan'].includes(this.modalType)) {
                         this.clearDocumentArchiveCache();
                     }
+
+                    // Matriks dihitung ulang di server dari riwayat resmi. Render
+                    // ulang komponen agar status dan arsip tidak memakai snapshot lama.
+                    if (['kgb', 'jabatan', 'pangkat'].includes(this.modalType)) {
+                        await this.$wire.$refresh();
+                    }
                     
                     this.showModal = false;
                     this.toast = { show: true, message: 'Data berhasil disimpan!', type: 'success' };
@@ -939,12 +952,13 @@
             :dashboard-url="route('dashboard')"
             :employees-url="route('data-pegawai')"
         >
-                @if(auth()->user()->role !== 'pimpinan')
-                <a href="{{ route('pegawai.edit', $p->id) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                @if($canUpdateEmployee)
+                <a href="{{ route('pegawai.edit', $p->id) }}" wire:navigate aria-label="Edit Pegawai" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 sm:px-4">
+                    <svg class="mr-1.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
-                    Edit Pegawai
+                    <span class="sm:hidden">Edit</span>
+                    <span class="hidden sm:inline">Edit Pegawai</span>
                 </a>
                 @endif
                 @if($canDeactivateEmployee)
@@ -1035,7 +1049,7 @@
                             </p>
                         </div>
                         <label class="relative inline-flex items-center cursor-pointer select-none">
-                            @if(auth()->user()->role !== 'pimpinan')
+                            @if($canUpdateEmployee)
                             <input type="checkbox" x-model="kinerjaBaik" @change="updateKinerjaBaik(kinerjaBaik)" :disabled="isUpdatingKinerja" aria-label="Toggle Kinerja Baik" class="sr-only peer">
                             @else
                             <input type="checkbox" x-model="kinerjaBaik" disabled aria-label="Toggle Kinerja Baik" class="sr-only peer">
@@ -1056,7 +1070,7 @@
                                 </p>
                             </div>
                             <label class="relative inline-flex items-center cursor-pointer select-none">
-                                @if(auth()->user()->role !== 'pimpinan')
+                                @if($canUpdateEmployee)
                                 <input type="checkbox" x-model="satyalancanaEligible" @change="updateSatyalancanaEligibility()" :disabled="isUpdatingSatyalancana" aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
                                 @else
                                 <input type="checkbox" x-model="satyalancanaEligible" disabled aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
@@ -1066,7 +1080,7 @@
                         </div>
                         <div class="space-y-1">
                             <label for="satyalancana-note" class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
-                            @if(auth()->user()->role === 'pimpinan')
+                            @if(! $canUpdateEmployee)
                             <textarea id="satyalancana-note" x-model="satyalancanaNote" rows="2" readonly class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:outline-none focus:ring-0 opacity-70 resize-none"></textarea>
                             @else
                             <textarea
@@ -1079,7 +1093,7 @@
                             ></textarea>
                             @endif
                         </div>
-                        @if(auth()->user()->role !== 'pimpinan')
+                        @if($canUpdateEmployee)
                         <button
                             type="button"
                             @click="updateSatyalancanaEligibility()"
@@ -1205,22 +1219,23 @@
 
             {{-- TAB 2: DATA KELUARGA --}}
             <x-pegawai.detail.panel tab="keluarga" id-prefix="admin">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Data Keluarga</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Daftar istri/suami dan anak yang tercatat sebagai tanggungan.</p>
-                    </div>
-                    @if(auth()->user()->role !== 'pimpinan')
-                            <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                <x-pegawai.detail.section-header
+                    title="Data Keluarga"
+                    description="Daftar istri/suami dan anak yang tercatat sebagai tanggungan."
+                >
+                    @if($canCreateFamily)
+                        <x-slot:actions>
+                            <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Keluarga
                     </button>
-                            @endif
-                </div>
+                        </x-slot:actions>
+                    @endif
+                </x-pegawai.detail.section-header>
                 {{-- Loading skeleton --}}
-                <div x-show="keluargaLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
+                <div x-show="keluargaLoading" role="status" aria-live="polite" class="flex items-center justify-center gap-2 py-10 text-xs text-muted font-sans">
                     <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -1231,13 +1246,13 @@
                 <x-pegawai.detail.table
                     name="keluarga"
                     :headings="['Nama Lengkap & NIK', 'Hubungan', 'TTL', 'Pekerjaan', 'Status']"
-                    :show-actions="auth()->user()->role !== 'pimpinan'"
+                    :show-actions="$canDeleteFamily"
                     x-show="!keluargaLoading"
                 >
                             <template x-for="(fam, index) in keluargaList" :key="fam.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink" data-family-readonly-row>
                                     @include('pegawai.partials.detail.family-readonly-cells', ['mode' => 'alpine'])
-                                    @if(auth()->user()->role !== 'pimpinan')
+                                    @if($canDeleteFamily)
                                             <td class="px-4 py-3 text-right">
                                         <button
                                             type="button"
@@ -1256,7 +1271,7 @@
                                 </tr>
                             </template>
                             <tr x-show="!keluargaLoading && keluargaList.length === 0">
-                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="{{ $canDeleteFamily ? 6 : 5 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki data anggota keluarga.
                                 </td>
                             </tr>
@@ -1265,20 +1280,21 @@
 
             {{-- TAB 3: RIWAYAT KEPANGKATAN --}}
             <x-pegawai.detail.panel tab="kepangkatan" id-prefix="admin">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kepangkatan & Golongan</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas.</p>
-                    </div>
+                <x-pegawai.detail.section-header
+                    title="Riwayat Kepangkatan & Golongan"
+                    description="Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas."
+                >
                     @if($canCreateEmployeeHistory)
-                        <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                        <x-slot:actions>
+                        <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat Kepangkatan
                         </button>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="kepangkatan"
                     :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat', 'Berkas']"
@@ -1302,20 +1318,21 @@
 
             {{-- TAB 4: RIWAYAT JABATAN --}}
             <x-pegawai.detail.panel tab="jabatan" id-prefix="admin">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Riwayat Jabatan & Struktural</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Catatan penugasan jabatan fungsional maupun struktural.</p>
-                    </div>
+                <x-pegawai.detail.section-header
+                    title="Riwayat Jabatan & Struktural"
+                    description="Catatan penugasan jabatan fungsional maupun struktural."
+                >
                     @if($canCreateEmployeeHistory)
-                        <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                        <x-slot:actions>
+                        <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat Jabatan
                         </button>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="jabatan"
                     :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan', 'Berkas']"
@@ -1340,20 +1357,21 @@
 
             {{-- TAB 5: RIWAYAT KGB --}}
             <x-pegawai.detail.panel tab="kgb" id-prefix="admin">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Riwayat Kenaikan Gaji Berkala (KGB)</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Catatan penyesuaian gaji berkala setiap 2 tahun sekali.</p>
-                    </div>
+                <x-pegawai.detail.section-header
+                    title="Riwayat Kenaikan Gaji Berkala (KGB)"
+                    description="Catatan penyesuaian gaji berkala setiap 2 tahun sekali."
+                >
                     @if($canCreateEmployeeHistory)
-                        <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                        <x-slot:actions>
+                        <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat KGB
                         </button>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="kgb"
                     :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB', 'Berkas']"
@@ -1377,20 +1395,21 @@
 
             {{-- TAB 6: HUKUMAN DISIPLIN --}}
             <x-pegawai.detail.panel tab="disiplin" id-prefix="admin">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Riwayat Hukuman Disiplin</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian.</p>
-                    </div>
-                    @if(auth()->user()->role !== 'pimpinan')
-                            <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                <x-pegawai.detail.section-header
+                    title="Riwayat Hukuman Disiplin"
+                    description="Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian."
+                >
+                    @if($canCreateDiscipline)
+                        <x-slot:actions>
+                            <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Hukuman
                     </button>
-                            @endif
-                </div>
+                        </x-slot:actions>
+                    @endif
+                </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="disiplin"
                     :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas']"
@@ -1423,20 +1442,21 @@
 
             {{-- TAB 7: RIWAYAT PENDIDIKAN --}}
             <x-pegawai.detail.panel tab="pendidikan" id-prefix="admin">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans">Riwayat Pendidikan Formal</h3>
-                        <p class="text-xs text-muted font-sans mt-0.5">Riwayat kualifikasi akademis tertinggi staf.</p>
-                    </div>
-                    @if(auth()->user()->role !== 'pimpinan')
-                            <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex items-center gap-1.5 rounded-lg border border-primary bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm cursor-pointer font-sans">
+                <x-pegawai.detail.section-header
+                    title="Riwayat Pendidikan Formal"
+                    description="Riwayat kualifikasi akademis tertinggi staf."
+                >
+                    @if($canCreateEmployeeHistory)
+                        <x-slot:actions>
+                            <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
                         <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Pendidikan
                     </button>
+                        </x-slot:actions>
                     @endif
-                </div>
+                </x-pegawai.detail.section-header>
                 <div class="grid gap-3 rounded-lg border border-border bg-soft/30 p-4 sm:grid-cols-2">
                     <div>
                         <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Pendidikan Terakhir</p>
@@ -1448,7 +1468,7 @@
                     </div>
                 </div>
                 {{-- Loading skeleton --}}
-                <div x-show="pendidikanLoading" class="flex items-center justify-center py-10 text-xs text-muted font-sans gap-2">
+                <div x-show="pendidikanLoading" role="status" aria-live="polite" class="flex items-center justify-center gap-2 py-10 text-xs text-muted font-sans">
                     <svg class="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -1459,7 +1479,7 @@
                 <x-pegawai.detail.table
                     name="pendidikan"
                     :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah', 'Berkas']"
-                    :show-actions="auth()->user()->role !== 'pimpinan'"
+                    :show-actions="$canCreateEmployeeHistory"
                     x-show="!pendidikanLoading"
                 >
                             <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
@@ -1473,7 +1493,7 @@
                                         <a x-show="edu.download_url" :href="edu.download_url" class="font-semibold text-primary hover:underline">Unduh Ijazah</a>
                                         <span x-show="!edu.download_url" class="text-muted">-</span>
                                     </td>
-                                    @if(auth()->user()->role !== 'pimpinan')
+                                    @if($canCreateEmployeeHistory)
                                             <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
                                             <button
@@ -1501,7 +1521,7 @@
                                 </tr>
                             </template>
                             <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
-                                <td colspan="7" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="{{ $canCreateEmployeeHistory ? 7 : 6 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki riwayat pendidikan formal.
                                 </td>
                             </tr>
@@ -1510,10 +1530,10 @@
 
             {{-- TAB 8: DATA PENGANGKATAN --}}
             <x-pegawai.detail.panel tab="pengangkatan" id-prefix="admin">
-                <div>
-                    <h3 class="text-sm font-bold text-ink font-sans">Data & SK Pengangkatan Pertama</h3>
-                    <p class="text-xs text-muted font-sans mt-0.5">Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK.</p>
-                </div>
+                <x-pegawai.detail.section-header
+                    title="Data & SK Pengangkatan Pertama"
+                    description="Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK."
+                />
                 @include('pegawai.partials.detail.appointment-readonly', [
                     'appointment' => $p->appointment,
                     'attachmentDownloadUrl' => $p->appointment?->admin_attachment_download_url,
