@@ -80,6 +80,23 @@ class HandleKeycloakCallbackAction
             }
 
             $employee = $employees->first();
+
+            // Pegawai nonaktif tidak boleh mendapat akun baru ber-privilege — cek sebelum role assignment
+            // (matchedEmployees hanya filter deleted_at; kelompok Nonaktif/Pensiun/Mutasi harus ditolak di sini).
+            if ($this->employeeIsInactive($employee->id)) {
+                return view('auth.unregistered', [
+                    'message' => 'Akun pegawai tidak aktif.',
+                ]);
+            }
+
+            // Fail-closed untuk mapping invalid: email tercantum di role_mapping tetapi nilainya
+            // di luar allowlist tidak boleh jatuh ke fallback pegawai/super_admin.
+            if ($this->isInvalidRoleMapping($matchedEmail)) {
+                return view('auth.unregistered', [
+                    'message' => 'Konfigurasi role mapping tidak valid.',
+                ]);
+            }
+
             $user = User::whereRaw('lower(email) = ?', [$matchedEmail])->first();
 
             if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
@@ -118,6 +135,7 @@ class HandleKeycloakCallbackAction
                 // Mapping pegawai valid + role internal belum ada → role mengikuti pemetaan
                 // email SSO bila tersedia; tanpa pemetaan, default SSO Pegawai berperan
                 // sebagai Pegawai; akun pertama sistem diberi akses super_admin agar dapat dikonfigurasi.
+                // Invalid mapping sudah ditolak di atas, jadi fallback hanya untuk missing mapping.
                 $user->role = $this->mappedRoleForEmail($matchedEmail)
                     ?? (User::query()->exists() ? 'pegawai' : 'super_admin');
                 $user->password = Str::random(48);
@@ -133,7 +151,7 @@ class HandleKeycloakCallbackAction
         ]);
     }
 
-    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse
+    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse|View
     {
         $user->fill([
             'name' => $name ?: $user->name,
@@ -146,6 +164,17 @@ class HandleKeycloakCallbackAction
         $claimedUsername = $username ?: $user->keycloak_username;
         if ($this->usernameIsAvailable($user, $claimedUsername)) {
             $user->keycloak_username = $claimedUsername;
+        }
+
+        // Fail-closed untuk mapping invalid: email tercantum di role_mapping tetapi nilainya
+        // di luar allowlist tidak boleh jatuh ke fallback pegawai.
+        if ($user->employee_id !== null
+            && is_string($user->employee_id)
+            && in_array($user->role, [null, ''], true)
+            && $this->isInvalidRoleMapping($user->email)) {
+            return view('auth.unregistered', [
+                'message' => 'Konfigurasi role mapping tidak valid.',
+            ]);
         }
 
         // Role internal kosong (null atau string kosong) pada mapping pegawai valid
@@ -312,6 +341,30 @@ class HandleKeycloakCallbackAction
         }
 
         return $mapped;
+    }
+
+    /**
+     * True bila email tercantum di role_mapping tetapi nilainya di luar allowlist.
+     * Bedakan dari missing mapping (tidak tercantum) yang masih boleh fallback ke pegawai/super_admin.
+     */
+    private function isInvalidRoleMapping(?string $email): bool
+    {
+        if (! is_string($email) || trim($email) === '') {
+            return false;
+        }
+
+        $roleMapping = (array) config('services.keycloak.role_mapping', []);
+        // Normalisasi key case-insensitive agar typo kapitalisasi tetap terdeteksi.
+        $normalizedMap = array_change_key_case($roleMapping, CASE_LOWER);
+        $normalizedEmail = strtolower(trim($email));
+
+        if (! array_key_exists($normalizedEmail, $normalizedMap)) {
+            return false;
+        }
+
+        $mapped = $normalizedMap[$normalizedEmail];
+
+        return ! is_string($mapped) || ! in_array($mapped, self::ALLOWED_INTERNAL_ROLES, true);
     }
 
     /**
