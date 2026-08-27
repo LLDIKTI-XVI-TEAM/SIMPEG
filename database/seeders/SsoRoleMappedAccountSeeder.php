@@ -72,8 +72,13 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 'role' => $user->exists ? $user->role : $role,
                 'employee_id' => $employee->id,
                 'email_verified_at' => $user->email_verified_at ?? now(),
-                'password' => Str::random(48),
             ]);
+
+            // Password acak hanya untuk placeholder user baru; user existing yang sudah
+            // menetapkan password via profil tidak boleh ditimpa tanpa audit.
+            if (! $user->exists) {
+                $user->password = Str::random(48);
+            }
 
             $user->save();
 

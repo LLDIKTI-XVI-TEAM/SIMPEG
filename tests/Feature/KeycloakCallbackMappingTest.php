@@ -826,6 +826,85 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
+    /** Pegawai berstatus Non-Aktif (tanpa soft-delete) tidak boleh mendapat role baru via SSO. */
+    public function test_role_not_initialized_for_non_active_employee_without_soft_delete(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pensiunan Belum Dihapus',
+            'email' => 'pensiun@example.com',
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        // User terpeta tanpa soft-delete, role masih kosong.
+        $user = User::factory()->create([
+            'email' => 'pensiun@example.com',
+            'keycloak_id' => 'kc-pensiun-tanpa-softdel',
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-pensiun-tanpa-softdel',
+            'nickname' => 'pensiun-user',
+            'name' => 'Pensiunan Belum Dihapus',
+            'email' => 'pensiun@example.com',
+            'raw' => ['email' => 'pensiun@example.com', 'email_verified' => true, 'preferred_username' => 'pensiun-user'],
+        ]);
+
+        $this->get('/auth/keycloak/callback');
+
+        // Role tetap kosong: pegawai Pensiun tanpa soft-delete tidak mendapat role baru.
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+        $this->assertDatabaseMissing('audit_logs', [
+            'event' => 'UPDATE',
+            'auditable_type' => 'User',
+            'auditable_id' => $user->id,
+        ]);
+    }
+
+    /** Username case collision: User B punya 'foo', User A punya 'Foo'; Keycloak kirim 'foo' untuk A → username A tidak berubah. */
+    public function test_username_case_collision_does_not_violate_unique_constraint(): void
+    {
+        $employeeA = Employee::factory()->create(['email' => 'user-a@example.com']);
+        $userA = User::factory()->create([
+            'email' => 'user-a@example.com',
+            'keycloak_id' => 'kc-user-a',
+            'keycloak_username' => 'Foo',
+            'employee_id' => $employeeA->id,
+            'role' => 'pegawai',
+        ]);
+
+        // User B sudah memegang 'foo' (huruf kecil).
+        User::factory()->create([
+            'email' => 'user-b@example.test',
+            'keycloak_username' => 'foo',
+            'role' => 'pegawai',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-user-a',
+            'nickname' => 'foo', // Keycloak mengirim lowercase
+            'name' => 'User A',
+            'email' => 'user-a@example.com',
+            'raw' => ['email' => 'user-a@example.com', 'email_verified' => true, 'preferred_username' => 'foo'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+
+        // Username A tetap 'Foo' karena 'foo' sudah dimiliki User B.
+        $this->assertDatabaseHas('users', [
+            'id' => $userA->id,
+            'keycloak_username' => 'Foo',
+        ]);
+    }
+
     /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */

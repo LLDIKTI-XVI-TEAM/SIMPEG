@@ -152,11 +152,11 @@ class HandleKeycloakCallbackAction
         // diinisialisasi mengikuti pemetaan email SSO bila tersedia, selain itu sebagai
         // Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
         // Inisialisasi hanya untuk pegawai yang masih aktif: pegawai yang sudah dinonaktifkan
-        // (soft-delete) tidak layak menerima role baru, agar akses yang dicabut lewat deaktivasi
-        // tidak pulih hanya karena role account lama masih kosong.
+        // (soft-delete maupun status referensi Non-Aktif/Pensiun/Mutasi) tidak layak menerima
+        // role baru, agar akses yang dicabut lewat deaktivasi tidak pulih.
         if ($user->employee_id !== null
             && is_string($user->employee_id)
-            && ! $this->employeeIsSoftDeleted($user->employee_id)
+            && ! $this->employeeIsInactive($user->employee_id)
             && in_array($user->role, [null, ''], true)) {
             $user->role = $this->mappedRoleForEmail($user->email) ?? 'pegawai';
         }
@@ -242,12 +242,29 @@ class HandleKeycloakCallbackAction
     }
 
     /**
-     * Apakah pegawai terpeta sudah dinonaktifkan (soft-delete). Pegawai nonaktif tidak berhak
+     * Apakah pegawai terpeta sudah tidak aktif. Pegawai nonaktif tidak berhak
      * atas inisialisasi role baru lewat SSO.
+     *
+     * Pemeriksaan mencakup dua skenario: (1) soft-delete via deleted_at, dan
+     * (2) status referensi (kelompok) bukan aktif — contoh Pensiun, Mutasi, Nonaktif
+     * yang belum di-soft-delete. Fail-closed: pegawai tanpa status dianggap nonaktif.
      */
-    private function employeeIsSoftDeleted(string $employeeId): bool
+    private function employeeIsInactive(string $employeeId): bool
     {
-        return (bool) Employee::withTrashed()->whereKey($employeeId)->value('deleted_at');
+        $employee = Employee::withTrashed()->with('statusPegawai')->whereKey($employeeId)->first();
+
+        if (! $employee) {
+            return true; // fail-closed
+        }
+
+        if ($employee->trashed()) {
+            return true;
+        }
+
+        // Kelompok status pegawai adalah single source of truth untuk aktif/nonaktif.
+        $kelompok = strtolower((string) ($employee->statusPegawai?->kelompok ?? ''));
+
+        return ! in_array($kelompok, ['aktif', 'aktif/khusus'], true);
     }
 
     /**
@@ -298,19 +315,15 @@ class HandleKeycloakCallbackAction
     }
 
     /**
-     * True bila keycloak_username boleh disimpan pada user ini: kosong, sudah miliknya,
-     * atau belum dipakai user lain. Constraint unik users_keycloak_username_unique
-     * tidak boleh menggagalkan login karena identitas kanonis adalah keycloak_id.
+     * True bila keycloak_username boleh disimpan pada user ini: kosong atau belum
+     * dipakai user lain. Constraint unik users_keycloak_username_unique (PostgreSQL
+     * case-sensitive) tidak boleh menggagalkan login; selalu periksa DB karena user
+     * lain bisa memegang variasi kapitalisasi berbeda dari username yang sama.
      */
     private function usernameIsAvailable(User $user, ?string $username): bool
     {
         if (! is_string($username) || trim($username) === '') {
             return false;
-        }
-
-        if ($user->keycloak_username !== null
-            && strtolower(trim($user->keycloak_username)) === strtolower(trim($username))) {
-            return true;
         }
 
         return ! User::query()
