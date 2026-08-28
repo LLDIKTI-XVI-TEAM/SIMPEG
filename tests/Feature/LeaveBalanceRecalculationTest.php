@@ -52,10 +52,83 @@ class LeaveBalanceRecalculationTest extends TestCase
         $actor = User::factory()->adminKepegawaian()->create();
 
         try {
-            $this->createSet($employee, $actor, [2024 => 0, 2025 => 0, 2026 => 1]);
+            $this->createSet($employee, $actor, [2024 => 1, 2025 => 0, 2026 => 0]);
             $this->fail('Pemakaian tahunan tanpa hak yang eligible harus ditolak.');
         } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('usage.2026', $exception->errors());
+            $this->assertSame([
+                'usage.2024' => [
+                    'Hak cuti tahun 2024 belum dapat dihitung karena TMT pengangkatan pegawai belum tersedia.',
+                ],
+            ], $exception->errors());
+        }
+    }
+
+    public function test_rekalkulasi_menjelaskan_masa_kerja_belum_cukup_untuk_tahun_pemakaian(): void
+    {
+        $originalNow = Carbon::getTestNow();
+
+        try {
+            Carbon::setTestNow('2026-08-23 09:00:00');
+            [$employee, $actor] = $this->employeeWithAppointment('2024-06-01');
+
+            try {
+                $this->createSet($employee, $actor, [2024 => 1, 2025 => 0, 2026 => 0]);
+                $this->fail('Pemakaian sebelum masa kerja minimum harus ditolak dengan alasan yang spesifik.');
+            } catch (ValidationException $exception) {
+                $this->assertSame([
+                    'usage.2024' => [
+                        'Pegawai belum memenuhi masa kerja minimum untuk memperoleh hak cuti tahunan pada tahun 2024.',
+                    ],
+                ], $exception->errors());
+            }
+        } finally {
+            Carbon::setTestNow($originalNow);
+        }
+    }
+
+    public function test_rekalkulasi_menampilkan_hak_tersedia_saat_pemakaian_benar_benar_berlebih(): void
+    {
+        $originalNow = Carbon::getTestNow();
+
+        try {
+            Carbon::setTestNow('2026-08-23 09:00:00');
+            [$employee, $actor] = $this->employeeWithAppointment('2020-01-01');
+
+            try {
+                $this->createSet($employee, $actor, [2024 => 12, 2025 => 12, 2026 => 13]);
+                $this->fail('Pemakaian yang melampaui hak tersedia harus ditolak dengan batas yang dapat dipahami.');
+            } catch (ValidationException $exception) {
+                $this->assertSame([
+                    'usage.2026' => [
+                        'Pemakaian 13 hari melebihi hak cuti yang tersedia pada tahun 2026, yaitu 12 hari.',
+                    ],
+                ], $exception->errors());
+            }
+        } finally {
+            Carbon::setTestNow($originalNow);
+        }
+    }
+
+    public function test_rekalkulasi_menampilkan_hak_tersedia_dua_puluh_empat_hari_secara_dinamis(): void
+    {
+        $originalNow = Carbon::getTestNow();
+
+        try {
+            Carbon::setTestNow('2026-08-23 09:00:00');
+            [$employee, $actor] = $this->employeeWithAppointment('2020-01-01');
+
+            try {
+                $this->createSet($employee, $actor, [2024 => 0, 2025 => 0, 2026 => 25]);
+                $this->fail('Pemakaian di atas hak 24 hari harus ditolak dengan batas aktual yang tersedia.');
+            } catch (ValidationException $exception) {
+                $this->assertSame([
+                    'usage.2026' => [
+                        'Pemakaian 25 hari melebihi hak cuti yang tersedia pada tahun 2026, yaitu 24 hari.',
+                    ],
+                ], $exception->errors());
+            }
+        } finally {
+            Carbon::setTestNow($originalNow);
         }
     }
 
