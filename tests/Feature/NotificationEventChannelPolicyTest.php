@@ -21,7 +21,7 @@ class NotificationEventChannelPolicyTest extends TestCase
         $this->assertSame([
             'label' => 'Cuti ditangguhkan karena tugas dinas',
             'group' => 'Cuti',
-            'allowed_channels' => ['in_app', 'email'],
+            'allowed_channels' => ['in_app', 'email', 'whatsapp_business'],
         ], $event);
         $this->assertTrue($catalog->supportsChannel('cuti.ditangguhkan_tugas_dinas', 'in_app'));
         $this->assertTrue($catalog->supportsChannel('cuti.ditangguhkan_tugas_dinas', 'email'));
@@ -45,7 +45,7 @@ class NotificationEventChannelPolicyTest extends TestCase
         $this->assertSame([
             'label' => 'Cuti dikembalikan karena rollover',
             'group' => 'Cuti',
-            'allowed_channels' => ['in_app', 'email'],
+            'allowed_channels' => ['in_app', 'email', 'whatsapp_business'],
         ], $event);
 
         $emailChannelId = RefNotificationChannel::query()->where('code', 'email')->value('id');

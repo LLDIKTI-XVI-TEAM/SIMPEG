@@ -56,6 +56,7 @@ class PostponeLeaveAction
         });
 
         $pemohon = $leaveRequest->employee;
+        $approvalId = $leaveRequest->getRelation('lastRecordedApproval')?->id;
 
         if ($pemohon !== null) {
             $this->notifications->createForEmployee(
@@ -64,7 +65,11 @@ class PostponeLeaveAction
                 'Pengajuan Cuti Ditangguhkan',
                 'Pengajuan cuti Anda ditangguhkan oleh approver. Silakan periksa catatan penangguhan.',
                 // Pemohon diarahkan ke detail pengajuannya; path relatif internal agar link aman lintas host.
-                ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
+                [
+                    'leave_request_id' => $leaveRequest->id,
+                    'leave_approval_id' => $approvalId,
+                    'url' => route('cuti.show', ['id' => $leaveRequest->id], false),
+                ],
             );
         }
 

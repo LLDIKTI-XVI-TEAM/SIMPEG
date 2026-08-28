@@ -98,12 +98,13 @@ class LeaveApprovalService
                 'acted_at' => Carbon::now(),
             ])->save();
 
-            $this->recordApproval($locked, $actor, $activeStep->step_order, 'APPROVE', $komentar);
+            $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'APPROVE', $komentar);
 
             $nextStep = $this->activateNextStep($locked, $actor, $activeStep->step_order);
 
             if ($nextStep !== null) {
                 $locked->forceFill(['status' => self::STATUS_MENUNGGU])->save();
+                $locked->setRelation('lastRecordedApproval', $recordedApproval);
 
                 return $locked;
             }
@@ -135,7 +136,7 @@ class LeaveApprovalService
             $this->usageRecords->recordApprovedRequest($locked, $actingUser, $httpRequest);
             $this->proofs->generateForApprovedRequest($locked, $actor, $actingUser, $httpRequest);
 
-            return $locked->refresh();
+            return $locked->refresh()->setRelation('lastRecordedApproval', $recordedApproval);
         });
     }
 
@@ -155,9 +156,10 @@ class LeaveApprovalService
             $this->assertActorMatchesStep($activeStep, $actor);
 
             $activeStep->forceFill(['decision_note' => $komentar])->save();
-            $this->recordApproval($locked, $actor, $activeStep->step_order, 'POSTPONE', $komentar);
+            $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'POSTPONE', $komentar);
 
             $locked->forceFill(['status' => self::STATUS_DITANGGUHKAN])->save();
+            $locked->setRelation('lastRecordedApproval', $recordedApproval);
 
             return $locked;
         });
@@ -179,9 +181,10 @@ class LeaveApprovalService
             $this->assertActorMatchesStep($activeStep, $actor);
 
             $activeStep->forceFill(['decision_note' => $komentar])->save();
-            $this->recordApproval($locked, $actor, $activeStep->step_order, 'REQUEST_CHANGES', $komentar);
+            $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'REQUEST_CHANGES', $komentar);
 
             $locked->forceFill(['status' => self::STATUS_PERLU_PERUBAHAN])->save();
+            $locked->setRelation('lastRecordedApproval', $recordedApproval);
 
             return $locked;
         });
@@ -208,7 +211,7 @@ class LeaveApprovalService
                 'acted_at' => Carbon::now(),
             ])->save();
 
-            $this->recordApproval($locked, $actor, $activeStep->step_order, 'NOT_APPROVED', $komentar);
+            $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'NOT_APPROVED', $komentar);
             $this->reservations->releaseForNotApproved($locked);
             $locked->steps()
                 ->where('status', 'pending')
@@ -219,6 +222,7 @@ class LeaveApprovalService
                     'acted_at' => Carbon::now(),
                 ]);
             $locked->forceFill(['status' => self::STATUS_TIDAK_DISETUJUI])->save();
+            $locked->setRelation('lastRecordedApproval', $recordedApproval);
 
             return $locked;
         });
@@ -303,9 +307,9 @@ class LeaveApprovalService
         }
     }
 
-    private function recordApproval(LeaveRequest $leaveRequest, Employee $actor, int $stage, string $action, ?string $komentar): void
+    private function recordApproval(LeaveRequest $leaveRequest, Employee $actor, int $stage, string $action, ?string $komentar): LeaveApproval
     {
-        LeaveApproval::create([
+        return LeaveApproval::create([
             'leave_request_id' => $leaveRequest->id,
             'approver_id' => $actor->id,
             'stage' => $stage,

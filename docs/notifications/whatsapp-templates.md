@@ -3,9 +3,9 @@
 > **Dokumen Kontrak Pengajuan (*Submission Proposal*)**  
 > **Status:** Disiapkan oleh tim pengembang SIMPEG untuk diserahkan kepada LLDIKTI Wilayah XVI guna proses pengajuan template resmi ke Meta / WhatsApp Business Solution Provider resmi yang ditetapkan oleh LLDIKTI Wilayah XVI (dengan Qontak sebagai baseline kandidat acuan).  
 > **Acuan Dokumen Kanonis:**  
-> - [PRD-SIMPEG-Fase1-Core.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/b9122e75546a97cfa75adfcdf1550a026e6dab8a/DOCUMENT/PRD-DLL/PRD-SIMPEG-Fase1-Core.md) (§10 *Early Warning System* dan §11 *Notifikasi*)
-> - [User-Stories-SIMPEG-Fase1.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/b9122e75546a97cfa75adfcdf1550a026e6dab8a/DOCUMENT/PRD-DLL/User-Stories-SIMPEG-Fase1.md) (US-6.5 AC-1 s.d. AC-5 dan Addendum AC-MTG-4 s.d. AC-MTG-10)
-> - [Keputusan-Evaluasi-Meeting-LLDIKTI-15-Agustus-2026.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/b9122e75546a97cfa75adfcdf1550a026e6dab8a/DOCUMENT/Keputusan-Evaluasi-Meeting-LLDIKTI-15-Agustus-2026.md) (K-MTG-05, K-MTG-05A, dan K-MTG-07 OQ-MTG-06)
+> - [PRD-SIMPEG-Fase1-Core.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/1e53db76189b57551cf87de2a5e35834206f1d2e/DOCUMENT/PRD-DLL/PRD-SIMPEG-Fase1-Core.md) (§10 *Early Warning System* dan §11 *Notifikasi*)
+> - [User-Stories-SIMPEG-Fase1.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/1e53db76189b57551cf87de2a5e35834206f1d2e/DOCUMENT/PRD-DLL/User-Stories-SIMPEG-Fase1.md) (US-6.5 AC-1 s.d. AC-5 dan Addendum AC-MTG-4 s.d. AC-MTG-10)
+> - [Keputusan-Evaluasi-Meeting-LLDIKTI-15-Agustus-2026.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/1e53db76189b57551cf87de2a5e35834206f1d2e/DOCUMENT/Keputusan-Evaluasi-Meeting-LLDIKTI-15-Agustus-2026.md) (K-MTG-05, K-MTG-05A, dan K-MTG-07 OQ-MTG-06)
 
 ---
 
@@ -40,6 +40,9 @@ Dalam penyusunan template ini, prinsip-prinsip berikut ditegakkan secara ketat:
    - Target penerima pada dokumen ini mengidentifikasi pegawai/aktor, bukan nomor telepon yang langsung siap dikirimi pesan. Kontrak LLDIKTI/provider wajib menetapkan sumber nomor WhatsApp kanonis, normalisasi, serta bukti verifikasi kepemilikan/alamat tujuan sebelum adapter diaktifkan.
    - `leave_requests.nomor_telepon` adalah snapshot kontak selama cuti dan **dilarang** dipakai sebagai alamat pengiriman WhatsApp. Nilai `employees.no_hp` juga belum boleh dianggap sebagai alamat WhatsApp terverifikasi hanya karena terisi; ia baru dapat dipakai setelah aturan pemetaan dan verifikasi formal tersedia.
    - Bila penerima tidak memiliki alamat WhatsApp kanonis yang terverifikasi, hasil resolusi ambigu, atau pemeriksaan gagal, adapter wajib *fail-closed* / tidak mengirim.
+7. **Antrean dan Outbox Durable**:
+   - Setelah seluruh gerbang lolos, SIMPEG mencatat audit delivery dan payload job terenkripsi pada outbox dalam transaksi yang sama. Nomor tujuan, isi pesan, token, serta respons provider tidak disimpan pada audit delivery.
+   - Publisher hanya menandai outbox berhasil dipublikasi setelah broker menerima job. Outbox yang kehilangan callback atau mengalami kegagalan broker dipulihkan scheduler secara berbatas dan ber-lease; worker tetap idempoten berdasarkan `idempotency_key`.
 
 ---
 
@@ -229,6 +232,7 @@ Tabel berikut menghubungkan katalog event internal sistem (`App\Services\Notific
 
 1. **Kontrak Runtime Eksternal**:
    - Nama teknis template ID resmi, nama variabel runtime, kode bahasa (misal `id` / `id_ID`), dan konfigurasi tombol tautan URL (*call-to-action button*) akan mengikuti respon resmi dari Meta / WhatsApp Provider yang dikembalikan oleh LLDIKTI Wilayah XVI.
+   - Setelah artefak resmi diterima, kontrak tersebut dipasang melalui secret `SIMPEG_WHATSAPP_TEMPLATE_CONFIGURATION` berbentuk JSON dengan dua bagian: `event_templates` (event internal ke template provider) dan `templates` (setiap template memuat `id`, `language`, `variables_map`, `button`, serta `archetype` bila template dipecah per-event). Konfigurasi JSON tidak valid atau kontrak yang tidak lengkap membuat readiness tetap `false`; tidak ada fallback ke nama variabel proposal.
 2. **Klausul Pemecahan Template (*Split per-Event*)**:
    - Jika pihak Meta / Provider menolak generalisasi model template (misalnya meminta template terpisah untuk masing-masing jenis cuti atau masing-masing event EWS), tim pengembang akan memecah template tersebut per-event dengan daftar variabel yang telah disetujui, **tanpa mengubah arsitektur domain event internal SIMPEG** (K-MTG-05A.3).
 3. **Kesiapan Integrasi (*Fail-Closed Guard & Full Readiness Dependencies*)**:

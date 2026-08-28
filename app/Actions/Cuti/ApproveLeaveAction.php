@@ -84,7 +84,10 @@ class ApproveLeaveAction
 
                 // Notifikasi in-app tetap berada di transaksi; job email memakai afterCommit
                 // sehingga rollback tidak pernah mengirim keputusan yang belum sah.
-                $this->notifyAfterApproval($leaveRequest);
+                // ID approval dan versi digunakan dispatcher untuk menolak intent yang stale
+                // bila pengajuan berubah lagi sebelum job WhatsApp dieksekusi.
+                $approvalId = $leaveRequest->getRelation('lastRecordedApproval')?->id;
+                $this->notifyAfterApproval($leaveRequest, $approvalId);
 
                 // Audit keputusan ditulis paling akhir agar kegagalannya membatalkan status,
                 // reservasi, fakta, replay, bukti metadata, dan notifikasi sebagai satu unit.
@@ -134,7 +137,7 @@ class ApproveLeaveAction
      * Bila masih ada tahap menunggu, approver tahap berikutnya diberi tahu; bila sudah final,
      * pemohon diberi tahu bahwa cutinya disetujui.
      */
-    private function notifyAfterApproval(LeaveRequest $leaveRequest): void
+    private function notifyAfterApproval(LeaveRequest $leaveRequest, ?string $approvalId = null): void
     {
         if ($leaveRequest->status === 'disetujui') {
             $pemohon = $leaveRequest->employee;
@@ -146,26 +149,25 @@ class ApproveLeaveAction
                     'Pengajuan Cuti Disetujui',
                     'Pengajuan cuti Anda telah disetujui sepenuhnya.',
                     // Pemohon diarahkan ke detail pengajuannya; path relatif internal agar link aman lintas host.
-                    ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
+                    [
+                        'leave_request_id' => $leaveRequest->id,
+                        'leave_approval_id' => $approvalId,
+                        'url' => route('cuti.show', ['id' => $leaveRequest->id], false),
+                    ],
                 );
             }
 
             return;
         }
 
-        $stage = $this->approvals->pendingStage($leaveRequest);
+        $nextStep = $leaveRequest->steps()
+            ->where('status', 'active')
+            ->orderBy('step_order')
+            ->first();
 
-        if ($stage === null) {
-            return;
-        }
-
-        $approverId = $this->approvals->approverEmployeeIdForStage($leaveRequest, $stage);
-
-        if ($approverId === null) {
-            return;
-        }
-
-        $approver = Employee::find($approverId);
+        $approver = $nextStep?->approver_employee_id === null
+            ? null
+            : Employee::find($nextStep->approver_employee_id);
 
         if ($approver === null) {
             return;
@@ -177,7 +179,12 @@ class ApproveLeaveAction
             'Pengajuan Cuti Menunggu Persetujuan',
             'Terdapat pengajuan cuti yang menunggu persetujuan Anda.',
             // Approver tahap berikutnya diarahkan ke antrean approval; path relatif internal agar link aman lintas host.
-            ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.approval', [], false)],
+            [
+                'leave_request_id' => $leaveRequest->id,
+                'leave_request_step_id' => $nextStep->id,
+                'leave_request_version' => $leaveRequest->updated_at?->utc()->format('Y-m-d\TH:i:s.u\Z'),
+                'url' => route('cuti.approval', [], false),
+            ],
         );
     }
 }

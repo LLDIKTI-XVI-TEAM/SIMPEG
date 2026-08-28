@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
 use Database\Factories\EmployeeFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -170,6 +171,18 @@ class Employee extends Model
     public function statusPegawai(): BelongsTo
     {
         return $this->belongsTo(RefStatusPegawai::class, 'status_pegawai_id');
+    }
+
+    /**
+     * Membatasi query pada status pegawai aktif menurut kelompok referensi kanonis.
+     * Relasi status yang hilang atau kelompok tidak dikenal sengaja tidak lolos agar konsumen fail-closed.
+     *
+     * @param  Builder<Employee>  $query
+     */
+    public function scopeWithActiveLifecycleStatus(Builder $query): void
+    {
+        $query->whereHas('statusPegawai', fn (Builder $statuses) => $statuses
+            ->whereIn('kelompok', RefStatusPegawai::activeGroups()));
     }
 
     /** @return BelongsTo<RefProgramStudi, $this> */

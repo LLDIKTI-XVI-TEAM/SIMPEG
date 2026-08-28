@@ -49,6 +49,17 @@ class NotificationEventChannelManagementTest extends TestCase
         $this->assertFalse($catalog->supportsChannel('ews.followup.pensiun', 'email'));
     }
 
+    public function test_whatsapp_hanya_didukung_untuk_allowlist_cuti_dan_lima_ews(): void
+    {
+        $catalog = app(NotificationEventCatalog::class);
+
+        $this->assertTrue($catalog->supportsChannel('cuti.disetujui', 'whatsapp_business'));
+        $this->assertTrue($catalog->supportsChannel('ews.satyalancana', 'whatsapp_business'));
+        $this->assertFalse($catalog->supportsChannel('ews.scheduler_failed', 'whatsapp_business'));
+        $this->assertFalse($catalog->supportsChannel('import_pegawai', 'whatsapp_business'));
+        $this->assertFalse($catalog->hasAdapter('whatsapp_business'));
+    }
+
     public function test_super_admin_dapat_membuat_dan_memperbarui_policy_supported(): void
     {
         $admin = User::factory()->superAdmin()->create();

@@ -8,6 +8,7 @@ use App\Models\EwsAlert;
 use App\Models\SimpegNotification;
 use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationRecipientResolver;
+use App\Services\Notifications\WhatsApp\WhatsAppNotificationDispatcher;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection as SupportCollection;
@@ -17,6 +18,7 @@ class NotificationService
     public function __construct(
         private readonly NotificationRecipientResolver $recipients,
         private readonly NotificationChannelResolver $channels,
+        private readonly WhatsAppNotificationDispatcher $whatsApp,
     ) {}
 
     /**
@@ -53,6 +55,7 @@ class NotificationService
         }
 
         $this->dispatchEmails($employee, $additionalRecipients, $type, $title, $body, $data);
+        $this->dispatchWhatsApp($employee, $additionalRecipients, $type, $data);
 
         return $notification;
     }
@@ -73,13 +76,17 @@ class NotificationService
         array $data,
         bool $createIfMissing = true,
     ): ?SimpegNotification {
-        // Kebijakan channel dicek per event (fail-closed), bukan hanya channel global,
-        // agar operator bisa mematikan reminder untuk satu jenis event EWS tanpa
-        // mematikan seluruh notifikasi in-app. Menonaktifkan in_app untuk event ini
-        // sengaja ikut menghentikan email reminder: dedup reminder berlabuh pada
-        // record in-app, sehingga tanpa record tersebut email akan terkirim ulang
-        // setiap run scheduler.
-        if (! $this->channels->isEnabledForEvent($type, 'in_app')) {
+        $inAppEnabled = $this->channels->isEnabledForEvent($type, 'in_app');
+        if (! $inAppEnabled) {
+            // Menonaktifkan in_app sengaja ikut menghentikan email reminder karena
+            // dedup reminder email berlabuh pada record in-app.
+            // Namun channel WhatsApp memiliki idempotency mandiri (berbasis ews_alert_id),
+            // sehingga tetap dievaluasi jika alert belum di-acknowledge.
+            if ($alert->notification_acknowledged_at === null && $createIfMissing) {
+                $additionalRecipients = $this->recipients->additionalRecipients($employee, $type, $data);
+                $this->dispatchWhatsApp($employee, $additionalRecipients, $type, $data);
+            }
+
             return null;
         }
 
@@ -115,6 +122,15 @@ class NotificationService
 
             $notification->fill($attributes)->save();
 
+            // Delivery WhatsApp memiliki idempotensi terpisah dari record in-app.
+            // Karena itu reminder lama yang masih belum dibaca perlu dievaluasi ulang
+            // pada setiap scheduler run: channel/readiness WhatsApp dapat baru aktif
+            // setelah notifikasi in-app pertama kali dibuat.
+            if ($createIfMissing && $alert->notification_acknowledged_at === null) {
+                $additionalRecipients = $this->recipients->additionalRecipients($employee, $type, $data);
+                $this->dispatchWhatsApp($employee, $additionalRecipients, $type, $data);
+            }
+
             return $notification->refresh();
         }
 
@@ -143,13 +159,14 @@ class NotificationService
                 ->first();
         }
 
-        // Fan-out email ke penerima tambahan (Admin Kepegawaian) mengikuti resolver
-        // yang sama dengan createForEmployee, tetapi terbatas pada email; admin tidak
+        // Fan-out email dan WhatsApp ke penerima tambahan (Admin Kepegawaian) mengikuti resolver
+        // yang sama dengan createForEmployee, tetapi terbatas pada channel eksternal; admin tidak
         // dibuatkan record in-app reminder karena dedup reminder berlabuh pada pegawai.
-        // Email hanya dikirim saat notifikasi pertama kali dibuat supaya refresh
-        // reminder tidak membanjiri email.
+        // Notifikasi hanya dikirim saat pengingat pertama kali dibuat supaya refresh
+        // reminder tidak membanjiri antrean.
         $additionalRecipients = $this->recipients->additionalRecipients($employee, $type, $data);
         $this->dispatchEmails($employee, $additionalRecipients, $type, $title, $body, $data);
+        $this->dispatchWhatsApp($employee, $additionalRecipients, $type, $data);
 
         return $notification;
     }
@@ -202,6 +219,28 @@ class NotificationService
 
         foreach ($emailRecipients as $recipient) {
             SendSimpegNotificationEmailJob::dispatch($recipient->id, $type, $title, $body, $data)->afterCommit();
+        }
+    }
+
+    /**
+     * Menjadwalkan pengiriman WhatsApp via dispatcher bila seluruh syarat kesiapan terpenuhi.
+     * Fail-closed: default nonaktif menjamin tidak ada pesan/panggilan keluar jika belum terverifikasi.
+     *
+     * @param  SupportCollection<int, Employee>  $additionalRecipients
+     * @param  array<string, mixed>|null  $data
+     */
+    private function dispatchWhatsApp(
+        Employee $primaryRecipient,
+        SupportCollection $additionalRecipients,
+        string $type,
+        ?array $data,
+    ): void {
+        $this->whatsApp->dispatch($primaryRecipient, $type, $data);
+
+        foreach ($additionalRecipients as $recipient) {
+            if ($recipient->id !== $primaryRecipient->id) {
+                $this->whatsApp->dispatch($recipient, $type, $data);
+            }
         }
     }
 

@@ -19,7 +19,12 @@ class EmployeeFactory extends Factory
         ]);
         $statusPegawai = RefStatusPegawai::firstOrCreate(
             ['nama' => 'Aktif'],
-            ['keterangan' => 'Pegawai aktif', 'is_default' => true],
+            [
+                'kode' => 'AKTIF',
+                'kelompok' => 'Aktif',
+                'keterangan' => 'Pegawai aktif',
+                'is_default' => true,
+            ],
         );
         $kelasJabatan = (string) fake()->numberBetween(5, 12);
         $email = fake()->unique()->safeEmail();

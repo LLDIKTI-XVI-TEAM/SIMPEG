@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\Notifications\WhatsApp\UnavailableWhatsAppTemplateAdapter;
+use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
 use App\Services\Rbac\UiPermissionCapabilityService;
 use App\Services\TransactionSideEffectManager;
 use Illuminate\Support\Facades\Event;
@@ -22,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Satu request harus berbagi daftar kompensasi yang sama antara middleware dan Action.
         $this->app->singleton(TransactionSideEffectManager::class);
+
+        // Adapter default sengaja fail-closed sampai kontrak provider WhatsApp terverifikasi.
+        $this->app->singleton(WhatsAppTemplateAdapter::class, UnavailableWhatsAppTemplateAdapter::class);
 
         // Cache capability dibatasi pada lifecycle request agar perubahan RBAC pada request berikutnya langsung berlaku.
         $this->app->scoped(UiPermissionCapabilityService::class);

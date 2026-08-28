@@ -34,6 +34,13 @@ Schedule::command('import:recover-dispatches --limit=50')
     ->withoutOverlapping(10)
     ->timezone(config('app.timezone'));
 
+// Outbox terenkripsi memastikan delivery WhatsApp yang sudah commit tetapi gagal
+// dipublikasikan ke queue dapat dipulihkan tanpa menyimpan nomor atau isi pesan di audit.
+Schedule::command('whatsapp:recover-dispatches --limit=50')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->timezone(config('app.timezone'));
+
 // Recovery bounded memulihkan file privat yatim atau adoption yang terputus oleh hard crash.
 Schedule::command('storage:retry-recovery --limit=100')
     ->everyFiveMinutes()

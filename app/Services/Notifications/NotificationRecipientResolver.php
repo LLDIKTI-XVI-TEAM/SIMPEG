@@ -3,6 +3,7 @@
 namespace App\Services\Notifications;
 
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -81,7 +82,10 @@ class NotificationRecipientResolver
             // EWS rutin hanya perlu ditindaklanjuti Admin Kepegawaian; Super Admin khusus kegagalan scheduler.
             ->where('role', 'admin_kepegawaian')
             ->whereNotNull('employee_id')
-            ->with('employee')
+            // Role saja tidak cukup: akun tertaut ke Employee Nonaktif tidak boleh menerima fan-out EWS.
+            ->whereHas('employee.statusPegawai', fn ($statuses) => $statuses
+                ->whereIn('kelompok', RefStatusPegawai::activeGroups()))
+            ->with(['employee.statusPegawai'])
             ->get()
             ->pluck('employee')
             ->filter(fn ($employee): bool => $employee instanceof Employee)
