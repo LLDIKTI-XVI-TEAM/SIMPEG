@@ -334,7 +334,12 @@ class HandleKeycloakCallbackAction
 
         $roleMapping = (array) config('services.keycloak.role_mapping', []);
 
-        $mapped = $roleMapping[strtolower(trim($email))] ?? null;
+        // Normalisasi key case-insensitive agar pemetaan dengan kapitalisasi
+        // berbeda (mis. 'Admin@Example.com') tetap terurai ke role terpetakan,
+        // konsisten dengan isInvalidRoleMapping().
+        $normalizedMap = array_change_key_case($roleMapping, CASE_LOWER);
+
+        $mapped = $normalizedMap[strtolower(trim($email))] ?? null;
 
         if (! is_string($mapped) || ! in_array($mapped, self::ALLOWED_INTERNAL_ROLES, true)) {
             return null;

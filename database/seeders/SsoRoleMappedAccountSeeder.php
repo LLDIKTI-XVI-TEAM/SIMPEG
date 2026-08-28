@@ -23,6 +23,8 @@ class SsoRoleMappedAccountSeeder extends Seeder
      * - relasi user → employee yang sudah ada TIDAK ditimpa; bila user sudah terhubung
      *   ke pegawai lain, mapping untuk email tersebut dilewati (reject, bukan overwrite)
      *   agar identitas SSO tidak berpindah pegawai secara diam-diam.
+     * - nama user yang sudah ada TIDAK ditimpa; displayName hanya dipakai untuk
+     *   placeholder baru atau bila nama existing kosong (seeder non-destructive).
      */
     public function run(): void
     {
@@ -67,7 +69,9 @@ class SsoRoleMappedAccountSeeder extends Seeder
             }
 
             $user->fill([
-                'name' => $this->displayName($email),
+                // Nama hanya untuk placeholder baru atau bila nama existing kosong;
+                // nama yang sudah ditetapkan admin/pengguna tidak boleh ditimpa (non-destructive).
+                'name' => $user->exists && filled($user->name) ? $user->name : $this->displayName($email),
                 'email' => $email,
                 'role' => $user->exists ? $user->role : $role,
                 'employee_id' => $employee->id,

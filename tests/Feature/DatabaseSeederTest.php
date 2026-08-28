@@ -114,6 +114,31 @@ class DatabaseSeederTest extends TestCase
         ]);
     }
 
+    public function test_seeder_preserves_existing_user_name_on_reseed(): void
+    {
+        $email = collect(config('services.keycloak.role_mapping'))->keys()->first();
+        $customName = 'Nama Kustom Yang Sudah Ada';
+
+        // User existing dengan nama yang sudah ditetapkan (bukan derived dari email).
+        User::factory()->create([
+            'email' => $email,
+            'name' => $customName,
+            'role' => 'pegawai',
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        $this->assertDatabaseHas('users', [
+            'email' => $email,
+            'name' => $customName,
+        ]);
+        $this->assertSame(
+            $customName,
+            User::where('email', $email)->first()->name,
+            'Seeder ulang tidak boleh menimpa nama user existing.'
+        );
+    }
+
     public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void
     {
         $this->seed(DatabaseSeeder::class);

@@ -912,6 +912,75 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
+    /** Key role_mapping dengan kapitalisasi berbeda harus tetap terurai ke role terpetakan (bukan fallback pegawai). */
+    public function test_mixed_case_role_mapping_key_grants_mapped_role_to_new_login(): void
+    {
+        User::factory()->superAdmin()->create();
+
+        config()->set('services.keycloak.role_mapping', [
+            'Kabag@Example.com' => 'kepala_bagian',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kabag SSO',
+            'email' => 'kabag@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-kabag-case',
+            'nickname' => 'kabag-case',
+            'name' => 'Kabag SSO',
+            'email' => 'kabag@example.com',
+            'raw' => ['email' => 'kabag@example.com', 'email_verified' => true, 'preferred_username' => 'kabag-case'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'email' => 'kabag@example.com',
+            'keycloak_id' => 'kc-kabag-case',
+            'employee_id' => $employee->id,
+            'role' => 'kepala_bagian',
+        ]);
+    }
+
+    /** User existing dengan role kosong + email mapping bergaya kapitalisasi campuran diinisialisasi ke role terpetakan. */
+    public function test_existing_blank_role_resolves_mixed_case_mapping_key(): void
+    {
+        config()->set('services.keycloak.role_mapping', [
+            'Admin@Example.com' => 'admin_kepegawaian',
+        ]);
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Admin SSO',
+            'email' => 'admin@example.com',
+        ]);
+
+        User::factory()->create([
+            'email' => 'admin@example.com',
+            'employee_id' => $employee->id,
+            'role' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-admin-case',
+            'nickname' => 'admin-case',
+            'name' => 'Admin SSO',
+            'email' => 'admin@example.com',
+            'raw' => ['email' => 'admin@example.com', 'email_verified' => true, 'preferred_username' => 'admin-case'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertDatabaseHas('users', [
+            'email' => 'admin@example.com',
+            'keycloak_id' => 'kc-admin-case',
+            'role' => 'admin_kepegawaian',
+        ]);
+    }
+
     /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
