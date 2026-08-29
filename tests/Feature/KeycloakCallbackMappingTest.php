@@ -1061,7 +1061,11 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame($userByEmployee->id, $audit->auditable_id ?? null);
     }
 
-    /** Percobaan login pegawai nonaktif (tanpa soft-delete) ditolak dan tercatat audit keamanan. */
+    /**
+     * Pegawai non-aktif (kelompok status bukan Aktif) tidak pernah menjadi pintu masuk
+     * akun SSO baru: permukaan autentikasi hanya memetakan pegawai aktif, sehingga
+     * percobaan login ditolak sebagai not-found dan tercatat audit keamanan.
+     */
     public function test_mapping_rejection_for_inactive_employee_is_audited(): void
     {
         Employee::factory()->create([
@@ -1081,7 +1085,7 @@ class KeycloakCallbackMappingTest extends TestCase
         $response = $this->get('/auth/keycloak/callback');
 
         $response->assertOk();
-        $response->assertSee('Akun pegawai tidak aktif.');
+        $response->assertSee('Akun Keycloak belum terdaftar sebagai pegawai SIMPEG.');
         $this->assertGuest();
         $this->assertDatabaseMissing('users', [
             'email' => 'pensiun-baru@example.com',
@@ -1089,7 +1093,8 @@ class KeycloakCallbackMappingTest extends TestCase
 
         $audit = AuditLog::query()->where('event', 'SSO_MAPPING_REJECTED')->latest('created_at')->first();
         $this->assertNotNull($audit);
-        $this->assertSame('employee_inactive', $audit->new_values['reason'] ?? null);
+        $this->assertSame('employee_match_not_found', $audit->new_values['reason'] ?? null);
+        $this->assertNull($audit->user_id);
     }
 
     /**

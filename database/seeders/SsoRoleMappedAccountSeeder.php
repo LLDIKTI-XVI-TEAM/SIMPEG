@@ -65,24 +65,25 @@ class SsoRoleMappedAccountSeeder extends Seeder
 
             // Lookup kanonis case-insensitive pada email legacy + email_pribadi kanonis,
             // agar pegawai existing tidak terlewat hanya karena kapitalisasi/kolom berbeda.
+            // Discovery TANPA filter status aktif agar pegawai non-aktif pemilik email
+            // kanonis tetap terlihat (tidak terjadi duplikasi placeholder dengan email
+            // yang sama); kelayakannya diperiksa eksplisit setelah kandidat ditemukan.
             //
             // Sama seperti callback, kandidat diambil hingga 2 dan dihitung — seeder tidak
             // boleh memilih pegawai secara arbitrer saat pencocokan ambigu (kolom legacy
-            // email tidak memiliki constraint unik). Kelayakan aktif mengikuti kontrak
-            // lifecycle: kelompok status kepegawaian (whereActiveStatus).
+            // email tidak memiliki constraint unik).
             $candidates = Employee::query()
                 ->where(function ($query) use ($email): void {
                     $query
                         ->whereRaw('lower(email) = ?', [strtolower($email)])
                         ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
                 })
-                ->whereActiveStatus()
                 ->limit(2)
                 ->get()
                 ->unique('id');
 
             if ($candidates->count() > 1) {
-                // Lebih dari satu pegawai aktif cocok → ambigu, sama seperti kontrak
+                // Lebih dari satu pegawai cocok → ambigu, sama seperti kontrak
                 // callback: jangan pilih arbitrer dan jangan mengikat user ber-role ke
                 // pegawai yang salah. Mapping dilewati + peringatan.
                 $this->command?->warn(
@@ -93,6 +94,18 @@ class SsoRoleMappedAccountSeeder extends Seeder
             }
 
             $employee = $candidates->first();
+
+            if ($employee && ! $employee->isActive()) {
+                // Pegawai existing ternyata non-aktif (Nonaktif/Pensiun/Mutasi): JANGAN
+                // mengubah status/lifecycle-nya dan JANGAN membuat placeholder duplikat
+                // dengan email kanonis yang sama. Mapping dilewati; callback pun akan
+                // menolak mapping ke pegawai non-aktif.
+                $this->command?->warn(
+                    "SSO mapped account '{$email}' dilewati: pegawai existing berstatus non-aktif."
+                );
+
+                continue;
+            }
 
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.
