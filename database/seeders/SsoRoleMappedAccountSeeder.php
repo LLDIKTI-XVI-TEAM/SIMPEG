@@ -69,25 +69,46 @@ class SsoRoleMappedAccountSeeder extends Seeder
             // Employee trashed dengan email kanonis sama TETAP ditemukan sehingga seeder
             // tidak membuat duplikat Employee. (Setelah PR lifecycle #19 menghapus
             // SoftDeletes, kompatibilitas ini dapat disederhanakan saat rebase.)
-            $employee = Employee::withTrashed()
+            //
+            // Sama seperti callback, kandidat diambil hingga 2 dan dihitung — seeder tidak
+            // boleh memilih pegawai secara arbitrer saat pencocokan ambigu (kolom legacy
+            // email tidak memiliki constraint unik).
+            $candidates = Employee::withTrashed()
                 ->where(function ($query) use ($email): void {
                     $query
                         ->whereRaw('lower(email) = ?', [strtolower($email)])
                         ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
                 })
-                ->first();
+                ->limit(2)
+                ->get()
+                ->unique('id');
 
-            if ($employee && $employee->trashed()) {
-                // Pegawai existing sudah dihapus: JANGAN restore dan JANGAN mengubah
-                // status/lifecycle-nya. Mapping dilewati agar tidak ada duplikat Employee
-                // dengan email kanonis yang sama dan tidak ada akun dihidupkan kembali
-                // lewat seeder.
+            $activeCandidates = $candidates->reject(fn (Employee $candidate): bool => $candidate->trashed())->values();
+
+            if ($candidates->isNotEmpty() && $activeCandidates->isEmpty()) {
+                // Seluruh pegawai kandidat berstatus terhapus: JANGAN restore dan JANGAN
+                // mengubah status/lifecycle-nya. Mapping dilewati agar tidak ada duplikat
+                // Employee dengan email kanonis yang sama dan tidak ada akun dihidupkan
+                // kembali lewat seeder.
                 $this->command?->warn(
                     "SSO mapped account '{$email}' dilewati: pegawai existing berstatus terhapus (trashed)."
                 );
 
                 continue;
             }
+
+            if ($activeCandidates->count() > 1) {
+                // Lebih dari satu pegawai aktif cocok → ambigu, sama seperti kontrak
+                // callback: jangan pilih arbitrer dan jangan mengikat user ber-role ke
+                // pegawai yang salah. Mapping dilewati + peringatan.
+                $this->command?->warn(
+                    "SSO mapped account '{$email}' dilewati: pencocokan pegawai ambigu (lebih dari satu pegawai cocok)."
+                );
+
+                continue;
+            }
+
+            $employee = $activeCandidates->first();
 
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.
@@ -103,10 +124,21 @@ class SsoRoleMappedAccountSeeder extends Seeder
             // menaikkan/menurunkan role yang sudah ditetapkan admin.
 
             // Resolver user kanonis: employee_id dulu (kontrak Issue #6), baru
-            // fallback email case-insensitive — duplicate identity terhindar.
-            $user = User::where('employee_id', $employee->id)->first()
-                ?? User::whereRaw('lower(email) = ?', [strtolower($email)])->first()
-                ?? new User;
+            // fallback email case-insensitive. Keduanya di-resolve TERPISAH agar
+            // konflik identitas terdeteksi — operator ?? di sini akan menyembunyikan
+            // konflik yang nanti ditolak callback sebagai identity_conflict.
+            $userByEmployee = User::where('employee_id', $employee->id)->first();
+            $userByEmail = User::whereRaw('lower(email) = ?', [strtolower($email)])->first();
+
+            if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
+                $this->command?->warn(
+                    "SSO mapped account '{$email}' dilewati: konflik identitas (email juga dimiliki user lain selain user pegawai)."
+                );
+
+                continue;
+            }
+
+            $user = $userByEmployee ?? $userByEmail ?? new User;
 
             // Tolak ketidakcocokan relasi: user yang sudah terhubung ke pegawai lain
             // tidak boleh dipindahkan ke pegawai hasil lookup email (email pegawai asal

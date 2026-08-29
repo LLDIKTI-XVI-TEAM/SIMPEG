@@ -210,6 +210,71 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame(0, User::where('employee_id', $employee->id)->count());
     }
 
+    /**
+     * Seeder menolak pencocokan pegawai yang ambigu (lebih dari satu pegawai aktif cocok)
+     * sama seperti kontrak callback: tidak memilih arbitrer, tidak membuat/mengikat user.
+     */
+    public function test_seeder_skips_ambiguous_employee_match(): void
+    {
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+
+        $employeeA = Employee::factory()->create([
+            'nama_lengkap' => 'Ambigu A',
+            'email' => $email,
+        ]);
+        $employeeB = Employee::factory()->create([
+            'nama_lengkap' => 'Ambigu B',
+        ]);
+        // Kolom legacy email tidak unik: data lama/impor bisa menimbulkan kecocokan kedua.
+        DB::table('employees')->where('id', $employeeB->id)->update(['email' => $email]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        // Seeder tidak membuat/mengikat user untuk email ambigu itu.
+        $this->assertSame(0, User::where('email', $email)->count());
+        $this->assertSame(0, User::where('employee_id', $employeeA->id)->count());
+        $this->assertSame(0, User::where('employee_id', $employeeB->id)->count());
+    }
+
+    /**
+     * Seeder mendeteksi konflik identitas yang akan ditolak callback: user milik pegawai
+     * dan user pemilik email mapping adalah dua akun berbeda → mapping dilewati tanpa
+     * mutasi apa pun (fixture tidak dipaksakan jadi sumber identity_conflict).
+     */
+    public function test_seeder_skips_mapping_when_employee_user_conflicts_with_email_user(): void
+    {
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+
+        $employee = Employee::factory()->create([
+            'email_pribadi' => $email,
+        ]);
+
+        $userByEmployee = User::factory()->create([
+            'email' => 'internal-konflik@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+            'name' => 'User Pegawai Asli',
+        ]);
+        $userByEmail = User::factory()->create([
+            'email' => $email,
+            'role' => 'pegawai',
+            'name' => 'User Email Asli',
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        // Kedua user sama sekali tidak berubah (mapping untuk email itu dilewati).
+        $userByEmployee->refresh();
+        $this->assertSame('internal-konflik@lldikti.go.id', $userByEmployee->email);
+        $this->assertSame('pimpinan', $userByEmployee->role);
+
+        $userByEmail->refresh();
+        $this->assertSame($email, $userByEmail->email);
+        $this->assertSame('pegawai', $userByEmail->role);
+        $this->assertNull($userByEmail->employee_id);
+        $this->assertNull($userByEmployee->refresh()->keycloak_id);
+    }
+
     public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void
     {
         $this->seed(DatabaseSeeder::class);

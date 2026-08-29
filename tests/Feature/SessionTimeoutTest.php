@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
 
 class SessionTimeoutTest extends TestCase
@@ -104,17 +107,38 @@ class SessionTimeoutTest extends TestCase
 
     public function test_auth_session_regeneration_preserves_timeout_message(): void
     {
-        $user = User::factory()->adminKepegawaian()->create();
+        config()->set('services.keycloak.employee_match_field', 'email');
 
-        // Simulasi regenerasi session saat login SSO: timeout message yang sudah
-        // disiapkan harus tetap tampil setelah session aktif dibuka kembali.
-        $this->actingAs($user)
-            ->withSession([
-                'simpeg_session_timeout_message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
-            ])
-            ->get(route('dashboard'))
+        Employee::factory()->create([
+            'nama_lengkap' => 'Admin Regenerasi',
+            'email' => 'regenerasi@example.com',
+        ]);
+
+        // Simulasi sesi sebelum login SSO: pesan timeout sudah disiapkan middleware.
+        $this->withSession([
+            'simpeg_session_timeout_message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-regenerasi',
+            'nickname' => 'regenerasi',
+            'name' => 'Admin Regenerasi',
+            'email' => 'regenerasi@example.com',
+            'raw' => ['email' => 'regenerasi@example.com', 'email_verified' => true, 'preferred_username' => 'regenerasi'],
+        ]);
+
+        // Callback SSO mengeksekusi handler login asli yang memanggil Auth::login +
+        // session()->regenerate() — regenerasi sesi tidak boleh menghapus pesan
+        // timeout yang sudah disiapkan sebelum login.
+        $this->get('/auth/keycloak/callback')
+            ->assertRedirect(route('dashboard'));
+
+        $this->get(route('dashboard'))
             ->assertOk()
             ->assertSee('Sesi Anda telah berakhir. Silakan login kembali.');
+
+        // Pesan hanya dirender sekali lalu dibersihkan.
+        $this->assertFalse(session()->has('simpeg_session_timeout_message'));
     }
 
     public function test_notification_polling_does_not_refresh_activity_timestamp(): void
@@ -236,5 +260,34 @@ class SessionTimeoutTest extends TestCase
             'user_name' => 'Admin API Timeout',
             'event' => 'SESSION_TIMEOUT',
         ]);
+    }
+
+    /**
+     * Stub Socialite supaya test mereproduksi jalur login SSO asli (Auth::login +
+     * session()->regenerate()) tanpa jaringan Keycloak.
+     */
+    private function fakeKeycloakUser(array $attributes): void
+    {
+        $user = (new SocialiteUser)->setRaw($attributes['raw'])->map([
+            'id' => $attributes['id'],
+            'nickname' => $attributes['nickname'],
+            'name' => $attributes['name'],
+            'email' => $attributes['email'],
+        ]);
+
+        $provider = new class($user)
+        {
+            public function __construct(private readonly SocialiteUser $user) {}
+
+            public function user(): SocialiteUser
+            {
+                return $this->user;
+            }
+        };
+
+        Socialite::shouldReceive('driver')
+            ->once()
+            ->with('keycloak')
+            ->andReturn($provider);
     }
 }

@@ -6,6 +6,7 @@ use App\Exceptions\UserMappingAuditException;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Support\IdentifierMasker;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -238,24 +239,12 @@ class UpdateUserMappingAction
             'employee_id' => $user->employee_id,
             'role' => $user->role,
             'mapping_status' => $user->keycloak_id ? 'connected' : 'disconnected',
-            'keycloak_id_masked' => $this->maskIdentifier($user->keycloak_id),
+            'keycloak_id_masked' => IdentifierMasker::mask($user->keycloak_id),
             'temporary_role' => $user->temporary_role,
             'temporary_permission' => $user->temporary_permission,
             'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
             'temporary_role_switched_by' => $user->temporary_role_switched_by,
         ];
-    }
-
-    private function maskIdentifier(?string $identifier): ?string
-    {
-        if ($identifier === null || $identifier === '') {
-            return null;
-        }
-
-        $visibleCharacters = min(4, strlen($identifier));
-
-        return str_repeat('*', max(strlen($identifier) - $visibleCharacters, 0))
-            .substr($identifier, -$visibleCharacters);
     }
 
     private function isUniqueConstraintViolation(QueryException $exception): bool

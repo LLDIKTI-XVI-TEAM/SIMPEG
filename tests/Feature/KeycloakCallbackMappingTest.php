@@ -1002,9 +1002,12 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame('dayen-internal@lldikti.go.id', $existingUser->email);
         $this->assertSame($employee->id, $existingUser->employee_id);
 
-        // Binding keycloak_id pertama tercatat sebagai audit.
+        // Binding keycloak_id pertama tercatat sebagai audit — subject tersamarkan,
+        // nilai mentah TIDAK boleh masuk payload append-only.
         $binding = AuditLog::query()->where('event', 'SSO_BINDING')->where('auditable_id', $existingUser->id)->sole();
-        $this->assertSame('kc-new-subject', $binding->new_values['keycloak_id'] ?? null);
+        $this->assertSame('**********ject', $binding->new_values['keycloak_id_masked'] ?? null);
+        $this->assertArrayNotHasKey('keycloak_id', $binding->new_values);
+        $this->assertStringNotContainsString('kc-new-subject', json_encode($binding->toArray()));
     }
 
     /**
@@ -1312,6 +1315,136 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertNotNull($audit);
         $this->assertSame('employee_match_ambiguous', $audit->new_values['reason'] ?? null);
         $this->assertStringNotContainsString('token', json_encode($audit->toArray()));
+    }
+
+    /**
+     * Audit SSO_BINDING tidak pernah menyimpan subject Keycloak mentah — payload
+     * append-only hanya memuat representasi tersamarkan (konsisten dengan jalur
+     * pemetaan admin di UpdateUserMappingAction).
+     */
+    public function test_binding_audit_does_not_store_raw_keycloak_subject(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Subjek Terbind',
+            'email' => 'subjek-bind@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-subjek-rahasia-9f2a',
+            'nickname' => 'subjek-bind',
+            'name' => 'Subjek Terbind',
+            'email' => 'subjek-bind@example.com',
+            'raw' => ['email' => 'subjek-bind@example.com', 'email_verified' => true, 'preferred_username' => 'subjek-bind'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $binding = AuditLog::query()->where('event', 'SSO_BINDING')->sole();
+        $this->assertSame('9f2a', substr((string) ($binding->new_values['keycloak_id_masked'] ?? ''), -4));
+        $this->assertStringContainsString('*', (string) $binding->new_values['keycloak_id_masked']);
+        $this->assertStringNotContainsString('kc-subjek-rahasia-9f2a', json_encode($binding->toArray()));
+    }
+
+    /**
+     * User yang dipakai ulang via employee_id dengan email internal berbeda TIDAK
+     * mendapat email_verified_at dari klaim SSO — Keycloak hanya memverifikasi email
+     * SSO-nya, bukan email internal SIMPEG; nilai existing juga tidak pernah dicabut.
+     */
+    public function test_reused_user_with_different_internal_email_keeps_email_verification_untouched(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Verifikasi Terjaga',
+            'email_pribadi' => 'sso-terverifikasi@example.com',
+        ]);
+
+        $existingUser = User::factory()->create([
+            'email' => 'internal-terjaga@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+            'email_verified_at' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-verifikasi',
+            'nickname' => 'verifikasi',
+            'name' => 'Verifikasi Terjaga',
+            'email' => 'sso-terverifikasi@example.com',
+            'raw' => ['email' => 'sso-terverifikasi@example.com', 'email_verified' => true, 'preferred_username' => 'verifikasi'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        // Email internal yang tidak pernah diverifikasi Keycloak tetap tidak terverifikasi.
+        $this->assertNull($existingUser->refresh()->email_verified_at);
+    }
+
+    /** User yang emailnya sama dengan klaim SSO terverifikasi tetap sah ditandai terverifikasi. */
+    public function test_user_with_matching_verified_email_gets_email_verified_at(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Email Kanonis',
+            'email' => 'kanonis@example.com',
+        ]);
+
+        $existingUser = User::factory()->create([
+            'email' => 'kanonis@example.com',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+            'email_verified_at' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-kanonis',
+            'nickname' => 'kanonis',
+            'name' => 'Email Kanonis',
+            'email' => 'kanonis@example.com',
+            'raw' => ['email' => 'kanonis@example.com', 'email_verified' => true, 'preferred_username' => 'kanonis'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertNotNull($existingUser->refresh()->email_verified_at);
+    }
+
+    /**
+     * Audit penolakan yang menyentuh akun berisi aktor SISTEM, bukan pemilik akun —
+     * pemilik akun belum terautentikasi dan mungkin korban percobaan pengikatan.
+     */
+    public function test_identity_conflict_audit_uses_system_actor_not_victim_account(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Korban Aktor',
+            'email_pribadi' => 'aktor-korban@example.com',
+        ]);
+
+        $userByEmployee = User::factory()->create([
+            'email' => 'aktor-internal@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+            'name' => 'Korban Aktor',
+        ]);
+        User::factory()->create([
+            'email' => 'aktor-korban@example.com',
+            'role' => 'pegawai',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-aktor-korban',
+            'nickname' => 'aktor-korban',
+            'name' => 'Korban Aktor',
+            'email' => 'aktor-korban@example.com',
+            'raw' => ['email' => 'aktor-korban@example.com', 'email_verified' => true, 'preferred_username' => 'aktor-korban'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertOk();
+
+        $audit = AuditLog::query()->where('event', 'SSO_MAPPING_REJECTED')->latest('created_at')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('identity_conflict', $audit->new_values['reason'] ?? null);
+        // Aktor sistem: user korban hanya sebagai objek audit, bukan pelaku.
+        $this->assertNull($audit->user_id);
+        $this->assertSame('SSO Callback', $audit->user_name);
+        $this->assertSame($userByEmployee->id, $audit->auditable_id ?? null);
     }
 
     /**

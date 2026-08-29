@@ -5,6 +5,7 @@ namespace App\Actions\Auth;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Support\IdentifierMasker;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
@@ -65,7 +66,9 @@ class HandleKeycloakCallbackAction
         $existingUser = User::where('keycloak_id', $keycloakId)->first();
 
         if ($existingUser) {
-            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request);
+            // Email internal user yang sudah terikat tidak pernah diverifikasi ulang oleh
+            // Keycloak pada jalur ini — status verifikasi existing dipertahankan apa adanya.
+            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: false);
         }
 
         // Pegawai asli wajib cocok ke data employees; akun tanpa email hanya boleh lewat whitelist user lokal.
@@ -122,7 +125,7 @@ class HandleKeycloakCallbackAction
             }
 
             try {
-                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
+                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: $this->emailMatchesVerifiedClaim($user, $matchedEmail));
             } catch (UniqueConstraintViolationException) {
                 // Database adalah authority terakhir: benturan unik berarti callback
                 // paralel sudah membuat/mengikat user setelah resolusi kita. Re-resolve
@@ -134,7 +137,7 @@ class HandleKeycloakCallbackAction
                     return view('auth.unregistered', ['message' => $rejected->userMessage]);
                 }
 
-                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
+                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: $this->emailMatchesVerifiedClaim($user, $matchedEmail));
             }
         }
 
@@ -189,11 +192,12 @@ class HandleKeycloakCallbackAction
             if ($user) {
                 // Reuse user existing: email internal TIDAK ditimpa agar identitas kanonis
                 // aplikasi tetap; yang diikat hanyalah subject Keycloak dan metadata login.
+                // Status verifikasi email JUGA tidak disentuh di sini: verifikasi hanya
+                // sah untuk email yang benar-benar diverifikasi IdP (diputuskan pemanggil).
                 $user->fill([
                     'name' => $name ?: $username ?: $employee->nama_lengkap,
                     'keycloak_id' => $keycloakId,
                     'employee_id' => $employee->id,
-                    'email_verified_at' => $user->email_verified_at ?? now(),
                 ]);
             } else {
                 $user = new User(['email' => $matchedEmail]);
@@ -229,13 +233,21 @@ class HandleKeycloakCallbackAction
         return $state['user'];
     }
 
-    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse|View
+    private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request, bool $markEmailVerified = false): RedirectResponse|View
     {
         $user->fill([
             'name' => $name ?: $user->name,
             'keycloak_id' => $keycloakId,
-            'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
+
+        // email_verified_at hanya ditandai bila email kanonis user memang sama dengan
+        // email SSO yang diverifikasi IdP (atau user baru yang emailnya berasal dari
+        // klaim terverifikasi itu). Email internal yang tidak pernah diverifikasi
+        // Keycloak tidak boleh ikut tercatat terverifikasi; nilai existing tidak
+        // pernah dicabut.
+        if ($markEmailVerified && $user->email_verified_at === null) {
+            $user->email_verified_at = now();
+        }
 
         // keycloak_username disimpan hanya jika belum dipakai user lain; identitas kanonis
         // login adalah keycloak_id (subject), jadi benturan username tidak boleh menggagalkan login.
@@ -373,7 +385,10 @@ class HandleKeycloakCallbackAction
      * Mencatat pengikatan pertama subject Keycloak (keycloak_id) pada user SIMPEG.
      *
      * Fail-closed: kegagalan menulis audit membatalkan binding. Payload hanya memuat
-     * identitas kanonis (subject, employee) tanpa payload/token mentah Keycloak.
+     * identitas kanonis (subject, employee) tanpa payload/token mentah Keycloak, dan
+     * subject tersamarkan (keycloak_id_masked) — audit bersifat append-only sehingga
+     * identifier eksternal utuh tidak boleh tersimpan permanen (konsisten dengan
+     * jalur pemetaan admin di UpdateUserMappingAction).
      */
     private function auditIdentityBinding(User $user, Request $request): void
     {
@@ -383,8 +398,12 @@ class HandleKeycloakCallbackAction
             'SSO_BINDING',
             'User',
             $user->id,
-            ['keycloak_id' => null],
-            ['keycloak_id' => $user->keycloak_id, 'employee_id' => $user->employee_id, 'source' => 'sso_callback'],
+            ['keycloak_id_masked' => null],
+            [
+                'keycloak_id_masked' => IdentifierMasker::mask($user->keycloak_id),
+                'employee_id' => $user->employee_id,
+                'source' => 'sso_callback',
+            ],
             $request,
         );
     }
@@ -392,12 +411,16 @@ class HandleKeycloakCallbackAction
     /**
      * Mencatat penolakan mapping identitas SSO (pegawai nonaktif / konflik identitas)
      * sebagai evidence keamanan tanpa menyimpan payload mentah Keycloak.
+     *
+     * Aktornya SELALU sistem: pemilik akun yang tersentuh belum terautentikasi dan
+     * mungkin justru korban percobaan pengikatan — atribusi ke user tersebut akan
+     * salah menunjuk pelaku. User terkait tetap tertelusuri lewat auditable_id.
      */
     private function auditMappingRejected(?User $user, string $reason, ?string $email, ?string $employeeId, Request $request): void
     {
         AuditService::logAsOrFail(
-            $user?->id ?? 'system',
-            $user?->name ?? 'SSO Callback',
+            'system',
+            'SSO Callback',
             'SSO_MAPPING_REJECTED',
             'User',
             $user?->id,
@@ -405,6 +428,15 @@ class HandleKeycloakCallbackAction
             ['reason' => $reason, 'email' => $email, 'employee_id' => $employeeId, 'source' => 'sso_callback'],
             $request,
         );
+    }
+
+    /**
+     * True bila email kanonis user sama dengan email SSO terverifikasi yang sedang
+     * dipetakan, sehingga menandai email terverifikasi adalah pernyataan yang benar.
+     */
+    private function emailMatchesVerifiedClaim(User $user, string $matchedEmail): bool
+    {
+        return strtolower((string) $user->email) === $matchedEmail;
     }
 
     /**
