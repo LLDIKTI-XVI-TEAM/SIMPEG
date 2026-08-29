@@ -30,8 +30,15 @@ class GlobalSearchController extends Controller
         $op = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         // 1. Search Employees (Pegawai & NIP)
-        $employees = Employee::where('nama_lengkap', $op, "%{$query}%")
-            ->orWhere('nip', $op, "%{$query}%")
+        // Daftar pegawai hanya menampilkan yang aktif secara default; hasil pencarian
+        // dibatasi ke klasifikasi kelompok aktif dan URL-nya menyertakan filter
+        // status "all" agar memilih hasil pegawai tidak membuka daftar kosong.
+        $employees = Employee::query()
+            ->where(function ($q) use ($op, $query): void {
+                $q->where('nama_lengkap', $op, "%{$query}%")
+                    ->orWhere('nip', $op, "%{$query}%");
+            })
+            ->whereActiveStatus()
             ->limit(5)
             ->get();
 
@@ -41,8 +48,8 @@ class GlobalSearchController extends Controller
                     'title' => $emp->nama_lengkap,
                     'subtitle' => 'NIP: '.$emp->nip.' — '.($emp->jabatan_terakhir ?? '-'),
                     'url' => $isPimpinan
-                        ? route('pimpinan.pegawai.index', ['search' => $emp->nip])
-                        : route('data-pegawai', ['search' => $emp->nip]),
+                        ? route('pimpinan.pegawai.index', ['search' => $emp->nip, 'status_pegawai_id' => 'all'])
+                        : route('data-pegawai', ['search' => $emp->nip, 'status_pegawai_id' => 'all']),
                 ];
             });
         }

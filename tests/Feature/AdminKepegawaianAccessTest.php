@@ -36,7 +36,6 @@ class AdminKepegawaianAccessTest extends TestCase
             'ews.config',
             'cuti.config',
             'pengaturan',
-            'data-nonaktif',
         ] as $forbiddenRoute) {
             $response->assertDontSee('href="'.route($forbiddenRoute).'"', false);
         }
@@ -49,8 +48,6 @@ class AdminKepegawaianAccessTest extends TestCase
             'laporan.pegawai',
             'cuti.laporan',
             'audit-log',
-            // Data Backup terbuka bagi role ini karena memegang employees.restore.
-            'data-backup',
         ] as $allowedRoute) {
             $response->assertSee('href="'.route($allowedRoute).'"', false);
         }

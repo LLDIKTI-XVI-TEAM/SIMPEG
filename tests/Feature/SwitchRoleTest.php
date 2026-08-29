@@ -810,7 +810,6 @@ class SwitchRoleTest extends TestCase
         $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
         $adminRole->permissions()->detach(
             Permission::whereIn('name', [
-                'employees.restore',
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
             ])->pluck('id'),
@@ -823,7 +822,6 @@ class SwitchRoleTest extends TestCase
 
         $response = $this->actingAs($user->refresh())->get(route('cuti'));
         $response->assertOk();
-        $response->assertDontSee('href="'.route('data-backup').'"', false);
         $response->assertDontSee('Administrasi Pemakaian Cuti');
     }
 

@@ -4,13 +4,14 @@ namespace App\Services;
 
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
+use App\Models\EmployeeStatusTransition;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
-use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class EwsEngineService
@@ -40,8 +41,11 @@ class EwsEngineService
         ]);
 
         try {
-            // Retrieve config values for alert thresholds
-            $configDays = fn (string $key, int $default): int => (int) EwsConfig::getVal($key, (string) $default);
+            // Satu snapshot konfigurasi menghindari query per key pada setiap run;
+            // default tetap dipakai untuk key yang belum disimpan.
+            $configValues = EwsConfig::query()->pluck('value', 'key');
+            $configDays = fn (string $key, int $default): int => (int) ($configValues[$key] ?? $default);
+            $configYears = fn (string $key, int $default): int => max(1, $configDays($key, $default));
 
             $pangkatDays = [
                 $configDays('pangkat_h90', 90),
@@ -73,14 +77,14 @@ class EwsEngineService
                 $configDays('satyalancana_h30', 30),
             ];
 
-            $pangkatRequiredYears = $this->configYears('pangkat_required_years', 4);
-            $kgbRequiredYears = $this->configYears('kgb_required_years', 2);
+            $pangkatRequiredYears = $configYears('pangkat_required_years', 4);
+            $kgbRequiredYears = $configYears('kgb_required_years', 2);
             $pensiunRequiredAgeYears = max(0, $configDays('pensiun_required_age_years', 0));
-            $pppkContractYears = $this->configYears('pppk_contract_years', 4);
+            $pppkContractYears = $configYears('pppk_contract_years', 4);
             $satyalancanaYears = [
-                $this->configYears('satyalancana_years_1', 10),
-                $this->configYears('satyalancana_years_2', 20),
-                $this->configYears('satyalancana_years_3', 30),
+                $configYears('satyalancana_years_1', 10),
+                $configYears('satyalancana_years_2', 20),
+                $configYears('satyalancana_years_3', 30),
             ];
 
             // Gunakan milestone terhitung untuk mengurangi query, lalu hitung langsung
@@ -95,6 +99,11 @@ class EwsEngineService
                 'salaryHistories',
                 'appointments',
             ])
+                ->withExists([
+                    'statusTransitions as has_pending_ews_retirement' => fn ($query) => $query
+                        ->where('kind', EmployeeStatusTransition::KIND_EWS_RETIREMENT)
+                        ->where('is_applied', false),
+                ])
                 // Satu-satunya predicate lifecycle: Aktif dan Aktif/khusus boleh diproses.
                 // Status hilang/tidak valid tidak boleh menghasilkan alert maupun fan-out admin.
                 ->withActiveLifecycleStatus()
@@ -173,7 +182,10 @@ class EwsEngineService
                         $targetDate = $this->getMilestoneDate($employee, 'pensiun')
                             ?? $this->calculatePensionDate($employee, $pensiunRequiredAgeYears);
 
-                        if ($targetDate) {
+                        // Approval pensiun future sudah menutup milestone ini. Selama
+                        // transisinya pending, engine tidak boleh membuka tahap PENSIUN
+                        // berikutnya; perhitungan EWS lain untuk pegawai tetap berjalan.
+                        if ($targetDate && ! $employee->has_pending_ews_retirement) {
                             $diffDays = (int) now()->startOfDay()->diffInDays($targetDate->startOfDay(), false);
                             $days = $this->dueStage($pensiunDays, $diffDays);
 
@@ -266,8 +278,7 @@ class EwsEngineService
             // Notify Super Admin if scheduler fails
             $superAdmins = User::where('role', 'super_admin')
                 ->whereNotNull('employee_id')
-                ->whereHas('employee.statusPegawai', fn ($statuses) => $statuses
-                    ->whereIn('kelompok', RefStatusPegawai::activeGroups()))
+                ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
                 ->with(['employee.statusPegawai'])
                 ->get();
 
@@ -288,11 +299,6 @@ class EwsEngineService
 
             throw $e;
         }
-    }
-
-    private function configYears(string $key, int $default): int
-    {
-        return max(1, (int) EwsConfig::getVal($key, (string) $default));
     }
 
     /**
@@ -545,6 +551,97 @@ class EwsEngineService
         ?int $satyalancanaYears = null,
         bool $sendNotification = true,
     ): bool {
+        if ($type === 'PENSIUN') {
+            return DB::transaction(function () use ($employee, $type, $targetDate, $days, $titleLabel, $isEligible, $satyalancanaYears, $sendNotification): bool {
+                // Alert yang sudah ada dikunci sebelum pegawai agar urutannya sama
+                // dengan approval HTTP dan kedua transaksi tidak saling menunggu.
+                $existingAlert = EwsAlert::query()
+                    ->where('employee_id', $employee->id)
+                    ->where('type', $type)
+                    ->whereDate('target_date', $targetDate)
+                    ->where('interval_days', $days)
+                    ->lockForUpdate()
+                    ->first();
+
+                // Snapshot chunk hanya optimasi. Lock pegawai menutup celah terhadap
+                // approval future, lalu transition dicek ulang tepat sebelum persist.
+                $lockedEmployee = Employee::query()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
+                $hasPendingRetirement = EmployeeStatusTransition::query()
+                    ->where('employee_id', $lockedEmployee->id)
+                    ->where('kind', EmployeeStatusTransition::KIND_EWS_RETIREMENT)
+                    ->where('is_applied', false)
+                    ->exists();
+
+                // Approval efektif hari ini tidak membuat transition pending, tetapi
+                // sudah mengubah snapshot pegawai menjadi nonaktif. Snapshot chunk
+                // tidak boleh dipakai lagi setelah lock canonical diperoleh.
+                if (! $lockedEmployee->isActive() || $hasPendingRetirement) {
+                    return false;
+                }
+
+                if ($existingAlert === null) {
+                    // Baris yang belum ada tidak dapat di-lock. INSERT ON CONFLICT
+                    // mempertahankan dedupe ketika dua scheduler melihat snapshot kosong;
+                    // pihak yang kalah tidak menyentuh alert pemenang saat masih memegang
+                    // lock pegawai, sehingga tidak membentuk ulang siklus lock HTTP.
+                    $existingAlert = $this->createRetirementAlertAtomically(
+                        $lockedEmployee,
+                        $type,
+                        $targetDate,
+                        $days,
+                        $isEligible,
+                        $satyalancanaYears,
+                    );
+
+                    if ($existingAlert === null) {
+                        return false;
+                    }
+
+                    $wasCreated = true;
+                } else {
+                    $wasCreated = false;
+                }
+
+                return $this->persistAlertAndReminder(
+                    $lockedEmployee,
+                    $type,
+                    $targetDate,
+                    $days,
+                    $titleLabel,
+                    $isEligible,
+                    $satyalancanaYears,
+                    $sendNotification,
+                    $existingAlert,
+                    $wasCreated,
+                );
+            });
+        }
+
+        return $this->persistAlertAndReminder(
+            $employee,
+            $type,
+            $targetDate,
+            $days,
+            $titleLabel,
+            $isEligible,
+            $satyalancanaYears,
+            $sendNotification,
+        );
+    }
+
+    /** Menulis alert dan reminder setelah gate concurrency tipe terkait terpenuhi. */
+    private function persistAlertAndReminder(
+        Employee $employee,
+        string $type,
+        string $targetDate,
+        int $days,
+        string $titleLabel,
+        ?bool $isEligible,
+        ?int $satyalancanaYears,
+        bool $sendNotification,
+        ?EwsAlert $alert = null,
+        bool $wasCreated = false,
+    ): bool {
         $identity = [
             'employee_id' => $employee->id,
             'type' => $type,
@@ -557,8 +654,7 @@ class EwsEngineService
             ->where('type', $type)
             ->whereDate('target_date', $targetDate)
             ->where('interval_days', $days);
-        $alert = $findAlert()->first();
-        $wasCreated = false;
+        $alert ??= $findAlert()->first();
 
         if ($alert === null) {
             try {
@@ -656,5 +752,41 @@ class EwsEngineService
         }
 
         return $wasCreated;
+    }
+
+    /** Membuat alert pensiun baru tanpa mengambil lock baris milik transaksi lain. */
+    private function createRetirementAlertAtomically(
+        Employee $employee,
+        string $type,
+        string $targetDate,
+        int $days,
+        ?bool $isEligible,
+        ?int $satyalancanaYears,
+    ): ?EwsAlert {
+        $timestamp = now();
+        $alert = new EwsAlert;
+        $alert->forceFill([
+            'id' => $alert->newUniqueId(),
+            'employee_id' => $employee->id,
+            'type' => $type,
+            'target_date' => $targetDate,
+            'interval_days' => $days,
+            'is_processed' => false,
+            'is_eligible' => $isEligible,
+            'satyalancana_years' => $satyalancanaYears,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
+
+        if (EwsAlert::query()->insertOrIgnore($alert->getAttributes()) !== 1) {
+            return null;
+        }
+
+        $alert->exists = true;
+        $alert->wasRecentlyCreated = true;
+        $alert->syncOriginal();
+
+        return $alert;
     }
 }

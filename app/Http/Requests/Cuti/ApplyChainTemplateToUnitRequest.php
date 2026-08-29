@@ -121,10 +121,10 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
             // Approver pada rantai sumber bisa sudah pensiun atau keluar sejak rantai dibuat. Form
             // per pegawai hanya menerima approver aktif, jadi template kedaluwarsa ditolak di sini
             // supaya admin melihat galat yang menerangkan sebabnya, bukan galat server.
+            // Klasifikasi aktif memakai kelompok referensi — satu sumber dengan whereActiveStatus().
             $approverNonaktif = Employee::query()
-                ->withTrashed()
                 ->whereIn('id', $langkahDisalin->pluck('approver_employee_id')->filter()->unique())
-                ->where(fn ($query) => $query->where('status_aktif', '!=', 'Aktif')->orWhereNotNull('deleted_at'))
+                ->whereNotActiveStatus()
                 ->pluck('nama_lengkap');
 
             if ($approverNonaktif->isNotEmpty()) {

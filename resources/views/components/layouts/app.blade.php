@@ -70,8 +70,6 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            $canRestoreEmployees = in_array($activeRole, ['super_admin', 'admin_kepegawaian'], true)
-                && ($layoutCapabilities['employees.restore'] ?? false);
             $canAdministerLeaveBalance = $activeRole === 'admin_kepegawaian'
                 && (($layoutCapabilities['cuti.balance.reconcile'] ?? false)
                     || ($layoutCapabilities['cuti.manual.manage'] ?? false));
@@ -92,7 +90,6 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-backup',
                     'ews.config',
                 ],
                 'kepala_bagian' => [
@@ -104,8 +101,6 @@
                     'pengaturan',
                     'user-management',
                     'rbac',
-                    'data-nonaktif',
-                    'data-backup',
                     'data-master',
                     'laporan',
                     'laporan.pegawai',
@@ -118,7 +113,6 @@
                 'pegawai' => [
                     'data-pegawai',
                     'pegawai.import',
-                    'data-backup',
                     'dokumen',
                     'cuti.rekap',
                     'ews',
@@ -149,11 +143,6 @@
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
-                        // Route Data Backup mensyaratkan permission employees.restore, sehingga
-                        // menunya hanya ditampilkan bila permission itu benar-benar dimiliki.
-                        $canRestoreEmployees
-                            ? ['label' => 'Data Backup', 'route' => 'data-backup', 'icon' => 'user-minus']
-                            : null,
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                     ])

@@ -212,8 +212,8 @@ class SubmitLeaveRequestTest extends TestCase
         $jenis = $this->jenisCuti('Cuti Tanpa Link '.$role);
         $user = User::factory()->state(['role' => $role])->create(['employee_id' => null]);
 
-        $this->actingAs($user)->get(route('cuti.create'))->assertForbidden();
-        $this->actingAs($user)->postJson(route(self::ROUTE), $this->payload($jenis))->assertUnprocessable();
+        $this->actingAsUnmapped($user)->get(route('cuti.create'))->assertRedirect(route('status-akun'));
+        $this->actingAsUnmapped($user)->postJson(route(self::ROUTE), $this->payload($jenis))->assertRedirect(route('status-akun'));
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
@@ -684,10 +684,10 @@ class SubmitLeaveRequestTest extends TestCase
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        $this->actingAs($user);
+        $this->actingAsUnmapped($user);
         $response = $this->get(route('cuti.create'));
 
-        $response->assertForbidden();
+        $response->assertRedirect(route('status-akun'));
     }
 
     public function test_cuti_create_form_exposes_fact_backed_available_balance(): void
@@ -1489,7 +1489,10 @@ class SubmitLeaveRequestTest extends TestCase
         ]);
         $audit = AuditLog::query()->where('auditable_type', 'LeaveRequest')->where('event', 'UPDATE')->latest('created_at')->firstOrFail();
         $oldKeys = array_keys($audit->old_values);
-        $newKeys = array_keys($audit->new_values);
+        $newValues = $audit->new_values;
+        $this->assertSame('pegawai', $newValues['_effective_role'] ?? null);
+        unset($newValues['_effective_role']);
+        $newKeys = array_keys($newValues);
         sort($oldKeys);
         sort($newKeys);
         $this->assertSame($oldKeys, $newKeys);

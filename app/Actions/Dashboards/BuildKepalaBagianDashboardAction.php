@@ -21,8 +21,7 @@ class BuildKepalaBagianDashboardAction
     {
         $today = now()->toDateString();
         $reportIds = $this->scope->directReportIds($user);
-        $activeReports = $this->scope->directReports($user)
-            ->whereHas('statusPegawai', fn ($statuses) => $statuses->where('nama', 'Aktif'));
+        $activeReports = $this->scope->directReports($user);
 
         $reports = (clone $activeReports)
             ->with([
@@ -54,7 +53,7 @@ class BuildKepalaBagianDashboardAction
             ->limit(5)
             ->get();
 
-        $ews = $this->ewsAlerts->executeForEmployees($reportIds, null, null)['alerts'];
+        $ews = $this->ewsAlerts->preview(5, employeeIds: $reportIds)['alerts'];
 
         return [
             'namaKepalaBagian' => $user->name,
@@ -68,7 +67,7 @@ class BuildKepalaBagianDashboardAction
                 ->count(),
             'bawahan' => $reports,
             'pendingLeaves' => $pendingLeaves,
-            'ewsBawahan' => array_slice($ews, 0, 5),
+            'ewsBawahan' => $ews,
         ];
     }
 }

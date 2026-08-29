@@ -1,10 +1,10 @@
 <x-layouts.app title="Dashboard" subtitle="Ringkasan operasional kepegawaian dan pemantauan tindak lanjut.">
     @php
         $dashboardEwsAlerts = collect($dashboardEwsAlerts ?? [])->take(5);
-        $dashboardEwsTotal = $dashboardEwsTotal ?? $dashboardEwsAlerts->count();
-        $dashboardEwsUrgent = $dashboardEwsUrgent ?? $dashboardEwsAlerts->where('urgency', 'danger')->count();
-        $dashboardEwsWarning = $dashboardEwsWarning ?? $dashboardEwsAlerts->where('urgency', 'warning')->count();
-        $dashboardEwsInfo = $dashboardEwsInfo ?? $dashboardEwsAlerts->where('urgency', 'success')->count();
+        $dashboardEwsTotal = $dashboardEwsTotal ?? 0;
+        $dashboardEwsUrgent = $dashboardEwsUrgent ?? 0;
+        $dashboardEwsWarning = $dashboardEwsWarning ?? 0;
+        $dashboardEwsInfo = $dashboardEwsInfo ?? 0;
         $dashboardEwsLink = $dashboardEwsLink ?? route('ews');
 
         // K-3: variabel di bawah dikirim BuildAdminDashboardAction.

@@ -26,7 +26,7 @@
             {{-- Search input --}}
             <div class="{{ $searchCols }} space-y-1.5 flex flex-col justify-end">
                 @if($searchLabel)
-                    <label class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">{{ $searchLabel }}</label>
+                    <label @if($searchId) for="{{ $searchId }}" @endif class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">{{ $searchLabel }}</label>
                 @endif
                 <div class="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary w-full transition-all duration-200">
                     <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">

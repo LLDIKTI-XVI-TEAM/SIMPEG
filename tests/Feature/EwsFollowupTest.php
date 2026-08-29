@@ -2,20 +2,30 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\RestoreEmployeeAction;
+use App\Http\Requests\Employee\DeactivateEmployeeRequest;
+use App\Models\AuditLog;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
+use App\Models\EmployeeStatusTransition;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\Permission;
 use App\Models\RefGolongan;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\SimpegNotification;
+use App\Models\StorageRecoveryTask;
 use App\Models\User;
+use App\Services\Employees\EmployeeStatusTransitionService;
 use App\Services\EwsEngineService;
+use App\Services\NotificationService;
+use App\Services\StorageRecoveryService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
@@ -82,7 +92,7 @@ class EwsFollowupTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'user_id' => $alert->employee_id,
             'type' => 'ews.followup.satyalancana',
-            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'title' => 'Tindak Lanjut EWS: Ditangani',
             'body' => 'Berkas kenaikan pangkat sudah diproses.',
             'is_read' => false,
         ]);
@@ -133,6 +143,29 @@ class EwsFollowupTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+    }
+
+    public function test_pension_followup_is_forbidden_without_employees_deactivate_permission(): void
+    {
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionId = Permission::where('name', 'employees.deactivate')->firstOrFail()->id;
+        $role->permissions()->detach($permissionId);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $alert = $this->activeAlert('Pegawai Pensiun Tanpa Permission', 'PENSIUN');
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'Percobaan pensiun tanpa permission deactivate.',
+                'no_sk' => 'SK-PENSIUN-TANPA-IZIN',
+                'tanggal_sk' => '2026-08-27',
+                'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+            ])
+            ->assertForbidden();
+
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertTrue($alert->employee->refresh()->isActive());
     }
 
     public function test_pangkat_approval_creates_new_history_and_resets_ews_from_configured_tmt(): void
@@ -190,7 +223,7 @@ class EwsFollowupTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.followup.kenaikan_pangkat',
-            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'title' => 'Tindak Lanjut EWS: Ditangani',
             'body' => 'SK pangkat baru sudah disetujui.',
             'is_read' => false,
         ]);
@@ -252,7 +285,7 @@ class EwsFollowupTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.followup.kgb',
-            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'title' => 'Tindak Lanjut EWS: Ditangani',
             'body' => 'SK KGB baru sudah disetujui.',
             'is_read' => false,
         ]);
@@ -292,6 +325,7 @@ class EwsFollowupTest extends TestCase
         $this->assertDatabaseHas('employees', [
             'id' => $employee->id,
             'status_aktif' => 'Pensiun',
+            'status_note' => DeactivateEmployeeRequest::DEFAULT_NOTE,
         ]);
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
@@ -336,10 +370,719 @@ class EwsFollowupTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.followup.pensiun',
-            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'title' => 'Tindak Lanjut EWS: Ditangani',
             'body' => 'SK pensiun telah diterbitkan.',
             'is_read' => false,
         ]);
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'status_pegawai.dinonaktifkan')
+            ->count());
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'ews.followup.pensiun')
+            ->count());
+
+        $employeeAudit = AuditLog::query()
+            ->where('auditable_type', 'Employee')
+            ->where('auditable_id', $employee->id)
+            ->sole();
+        $serializedAudit = json_encode([$employeeAudit->old_values, $employeeAudit->new_values], JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString((string) $employee->nip, $serializedAudit);
+        $this->assertStringNotContainsString((string) $document->file_path, $serializedAudit);
+    }
+
+    public function test_future_pension_approval_schedules_one_private_sk_without_mutating_lifecycle_until_due(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $activeStatusId = $employee->status_pegawai_id;
+        $effectiveDate = now('Asia/Makassar')->addDays(30)->toDateString();
+        $selected = $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 90);
+        $sibling = $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 180);
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $selected), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun future telah diterbitkan.',
+            'no_sk' => 'SK-PENSIUN-FUTURE-001',
+            'tanggal_sk' => $effectiveDate,
+            'file_sk' => UploadedFile::fake()->createWithContent('sk-pensiun-future.pdf', 'SK pensiun future'),
+        ])->assertOk();
+
+        $transition = EmployeeStatusTransition::query()->sole();
+        $document = Document::query()->sole();
+        $employee->refresh();
+
+        $this->assertFalse($transition->is_applied);
+        $this->assertSame(EmployeeStatusTransition::KIND_EWS_RETIREMENT, $transition->kind);
+        $this->assertSame($selected->id, $transition->source_ews_alert_id);
+        $this->assertSame($document->id, $transition->document_id);
+        $this->assertSame('employees.deactivate', $transition->authorization_permission);
+        $this->assertSame(EmployeeStatusTransition::KIND_DEACTIVATE, $transition->authorization_action);
+        $this->assertSame($activeStatusId, $employee->status_pegawai_id);
+        $this->assertTrue($employee->isActive());
+        $this->assertNull($employee->status_berkas_path);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertSame(0, AuditLog::query()
+            ->where('auditable_type', 'Employee')
+            ->where('auditable_id', $employee->id)
+            ->count());
+        $this->assertSame(0, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'status_pegawai.dinonaktifkan')
+            ->count());
+        $this->assertSame('sk_pensiun', $document->jenis_dokumen);
+        $this->assertSame('SK-PENSIUN-FUTURE-001', $document->nomor_dokumen);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($document->file_path);
+        $this->assertCount(1, Storage::disk(Document::STORAGE_DISK)->allFiles());
+        $this->assertDatabaseHas('storage_recovery_tasks', [
+            'operation' => StorageRecoveryTask::OPERATION_CREATION_TARGET,
+            'status' => StorageRecoveryTask::STATUS_ADOPTED,
+            'category' => StorageRecoveryService::CATEGORY_EMPLOYEE_STATUS_DOCUMENT,
+            'disk' => Document::STORAGE_DISK,
+            'path' => $document->file_path,
+            'owner_id' => $employee->id,
+        ]);
+        $this->assertNotNull($selected->refresh()->followup_notified_at);
+        $this->assertNull($selected->lifecycle_notified_at);
+        $this->assertNotNull($sibling->refresh()->followup_notified_at);
+        $this->assertNull($sibling->lifecycle_notified_at);
+
+        $service = app(EmployeeStatusTransitionService::class);
+        $this->assertSame(0, $service->applyDue(now('Asia/Makassar')->toDateString()));
+        $this->assertTrue($employee->refresh()->isActive());
+
+        $role = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $permission = Permission::query()->where('name', 'employees.deactivate')->firstOrFail();
+        $role->permissions()->detach($permission->id);
+
+        $this->assertSame(1, $service->applyDue($effectiveDate));
+
+        $employee->refresh();
+        $history = EmployeeStatusHistory::query()->where('employee_id', $employee->id)->sole();
+        $this->assertFalse($employee->isActive());
+        $this->assertSame('Pensiun', $employee->status_aktif);
+        $this->assertSame($document->file_path, $employee->status_berkas_path);
+        $this->assertSame($document->file_path, $history->file_sk);
+        $this->assertSame(1, AuditLog::query()
+            ->where('auditable_type', 'Employee')
+            ->where('auditable_id', $employee->id)
+            ->count());
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'status_pegawai.dinonaktifkan')
+            ->count());
+        $this->assertNotNull($selected->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($sibling->refresh()->lifecycle_notified_at);
+
+        $this->assertSame(0, $service->applyDue($effectiveDate));
+        $this->assertDatabaseCount('documents', 1);
+        $this->assertDatabaseCount('employee_status_histories', 1);
+        $this->assertSame(1, AuditLog::query()
+            ->where('auditable_type', 'Employee')
+            ->where('auditable_id', $employee->id)
+            ->count());
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'status_pegawai.dinonaktifkan')
+            ->count());
+        $this->assertCount(1, Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_ews_engine_suppresses_only_pension_alert_for_employee_with_pending_retirement(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $effectiveDate = now('Asia/Makassar')->addDays(180)->toDateString();
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_pensiun' => $effectiveDate,
+            'tanggal_kgb_berikutnya' => now('Asia/Makassar')->addDays(150)->toDateString(),
+        ]);
+        $selected = $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 180);
+        $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 365);
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $selected), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Pensiun future sudah disetujui.',
+            'no_sk' => 'SK-PENSIUN-ENGINE-SUPPRESS',
+            'tanggal_sk' => $effectiveDate,
+            'file_sk' => UploadedFile::fake()->createWithContent('sk-pensiun-engine.pdf', 'SK pensiun engine'),
+        ])->assertOk();
+
+        $employeeWithoutTransition = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_pensiun' => $effectiveDate,
+        ]);
+
+        $this->travel(90)->days();
+        app(EwsEngineService::class)->run();
+
+        $this->assertSame(0, EwsAlert::query()
+            ->where('employee_id', $employee->id)
+            ->where('type', 'PENSIUN')
+            ->where('followup_status', EwsAlert::FOLLOWUP_STATUS_ACTIVE)
+            ->count());
+        $this->assertDatabaseHas('ews_alerts', [
+            'employee_id' => $employee->id,
+            'type' => 'KGB',
+            'interval_days' => 60,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+        $this->assertDatabaseHas('ews_alerts', [
+            'employee_id' => $employeeWithoutTransition->id,
+            'type' => 'PENSIUN',
+            'interval_days' => 90,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+    }
+
+    public function test_due_future_pension_retries_only_missing_lifecycle_intent_after_notification_failure(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $effectiveDate = now('Asia/Makassar')->addDays(30)->toDateString();
+        $selected = $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 90);
+        $sibling = $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 180);
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $selected), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun future siap diterapkan.',
+            'no_sk' => 'SK-PENSIUN-FUTURE-RETRY',
+            'tanggal_sk' => $effectiveDate,
+            'file_sk' => UploadedFile::fake()->createWithContent('sk-pensiun-future.pdf', 'SK pensiun retry'),
+        ])->assertOk();
+
+        $realNotifications = app(NotificationService::class);
+        $flakyNotifications = new class($realNotifications) extends NotificationService
+        {
+            public int $calls = 0;
+
+            public bool $shouldFail = true;
+
+            public function __construct(private readonly NotificationService $inner) {}
+
+            public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
+            {
+                $this->calls++;
+                if ($this->shouldFail) {
+                    throw new \RuntimeException('Paksa gagal intent lifecycle scheduler.');
+                }
+
+                return $this->inner->createForEmployee($employee, $type, $title, $body, $data);
+            }
+        };
+        $this->app->instance(NotificationService::class, $flakyNotifications);
+        $service = app(EmployeeStatusTransitionService::class);
+
+        $this->assertSame(1, $service->applyDue($effectiveDate));
+        $this->assertFalse($employee->refresh()->isActive());
+        $this->assertTrue(EmployeeStatusTransition::query()->sole()->is_applied);
+        $this->assertNull($selected->refresh()->lifecycle_notified_at);
+        $this->assertNull($sibling->refresh()->lifecycle_notified_at);
+        $this->assertSame(0, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertDatabaseCount('documents', 1);
+        $this->assertDatabaseCount('employee_status_histories', 1);
+        $this->assertSame(1, AuditLog::query()->where('auditable_type', 'Employee')->count());
+        $this->assertCount(1, Storage::disk(Document::STORAGE_DISK)->allFiles());
+
+        $flakyNotifications->shouldFail = false;
+
+        $this->assertSame(0, $service->applyDue($effectiveDate));
+        $this->assertNotNull($selected->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($sibling->refresh()->lifecycle_notified_at);
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertDatabaseCount('documents', 1);
+        $this->assertDatabaseCount('employee_status_histories', 1);
+        $this->assertSame(1, AuditLog::query()->where('auditable_type', 'Employee')->count());
+        $this->assertCount(1, Storage::disk(Document::STORAGE_DISK)->allFiles());
+
+        $this->assertSame(0, $service->applyDue($effectiveDate));
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+    }
+
+    public function test_lifecycle_superseded_marker_uses_explicit_group_when_two_groups_share_handled_second(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $firstDate = now('Asia/Makassar')->addDays(30)->toDateString();
+        $secondDate = now('Asia/Makassar')->addDays(60)->toDateString();
+        $firstSource = $this->activeAlertFor($employee, 'PENSIUN', $firstDate, 90);
+        $firstSibling = $this->activeAlertFor($employee, 'PENSIUN', $firstDate, 180);
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $firstSource), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Grup pensiun pertama.',
+            'no_sk' => 'SK-PENSIUN-GRUP-001',
+            'tanggal_sk' => $firstDate,
+            'file_sk' => UploadedFile::fake()->createWithContent('sk-pensiun-grup-1.pdf', 'SK pensiun grup 1'),
+        ])->assertOk();
+
+        $secondSource = $this->activeAlertFor($employee, 'PENSIUN', $secondDate, 90);
+        $secondSibling = $this->activeAlertFor($employee, 'PENSIUN', $secondDate, 180);
+        $this->postJsonWithCsrf(route('ews.followup.update', $secondSource), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Grup pensiun kedua.',
+            'no_sk' => 'SK-PENSIUN-GRUP-002',
+            'tanggal_sk' => $secondDate,
+            'file_sk' => UploadedFile::fake()->createWithContent('sk-pensiun-grup-2.pdf', 'SK pensiun grup 2'),
+        ])->assertOk();
+
+        $firstTransition = EmployeeStatusTransition::query()
+            ->where('source_ews_alert_id', $firstSource->id)
+            ->sole();
+        $firstTransition->forceFill([
+            'is_applied' => true,
+            'applied_at' => now(),
+        ])->saveOrFail();
+
+        $this->assertSame(0, app(EmployeeStatusTransitionService::class)->applyDue($firstDate));
+        $this->assertNull($firstSource->refresh()->lifecycle_notified_at);
+        $this->assertNull($firstSibling->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($firstSource->lifecycle_notification_superseded_at);
+        $this->assertNotNull($firstSibling->lifecycle_notification_superseded_at);
+        $this->assertNull($secondSource->refresh()->lifecycle_notified_at);
+        $this->assertNull($secondSibling->refresh()->lifecycle_notified_at);
+        $this->assertNull($secondSource->lifecycle_notification_superseded_at);
+        $this->assertNull($secondSibling->lifecycle_notification_superseded_at);
+        $this->assertSame($firstSource->id, $firstSource->followup_group_id);
+        $this->assertSame($firstSource->id, $firstSibling->followup_group_id);
+        $this->assertSame($secondSource->id, $secondSource->followup_group_id);
+        $this->assertSame($secondSource->id, $secondSibling->followup_group_id);
+        $this->assertNotSame($firstSource->followup_group_id, $secondSource->followup_group_id);
+    }
+
+    public function test_pension_followup_rolls_back_when_lifecycle_audit_fails(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        Storage::fake('public');
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+
+        AuditLog::creating(function (AuditLog $audit): void {
+            if ($audit->auditable_type === 'Employee') {
+                throw new \RuntimeException('Paksa gagal audit lifecycle EWS.');
+            }
+        });
+
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->actingAs($user)->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'SK pensiun telah diterbitkan.',
+                'no_sk' => 'SK-PENSIUN-AUDIT-GAGAL',
+                'tanggal_sk' => '2026-08-27',
+                'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+            ]);
+            $this->fail('Kegagalan audit lifecycle wajib diteruskan.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Paksa gagal audit lifecycle EWS.', $exception->getMessage());
+        }
+
+        $this->assertTrue($employee->refresh()->isActive());
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertDatabaseMissing('employee_status_histories', ['employee_id' => $employee->id]);
+        $this->assertDatabaseMissing('documents', ['employee_id' => $employee->id]);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles('sk'));
+    }
+
+    public function test_pension_followup_double_submit_does_not_duplicate_lifecycle_side_effects(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        Storage::fake('public');
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+        $payload = [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun telah diterbitkan.',
+            'no_sk' => 'SK-PENSIUN-IDEMPOTEN',
+            'tanggal_sk' => '2026-08-27',
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+        ];
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), $payload)->assertOk();
+        $payload['file_sk'] = UploadedFile::fake()->create('sk-pensiun-retry.pdf', 128, 'application/pdf');
+        $this->postJsonWithCsrf(route('ews.followup.update', $alert), $payload)
+            ->assertUnprocessable();
+
+        $this->assertSame(1, EmployeeStatusHistory::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame(1, AuditLog::query()
+            ->where('auditable_type', 'Employee')
+            ->where('auditable_id', $employee->id)
+            ->count());
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'status_pegawai.dinonaktifkan')
+            ->count());
+        $this->assertSame(1, SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->where('type', 'ews.followup.pensiun')
+            ->count());
+    }
+
+    public function test_closed_pension_sibling_cannot_recover_selected_alert_notification_intents(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $selected = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+        $sibling = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 180);
+        $payload = [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun telah diterbitkan.',
+            'no_sk' => 'SK-PENSIUN-OWNER',
+            'tanggal_sk' => '2026-08-28',
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+        ];
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $selected), $payload)->assertOk();
+
+        $this->assertNotNull($selected->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($selected->followup_notified_at);
+        $this->assertNotNull($sibling->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($sibling->followup_notified_at);
+
+        $payload['file_sk'] = UploadedFile::fake()->create('sk-pensiun-sibling.pdf', 128, 'application/pdf');
+        $this->postJsonWithCsrf(route('ews.followup.update', $sibling), $payload)->assertUnprocessable();
+
+        $this->assertSame(1, EmployeeStatusHistory::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame(1, Document::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'ews.followup.pensiun')->count());
+        $this->assertCount(1, Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_pension_followup_rejects_stale_inactive_employee_before_document_side_effect(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $mutasi = RefStatusPegawai::query()->where('kode', 'MUTASI')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $mutasi->id,
+            'status_aktif' => $mutasi->nama,
+            'status_note' => 'Status nonaktif lain tidak boleh ditimpa.',
+        ]);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Alert stale.',
+            'no_sk' => 'SK-PENSIUN-STALE',
+            'tanggal_sk' => '2026-08-28',
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+        ])->assertUnprocessable();
+
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->refresh()->followup_status);
+        $this->assertSame($mutasi->id, $employee->refresh()->status_pegawai_id);
+        $this->assertSame('Status nonaktif lain tidak boleh ditimpa.', $employee->status_note);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('documents', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_pension_same_status_different_date_is_rejected_without_side_effects(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $pensiun = RefStatusPegawai::query()->where('kode', 'PENSIUN')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $pensiun->id,
+            'status_aktif' => $pensiun->nama,
+            'status_tanggal' => '2026-08-01',
+            'status_keterangan' => 'Pensiun sudah berlaku.',
+            'status_note' => 'Catatan lama.',
+        ]);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Retry tanggal berbeda.',
+            'no_sk' => 'SK-PENSIUN-NOOP',
+            'tanggal_sk' => '2026-08-28',
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+        ])->assertUnprocessable();
+
+        $employee->refresh();
+        $this->assertSame('2026-08-01', $employee->status_tanggal?->toDateString());
+        $this->assertSame('Pensiun sudah berlaku.', $employee->status_keterangan);
+        $this->assertSame('Catatan lama.', $employee->status_note);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+        $this->assertDatabaseCount('documents', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertSame([], Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_partial_notification_failure_can_recover_missing_intent_exactly_once(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+        $sibling = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 180);
+        $realNotifications = app(NotificationService::class);
+        $flakyNotifications = new class($realNotifications) extends NotificationService
+        {
+            public int $calls = 0;
+
+            public ?int $failOnCall = 2;
+
+            public function __construct(private readonly NotificationService $inner) {}
+
+            public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
+            {
+                $this->calls++;
+                if ($this->calls === $this->failOnCall) {
+                    throw new \RuntimeException('Paksa gagal di antara dua intent notifikasi.');
+                }
+
+                return $this->inner->createForEmployee($employee, $type, $title, $body, $data);
+            }
+        };
+        $this->app->instance(NotificationService::class, $flakyNotifications);
+        $payload = [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun telah diterbitkan.',
+            'no_sk' => 'SK-PENSIUN-RECOVERY',
+            'tanggal_sk' => '2026-08-28',
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+        ];
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), $payload);
+            $this->fail('Kegagalan intent kedua wajib diteruskan agar dapat di-retry.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Paksa gagal di antara dua intent notifikasi.', $exception->getMessage());
+        }
+
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->refresh()->followup_status);
+        $this->assertNotNull($alert->lifecycle_notified_at);
+        $this->assertNull($alert->followup_notified_at);
+        $this->assertNotNull($sibling->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($sibling->followup_notified_at);
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertSame(0, SimpegNotification::query()->where('type', 'ews.followup.pensiun')->count());
+
+        $flakyNotifications->failOnCall = null;
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun telah diterbitkan.',
+        ])->assertOk();
+
+        $this->assertNotNull($alert->refresh()->followup_notified_at);
+        $this->assertSame(1, EmployeeStatusHistory::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame(1, AuditLog::query()->where('auditable_type', 'Employee')->where('auditable_id', $employee->id)->count());
+        $this->assertSame(1, Document::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'ews.followup.pensiun')->count());
+        $this->assertCount(1, Storage::disk(Document::STORAGE_DISK)->allFiles());
+    }
+
+    public function test_recovery_tidak_mengirim_notifikasi_pensiun_lama_setelah_pegawai_dipulihkan(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+        $realNotifications = app(NotificationService::class);
+        $flakyNotifications = new class($realNotifications) extends NotificationService
+        {
+            public bool $shouldFail = true;
+
+            public function __construct(private readonly NotificationService $inner) {}
+
+            public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
+            {
+                if ($this->shouldFail) {
+                    throw new \RuntimeException('Paksa gagal intent lifecycle sebelum restore.');
+                }
+
+                return $this->inner->createForEmployee($employee, $type, $title, $body, $data);
+            }
+        };
+        $this->app->instance(NotificationService::class, $flakyNotifications);
+        $payload = [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun sebelum pemulihan.',
+            'no_sk' => 'SK-PENSIUN-SUPERSEDED',
+            'tanggal_sk' => now('Asia/Makassar')->toDateString(),
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun.pdf', 128, 'application/pdf'),
+        ];
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), $payload);
+            $this->fail('Kegagalan intent lifecycle wajib diteruskan untuk recovery.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Paksa gagal intent lifecycle sebelum restore.', $exception->getMessage());
+        }
+
+        $this->assertFalse($employee->refresh()->isActive());
+        $this->assertNull($alert->refresh()->lifecycle_notified_at);
+        $flakyNotifications->shouldFail = false;
+        $restoreRequest = Request::create('/pegawai/restore', 'POST', [
+            'tanggal_efektif' => now('Asia/Makassar')->toDateString(),
+            'alasan' => 'Pemulihan resmi sebelum retry notifikasi EWS.',
+        ], [], [], [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_USER_AGENT' => 'SIMPEG-EWS-Recovery-Test/1.0',
+        ]);
+        $restoreRequest->setUserResolver(static fn (): User => $user);
+        app(RestoreEmployeeAction::class)->execute($employee->fresh(), $restoreRequest);
+        $this->assertTrue($employee->refresh()->isActive());
+
+        $this->postJsonWithCsrf(route('ews.followup.update', $alert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun sebelum pemulihan.',
+        ])->assertOk();
+
+        $this->assertNull($alert->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($alert->lifecycle_notification_superseded_at);
+        $this->assertSame(0, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.diubah')->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'ews.followup.pensiun')->count());
+    }
+
+    public function test_recovery_alert_lama_tidak_mengirim_ulang_setelah_pensiun_generasi_baru(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $oldAlert = $this->activeAlertFor($employee, 'PENSIUN', now()->subDay()->toDateString(), 90);
+        $realNotifications = app(NotificationService::class);
+        $flakyNotifications = new class($realNotifications) extends NotificationService
+        {
+            public bool $shouldFail = true;
+
+            public function __construct(private readonly NotificationService $inner) {}
+
+            public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
+            {
+                if ($this->shouldFail) {
+                    throw new \RuntimeException('Paksa gagal intent lifecycle generasi lama.');
+                }
+
+                return $this->inner->createForEmployee($employee, $type, $title, $body, $data);
+            }
+        };
+        $this->app->instance(NotificationService::class, $flakyNotifications);
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $oldAlert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'Pensiun generasi lama.',
+                'no_sk' => 'SK-PENSIUN-LAMA',
+                'tanggal_sk' => now('Asia/Makassar')->toDateString(),
+                'file_sk' => UploadedFile::fake()->create('sk-pensiun-lama.pdf', 128, 'application/pdf'),
+            ]);
+            $this->fail('Kegagalan intent lifecycle generasi lama wajib diteruskan.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Paksa gagal intent lifecycle generasi lama.', $exception->getMessage());
+        }
+
+        $oldHistoryId = EmployeeStatusHistory::query()->where('employee_id', $employee->id)->where('is_latest', true)->value('id');
+        $this->assertSame($oldHistoryId, $oldAlert->refresh()->lifecycle_status_history_id);
+        $flakyNotifications->shouldFail = false;
+        $restoreRequest = Request::create('/pegawai/restore', 'POST', [
+            'tanggal_efektif' => now('Asia/Makassar')->toDateString(),
+            'alasan' => 'Pemulihan sebelum pensiun generasi baru.',
+        ], [], [], [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_USER_AGENT' => 'SIMPEG-EWS-Generation-Test/1.0',
+        ]);
+        $restoreRequest->setUserResolver(static fn (): User => $user);
+        app(RestoreEmployeeAction::class)->execute($employee->fresh(), $restoreRequest);
+
+        $newAlert = $this->activeAlertFor($employee->fresh(), 'PENSIUN', now()->toDateString(), 180);
+        $this->postJsonWithCsrf(route('ews.followup.update', $newAlert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Pensiun generasi baru.',
+            'no_sk' => 'SK-PENSIUN-BARU',
+            'tanggal_sk' => now('Asia/Makassar')->toDateString(),
+            'file_sk' => UploadedFile::fake()->create('sk-pensiun-baru.pdf', 128, 'application/pdf'),
+        ])->assertOk();
+        $newHistoryId = EmployeeStatusHistory::query()->where('employee_id', $employee->id)->where('is_latest', true)->value('id');
+        $this->assertNotSame($oldHistoryId, $newHistoryId);
+        $this->assertSame($newHistoryId, $newAlert->refresh()->lifecycle_status_history_id);
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+
+        $this->postJsonWithCsrf(route('ews.followup.update', $oldAlert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'Retry pensiun generasi lama.',
+        ])->assertOk();
+
+        $this->assertNull($oldAlert->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($oldAlert->lifecycle_notification_superseded_at);
+        $this->assertNotNull($newAlert->refresh()->lifecycle_notified_at);
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+    }
+
+    public function test_scheduler_recovery_tidak_mengirim_notifikasi_pensiun_lama_setelah_pegawai_dipulihkan(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create(['status_aktif' => 'Aktif']);
+        $effectiveDate = now('Asia/Makassar')->addDays(30)->toDateString();
+        $alert = $this->activeAlertFor($employee, 'PENSIUN', $effectiveDate, 90);
+        $this->actingAs($user)->postJsonWithCsrf(route('ews.followup.update', $alert), [
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+            'handled_note' => 'SK pensiun terjadwal sebelum pemulihan.',
+            'no_sk' => 'SK-PENSIUN-SCHEDULED-SUPERSEDED',
+            'tanggal_sk' => $effectiveDate,
+            'file_sk' => UploadedFile::fake()->createWithContent('sk-pensiun.pdf', 'SK pensiun terjadwal'),
+        ])->assertOk();
+
+        $realNotifications = app(NotificationService::class);
+        $flakyNotifications = new class($realNotifications) extends NotificationService
+        {
+            public bool $shouldFail = true;
+
+            public function __construct(private readonly NotificationService $inner) {}
+
+            public function createForEmployee(Employee $employee, string $type, string $title, string $body, ?array $data = null): ?SimpegNotification
+            {
+                if ($this->shouldFail) {
+                    throw new \RuntimeException('Paksa gagal intent lifecycle scheduler sebelum restore.');
+                }
+
+                return $this->inner->createForEmployee($employee, $type, $title, $body, $data);
+            }
+        };
+        $this->app->instance(NotificationService::class, $flakyNotifications);
+        $service = app(EmployeeStatusTransitionService::class);
+        $this->assertSame(1, $service->applyDue($effectiveDate));
+        $this->assertFalse($employee->refresh()->isActive());
+        $this->assertNull($alert->refresh()->lifecycle_notified_at);
+
+        $flakyNotifications->shouldFail = false;
+        $restoreRequest = Request::create('/pegawai/restore', 'POST', [
+            'tanggal_efektif' => now('Asia/Makassar')->toDateString(),
+            'alasan' => 'Pemulihan resmi sebelum retry scheduler EWS.',
+        ], [], [], [
+            'REMOTE_ADDR' => '127.0.0.1',
+            'HTTP_USER_AGENT' => 'SIMPEG-EWS-Scheduler-Recovery-Test/1.0',
+        ]);
+        $restoreRequest->setUserResolver(static fn (): User => $user);
+        app(RestoreEmployeeAction::class)->execute($employee->fresh(), $restoreRequest);
+        $this->assertTrue($employee->refresh()->isActive());
+
+        $this->assertSame(0, $service->applyDue($effectiveDate));
+        $this->assertNull($alert->refresh()->lifecycle_notified_at);
+        $this->assertNotNull($alert->lifecycle_notification_superseded_at);
+        $this->assertSame(0, SimpegNotification::query()->where('type', 'status_pegawai.dinonaktifkan')->count());
+        $this->assertSame(1, SimpegNotification::query()->where('type', 'status_pegawai.diubah')->count());
     }
 
     public function test_handled_satyalancana_closes_sibling_alerts_and_stops_reminders(): void
@@ -382,7 +1125,7 @@ class EwsFollowupTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'user_id' => $employee->id,
             'type' => 'ews.followup.satyalancana',
-            'title' => 'Tindak Lanjut EWS: Disetujui',
+            'title' => 'Tindak Lanjut EWS: Ditangani',
             'body' => 'Usulan satyalancana sudah diproses.',
             'is_read' => false,
         ]);

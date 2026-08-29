@@ -24,14 +24,9 @@ class ListEmployeesAction
         $direction = $validated['direction'] ?? 'asc';
         $perPage = (int) ($validated['per_page'] ?? 10);
 
+        // Soft delete sudah dihapus (keputusan produk): parameter show_nonaktif/onlyTrashed
+        // tidak lagi relevan — nonaktif kini status kepegawaian biasa.
         $employees = Employee::query();
-
-        $showNonaktif = filter_var($validated['show_nonaktif'] ?? false, FILTER_VALIDATE_BOOLEAN);
-
-        if ($showNonaktif) {
-            $employees->onlyTrashed();
-        }
-
         $paginator = $employees
             ->select([
                 'id',
@@ -46,7 +41,10 @@ class ListEmployeesAction
             ])
             ->with([
                 'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
+                // kelompok dibutuhkan isActive() untuk klasifikasi aktif/nonaktif.
+                'statusPegawai:id,nama,kelompok',
+                // Semua riwayat dibutuhkan untuk memeriksa kelengkapan SK, bukan
+                // hanya riwayat terbaru yang sebelumnya diperlukan oleh tabel.
                 'rankHistories:id,employee_id,no_sk,tanggal_sk,tmt_pangkat,file_sk,is_latest,created_at',
                 'positionHistories' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])
@@ -87,29 +85,28 @@ class ListEmployeesAction
                 fn ($query, string $jenisPegawaiId) => $query->where('jenis_pegawai_id', $jenisPegawaiId)
             )
             ->when(
-                ($validated['status_pegawai_id'] ?? null) ?: null,
-                function ($query, string $statusPegawaiId) {
-                    if ($statusPegawaiId !== 'all') {
-                        $query->where('status_pegawai_id', $statusPegawaiId);
-                    }
+                ($statusPegawaiId = ($validated['status_pegawai_id'] ?? null)) && $statusPegawaiId !== 'all'
+                    ? $statusPegawaiId
+                    : null,
+                function ($query, string $statusPegawaiId): void {
+                    $query->where('status_pegawai_id', $statusPegawaiId);
                 },
-                function ($query) use ($validated, $showNonaktif): void {
+                function ($query) use ($validated): void {
                     $statusAktif = ($validated['status_aktif'] ?? '') ?: null;
 
-                    // Pilihan status eksplisit selalu dihormati pada kedua mode daftar.
+                    // Pilihan status eksplisit selalu dihormati.
                     if ($statusAktif !== null) {
                         $query->where('status_aktif', $statusAktif);
 
                         return;
                     }
 
-                    // Default hanya-Aktif adalah aturan daftar pegawai aktif. Pada daftar
-                    // pegawai nonaktif, default itu akan menyembunyikan pegawai yang sudah
-                    // dinonaktifkan namun berstatus Pensiun, Mutasi, atau Non-Aktif, sehingga
-                    // data yang justru dicari lewat filter ini menjadi tidak dapat ditemukan.
-                    if (! $showNonaktif) {
-                        $query->where('status_aktif', 'Aktif');
-                    }
+                    // Nilai "all" (atau tanpa filter status) diperlakukan seperti
+                    // tidak ada filter spesifik: default hanya menampilkan pegawai
+                    // aktif menurut klasifikasi kelompok referensi — satu sumber
+                    // dengan ekspor dan isActive(). Pegawai nonaktif hanya terlihat
+                    // melalui filter status.
+                    $query->whereActiveStatus();
                 }
             )
             ->orderBy($sort, $direction)
@@ -145,8 +142,11 @@ class ListEmployeesAction
             'jenis_pegawai' => $p->jenisPegawai?->nama ?? '-',
             'status_nama' => $statusNama,
             'status_key' => strtolower((string) $statusNama),
+            // Klasifikasi aktif dari kelompok status (satu sumber dengan isActive()),
+            // bukan nama snapshot: Tugas Belajar (Aktif/khusus) tetap terhitung aktif.
+            'is_aktif' => $p->isActive(),
             // Key is_lengkap dipertahankan karena sudah menjadi kontrak tabel;
-            // nilainya adalah key status, bukan boolean profil pegawai.
+            // nilainya adalah key status kelengkapan dokumen dari service development.
             'is_lengkap' => $documentStatus['status_kelengkapan'],
             'dokumen_is_dinilai' => $documentStatus['is_dinilai'],
             'dokumen_tersedia_count' => $documentStatus['tersedia_count'],

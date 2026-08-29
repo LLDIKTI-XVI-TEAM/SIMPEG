@@ -12,6 +12,7 @@ use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
+use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\Cuti\LeaveUsageRecordService;
@@ -192,8 +193,8 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             ->first() ?? new User;
 
         $employee = $user->employee_id !== null
-            ? Employee::withTrashed()->find($user->employee_id)
-            : Employee::withTrashed()->where('email', $email)->first();
+            ? Employee::query()->find($user->employee_id)
+            : Employee::query()->where('email', $email)->first();
 
         if ($employee === null) {
             $employee = $this->upsertEmployee(
@@ -230,11 +231,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         ?string $statusPegawaiId,
         array $extra = [],
     ): Employee {
-        $employee = Employee::withTrashed()->where('email', $email)->first() ?? new Employee;
-
-        if ($employee->trashed()) {
-            $employee->restore();
-        }
+        $employee = Employee::query()->where('email', $email)->first() ?? new Employee;
 
         $employee->fill([
             'nama_lengkap' => $name,
@@ -266,15 +263,11 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             ->firstOrFail();
 
         $employee = $user->employee_id !== null
-            ? Employee::withTrashed()->find($user->employee_id)
-            : Employee::withTrashed()->where('email', $user->email)->first();
+            ? Employee::query()->find($user->employee_id)
+            : Employee::query()->where('email', $user->email)->first();
 
         if ($employee === null) {
             throw new \RuntimeException('Employee untuk demo-klabat-kabag belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
-        }
-
-        if ($employee->trashed()) {
-            $employee->restore();
         }
 
         $employee->fill([
@@ -310,15 +303,11 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             ->firstOrFail();
 
         $employee = $user->employee_id !== null
-            ? Employee::withTrashed()->find($user->employee_id)
-            : Employee::withTrashed()->where('email', $user->email)->first();
+            ? Employee::query()->find($user->employee_id)
+            : Employee::query()->where('email', $user->email)->first();
 
         if ($employee === null) {
             throw new \RuntimeException('Employee untuk demo-klabat-pegawai belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
-        }
-
-        if ($employee->trashed()) {
-            $employee->restore();
         }
 
         $employee->fill([
@@ -332,6 +321,19 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             'role' => 'pegawai',
         ]);
         $employee->save();
+
+        // Form cuti membaca timeline penugasan aktual, bukan pointer legacy pada employee.
+        SupervisorAssignment::query()->updateOrCreate(
+            [
+                'employee_id' => $employee->id,
+                'tanggal_mulai' => '2026-01-01',
+            ],
+            [
+                'supervisor_id' => $approver->id,
+                'kepala_bagian_id' => $approver->id,
+                'tanggal_berakhir' => null,
+            ],
+        );
 
         $user->fill([
             'name' => 'QA Fase 7 Pegawai',

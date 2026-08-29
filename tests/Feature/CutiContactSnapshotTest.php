@@ -457,6 +457,8 @@ class CutiContactSnapshotTest extends TestCase
         $audit = $this->auditFor($leave, 'UPDATE');
         $oldValues = $audit->old_values;
         $newValues = $audit->new_values;
+        $this->assertSame('pegawai', $newValues['_effective_role'] ?? null);
+        unset($newValues['_effective_role']);
         $oldKeys = array_keys($oldValues);
         $newKeys = array_keys($newValues);
         sort($oldKeys);

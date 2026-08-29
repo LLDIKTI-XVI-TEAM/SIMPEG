@@ -81,6 +81,21 @@ class EmployeeShowTest extends TestCase
             ->assertJsonPath('employee.id', $employee->id);
     }
 
+    public function test_detail_pegawai_nonaktif_tidak_menawarkan_aksi_nonaktifkan_lagi(): void
+    {
+        $statusNonaktif = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->firstOrFail();
+        $employee = $this->employeeWithReferences([
+            'status_pegawai_id' => $statusNonaktif->id,
+            'status_aktif' => 'Nonaktif',
+        ]);
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertDontSee('@click="showDeactivateModal = true"', false)
+            ->assertDontSee('title="Nonaktifkan Pegawai"', false);
+    }
+
     public function test_detail_admin_fallback_ke_profil_saat_query_tab_legacy_atau_tidak_valid(): void
     {
         $employee = $this->employeeWithReferences();
@@ -1147,15 +1162,14 @@ class EmployeeShowTest extends TestCase
             ->assertJsonMissing(['id' => $otherEmployee->id]);
     }
 
-    public function test_pegawai_without_linked_employee_gets_not_found_on_own_detail(): void
+    public function test_pegawai_without_linked_employee_is_blocked_from_own_detail(): void
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        $this->actingAs($user);
+        $this->actingAsUnmapped($user);
         $response = $this->getJson('/api/v1/profil-saya');
 
-        $response->assertNotFound()
-            ->assertJsonPath('message', 'Data pegawai untuk akun ini belum terhubung.');
+        $response->assertRedirect(route('status-akun'));
     }
 
     public function test_admin_kepegawaian_cannot_use_pegawai_profile_endpoint(): void

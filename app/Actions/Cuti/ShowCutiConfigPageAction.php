@@ -97,7 +97,7 @@ class ShowCutiConfigPageAction
 
         return Employee::query()
             ->select(['id', 'nama_lengkap', 'nip', 'jabatan_terakhir', 'kepala_bagian_id'])
-            ->where('status_aktif', 'Aktif')
+            ->whereActiveStatus()
             ->where(function ($query) use ($keyword): void {
                 $query->whereRaw('lower(nama_lengkap) like ?', [$keyword])
                     ->orWhereRaw('lower(nip) like ?', [$keyword]);
@@ -126,7 +126,7 @@ class ShowCutiConfigPageAction
                     })
                     ->with('kepalaBagian:id,nama_lengkap,nip'),
             ])
-            ->where('status_aktif', 'Aktif')
+            ->whereActiveStatus()
             ->find($selectedEmployeeId);
     }
 
@@ -146,7 +146,7 @@ class ShowCutiConfigPageAction
             $keyword = '%'.mb_strtolower(trim($search)).'%';
             $activeCandidates = Employee::query()
                 ->select(['id', 'nama_lengkap', 'nip'])
-                ->where('status_aktif', 'Aktif')
+                ->whereActiveStatus()
                 ->where(function ($query) use ($keyword): void {
                     $query->whereRaw('lower(nama_lengkap) like ?', [$keyword])
                         ->orWhereRaw('lower(nip) like ?', [$keyword]);

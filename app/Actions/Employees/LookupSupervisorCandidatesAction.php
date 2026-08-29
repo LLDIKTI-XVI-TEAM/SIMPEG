@@ -10,7 +10,11 @@ class LookupSupervisorCandidatesAction
     private const RESULT_LIMIT = 15;
 
     /**
-     * Mengambil kandidat penugasan minimum, tidak memfilter status, role, atau unit agar sesuai aturan penugasan.
+     * Mengambil kandidat penugasan Kepala Bagian/Supervisor.
+     *
+     * Hanya pegawai berklasifikasi aktif yang ditawarkan: validasi penyimpanan
+     * (AssignSupervisorRequest) sudah dibatasi ke kelompok aktif, jadi setiap opsi
+     * yang disajikan autocomplete harus benar-benar dapat disimpan.
      *
      * @return Collection<int, array{id: string, nama_lengkap: string, nip: string}>
      */
@@ -20,6 +24,7 @@ class LookupSupervisorCandidatesAction
 
         return Employee::query()
             ->select(['id', 'nama_lengkap', 'nip'])
+            ->whereActiveStatus()
             ->whereKeyNot($excludedEmployeeId)
             ->where(function ($employeeQuery) use ($keyword): void {
                 $employeeQuery->whereRaw('lower(nama_lengkap) like ?', [$keyword])

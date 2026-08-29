@@ -77,13 +77,13 @@ class EmployeeReportExportTest extends TestCase
         $this->actingAs($admin)
             ->getJson(route('laporan.pegawai.preview'))
             ->assertOk()
-            ->assertJsonCount(2, 'pegawai')
+            ->assertJsonCount(3, 'pegawai')
             ->assertJsonMissing(['nama' => 'Pegawai Pensiun']);
 
         $this->actingAs($admin)
             ->getJson(route('laporan.pegawai.preview', ['status' => '']))
             ->assertOk()
-            ->assertJsonCount(3, 'pegawai')
+            ->assertJsonCount(4, 'pegawai')
             ->assertJsonFragment(['nama' => 'Pegawai Pensiun']);
 
         $response = $this->actingAs($admin)->get(route('laporan.pegawai.excel', [
@@ -218,6 +218,7 @@ class EmployeeReportExportTest extends TestCase
         $this->actingAs($admin)
             ->get(route('laporan.pegawai', [
                 'status' => 'Aktif',
+                'search' => 'Pegawai Rentang',
                 'sort' => 'nip',
                 'row_start' => 2,
                 'row_end' => 5,
@@ -254,6 +255,7 @@ class EmployeeReportExportTest extends TestCase
         $this->actingAs($admin)
             ->getJson(route('laporan.pegawai.preview', [
                 'status' => 'Aktif',
+                'search' => 'Pegawai',
                 'jabatan' => 'Analis Kepegawaian',
                 'sort' => 'nip',
             ]))
@@ -264,6 +266,7 @@ class EmployeeReportExportTest extends TestCase
         $this->actingAs($admin)
             ->getJson(route('laporan.pegawai.preview', [
                 'status' => 'Aktif',
+                'search' => 'Pegawai',
                 'sort' => 'nip',
             ]))
             ->assertOk()
@@ -337,6 +340,7 @@ class EmployeeReportExportTest extends TestCase
         $response = $this->actingAs($admin)->post(route('laporan.pegawai.custom'), [
             'columns' => ['tanggal_pensiun', 'nama', 'nip'],
             'status' => 'Aktif',
+            'search' => 'Nadia Custom',
         ]);
 
         $response->assertOk();

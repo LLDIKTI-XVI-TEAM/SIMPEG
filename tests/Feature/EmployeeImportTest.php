@@ -8,6 +8,7 @@ use App\Models\EmployeeMilestone;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\SalaryHistory;
 use App\Models\User;
 use App\Services\Employees\TmtCalculatorService;
@@ -131,7 +132,7 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('failed', 1);
         $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('employees', 1); // Termasuk Employee milik aktor autentikasi.
     }
 
     public function test_import_skips_existing_nip_and_inserts_other_valid_rows(): void
@@ -183,8 +184,9 @@ class EmployeeImportTest extends TestCase
         $inactiveEmployee = Employee::factory()->create([
             'nip' => '199901010000000001',
             'email_pribadi' => 'budi@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
-        $inactiveEmployee->delete();
 
         $this->actingAs($user);
         $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
@@ -207,8 +209,9 @@ class EmployeeImportTest extends TestCase
         $inactiveEmployee = Employee::factory()->create([
             'nip' => '198001012006041001',
             'email_pribadi' => 'arsip@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
-        $inactiveEmployee->delete();
 
         $this->actingAs($user);
         $upload = $this->postJsonWithCsrf('/api/pegawai/import/upload', [
@@ -284,7 +287,7 @@ class EmployeeImportTest extends TestCase
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('failed', 1);
         $response->assertJsonPath('errors.0.row', 4);
-        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('employees', 1); // Termasuk Employee milik aktor autentikasi.
     }
 
     public function test_import_accepts_xlsx_file_on_legacy_endpoint(): void
@@ -1199,7 +1202,7 @@ class EmployeeImportTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('employees', 1); // Termasuk Employee milik aktor autentikasi.
     }
 
     public function test_import_rejects_row_without_nip(): void
@@ -1215,7 +1218,7 @@ class EmployeeImportTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('employees', 1); // Termasuk Employee milik aktor autentikasi.
     }
 
     public function test_import_rejects_row_without_status_kepegawaian(): void
@@ -1231,7 +1234,7 @@ class EmployeeImportTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('errors.0.row', 2);
-        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('employees', 1); // Termasuk Employee milik aktor autentikasi.
     }
 
     public function test_old_employee_import_endpoint_is_not_available(): void

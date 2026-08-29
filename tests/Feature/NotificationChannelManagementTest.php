@@ -164,7 +164,7 @@ class NotificationChannelManagementTest extends TestCase
             ->where('auditable_id', $channel->id)
             ->sole();
         $this->assertSame(['is_enabled' => true], $audit->old_values);
-        $this->assertSame(['is_enabled' => false], $audit->new_values);
+        $this->assertSame(['is_enabled' => false, '_effective_role' => 'super_admin'], $audit->new_values);
 
         $this->actingAs($admin)
             ->postWithCsrf("/data-master/channel-notifikasi/{$channel->id}/status", ['is_enabled' => false])

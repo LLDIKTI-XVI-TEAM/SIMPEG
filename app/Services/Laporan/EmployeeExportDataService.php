@@ -91,7 +91,22 @@ class EmployeeExportDataService
                 $query->where('status_pegawai_id', $statusId);
             })
             ->when($statusId === '' && ($status !== '' || $defaultToActive), function (Builder $query) use ($status): void {
+                // Nilai eksplisit "all"/kosong tanpa default berarti semua status;
+                // jangan tambahkan predikat apa pun.
+                if ($status === 'all') {
+                    return;
+                }
+
                 $resolvedStatus = $status ?: 'Aktif';
+
+                // Default aktif memakai klasifikasi kelompok referensi — satu sumber
+                // dengan daftar pegawai (isActive()/whereActiveStatus()) sehingga
+                // status Aktif/khusus seperti Tugas Belajar ikut terekspor.
+                if ($resolvedStatus === 'Aktif') {
+                    $query->whereActiveStatus();
+
+                    return;
+                }
 
                 $query->where(function (Builder $query) use ($resolvedStatus): void {
                     $query->where('status_aktif', $resolvedStatus)

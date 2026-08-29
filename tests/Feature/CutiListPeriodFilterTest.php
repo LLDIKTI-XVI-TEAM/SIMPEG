@@ -8,6 +8,7 @@ use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -82,6 +83,34 @@ class CutiListPeriodFilterTest extends TestCase
 
         $response->assertOk();
         $this->assertSame(4, $response->viewData('riwayatCuti')->total());
+    }
+
+    public function test_opsi_bulan_tidak_melompati_februari_saat_hari_ini_di_akhir_bulan(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-29 09:00:00'));
+
+        try {
+            $response = $this->actingAs(User::factory()->superAdmin()->create())
+                ->get(route('cuti'));
+
+            $response->assertOk();
+            $this->assertSame([
+                '2026-08',
+                '2026-07',
+                '2026-06',
+                '2026-05',
+                '2026-04',
+                '2026-03',
+                '2026-02',
+                '2026-01',
+                '2025-12',
+                '2025-11',
+                '2025-10',
+                '2025-09',
+            ], $response->viewData('optPeriodes')->all());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     /**

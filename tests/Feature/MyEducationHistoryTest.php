@@ -61,9 +61,9 @@ class MyEducationHistoryTest extends TestCase
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        $this->actingAs($user)
+        $this->actingAsUnmapped($user)
             ->getJson(route('api.v1.profil-saya.pendidikan.index'))
-            ->assertNotFound();
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_pegawai_without_education_read_permission_cannot_read_self_education(): void

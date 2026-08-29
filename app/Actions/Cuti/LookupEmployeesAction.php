@@ -20,7 +20,7 @@ class LookupEmployeesAction
 
         return Employee::query()
             ->select(['id', 'nama_lengkap', 'nip'])
-            ->where('status_aktif', 'Aktif')
+            ->whereActiveStatus()
             ->where(function ($employeeQuery) use ($keyword): void {
                 $employeeQuery->whereRaw('lower(nama_lengkap) like ?', [$keyword])
                     ->orWhereRaw('lower(nip) like ?', [$keyword]);

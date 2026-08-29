@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\DisciplineRecord;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class EwsActivePageTest extends TestCase
@@ -33,6 +35,45 @@ class EwsActivePageTest extends TestCase
                 ->assertOk()
                 ->assertSee('EWS', false);
         }
+    }
+
+    public function test_admin_filter_event_dan_status_tidak_dikenal_ditolak(): void
+    {
+        $admin = $this->userWithRole('admin_kepegawaian');
+
+        $this->actingAs($admin)
+            ->getJson(route('ews', ['event' => 'EVENT_TIDAK_DIKENAL']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('event');
+
+        $this->actingAs($admin)
+            ->getJson(route('ews', ['status' => 'STATUS_TIDAK_DIKENAL']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
+    }
+
+    public function test_admin_event_semua_menampilkan_seluruh_tipe_alert_aktif(): void
+    {
+        $admin = $this->userWithRole('admin_kepegawaian');
+        $pangkat = Employee::factory()->create(['nama_lengkap' => 'Pegawai Pangkat Sentinel']);
+        $pensiun = Employee::factory()->create(['nama_lengkap' => 'Pegawai Pensiun Sentinel']);
+
+        foreach ([[$pangkat, 'KENAIKAN_PANGKAT'], [$pensiun, 'PENSIUN']] as [$employee, $type]) {
+            EwsAlert::query()->create([
+                'employee_id' => $employee->id,
+                'type' => $type,
+                'target_date' => now()->addDays(60)->toDateString(),
+                'interval_days' => 60,
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->get(route('ews', ['event' => 'semua']))
+            ->assertOk()
+            ->assertSee('Pegawai Pangkat Sentinel')
+            ->assertSee('Pegawai Pensiun Sentinel')
+            ->assertViewHas('alerts', fn ($alerts): bool => $alerts->total() === 2);
     }
 
     public function test_pegawai_cannot_open_ews_active_page(): void
@@ -107,7 +148,21 @@ class EwsActivePageTest extends TestCase
         $response->assertOk();
         $response->assertSee($handled->employee->nama_lengkap);
         $response->assertSee('Berkas sudah selesai diproses.');
+        $response->assertSee('Daftar EWS Ditangani');
+        $response->assertDontSee('Tidak ada peringatan EWS aktif untuk kategori ini.');
         $response->assertDontSee($active->employee->nama_lengkap);
+    }
+
+    public function test_filter_tanpa_hasil_menjelaskan_status_dan_empty_state_secara_spesifik(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('ews', ['status' => EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED]))
+            ->assertOk()
+            ->assertSee('Daftar EWS Tidak Perlu')
+            ->assertSee('Tidak ada data EWS untuk filter yang dipilih.')
+            ->assertDontSee('Tidak ada peringatan EWS aktif untuk kategori ini.');
     }
 
     public function test_unread_expired_reminder_is_reactivated_and_shown_as_active(): void
@@ -218,6 +273,94 @@ class EwsActivePageTest extends TestCase
             ->get(route('ews'))
             ->assertOk()
             ->assertSee(route('pegawai.show', $alert->employee_id), false);
+    }
+
+    public function test_alert_pegawai_nonaktif_tidak_muncul_di_halaman_ews(): void
+    {
+        // US-2.9 + klasifikasi kelompok: setelah SoftDeletes dilepas, pegawai nonaktif
+        // (termasuk hasil backfill legacy) tidak boleh lagi memunculkan alert EWS.
+        $user = User::factory()->adminKepegawaian()->create();
+        $nonaktifStatus = RefStatusPegawai::where('kode', 'NONAKTIF')->firstOrFail();
+        $nonaktif = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Nonaktif EWS',
+            'status_aktif' => 'Nonaktif',
+            'status_pegawai_id' => $nonaktifStatus->id,
+        ]);
+        // Rekan aktif di daftar yang sama memastikan filter tidak membuang semua alert.
+        $aktif = Employee::factory()->create(['nama_lengkap' => 'Pegawai Aktif EWS']);
+        EwsAlert::create([
+            'employee_id' => $nonaktif->id,
+            'type' => 'KGB',
+            'target_date' => now()->addDays(30)->toDateString(),
+            'interval_days' => 60,
+            'is_processed' => false,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+        EwsAlert::create([
+            'employee_id' => $aktif->id,
+            'type' => 'KGB',
+            'target_date' => now()->addDays(20)->toDateString(),
+            'interval_days' => 60,
+            'is_processed' => false,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('ews'))
+            ->assertOk()
+            ->assertSee('Pegawai Aktif EWS')
+            ->assertDontSee('Pegawai Nonaktif EWS');
+    }
+
+    public function test_daftar_ews_memakai_kelompok_aktif_ternormalisasi_dan_gagal_tertutup(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $tugasBelajar = RefStatusPegawai::query()->where('kode', 'TUGAS_BELAJAR')->firstOrFail();
+        DB::table('ref_status_pegawai')->where('id', $tugasBelajar->id)->update([
+            'kelompok' => ' AKTIF/KHUSUS ',
+        ]);
+
+        $aktifKhusus = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai EWS Aktif Khusus',
+            'status_pegawai_id' => $tugasBelajar->id,
+        ]);
+        $relasiKosong = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai EWS Relasi Kosong',
+            'status_aktif' => 'Aktif',
+        ]);
+        DB::table('employees')->where('id', $relasiKosong->id)->update(['status_pegawai_id' => null]);
+
+        $kelompokInvalid = RefStatusPegawai::query()->create([
+            'kode' => 'STATUS_INVALID_EWS',
+            'nama' => 'Status Invalid EWS',
+            'kelompok' => 'Tidak Diketahui',
+        ]);
+        $invalid = Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai EWS Kelompok Invalid',
+            'status_pegawai_id' => $kelompokInvalid->id,
+        ]);
+        DB::table('employees')->where('id', $invalid->id)->update([
+            'status_pegawai_id' => $kelompokInvalid->id,
+            'status_aktif' => 'Status Invalid EWS',
+        ]);
+
+        foreach ([$aktifKhusus, $relasiKosong, $invalid] as $employee) {
+            EwsAlert::create([
+                'employee_id' => $employee->id,
+                'type' => 'KGB',
+                'target_date' => now()->addDays(30)->toDateString(),
+                'interval_days' => 60,
+                'is_processed' => false,
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+            ]);
+        }
+
+        $this->actingAs($user)
+            ->get(route('ews'))
+            ->assertOk()
+            ->assertSee('Pegawai EWS Aktif Khusus')
+            ->assertDontSee('Pegawai EWS Relasi Kosong')
+            ->assertDontSee('Pegawai EWS Kelompok Invalid');
     }
 
     private function userWithRole(string $role): User

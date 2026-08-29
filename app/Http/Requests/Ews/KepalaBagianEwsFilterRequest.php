@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Ews;
 
+use App\Actions\Ews\ListActiveEwsAlertsAction;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,8 +16,10 @@ class KepalaBagianEwsFilterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'event' => ['nullable', 'string', 'max:100'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'event' => ['nullable', 'string', Rule::in(ListActiveEwsAlertsAction::allowedEventFilters())],
             'status' => ['nullable', Rule::in(['aktif', 'ditangani', 'tidak_perlu', 'kedaluwarsa'])],
+            'page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

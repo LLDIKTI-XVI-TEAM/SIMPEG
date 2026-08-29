@@ -3,6 +3,7 @@
 namespace App\Queries\Dashboards;
 
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use Illuminate\Contracts\Database\Query\Builder as BuilderContract;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -22,9 +23,6 @@ class EmployeeTrendQuery
 {
     private const JUMLAH_BULAN = 12;
 
-    /** Nilai status yang berarti pegawai masih dihitung sebagai pegawai aktif. */
-    private const STATUS_AKTIF = 'Aktif';
-
     /**
      * Menghitung jumlah pegawai aktif pada akhir setiap bulan selama satu tahun terakhir.
      *
@@ -32,7 +30,8 @@ class EmployeeTrendQuery
      */
     public function monthlyActiveCounts(?Carbon $sekarang = null): array
     {
-        $sekarang = $sekarang?->copy() ?? now();
+        // Jangkar ke awal bulan agar pengurangan bulan tidak overflow pada tanggal 29-31.
+        $sekarang = ($sekarang?->copy() ?? now())->startOfMonth();
         $awalRentang = $sekarang->copy()->subMonths(self::JUMLAH_BULAN - 1)->startOfMonth();
 
         $agregat = DB::query()->fromSub($this->batasMasaAktif($awalRentang), 'batas');
@@ -70,8 +69,9 @@ class EmployeeTrendQuery
      * - mulai diambil dari TMT pengangkatan paling awal; pegawai tanpa riwayat pengangkatan
      *   dianggap sudah aktif sebelum rentang karena mayoritas pegawai adalah pegawai lama
      *   dan mengecualikan mereka membuat grafik jauh di bawah jumlah pegawai sebenarnya.
-     * - keluar mengikuti riwayat status terakhir bila status itu bukan aktif, sehingga pegawai
-     *   yang pernah nonaktif lalu kembali bertugas tidak dianggap keluar permanen.
+     * - klasifikasi keadaan terkini mengikuti kelompok referensi status, bukan nama histori atau
+     *   snapshot legacy. Kelompok aktif/khusus tetap aktif, sedangkan relasi invalid fail-closed.
+     * - tanggal keluar status nonaktif mengikuti riwayat terakhir bila tersedia.
      * - di antara riwayat status dan tanggal pensiun dipilih tanggal yang paling awal. Migrasi
      *   riwayat status mengisi tanggal efektif dengan waktu migrasi ketika pegawai tidak punya
      *   tanggal status, sehingga pegawai yang sudah lama pensiun bisa memiliki riwayat bertanggal
@@ -94,25 +94,30 @@ class EmployeeTrendQuery
             ->groupBy('employee_id');
 
         $statusTerakhir = DB::table('employee_status_histories')
-            ->select('employee_id', 'status_nama', 'tanggal_efektif')
+            ->select('employee_id', 'tanggal_efektif')
             ->where('is_latest', true);
+
+        $activeGroupPlaceholders = implode(', ', array_fill(
+            0,
+            count(RefStatusPegawai::normalizedActiveGroups()),
+            '?',
+        ));
+        $statusExitDate = 'coalesce(status_terakhir.tanggal_efektif, employees.status_tanggal)';
 
         return Employee::query()
             ->leftJoinSub($pengangkatanTerawal, 'pengangkatan', 'pengangkatan.employee_id', '=', 'employees.id')
             ->leftJoinSub($statusTerakhir, 'status_terakhir', 'status_terakhir.employee_id', '=', 'employees.id')
+            ->leftJoin('ref_status_pegawai as status_saat_ini', 'status_saat_ini.id', '=', 'employees.status_pegawai_id')
             ->selectRaw($this->tanggalSaja('pengangkatan.tmt_mulai').' as mulai')
             ->selectRaw(
                 $this->tanggalSaja(
                     '(case '
-                    .'when status_terakhir.status_nama is not null and status_terakhir.status_nama <> ? '
-                    .'then '.$this->tanggalTerawal('status_terakhir.tanggal_efektif', 'employees.tanggal_pensiun').' '
-                    .'when employees.status_aktif <> ? '
-                    .'then case '
-                    .'when employees.status_tanggal is null and employees.tanggal_pensiun is null then ? '
-                    .'else '.$this->tanggalTerawal('employees.status_tanggal', 'employees.tanggal_pensiun').' end '
-                    .'else employees.tanggal_pensiun end)'
+                    ."when lower(trim(status_saat_ini.kelompok)) in ({$activeGroupPlaceholders}) "
+                    .'then employees.tanggal_pensiun '
+                    .'when '.$statusExitDate.' is null and employees.tanggal_pensiun is null then ? '
+                    .'else '.$this->tanggalTerawal($statusExitDate, 'employees.tanggal_pensiun').' end)'
                 ).' as keluar',
-                [self::STATUS_AKTIF, self::STATUS_AKTIF, $sebelumRentang],
+                [...RefStatusPegawai::normalizedActiveGroups(), $sebelumRentang],
             )
             ->toBase();
     }

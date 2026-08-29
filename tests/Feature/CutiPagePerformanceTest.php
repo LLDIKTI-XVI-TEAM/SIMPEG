@@ -134,7 +134,8 @@ class CutiPagePerformanceTest extends TestCase
             $this->attachValidManualApprovalSnapshot($record);
         }
 
-        $queries = $this->captureQueries(fn () => $this->actingAs($user)->get(route('cuti.rekap', [
+        $this->actingAs($user);
+        $queries = $this->captureQueries(fn () => $this->get(route('cuti.rekap', [
             'pegawai' => $employee->id,
         ])));
         $detailQueries = collect($queries)->filter(fn (string $sql): bool => str_contains($sql, 'union all')

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Document;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageDocument;
@@ -17,6 +18,8 @@ use Throwable;
 
 final class StorageRecoveryService
 {
+    public const CATEGORY_EMPLOYEE_STATUS_DOCUMENT = 'employee_status_document';
+
     public const CATEGORY_LEAVE_ATTACHMENT = 'leave_attachment';
 
     public const CATEGORY_LEAVE_USAGE_DOCUMENT = 'leave_usage_document';
@@ -36,6 +39,8 @@ final class StorageRecoveryService
     private const ALLOWED_ATTACHMENT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];
 
     private const ALLOWED_USAGE_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+
+    private const ALLOWED_EMPLOYEE_STATUS_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];
 
     private const LEAVE_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -289,6 +294,26 @@ final class StorageRecoveryService
             $employeeId,
             $sha256,
             'Manifest target lampiran pengajuan gagal ditulis.',
+        );
+    }
+
+    /** Mencatat manifest committed sebelum SK status pegawai ditulis ke disk privat. */
+    public function prepareEmployeeStatusDocumentCreationTarget(
+        string $path,
+        string $employeeId,
+        string $sha256,
+    ): StorageRecoveryTask {
+        if (! $this->isCanonicalEmployeeStatusDocumentPath($path, $employeeId)) {
+            throw new RuntimeException('Intent target SK status pegawai tidak memenuhi kontrak storage.');
+        }
+
+        return $this->prepareCreationTarget(
+            self::CATEGORY_EMPLOYEE_STATUS_DOCUMENT,
+            Document::STORAGE_DISK,
+            $path,
+            $employeeId,
+            $sha256,
+            'Manifest target SK status pegawai gagal ditulis.',
         );
     }
 
@@ -603,6 +628,20 @@ final class StorageRecoveryService
         );
     }
 
+    /** Menandai SK status sah hanya setelah metadata dokumen committed dan masih mereferensikan file yang sama. */
+    public function markEmployeeStatusDocumentCreationTargetAdopted(
+        string $taskId,
+        string $employeeId,
+        string $path,
+    ): void {
+        $this->markCreationTargetAdopted(
+            $taskId,
+            self::CATEGORY_EMPLOYEE_STATUS_DOCUMENT,
+            $employeeId,
+            $path,
+        );
+    }
+
     /**
      * Memproses satu task secara sinkron dan idempoten. Row lock mencegah dua processor
      * menghapus target yang sama bersamaan, sedangkan pemeriksaan referensi melindungi file bersama.
@@ -793,6 +832,30 @@ final class StorageRecoveryService
         );
     }
 
+    /** Path SK status dibatasi pada owner UUID dan filename UUID yang dibuat server. */
+    public function isCanonicalEmployeeStatusDocumentPath(string $path, ?string $employeeId): bool
+    {
+        if (! is_string($employeeId) || ! Str::isUuid($employeeId)) {
+            return false;
+        }
+
+        $segments = explode('/', $path);
+        if (count($segments) !== 3
+            || $segments[0] !== strtolower($employeeId)
+            || $segments[1] !== 'sk_status_pegawai'
+            || ! $this->isNormalizedRelativePath($path)) {
+            return false;
+        }
+
+        $filename = $segments[2];
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $uuid = pathinfo($filename, PATHINFO_FILENAME);
+
+        return basename($filename) === $filename
+            && Str::isUuid($uuid)
+            && in_array($extension, self::ALLOWED_EMPLOYEE_STATUS_EXTENSIONS, true);
+    }
+
     public function isCanonicalLeaveProofPath(string $path, ?string $leaveRequestId): bool
     {
         return is_string($leaveRequestId)
@@ -923,6 +986,8 @@ final class StorageRecoveryService
     private function assertValidDeleteTarget(string $category, string $disk, string $path, ?string $ownerId): void
     {
         $valid = match ($category) {
+            self::CATEGORY_EMPLOYEE_STATUS_DOCUMENT => $disk === Document::STORAGE_DISK
+                && $this->isCanonicalEmployeeStatusDocumentPath($path, $ownerId),
             self::CATEGORY_LEAVE_ATTACHMENT => ($disk === LeaveRequest::ATTACHMENT_STORAGE_DISK
                     && $this->isCanonicalLeaveAttachmentPath($path, $ownerId))
                 || ($disk === 'public' && $ownerId === null && $this->isSafeLegacyLeaveAttachmentPath($path)),
@@ -945,6 +1010,13 @@ final class StorageRecoveryService
     private function isStillReferenced(StorageRecoveryTask $task): bool
     {
         return match ($task->category) {
+            self::CATEGORY_EMPLOYEE_STATUS_DOCUMENT => Document::query()
+                ->where('employee_id', $task->owner_id)
+                // Manifest status juga menaungi SK pensiun karena memakai path privat,
+                // owner, checksum, dan kebijakan recovery yang identik.
+                ->whereIn('jenis_dokumen', ['sk_status_pegawai', 'sk_pensiun'])
+                ->where('file_path', $task->path)
+                ->exists(),
             self::CATEGORY_LEAVE_ATTACHMENT => LeaveRequest::query()
                 ->where('lampiran_path', $task->path)
                 ->when(
@@ -1133,12 +1205,15 @@ final class StorageRecoveryService
         $validLeaveUsageDocument = $task->category === self::CATEGORY_LEAVE_USAGE_DOCUMENT
             && $task->disk === LeaveUsageDocument::STORAGE_DISK
             && $this->isCanonicalLeaveUsagePath($task->path, $task->owner_id);
+        $validEmployeeStatusDocument = $task->category === self::CATEGORY_EMPLOYEE_STATUS_DOCUMENT
+            && $task->disk === Document::STORAGE_DISK
+            && $this->isCanonicalEmployeeStatusDocumentPath($task->path, $task->owner_id);
 
         if ($task->operation !== StorageRecoveryTask::OPERATION_CREATION_TARGET
-            || (! $validLeaveAttachment && ! $validLeaveProof && ! $validLeaveUsageDocument)
+            || (! $validLeaveAttachment && ! $validLeaveProof && ! $validLeaveUsageDocument && ! $validEmployeeStatusDocument)
             || $task->source_disk !== null
             || $task->source_path !== null) {
-            throw new RuntimeException('Intent target pembuatan dokumen cuti tidak memenuhi kontrak keamanan.');
+            throw new RuntimeException('Intent target pembuatan dokumen privat tidak memenuhi kontrak keamanan.');
         }
 
         $this->assertValidOptionalSha256($task->sha256, required: true);
@@ -1156,13 +1231,13 @@ final class StorageRecoveryService
             $this->assertValidCreationTarget($task);
 
             if ($task->category !== $category || $task->owner_id !== $ownerId || $task->path !== $path) {
-                throw new RuntimeException('Intent target dokumen cuti tidak cocok dengan metadata committed.');
+                throw new RuntimeException('Intent target dokumen privat tidak cocok dengan metadata committed.');
             }
             if ($task->status === StorageRecoveryTask::STATUS_ADOPTED) {
                 return null;
             }
             if ($task->status !== StorageRecoveryTask::STATUS_PREPARED || ! $this->isStillReferenced($task)) {
-                throw new RuntimeException('Intent target dokumen cuti belum dapat diadopsi.');
+                throw new RuntimeException('Intent target dokumen privat belum dapat diadopsi.');
             }
             if (! $this->creationTargetMatchesPinnedHash($task)) {
                 $detail = 'Target pembuatan yang direferensikan hilang atau berubah sejak intent dibuat.';

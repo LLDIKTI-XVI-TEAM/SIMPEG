@@ -23,9 +23,9 @@ class EmployeeValidationRules
                 'size:16',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     $hash = hash_hmac('sha256', trim((string) $value), config('app.key'));
-                    // withTrashed() agar selaras dengan unique index employees_nik_hash_unique
-                    // yang mencakup soft-deleted rows — NIK pegawai yang dihapus tetap tidak boleh dipakai ulang.
-                    $exists = Employee::withTrashed()->where('nik_hash', $hash)->exists();
+                    // Seluruh pegawai (aktif maupun nonaktif) tetap tercakup karena semua
+                    // nonaktif disimpan sebagai status, bukan dihapus dari tabel.
+                    $exists = Employee::query()->where('nik_hash', $hash)->exists();
                     if ($exists) {
                         $fail('NIK sudah terdaftar pada pegawai lain.');
                     }
@@ -79,8 +79,8 @@ class EmployeeValidationRules
                 'email',
                 'max:255',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    // Identitas email tetap dicadangkan ketika pegawai dinonaktifkan agar restore aman.
-                    if (Employee::withTrashed()
+                    // Identitas email tetap dicadangkan ketika pegawai dinonaktifkan.
+                    if (Employee::query()
                         ->whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
                         ->exists()
                     ) {
@@ -117,7 +117,7 @@ class EmployeeValidationRules
             'max:255',
             function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
                 // Pegawai nonaktif tetap memiliki email kanonisnya; hanya email milik record ini yang dikecualikan.
-                if (Employee::withTrashed()
+                if (Employee::query()
                     ->whereRaw('LOWER(email_pribadi) = ?', [strtolower(trim((string) $value))])
                     ->where('id', '!=', $employee->id)
                     ->exists()
@@ -135,9 +135,9 @@ class EmployeeValidationRules
             'size:16',
             function (string $attribute, mixed $value, \Closure $fail) use ($employee): void {
                 $hash = hash_hmac('sha256', trim((string) $value), config('app.key'));
-                // withTrashed() agar selaras dengan unique index employees_nik_hash_unique
-                // yang mencakup soft-deleted rows — NIK pegawai yang dihapus tetap tidak boleh dipakai ulang.
-                $exists = Employee::withTrashed()
+                // Seluruh pegawai (aktif maupun nonaktif) tetap tercakup karena semua
+                // nonaktif disimpan sebagai status, bukan dihapus dari tabel.
+                $exists = Employee::query()
                     ->where('nik_hash', $hash)
                     ->where('id', '!=', $employee->id) // izinkan NIK milik sendiri saat update
                     ->exists();

@@ -65,39 +65,23 @@ class SsoRoleMappedAccountSeeder extends Seeder
 
             // Lookup kanonis case-insensitive pada email legacy + email_pribadi kanonis,
             // agar pegawai existing tidak terlewat hanya karena kapitalisasi/kolom berbeda.
-            // withTrashed() menjaga idempotensi pada baseline yang masih memakai SoftDeletes:
-            // Employee trashed dengan email kanonis sama TETAP ditemukan sehingga seeder
-            // tidak membuat duplikat Employee. (Setelah PR lifecycle #19 menghapus
-            // SoftDeletes, kompatibilitas ini dapat disederhanakan saat rebase.)
             //
             // Sama seperti callback, kandidat diambil hingga 2 dan dihitung — seeder tidak
             // boleh memilih pegawai secara arbitrer saat pencocokan ambigu (kolom legacy
-            // email tidak memiliki constraint unik).
-            $candidates = Employee::withTrashed()
+            // email tidak memiliki constraint unik). Kelayakan aktif mengikuti kontrak
+            // lifecycle: kelompok status kepegawaian (whereActiveStatus).
+            $candidates = Employee::query()
                 ->where(function ($query) use ($email): void {
                     $query
                         ->whereRaw('lower(email) = ?', [strtolower($email)])
                         ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
                 })
+                ->whereActiveStatus()
                 ->limit(2)
                 ->get()
                 ->unique('id');
 
-            $activeCandidates = $candidates->reject(fn (Employee $candidate): bool => $candidate->trashed())->values();
-
-            if ($candidates->isNotEmpty() && $activeCandidates->isEmpty()) {
-                // Seluruh pegawai kandidat berstatus terhapus: JANGAN restore dan JANGAN
-                // mengubah status/lifecycle-nya. Mapping dilewati agar tidak ada duplikat
-                // Employee dengan email kanonis yang sama dan tidak ada akun dihidupkan
-                // kembali lewat seeder.
-                $this->command?->warn(
-                    "SSO mapped account '{$email}' dilewati: pegawai existing berstatus terhapus (trashed)."
-                );
-
-                continue;
-            }
-
-            if ($activeCandidates->count() > 1) {
+            if ($candidates->count() > 1) {
                 // Lebih dari satu pegawai aktif cocok → ambigu, sama seperti kontrak
                 // callback: jangan pilih arbitrer dan jangan mengikat user ber-role ke
                 // pegawai yang salah. Mapping dilewati + peringatan.
@@ -108,7 +92,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 continue;
             }
 
-            $employee = $activeCandidates->first();
+            $employee = $candidates->first();
 
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.

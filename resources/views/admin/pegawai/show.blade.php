@@ -15,7 +15,8 @@
         $canAssignSupervisor = $canUpdateEmployee
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true);
         $canDeactivateEmployee = auth()->check()
-            && auth()->user()->hasPermission('employees.deactivate');
+            && auth()->user()->hasPermission('employees.deactivate')
+            && $p->isActive();
 
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
@@ -2106,24 +2107,43 @@
 
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
-        <div class="space-y-4">
+        <form method="POST" action="{{ route('pegawai.destroy', $p->id) }}" class="space-y-4">
+            @csrf
             <p class="text-sm text-muted font-sans">
-                Apakah Anda yakin ingin menonaktifkan pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong>?
-                Data tetap disimpan dan dapat dipulihkan kembali oleh pengguna yang memiliki permission pemulihan.
+                Pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong> akan dinonaktifkan: akses akun
+                diblokir dan data keluar dari daftar pegawai aktif. Data tetap disimpan dan dapat diaktifkan
+                kembali oleh Super Admin atau Admin Kepegawaian yang berwenang.
             </p>
+            {{-- Kontrak perubahan status resmi: tanggal efektif + alasan wajib (US-2.9) --}}
+            <div class="space-y-1.5">
+                <label for="detail-deactivate-tanggal" class="block text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                    Tanggal Efektif <span class="text-danger">*</span>
+                </label>
+                <input id="detail-deactivate-tanggal" type="date" name="tanggal_efektif" required
+                    value="{{ now()->toDateString() }}"
+                    class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                <p class="mt-1 text-xs text-muted">
+                    Jika memilih tanggal setelah hari ini, penonaktifan dijadwalkan dan akses baru diblokir setelah tanggal tersebut diproses.
+                </p>
+            </div>
+            <div class="space-y-1.5">
+                <label for="detail-deactivate-alasan" class="block text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                    Alasan Penonaktifan <span class="text-danger">*</span>
+                </label>
+                <textarea id="detail-deactivate-alasan" name="alasan" rows="2" required minlength="3"
+                    placeholder="Contoh: Mutasi keluar, pengunduran diri, atau sanksi administratif"
+                    class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"></textarea>
+            </div>
             <div class="flex justify-end gap-3 border-t border-border pt-4">
                 <button type="button" @click="showDeactivateModal = false"
                     class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft">
                     Batal
                 </button>
-                <form method="POST" action="{{ route('pegawai.destroy', $p->id) }}">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
-                        Ya, Nonaktifkan
-                    </button>
-                </form>
+                <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90">
+                    Ya, Nonaktifkan
+                </button>
             </div>
-        </div>
+        </form>
     </x-ui.modal>
     @endif
 </div>{{-- /x-data utama --}}

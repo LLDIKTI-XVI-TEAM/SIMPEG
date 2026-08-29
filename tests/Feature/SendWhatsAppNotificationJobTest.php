@@ -10,6 +10,7 @@ use App\Models\LeaveRequestStep;
 use App\Models\NotificationEventChannel;
 use App\Models\RefJenisCuti;
 use App\Models\RefNotificationChannel;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Models\WhatsAppNotificationDelivery;
 use App\Services\Notifications\NotificationChannelResolver;
@@ -20,6 +21,7 @@ use App\Services\Notifications\WhatsApp\WhatsAppRecipientResolver;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
 use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\Support\FakeWhatsAppTemplateAdapter;
 use Tests\TestCase;
@@ -1464,6 +1466,60 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $this->assertSame('ews_recipient_no_longer_authorized', $delivery->failure_code);
     }
 
+    public function test_admin_ews_dengan_kelompok_aktif_ternormalisasi_tetap_menerima_whatsapp(): void
+    {
+        $this->enableWhatsAppForEvent('ews.kgb');
+        $target = Employee::factory()->create();
+        $admin = Employee::factory()->create(['no_hp' => '08123456789']);
+        User::factory()->create(['employee_id' => $admin->id, 'role' => 'admin_kepegawaian']);
+
+        // Data legacy dapat memiliki kapitalisasi dan spasi yang tidak kanonis.
+        DB::table('ref_status_pegawai')
+            ->where('id', $admin->status_pegawai_id)
+            ->update(['kelompok' => ' AKTIF ']);
+
+        $alert = EwsAlert::create([
+            'employee_id' => $target->id,
+            'type' => 'KGB',
+            'target_date' => now()->addDays(30)->toDateString(),
+            'interval_days' => 30,
+            'is_eligible' => null,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+        ]);
+        $delivery = WhatsAppNotificationDelivery::create([
+            'idempotency_key' => 'ews-admin-kelompok-aktif-ternormalisasi',
+            'employee_id' => $admin->id,
+            'event_key' => 'ews.kgb',
+            'template_key' => 'simpeg_ews_pengingat',
+            'status' => 'queued',
+        ]);
+
+        $job = new SendWhatsAppNotificationJob(
+            idempotencyKey: $delivery->idempotency_key,
+            employeeId: $admin->id,
+            eventKey: 'ews.kgb',
+            templateKey: 'simpeg_ews_pengingat',
+            templateId: 'tmpl_ews_123',
+            language: 'id',
+            variables: [],
+            bodyVariables: $this->providerEwsBodyVariables(),
+            buttonVariables: $this->providerEwsButtonVariables(),
+            ewsAlertId: $alert->id,
+            variablesMap: $this->providerVariablesMap('simpeg_ews_pengingat'),
+        );
+
+        $job->handle(
+            app(WhatsAppReadiness::class),
+            app(NotificationChannelResolver::class),
+            app(NotificationEventCatalog::class),
+            app(WhatsAppRecipientResolver::class),
+            $this->fakeAdapter,
+        );
+
+        $this->fakeAdapter->assertSentCount(1);
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_DELIVERED, $delivery->refresh()->status);
+    }
+
     public function test_eligibility_promosi_ews_admin_dihitung_dari_pemilik_alert_bukan_penerima(): void
     {
         $this->enableWhatsAppForEvent('ews.kenaikan_pangkat');
@@ -1888,8 +1944,16 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $this->assertSame('leave_request_version_changed', $delivery->failure_code);
     }
 
-    public function test_job_ews_non_promosi_dilewati_bila_pemilik_alert_sudah_terhapus(): void
+    public function test_job_ews_non_promosi_dilewati_bila_pemilik_alert_sudah_nonaktif(): void
     {
+        $inactiveStatus = RefStatusPegawai::create([
+            'kode' => 'NONAKTIF_TEST_WHATSAPP',
+            'nama' => 'Nonaktif Test WhatsApp',
+            'kelompok' => 'Tidak Aktif',
+            'is_default' => false,
+            'is_active' => true,
+        ]);
+
         foreach ([
             'ews.kgb' => 'KGB',
             'ews.pensiun' => 'PENSIUN',
@@ -1909,9 +1973,11 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
                 'satyalancana_years' => $alertType === 'SATYALANCANA' ? 10 : null,
             ]);
-            $owner->delete();
+            // Owner tetap dipertahankan agar guard runtime benar-benar menguji
+            // status lifecycle, bukan alert yang ikut terhapus oleh FK cascade.
+            $owner->update(['status_pegawai_id' => $inactiveStatus->id]);
             $delivery = WhatsAppNotificationDelivery::create([
-                'idempotency_key' => "ews-owner-terhapus:{$eventKey}",
+                'idempotency_key' => "ews-owner-nonaktif:{$eventKey}",
                 'employee_id' => $admin->id,
                 'event_key' => $eventKey,
                 'template_key' => 'simpeg_ews_pengingat',

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\SsoRoleMappedAccountSeeder;
@@ -335,14 +336,14 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
     }
 
-    /** Pegawai yang sudah di-soft-delete tidak boleh dipetakan menjadi akun SSO baru. */
-    public function test_soft_deleted_employee_cannot_match_keycloak_login(): void
+    /** Pegawai yang sudah dinonaktifkan (kelompok status bukan Aktif) tidak boleh dipetakan menjadi akun SSO baru. */
+    public function test_non_active_employee_cannot_match_keycloak_login(): void
     {
-        $trashed = Employee::factory()->create([
+        Employee::factory()->create([
             'nama_lengkap' => 'Nonaktif',
             'email' => 'nonaktif@example.com',
+            'status_aktif' => 'Pensiun',
         ]);
-        $trashed->delete();
 
         $this->fakeKeycloakUser([
             'id' => 'kc-nonaktif',
@@ -361,11 +362,13 @@ class KeycloakCallbackMappingTest extends TestCase
     }
 
     /** Akun yang sudah ada tetap tidak mendapat role baru apabila pegawai terkait sudah dinonaktifkan. */
-    public function test_role_not_initialized_for_account_of_soft_deleted_employee(): void
+    public function test_role_not_initialized_for_account_of_deactivated_employee(): void
     {
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Nonaktif Terpeta',
             'email' => 'softdel-account@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
         $user = User::factory()->create([
             'email' => 'softdel-account@example.com',
@@ -373,7 +376,6 @@ class KeycloakCallbackMappingTest extends TestCase
             'employee_id' => $employee->id,
             'role' => null,
         ]);
-        $employee->delete();
 
         $this->fakeKeycloakUser([
             'id' => 'kc-softdel-account',
@@ -818,8 +820,8 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    /** Pegawai berstatus Non-Aktif (tanpa soft-delete) tidak boleh mendapat role baru via SSO. */
-    public function test_role_not_initialized_for_non_active_employee_without_soft_delete(): void
+    /** Pegawai berstatus Non-Aktif tidak boleh mendapat role baru via SSO. */
+    public function test_role_not_initialized_for_non_active_employee(): void
     {
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Pensiunan Belum Dihapus',
@@ -827,7 +829,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'status_aktif' => 'Pensiun',
         ]);
 
-        // User terpeta tanpa soft-delete, role masih kosong.
+        // User terpeta milik pegawai nonaktif, role masih kosong.
         $user = User::factory()->create([
             'email' => 'pensiun@example.com',
             'keycloak_id' => 'kc-pensiun-tanpa-softdel',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Employee;
 
+use App\Models\Employee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,8 +27,10 @@ class AssignSupervisorRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kepala_bagian_id' => ['nullable', 'uuid', Rule::exists('employees', 'id')->whereNull('deleted_at')],
-            'supervisor_id' => ['nullable', 'uuid', Rule::exists('employees', 'id')->whereNull('deleted_at')],
+            // Penetapan Kepala Bagian memakai klasifikasi aktif kelompok referensi
+            // (satu sumber dengan whereActiveStatus/isActive), bukan nama snapshot.
+            'kepala_bagian_id' => ['nullable', 'uuid', Rule::exists('employees', 'id')->where(fn ($query) => $query->whereIn('id', Employee::query()->whereActiveStatus()->select('id')))],
+            'supervisor_id' => ['nullable', 'uuid', Rule::exists('employees', 'id')->where(fn ($query) => $query->whereIn('id', Employee::query()->whereActiveStatus()->select('id')))],
             'effective_date' => ['required', 'date_format:Y-m-d'],
             // Halaman asal non-default harus berasal dari whitelist agar redirect tidak bisa diarahkan ke URL bebas.
             'redirect_to' => ['nullable', 'string', 'in:cuti-config'],

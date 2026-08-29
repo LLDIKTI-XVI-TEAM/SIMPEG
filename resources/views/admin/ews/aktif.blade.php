@@ -1,9 +1,21 @@
-<x-layouts.app title="EWS Aktif">
+<x-layouts.app title="Daftar EWS">
     @php
         $currentStatus = $filterStatus !== '' ? $filterStatus : 'aktif';
+        $statusHeading = match ($currentStatus) {
+            'ditangani' => 'Ditangani',
+            'tidak_perlu' => 'Tidak Perlu',
+            'kedaluwarsa' => 'Kedaluwarsa',
+            'semua' => 'Semua Status',
+            default => 'Aktif',
+        };
         $canFollowup = in_array(auth()->user()?->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true);
-        $ewsRoute = function (array $overrides = []) use ($filterEvent, $filterStatus) {
-            $query = array_merge(['event' => $filterEvent, 'status' => $filterStatus], $overrides);
+        $ewsRoute = function (array $overrides = []) use ($filterEvent, $filterStatus, $filterSearch, $alerts) {
+            $query = array_merge([
+                'event' => $filterEvent,
+                'status' => $filterStatus,
+                'search' => $filterSearch,
+                'per_page' => $alerts->perPage(),
+            ], $overrides);
             $query = array_filter($query, fn ($value) => $value !== null && $value !== '');
 
             return route('ews', $query);
@@ -17,7 +29,6 @@
     @endphp
 
     <div class="space-y-6" x-data="{
-        search: '',
         followup: { open: false, action: '', status: '', label: '', employee: '', type: '', note: '' },
         openFollowup(action, status, label, employee, type) {
             this.followup = { open: true, action, status, label, employee, type, note: '' };
@@ -30,13 +41,13 @@
         {{-- ================================================================ --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Daftar EWS Aktif</h2>
+                <h2 class="text-2xl font-semibold text-ink">Daftar EWS {{ $statusHeading }}</h2>
                 <nav class="mb-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
                     <span class="text-muted">EWS & Notifikasi</span>
                     <span>/</span>
-                    <span class="font-medium text-ink">EWS Aktif</span>
+                    <span class="font-medium text-ink">EWS {{ $statusHeading }}</span>
                 </nav>
             </div>
             
@@ -55,10 +66,10 @@
         {{-- ================================================================ --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             @php
-                $countMerah = collect($alerts)->filter(fn($a) => $a['sisa_hari'] < 30)->count();
-                $countKuning = collect($alerts)->filter(fn($a) => $a['sisa_hari'] >= 30 && $a['sisa_hari'] <= 90)->count();
-                $countHijau = collect($alerts)->filter(fn($a) => $a['sisa_hari'] > 90)->count();
-                $countTotal = count($alerts);
+                $countMerah = $summary['urgent'];
+                $countKuning = $summary['warning'];
+                $countHijau = $summary['info'];
+                $countTotal = $summary['total'];
             @endphp
             
             <x-ui.card class="flex items-center gap-4">
@@ -131,19 +142,25 @@
                 </div>
 
                 {{-- Search Box --}}
-                <div class="relative w-full sm:w-72">
+                <form method="GET" action="{{ route('ews') }}" class="relative w-full sm:w-72">
+                    <input type="hidden" name="event" value="{{ $filterEvent }}">
+                    <input type="hidden" name="status" value="{{ $filterStatus }}">
+                    <input type="hidden" name="per_page" value="{{ $alerts->perPage() }}">
+                    <label for="ews-search" class="sr-only">Cari nama atau NIP pegawai</label>
                     <span class="absolute inset-y-0 left-0 flex items-center pl-3">
                         <svg class="h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.603 10.603Z" />
                         </svg>
                     </span>
-                    <input 
-                        type="text" 
-                        x-model="search"
+                    <input
+                        id="ews-search"
+                        type="search"
+                        name="search"
+                        value="{{ $filterSearch }}"
                         placeholder="Cari nama atau NIP" 
                         class="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     />
-                </div>
+                </form>
             </div>
 
             {{-- TABLE --}}
@@ -178,8 +195,8 @@
                                     $sisaBadgeClass = 'text-success';
                                 }
                             @endphp
-                            <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" :interactive="true" class="align-top {{ $rowColorClass }}">
-                                <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
+                            <x-ui.table-row :interactive="true" class="align-top {{ $rowColorClass }}">
+                                <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ ($alerts->firstItem() ?? 1) + $index }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
                                         <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
@@ -339,12 +356,31 @@
                         @empty
                             <x-ui.table-row>
                                 <x-ui.table-td colspan="7" align="center" class="px-6 py-12 text-muted text-sm">
-                                    Tidak ada peringatan EWS aktif untuk kategori ini.
+                                    Tidak ada data EWS untuk filter yang dipilih.
                                 </x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
+            </div>
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-soft/20 px-6 py-4 sm:flex-row">
+                <form method="GET" action="{{ route('ews') }}" class="flex items-center gap-3 text-sm text-muted">
+                    <input type="hidden" name="event" value="{{ $filterEvent }}">
+                    <input type="hidden" name="status" value="{{ $filterStatus }}">
+                    <input type="hidden" name="search" value="{{ $filterSearch }}">
+                    <label for="ews-per-page">Tampilkan</label>
+                    <select id="ews-per-page" name="per_page" onchange="this.form.submit()" class="rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
+                        @foreach ([10, 25, 50] as $option)
+                            <option value="{{ $option }}" @selected($alerts->perPage() === $option)>{{ $option }}</option>
+                        @endforeach
+                    </select>
+                    @if ($alerts->total() > 0)
+                        <span>Menampilkan {{ $alerts->firstItem() }}-{{ $alerts->lastItem() }} dari {{ $alerts->total() }}</span>
+                    @endif
+                </form>
+                <div class="w-full sm:w-auto">
+                    {{ $alerts->links('vendor.pagination.simpeg') }}
+                </div>
             </div>
         </x-ui.card>
 
@@ -440,7 +476,7 @@
                     <div class="space-y-4 rounded-lg border border-danger/20 bg-danger/5 p-4">
                         <div>
                             <h4 class="text-sm font-semibold text-ink">SK Pensiun</h4>
-                            <p class="mt-1 text-xs text-muted">Saat disetujui, SK diarsipkan dan status pegawai langsung berubah menjadi Pensiun.</p>
+                            <p class="mt-1 text-xs text-muted">SK akan diarsipkan. Status langsung berubah menjadi Pensiun bila tanggal SK sudah berlaku; untuk tanggal mendatang, perubahan dijadwalkan pada tanggal tersebut.</p>
                         </div>
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div>

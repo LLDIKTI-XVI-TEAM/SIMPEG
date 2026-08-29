@@ -24,6 +24,20 @@ use Illuminate\Support\Facades\DB;
  */
 final class ReferenceTableCatalog
 {
+    /** @var array<string, string> kode kanonis => nama kanonis */
+    private const CORE_EMPLOYEE_STATUS_IDENTITIES = [
+        'AKTIF' => 'Aktif',
+        'NONAKTIF' => 'Nonaktif',
+        'PENSIUN' => 'Pensiun',
+        'MUTASI' => 'Mutasi',
+        'CLTN' => 'Cuti Luar Tanggungan Negara',
+        'PERPANJANGAN_CLTN' => 'Perpanjangan CLTN',
+        'TUGAS_BELAJAR' => 'Tugas Belajar',
+        'PEMBERHENTIAN_SEMENTARA' => 'Pemberhentian Sementara',
+        'WAJIB_MILITER' => 'Wajib Militer',
+        'HILANG' => 'PNS Dinyatakan Hilang',
+    ];
+
     /**
      * @var array<class-string, array{
      *     usage: list<array{table: string, column: string, label: string}>,
@@ -94,30 +108,23 @@ final class ReferenceTableCatalog
             'cache_keys' => ['ref.unit_kerja'],
         ],
         RefStatusPegawai::class => [
-            // Status pegawai dirujuk dua tempat: kolom status terkini pada data
-            // pegawai dan baris riwayat status yang bersifat append-only. Riwayat
-            // wajib ikut dihitung karena pegawai yang sudah berpindah status
-            // membuat baris lamanya menjadi satu-satunya perujuk, sehingga tanpa
-            // entri ini status lama tampak belum terpakai dan boleh dihapus.
+            // Status pegawai dirujuk oleh snapshot terkini, riwayat append-only,
+            // dan transisi terjadwal. Semua wajib dihitung agar status lama atau
+            // target jadwal tidak tampak belum dipakai lalu gagal di constraint DB.
             // FK employee_status_histories.status_pegawai_id memakai RESTRICT
             // sebagai backstop basis data; guard ini yang memberi pesan yang
             // dapat ditindaklanjuti admin sebelum constraint dilanggar.
             'usage' => [
                 ['table' => 'employees', 'column' => 'status_pegawai_id', 'label' => 'data pegawai'],
                 ['table' => 'employee_status_histories', 'column' => 'status_pegawai_id', 'label' => 'riwayat status pegawai'],
+                ['table' => 'employee_status_transitions', 'column' => 'status_pegawai_id', 'label' => 'transisi status terjadwal'],
             ],
             'cache_keys' => ['ref.status_pegawai'],
-            // Baris terproteksi: kode PENSIUN dicari langsung oleh proses
-            // followup EWS (firstOrFail — hilang berarti error 500). Baris
-            // AKTIF dilindungi bukan karena kodenya di-lookup, melainkan
-            // karena nama 'Aktif' dipakai sebagai fallback status pegawai
-            // baru/hasil import dan tersalin ke kolom legacy
-            // employees.status_aktif yang difilter scheduler EWS. Baris
-            // is_default adalah fallback resmi pegawai baru. Menghapus atau
-            // menonaktifkan baris-baris ini mematikan alur tersebut tanpa
-            // error yang terlihat admin.
+            // Baris terproteksi ini dicari langsung oleh lifecycle/followup atau menjadi
+            // default pegawai baru. Menghapus, menonaktifkan, atau mengubah identitasnya
+            // dapat memutus alur sistem walau baris belum dipakai oleh data pegawai.
             'protected' => [
-                ['column' => 'kode', 'values' => ['AKTIF', 'PENSIUN'], 'reason' => 'baris ini dirujuk logika sistem (followup pensiun EWS dan penetapan status aktif pegawai)'],
+                ['column' => 'kode', 'values' => ['AKTIF', 'NONAKTIF', 'PENSIUN'], 'reason' => 'baris ini dirujuk logika lifecycle sistem dan tidak boleh diubah identitas atau ketersediaannya'],
                 ['column' => 'is_default', 'values' => [true], 'reason' => 'status ini menjadi default untuk pegawai baru dan hasil import'],
             ],
         ],
@@ -129,6 +136,17 @@ final class ReferenceTableCatalog
     public static function usageReferences(string $modelClass): array
     {
         return self::DEFINITIONS[$modelClass]['usage'] ?? [];
+    }
+
+    /**
+     * Identitas status bawaan dikenali dari kode atau nama kanonis secara exact,
+     * selaras dengan uniqueness database yang case-sensitive. Pemeriksaan ganda
+     * mencegah identitas inti dicuci bertahap tanpa mengunci collision custom.
+     */
+    public static function isCoreEmployeeStatus(RefStatusPegawai $status): bool
+    {
+        return array_key_exists((string) $status->kode, self::CORE_EMPLOYEE_STATUS_IDENTITIES)
+            || in_array((string) $status->nama, self::CORE_EMPLOYEE_STATUS_IDENTITIES, true);
     }
 
     /**

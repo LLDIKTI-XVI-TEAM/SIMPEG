@@ -49,6 +49,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SkRequirementController;
 use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
+use App\Http\Controllers\Auth\InactiveEmployeeAccountController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\DashboardController;
@@ -71,6 +72,9 @@ Route::get('/login', [KeycloakAuthController::class, 'redirectToKeycloak'])->nam
 Route::get('/login/keycloak', [KeycloakAuthController::class, 'redirectToKeycloak'])->name('auth.keycloak.redirect');
 Route::get('/auth/keycloak/callback', [KeycloakAuthController::class, 'handleCallback'])->name('auth.keycloak.callback');
 Route::post('/logout', [KeycloakAuthController::class, 'logout'])->name('logout');
+Route::get('/status-akun', InactiveEmployeeAccountController::class)
+    ->middleware('auth')
+    ->name('status-akun');
 Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
     ->middleware('throttle:60,1')
     ->name('cuti.verify');
@@ -288,16 +292,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('statusPegawai')->name('status-pegawai.destroy');
     });
 
-    Route::get('/pegawai/nonaktif-list', [PegawaiController::class, 'inactive'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
-        ->name('data-nonaktif');
-
-    // Gate halaman Data Backup disamakan dengan aksi restore agar Admin Kepegawaian
-    // yang memegang employees.restore tidak berakhir 403 saat membuka halaman ini.
-    Route::get('/pegawai/data-backup', [PegawaiController::class, 'backup'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
-        ->name('data-backup');
-
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
@@ -442,9 +436,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.satyalancana.update');
-    Route::post('/pegawai/bulk-destroy', [PegawaiController::class, 'bulkDestroy'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
-        ->name('pegawai.bulkDestroy');
     Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
@@ -453,9 +444,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
         ->name('pegawai.restore');
-    Route::post('/pegawai/bulk-restore', [PegawaiController::class, 'bulkRestore'])
-        ->middleware(['role:super_admin', 'permission:employees.restore'])
-        ->name('pegawai.bulkRestore');
     Route::post('/pegawai/{id}/riwayat', [PegawaiController::class, 'storeRiwayat'])
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])

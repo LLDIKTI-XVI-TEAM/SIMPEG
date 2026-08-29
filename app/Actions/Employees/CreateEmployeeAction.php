@@ -15,9 +15,21 @@ use App\Services\Employees\TmtCalculatorService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class CreateEmployeeAction
 {
+    /** @var list<string> */
+    private const LIFECYCLE_FIELDS = [
+        'status_aktif',
+        'status_pegawai_id',
+        'status_keterangan',
+        'status_note',
+        'status_tanggal',
+        'status_berkas_path',
+        'status_nomor_berkas',
+    ];
+
     public function __construct(
         private readonly EmployeeFileStorageService $files,
         private readonly TmtCalculatorService $tmtCalculator,
@@ -31,6 +43,7 @@ class CreateEmployeeAction
      */
     public function execute(array $data, Request $request): Employee
     {
+        $this->assertNoLifecycleFields($data);
         $data = $this->normalizeEmployeeContract($data);
 
         $uploadedFiles = [];
@@ -40,6 +53,22 @@ class CreateEmployeeAction
                     $data['foto'] = $this->files->storePhoto($request->file('foto'));
                     $uploadedFiles[] = ['public', $data['foto']];
                 }
+
+                // Pegawai baru selalu lahir pada status kanonis AKTIF. Tanggal efektif,
+                // histori, dan dokumen status hanya dibuat oleh workflow lifecycle setelah create.
+                $activeStatus = RefStatusPegawai::query()
+                    ->where('kode', 'AKTIF')
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($activeStatus === null || ! RefStatusPegawai::isActiveGroup($activeStatus->kelompok)) {
+                    throw ValidationException::withMessages([
+                        'status_pegawai_id' => 'Status awal AKTIF tidak tersedia atau tidak valid.',
+                    ]);
+                }
+
+                $data['status_pegawai_id'] = $activeStatus->id;
+                $data['status_aktif'] = $activeStatus->nama;
 
                 $employee = Employee::create($data);
                 $sourceHistoryChanged = false;
@@ -240,21 +269,6 @@ class CreateEmployeeAction
                         'keterangan' => $data['berkas_lainnya_deskripsi'] ?? null,
                     ]);
 
-                    // SK Mutasi/Pensiun otomatis mengubah status pegawai sesuai berkas yang diunggah.
-                    $statusTujuan = match ($jenis) {
-                        'SK Mutasi' => 'Mutasi',
-                        'SK Pensiun' => 'Pensiun',
-                        default => null,
-                    };
-                    if ($statusTujuan !== null) {
-                        $statusPegawai = RefStatusPegawai::where('nama', $statusTujuan)->first();
-                        if ($statusPegawai) {
-                            $employee->update([
-                                'status_pegawai_id' => $statusPegawai->id,
-                                'status_aktif' => $statusPegawai->nama,
-                            ]);
-                        }
-                    }
                 }
 
                 $employee->refresh();
@@ -288,16 +302,6 @@ class CreateEmployeeAction
             $data['jabatan_terakhir'] = RefJabatan::find($data['jabatan_id'])?->nama;
         }
 
-        if (empty($data['status_pegawai_id'])) {
-            $statusName = $data['status_aktif'] ?? 'Aktif';
-            $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $statusName)->value('id')
-                ?? RefStatusPegawai::where('is_default', true)->value('id');
-        }
-
-        if (! empty($data['status_pegawai_id']) && empty($data['status_aktif'])) {
-            $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
-        }
-
         if (! empty($data['program_studi_id'])) {
             $data['prodi_pendidikan_terakhir'] = RefProgramStudi::find($data['program_studi_id'])?->nama;
         } else {
@@ -307,5 +311,21 @@ class CreateEmployeeAction
         unset($data['clear_program_studi']);
 
         return $data;
+    }
+
+    /** Caller non-HTTP juga tidak boleh menulis snapshot lifecycle melalui create. */
+    private function assertNoLifecycleFields(array $data): void
+    {
+        $errors = [];
+
+        foreach (self::LIFECYCLE_FIELDS as $field) {
+            if (array_key_exists($field, $data)) {
+                $errors[$field] = 'Field lifecycle tidak dapat diisi saat membuat pegawai.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 }

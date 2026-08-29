@@ -23,6 +23,10 @@ $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read')
 $adminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
     : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
+// Pemulihan pegawai adalah keputusan administrasi Super Admin (US-2.10 / runbook lifecycle).
+$superAdminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
+    ? []
+    : ['role:super_admin', 'permission:'.$permission];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
@@ -42,22 +46,13 @@ Route::middleware($employeeGroupMiddleware)
         Route::post('/import', [EmployeeImportController::class, 'store'])
             ->middleware($adminEmployeeMutationMiddleware('employees.import'))
             ->name('import.store');
-        Route::get('/nonaktif', [EmployeeController::class, 'inactive'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
-            ->name('inactive');
-
-        // Gate API Data Backup harus sama dengan halaman webnya; sebelumnya hanya super_admin
-        // sehingga search/pagination/refresh oleh Admin Kepegawaian berakhir 403 meski restore diizinkan.
-        Route::get('/backup', [EmployeeController::class, 'backup'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.restore', 'role:super_admin,admin_kepegawaian'])
-            ->name('backup');
-
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
             ->middleware($adminEmployeeMutationMiddleware('employees.deactivate'))
             ->whereUuid('employee')
             ->name('destroy');
 
         Route::post('/{employee}/restore', [EmployeeController::class, 'restore'])
+            // K-STATUS-04: Admin Kepegawaian ber-permission juga boleh reaktivasi.
             ->middleware($adminEmployeeMutationMiddleware('employees.restore'))
             ->whereUuid('employee')
             ->name('restore');

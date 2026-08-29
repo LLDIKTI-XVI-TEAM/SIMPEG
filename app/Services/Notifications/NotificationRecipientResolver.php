@@ -3,7 +3,6 @@
 namespace App\Services\Notifications;
 
 use App\Models\Employee;
-use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -83,12 +82,13 @@ class NotificationRecipientResolver
             ->where('role', 'admin_kepegawaian')
             ->whereNotNull('employee_id')
             // Role saja tidak cukup: akun tertaut ke Employee Nonaktif tidak boleh menerima fan-out EWS.
-            ->whereHas('employee.statusPegawai', fn ($statuses) => $statuses
-                ->whereIn('kelompok', RefStatusPegawai::activeGroups()))
+            ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
             ->with(['employee.statusPegawai'])
             ->get()
             ->pluck('employee')
-            ->filter(fn ($employee): bool => $employee instanceof Employee)
+            // Hanya admin yang pegawainya masih aktif: deaktivasi harus menghentikan
+            // distribusi notifikasi (data pegawai lain) ke akun yang aksesnya dicabut.
+            ->filter(fn ($employee): bool => $employee instanceof Employee && $employee->isActive())
             ->unique('id')
             ->values();
     }

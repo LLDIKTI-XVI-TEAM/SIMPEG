@@ -22,24 +22,28 @@ class KepalaBagianScopeService
             return Employee::query()->whereRaw('1 = 0');
         }
 
-        return Employee::query()->where(function (Builder $query) use ($employeeId): void {
-            $query->whereHas('supervisorAssignments', function (Builder $assignments) use ($employeeId): void {
-                $assignments->whereDate('tanggal_mulai', '<=', today()->toDateString())
-                    ->where(function (Builder $active): void {
-                        $active->whereNull('tanggal_berakhir')
-                            ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
-                    })
-                    ->where(function (Builder $assignment) use ($employeeId): void {
-                        $assignment->where('kepala_bagian_id', $employeeId)
-                            ->orWhere('supervisor_id', $employeeId);
+        return Employee::query()
+            // Hanya pegawai dengan klasifikasi aktif (kelompok referensi) yang masuk
+            // scope bawahan; nonaktif tidak lagi muncul meski assignment masih efektif.
+            ->whereActiveStatus()
+            ->where(function (Builder $query) use ($employeeId): void {
+                $query->whereHas('supervisorAssignments', function (Builder $assignments) use ($employeeId): void {
+                    $assignments->whereDate('tanggal_mulai', '<=', today()->toDateString())
+                        ->where(function (Builder $active): void {
+                            $active->whereNull('tanggal_berakhir')
+                                ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
+                        })
+                        ->where(function (Builder $assignment) use ($employeeId): void {
+                            $assignment->where('kepala_bagian_id', $employeeId)
+                                ->orWhere('supervisor_id', $employeeId);
+                        });
+                })
+                    ->orWhere(function (Builder $fallback) use ($employeeId): void {
+                        // Pointer lama hanya menjadi fallback bagi pegawai yang belum memiliki histori penugasan.
+                        $fallback->where('kepala_bagian_id', $employeeId)
+                            ->whereDoesntHave('supervisorAssignments');
                     });
-            })
-                ->orWhere(function (Builder $fallback) use ($employeeId): void {
-                    // Pointer lama hanya menjadi fallback bagi pegawai yang belum memiliki histori penugasan.
-                    $fallback->where('kepala_bagian_id', $employeeId)
-                        ->whereDoesntHave('supervisorAssignments');
-                });
-        });
+            });
     }
 
     /**

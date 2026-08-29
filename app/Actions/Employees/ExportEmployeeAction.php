@@ -57,6 +57,11 @@ class ExportEmployeeAction
             if ($request->query('filter') === 'pensiun' && $statusAktif === '') {
                 $statusAktif = 'Pensiun';
             }
+            // Normalisasi "all" sama seperti daftar: pilihan eksplisit "semua status"
+            // tidak boleh jatuh ke default aktif.
+            if ($statusPegawaiId === '' && mb_strtolower($statusAktif) === 'all') {
+                $statusAktif = '';
+            }
 
             if ($search !== '') {
                 $query->where(function ($q) use ($search) {
@@ -79,6 +84,12 @@ class ExportEmployeeAction
                 $query->where('status_pegawai_id', $statusPegawaiId);
             } elseif ($statusAktif !== '') {
                 $query->where('status_aktif', $statusAktif);
+            } else {
+                // Tanpa filter status apa pun: default hanya pegawai aktif menurut
+                // klasifikasi kelompok referensi — satu sumber dengan daftar
+                // (ListEmployeesAction) dan isActive(), sehingga ekspor tidak
+                // menyertakan pegawai nonaktif yang tak terlihat di layar.
+                $query->whereActiveStatus();
             }
         }
 

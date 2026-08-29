@@ -37,6 +37,12 @@ class UpdateEmployeeRequest extends FormRequest
 
         $rules = EmployeeValidationRules::update($employee);
 
+        // Lifecycle pegawai hanya boleh diubah lewat endpoint status khusus agar
+        // histori, audit, otorisasi, dan notifikasi tidak dapat dilewati.
+        foreach (Employee::LIFECYCLE_SNAPSHOT_FIELDS as $field) {
+            $rules[$field] = ['prohibited'];
+        }
+
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
             // Riwayat kepegawaian bersifat append-only (US-2.6): id riwayat lama ditolak agar record tidak dapat diedit.

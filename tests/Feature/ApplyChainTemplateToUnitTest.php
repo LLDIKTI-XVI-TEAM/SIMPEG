@@ -10,6 +10,7 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeaveRequest;
 use App\Models\PositionHistory;
 use App\Models\RefJenisCuti;
+use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
@@ -150,6 +151,76 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
     }
 
+    public function test_anggota_dan_approver_tugas_belajar_diproses_sebagai_aktif(): void
+    {
+        // Klasifikasi aktif memakai kelompok referensi: Tugas Belajar (Aktif/khusus)
+        // tetap diproses sebagai anggota unit dan diterima sebagai approver — konsisten
+        // dengan isActive()/whereActiveStatus di form dan resolver.
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan');
+        $pybmc = Employee::factory()->create();
+
+        $tugasBelajarStatus = RefStatusPegawai::updateOrCreate(
+            ['kode' => 'TUGAS_BELAJAR'],
+            ['nama' => 'Tugas Belajar', 'kelompok' => 'Aktif/khusus', 'is_active' => true, 'is_default' => false, 'keterangan' => 'Pegawai menjalani tugas belajar.'],
+        );
+        DB::table('ref_status_pegawai')->where('id', $tugasBelajarStatus->id)->update([
+            'kelompok' => ' AKTIF/KHUSUS ',
+        ]);
+        $verifikator = Employee::factory()->create([
+            'status_aktif' => 'Tugas Belajar',
+            'status_pegawai_id' => $tugasBelajarStatus->id,
+        ]);
+
+        $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+        $anggota->update([
+            'status_aktif' => 'Tugas Belajar',
+            'status_pegawai_id' => $tugasBelajarStatus->id,
+        ]);
+
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        $hasil = $this->terapkan($unit, $sumber, $aktor);
+
+        $this->assertSame([$anggota->id], $hasil['applied_employee_ids']);
+        $this->assertNotContains($anggota->id, $hasil['skipped_inactive_employee_ids']);
+        $this->assertDatabaseHas('leave_approval_chains', ['employee_id' => $anggota->id, 'is_active' => true]);
+    }
+
+    public function test_endpoint_menerima_template_dengan_approver_aktif_khusus_bervariasi(): void
+    {
+        $aktor = User::factory()->superAdmin()->create();
+        $unit = $this->unit('Bagian Keuangan Variasi');
+        $status = RefStatusPegawai::query()->where('kode', 'TUGAS_BELAJAR')->firstOrFail();
+        DB::table('ref_status_pegawai')->where('id', $status->id)->update([
+            'kelompok' => ' aktif/KHUSUS ',
+        ]);
+        $pybmc = Employee::factory()->create(['status_pegawai_id' => $status->id]);
+        $verifikator = Employee::factory()->create(['status_pegawai_id' => $status->id]);
+        DB::table('employees')->whereIn('id', [$pybmc->id, $verifikator->id])->update([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => 'Tugas Belajar',
+        ]);
+        $sumber = $this->pegawaiUnit($unit, 'Sumber Variasi');
+        $anggota = $this->pegawaiUnit($unit, 'Anggota Variasi');
+        $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => $sumber->id,
+                'template_reason' => 'Menguji kelompok aktif khusus bervariasi.',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('leave_approval_chains', [
+            'employee_id' => $anggota->id,
+            'is_active' => true,
+        ]);
+    }
+
     public function test_pegawai_dengan_kepala_bagian_nonaktif_dilewati(): void
     {
         // Penugasan atasan bisa tetap efektif walau orangnya sudah pensiun. Form per pegawai hanya
@@ -165,7 +236,9 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
         $this->rantaiAwal($sumber, $aktor, $verifikator, $pybmc);
 
-        Employee::query()->whereKey($anggota->kepala_bagian_id)->update(['status_aktif' => 'Pensiun']);
+        // Melalui mutator Eloquent agar snapshot dan relasi status (kelompok Nonaktif)
+        // tersinkron — sesuai satu sumber klasifikasi aktif (kelompok referensi).
+        Employee::findOrFail($anggota->kepala_bagian_id)->update(['status_aktif' => 'Pensiun']);
 
         $hasil = $this->terapkan($unit, $sumber, $aktor);
 

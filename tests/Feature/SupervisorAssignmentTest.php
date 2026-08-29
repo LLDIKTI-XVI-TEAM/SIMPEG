@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
+use App\Models\RefStatusPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\AuditService;
@@ -521,6 +522,34 @@ class SupervisorAssignmentTest extends TestCase
             'tanggal_mulai' => '2026-07-23 00:00:00',
             'tanggal_berakhir' => null,
         ]);
+    }
+
+    public function test_direct_report_scope_mengeluarkan_pegawai_nonaktif_meski_assignment_efektif(): void
+    {
+        // US-2.9/US-2.10 + klasifikasi kelompok: setelah SoftDeletes hilang, pegawai
+        // nonaktif tidak boleh lagi berada di scope bawahan hanya karena assignment-nya
+        // masih efektif — direktori bawahan harus memakai definisi aktif yang sama.
+        $user = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $kepalaBagianUser = User::factory()->kepalaBagian()->create(['employee_id' => $kepalaBagian->id]);
+        $nonaktifStatus = RefStatusPegawai::where('kode', 'NONAKTIF')->firstOrFail();
+        $employeeNonaktif = Employee::factory()->create([
+            'status_aktif' => 'Nonaktif',
+            'status_pegawai_id' => $nonaktifStatus->id,
+        ]);
+        SupervisorAssignment::create([
+            'employee_id' => $employeeNonaktif->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
+
+        $this->assertTrue($employeeNonaktif->refresh()->status_pegawai_id === $nonaktifStatus->id);
+        $this->assertFalse($employeeNonaktif->isActive());
+
+        $scope = app(KepalaBagianScopeService::class);
+        $this->assertFalse($scope->hasDirectReport($kepalaBagianUser, $employeeNonaktif->id));
+        $this->assertSame([], $scope->directReportIds($kepalaBagianUser));
     }
 
     public function test_future_assignment_does_not_change_today_pointer_current_resolver_or_direct_report_scope(): void

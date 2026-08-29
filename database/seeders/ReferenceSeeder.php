@@ -268,6 +268,7 @@ class ReferenceSeeder extends Seeder
             'ews.satyalancana',
             'ews.tidak_perlu',
             'status_pegawai.diubah',
+            'status_pegawai.dinonaktifkan',
             'import_pegawai',
             'import_pegawai_gagal',
         ];

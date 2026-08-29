@@ -6,7 +6,6 @@ use App\Actions\Employees\AssignSupervisorAction;
 use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
-use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\ShowEmployeeAction;
 use App\Actions\Employees\ShowEmployeeDocumentStatusAction;
@@ -60,13 +59,13 @@ class EmployeeController extends Controller
         // Gunakan HMAC-SHA256 blind index (nik_hash) sebagai gantinya.
         if ($request->type === 'nik') {
             $hash = hash_hmac('sha256', trim($request->value), config('app.key'));
-            // withTrashed() agar selaras dengan unique index employees_nik_hash_unique
-            // yang mencakup soft-deleted rows — NIK pegawai yang dihapus tetap tidak boleh dipakai ulang.
-            $query = Employee::withTrashed()->where('nik_hash', $hash);
+            // Seluruh pegawai (aktif maupun nonaktif) tercakup karena nonaktif
+            // disimpan sebagai status, bukan dihapus dari tabel.
+            $query = Employee::query()->where('nik_hash', $hash);
         } else {
-            // NIP disimpan plaintext — perbandingan langsung berfungsi.
-            // withTrashed() konsisten: NIP pegawai terhapus juga dianggap sudah terpakai.
-            $query = Employee::withTrashed()->where($request->type, $request->value);
+            // NIP disimpan plaintext — perbandingan langsung berfungsi. Seluruh
+            // pegawai (aktif maupun nonaktif) ikut dianggap sudah terpakai.
+            $query = Employee::query()->where($request->type, $request->value);
         }
 
         if ($request->filled('except_id')) {
@@ -142,61 +141,34 @@ class EmployeeController extends Controller
         ])->header('Cache-Control', 'no-store, private, max-age=0, must-revalidate');
     }
 
-    public function inactive(Request $request, ListInactiveEmployeesAction $action): JsonResponse
-    {
-        return response()->json([
-            'message' => 'Daftar pegawai nonaktif berhasil diambil.',
-            'employees' => $action->execute($request->query())->through(fn (Employee $employee): array => $this->employeeListPayload($employee)),
-        ]);
-    }
-
-    public function backup(Request $request): JsonResponse
-    {
-        $perPage = min(max((int) ($request->query('per_page', 10)), 1), 100);
-        $search = trim((string) ($request->query('search', '')));
-
-        $paginator = Employee::onlyTrashed()
-            ->with([
-                'jenisPegawai:id,nama',
-                'positionHistories' => fn ($q) => $q
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
-                    ->where('is_latest', true)
-                    ->limit(1),
-            ])
-            ->when($search !== '', function ($q) use ($search): void {
-                $keyword = '%'.mb_strtolower($search).'%';
-                $q->where(function ($q) use ($keyword): void {
-                    $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
-                        ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
-                });
-            })
-            ->orderByDesc('deleted_at')
-            ->paginate($perPage)
-            ->withQueryString()
-            ->through(fn (Employee $employee) => $this->backupPayload($employee));
-
-        return response()->json([
-            'message' => 'Data pegawai nonaktif berhasil diambil.',
-            'employees' => $paginator,
-        ]);
-    }
-
     public function destroy(Employee $employee, DeactivateEmployeeRequest $request, DeactivateEmployeeAction $action): JsonResponse
     {
-        $action->execute($employee, $request);
+        $result = $action->execute($employee, $request);
 
         return response()->json([
-            'message' => 'Data pegawai berhasil dinonaktifkan.',
+            'message' => $result->isScheduled()
+                ? "Penonaktifan pegawai berhasil dijadwalkan untuk tanggal {$result->effectiveDate}."
+                : 'Data pegawai berhasil dinonaktifkan.',
+            'status_transition' => [
+                'state' => $result->state,
+                'effective_date' => $result->effectiveDate,
+            ],
         ]);
     }
 
     public function restore(string $employee, RestoreEmployeeRequest $request, RestoreEmployeeAction $action): JsonResponse
     {
-        $restored = $action->execute(Employee::onlyTrashed()->findOrFail($employee), $request);
+        $result = $action->execute(Employee::query()->findOrFail($employee), $request);
 
         return response()->json([
-            'message' => 'Data pegawai berhasil diaktifkan kembali.',
-            'employee' => $this->employeeListPayload($restored),
+            'message' => $result->isScheduled()
+                ? "Pengaktifan kembali pegawai berhasil dijadwalkan untuk tanggal {$result->effectiveDate}."
+                : 'Data pegawai berhasil diaktifkan kembali.',
+            'employee' => $this->employeeListPayload($result->employee),
+            'status_transition' => [
+                'state' => $result->state,
+                'effective_date' => $result->effectiveDate,
+            ],
         ]);
     }
 
@@ -249,30 +221,7 @@ class EmployeeController extends Controller
             'golongan_terakhir' => $employee->golongan_terakhir,
             'jenis_pegawai' => $employee->jenisPegawai?->nama,
             'unit_kerja' => $latestPosition?->unitKerja?->nama,
-            'deleted_at' => $employee->deleted_at,
-        ];
-    }
-
-    /**
-     * Payload ringkas untuk backup — data pegawai nonaktif tanpa informasi sensitif.
-     *
-     * @return array<string, mixed>
-     */
-    private function backupPayload(Employee $employee): array
-    {
-        $latestPosition = $employee->positionHistories->first();
-        $deletedAt = $employee->deleted_at;
-
-        return [
-            'id' => $employee->id,
-            'nama_lengkap' => $employee->nama_lengkap,
-            'nip' => $employee->nip,
-            'foto_url' => $employee->foto_url,
-            'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
-            'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
-            'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
-            'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
-            'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
+            'status_aktif' => $employee->status_aktif,
         ];
     }
 }

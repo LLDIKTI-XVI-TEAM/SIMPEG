@@ -155,10 +155,9 @@ class CutiDetailTimelineTest extends TestCase
             'is_final' => true,
         ]);
 
-        $this->actingAs($unmappedUser)
+        $this->actingAsUnmapped($unmappedUser)
             ->get(route('cuti.show', $leaveRequest->id))
-            ->assertForbidden()
-            ->assertDontSee(route('cuti.approve', $leaveRequest->id), false);
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_active_approver_actions_wrap_on_small_screens(): void

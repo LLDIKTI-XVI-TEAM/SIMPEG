@@ -105,8 +105,8 @@ class HandleKeycloakCallbackAction
 
             $employee = $employees->first();
 
-            // Pegawai nonaktif tidak boleh mendapat akun baru ber-privilege — cek sebelum role assignment
-            // (matchedEmployees hanya filter deleted_at; kelompok Nonaktif/Pensiun/Mutasi harus ditolak di sini).
+            // Pegawai nonaktif tidak boleh mendapat akun baru ber-privilege — lapisan kedua
+            // setelah whereActiveStatus(): kelompok Nonaktif/Pensiun/Mutasi ditolak di sini.
             if ($this->employeeIsInactive($employee->id)) {
                 $this->auditMappingRejected(null, 'employee_inactive', $matchedEmail, $employee->id, $request);
 
@@ -165,7 +165,7 @@ class HandleKeycloakCallbackAction
         $state = DB::transaction(function () use ($employee, $keycloakId, $username, $name, $matchedEmail): array {
             // Serialisasi callback paralel untuk pegawai yang sama: kunci baris employee
             // sebelum re-check identitas (TOCTOU guard pada boundary database).
-            Employee::withTrashed()->whereKey($employee->id)->lockForUpdate()->first();
+            Employee::query()->whereKey($employee->id)->lockForUpdate()->first();
 
             $userByEmployee = User::where('employee_id', $employee->id)->lockForUpdate()->first();
             $userByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])->lockForUpdate()->first();
@@ -347,16 +347,16 @@ class HandleKeycloakCallbackAction
                     // pegawai nonaktif hanya memegang email_pribadi kanonisnya.
                     ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
             })
-                // Kelayakan aktif kanonis berasal dari ref_status_pegawai.kelompok
-                // (diperiksa employeeIsInactive). Filter deleted_at hanya pelengkap
-                // sementara Employee masih memakai SoftDeletes (selaras PR #19).
-                ->whereNull('deleted_at')
+                // Permukaan autentikasi hanya memetakan pegawai aktif menurut kelompok
+                // status kepegawaian (termasuk "Aktif/khusus" seperti Tugas Belajar);
+                // pegawai yang dinonaktifkan tidak boleh menjadi pintu masuk akun SSO baru.
+                ->whereActiveStatus()
                 ->limit(2)
                 ->get();
         }
 
         return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])
-            ->whereNull('deleted_at')
+            ->whereActiveStatus()
             ->limit(2)
             ->get();
     }
@@ -440,29 +440,17 @@ class HandleKeycloakCallbackAction
     }
 
     /**
-     * Apakah pegawai terpeta sudah tidak aktif. Pegawai nonaktif tidak berhak
-     * atas inisialisasi role baru lewat SSO.
-     *
-     * Pemeriksaan mencakup dua skenario: (1) soft-delete via deleted_at, dan
-     * (2) status referensi (kelompok) bukan aktif — contoh Pensiun, Mutasi, Nonaktif
-     * yang belum di-soft-delete. Fail-closed: pegawai tanpa status dianggap nonaktif.
+     * Apakah pegawai terpeta sudah dinonaktifkan. Klasifikasi memakai kelompok status
+     * kepegawaian (satu sumber dengan middleware dan isActive()), sehingga status
+     * "Aktif/khusus" seperti Tugas Belajar tidak dianggap dinonaktifkan hanya karena
+     * nama snapshotnya bukan "Aktif".
      */
     private function employeeIsInactive(string $employeeId): bool
     {
-        $employee = Employee::withTrashed()->with('statusPegawai')->whereKey($employeeId)->first();
-
-        if (! $employee) {
-            return true; // fail-closed
-        }
-
-        if ($employee->trashed()) {
-            return true;
-        }
-
-        // Kelompok status pegawai adalah single source of truth untuk aktif/nonaktif.
-        $kelompok = strtolower((string) ($employee->statusPegawai?->kelompok ?? ''));
-
-        return ! in_array($kelompok, ['aktif', 'aktif/khusus'], true);
+        return ! Employee::query()
+            ->whereKey($employeeId)
+            ->whereActiveStatus()
+            ->exists();
     }
 
     /**

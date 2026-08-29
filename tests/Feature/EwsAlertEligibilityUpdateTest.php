@@ -6,6 +6,7 @@ use App\Models\DisciplineRecord;
 use App\Models\Employee;
 use App\Models\EmployeeMilestone;
 use App\Models\EwsAlert;
+use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Services\EwsEngineService;
 use Database\Seeders\ReferenceSeeder;
@@ -255,5 +256,45 @@ class EwsAlertEligibilityUpdateTest extends TestCase
 
         $alert->refresh();
         $this->assertNull($alert->is_eligible, 'KGB alert should remain null regardless of performance');
+    }
+
+    /**
+     * Temuan review PR #19: EWS memfilter status_aktif = 'Aktif' persis sehingga pegawai
+     * berkelompok Aktif/khusus (mis. Tugas Belajar) hilang dari evaluasi EWS padahal
+     * Employee::isActive() menganggapnya aktif. Klasifikasi harus satu sumber kebenaran.
+     */
+    public function test_ews_evaluates_active_khusus_status_employee_like_tugas_belajar(): void
+    {
+        $this->seed(ReferenceSeeder::class);
+
+        $tugasBelajarStatus = RefStatusPegawai::query()
+            ->where('kode', 'TUGAS_BELAJAR')
+            ->firstOrFail();
+
+        $employee = Employee::factory()->create([
+            'status_aktif' => $tugasBelajarStatus->nama,
+            'status_pegawai_id' => $tugasBelajarStatus->id,
+            'is_kinerja_baik' => true,
+        ]);
+
+        // Sumber kebenaran klasifikasi: kelompok Aktif/khusus dianggap aktif.
+        $this->assertTrue($employee->isActive());
+
+        EmployeeMilestone::create([
+            'employee_id' => $employee->id,
+            'type' => 'kenaikan_pangkat',
+            'milestone_date' => now()->addDays(90),
+            'calculated_at' => now(),
+            'is_active' => true,
+            'metadata' => ['required_years' => 4],
+        ]);
+
+        app(EwsEngineService::class)->run();
+
+        // Pegawai Tugas Belajar tetap dievaluasi EWS meski snapshot status bukan "Aktif" persis.
+        $this->assertDatabaseHas('ews_alerts', [
+            'employee_id' => $employee->id,
+            'type' => 'KENAIKAN_PANGKAT',
+        ]);
     }
 }

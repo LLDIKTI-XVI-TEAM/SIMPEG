@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Models\Employee;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -22,8 +23,7 @@ class GlobalPybmcConfigRequest extends FormRequest
             'approver_employee_id' => [
                 'required',
                 Rule::exists('employees', 'id')
-                    ->where('status_aktif', 'Aktif')
-                    ->whereNull('deleted_at'),
+                    ->where(fn ($query) => $query->whereIn('id', Employee::query()->whereActiveStatus()->select('id'))),
             ],
             'pybmc_reason' => ['required', 'string', 'min:5', 'max:500'],
         ];

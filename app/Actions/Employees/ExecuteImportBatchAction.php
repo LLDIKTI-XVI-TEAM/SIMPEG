@@ -443,12 +443,12 @@ class ExecuteImportBatchAction
             // Validasi dan eksekusi terpisah waktu; NIP dan email dapat diklaim pegawai lain
             // setelah preview dinyatakan valid. Pre-check atomik mencegah insert yang tidak perlu
             // sebelum constraint database melempar QueryException.
-            if (! empty($data['nip']) && Employee::withTrashed()->where('nip', $data['nip'])->exists()) {
+            if (! empty($data['nip']) && Employee::query()->where('nip', $data['nip'])->exists()) {
                 return $this->duplicateNipOutcome($row);
             }
 
             if (! empty($data['email_pribadi'])
-                && Employee::withTrashed()
+                && Employee::query()
                     ->whereRaw('LOWER(email_pribadi) = ?', [strtolower((string) $data['email_pribadi'])])
                     ->exists()
             ) {

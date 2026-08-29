@@ -2,14 +2,66 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\SendSimpegNotificationEmailJob;
+use App\Models\Employee;
+use App\Models\RefStatusPegawai;
+use App\Models\SimpegNotification;
+use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 class NotificationEventChannelMigrationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_restore_memakai_kebijakan_generik_hasil_migration_untuk_in_app_dan_email(): void
+    {
+        Queue::fake();
+        $this->seed(RbacSeeder::class);
+
+        $this->assertDatabaseMissing('notification_event_channels', [
+            'event_key' => 'status_pegawai.diaktifkan_kembali',
+        ]);
+
+        $user = User::factory()->superAdmin()->create();
+        $nonaktif = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->firstOrFail();
+        $employee = Employee::factory()->create(['email_pribadi' => 'pegawai@example.test']);
+        $employee->status_pegawai_id = $nonaktif->id;
+        $employee->save();
+
+        $this->actingAs($user)
+            ->withSession(['_token' => 'test-token'])
+            ->postJson("/api/v1/pegawai/{$employee->id}/restore", [
+                '_token' => 'test-token',
+                'tanggal_efektif' => now()->toDateString(),
+                'alasan' => 'Masa sanksi berakhir.',
+            ])
+            ->assertOk();
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $employee->id)
+            ->sole();
+
+        $this->assertSame('status_pegawai.diubah', $notification->type);
+        $this->assertSame('Akun Anda Telah Diaktifkan Kembali', $notification->title);
+        $this->assertSame(
+            'Status kepegawaian Anda telah diaktifkan kembali. Keterangan: Masa sanksi berakhir.',
+            $notification->body,
+        );
+        $this->assertSame(route('profil', [], false), $notification->data['url']);
+
+        Queue::assertPushed(
+            SendSimpegNotificationEmailJob::class,
+            fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id
+                && $job->eventKey === 'status_pegawai.diubah'
+                && $job->title === 'Akun Anda Telah Diaktifkan Kembali'
+                && $job->body === 'Status kepegawaian Anda telah diaktifkan kembali. Keterangan: Masa sanksi berakhir.',
+        );
+    }
 
     public function test_migrations_backfill_complete_notification_policy_defaults_without_seeder(): void
     {
@@ -60,10 +112,10 @@ class NotificationEventChannelMigrationTest extends TestCase
 
         $statusPegawaiPolicies = DB::table('notification_event_channels')
             ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
-            ->where('notification_event_channels.event_key', 'status_pegawai.diubah')
+            ->whereIn('notification_event_channels.event_key', ['status_pegawai.diubah', 'status_pegawai.dinonaktifkan'])
             ->get(['notification_event_channels.is_enabled', 'ref_notification_channels.code']);
 
-        $this->assertCount(2, $statusPegawaiPolicies);
+        $this->assertCount(4, $statusPegawaiPolicies);
         $this->assertTrue($statusPegawaiPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
 
         $dutyPostponementPolicies = DB::table('notification_event_channels')
@@ -120,9 +172,9 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertTrue($followupPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
         $this->assertTrue($followupPolicies->every(fn (object $policy): bool => $policy->code === 'in_app'));
 
-        // Agregat 39 = 33 kebijakan existing (termasuk 2 event impor in_app)
-        // + 6 baris dari 6 event ews.followup.* (in_app saja).
-        $this->assertDatabaseCount('notification_event_channels', 39);
+        // Agregat 41 = 33 kebijakan existing + 6 baris dari 6 event ews.followup.* (in_app saja)
+        // + 2 baris dari status_pegawai.dinonaktifkan (in_app + email).
+        $this->assertDatabaseCount('notification_event_channels', 41);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')

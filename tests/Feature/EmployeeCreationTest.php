@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefProgramStudi;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -229,8 +230,9 @@ class EmployeeCreationTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $inactiveEmployee = Employee::factory()->create([
             'email_pribadi' => 'arsip.pegawai@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
-        $inactiveEmployee->delete();
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf(self::EMPLOYEES_ENDPOINT, $this->validPayload([

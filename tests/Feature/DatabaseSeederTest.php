@@ -172,45 +172,6 @@ class DatabaseSeederTest extends TestCase
     }
 
     /**
-     * Seeder idempotent terhadap Employee trashed (baseline masih memakai SoftDeletes):
-     * record trashed dengan email kanonis sama TIDAK diduplikasi, TIDAK di-restore,
-     * status/lifecycle tidak berubah, dan tidak ada user yang diikat ke pegawai itu.
-     */
-    public function test_seeder_skips_trashed_employee_without_duplicate_or_reactivation(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
-
-        $employee = Employee::factory()->create([
-            'email_pribadi' => $email,
-        ]);
-        $statusBefore = $employee->status_aktif;
-        $employee->delete();
-
-        $this->seed(DatabaseSeeder::class);
-
-        // Tidak ada duplikat Employee dengan email kanonis yang sama.
-        $this->assertSame(
-            1,
-            Employee::withTrashed()
-                ->where(function ($query) use ($email): void {
-                    $query
-                        ->whereRaw('lower(email) = ?', [strtolower($email)])
-                        ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
-                })
-                ->count(),
-        );
-
-        // Record trashed tetap trashed dan statusnya tidak berubah.
-        $trashed = Employee::withTrashed()->whereKey($employee->id)->first();
-        $this->assertNotNull($trashed);
-        $this->assertNotNull($trashed->deleted_at);
-        $this->assertSame($statusBefore, $trashed->status_aktif);
-
-        // Tidak ada user yang diikat ke pegawai trashed tersebut.
-        $this->assertSame(0, User::where('employee_id', $employee->id)->count());
-    }
-
-    /**
      * Seeder menolak pencocokan pegawai yang ambigu (lebih dari satu pegawai aktif cocok)
      * sama seperti kontrak callback: tidak memilih arbitrer, tidak membuat/mengikat user.
      */
@@ -605,6 +566,25 @@ class DatabaseSeederTest extends TestCase
         $this->assertTrue($invalidPreview['available']);
         $this->assertFalse($invalidPreview['valid']);
         $this->assertContains('Approver pada salah satu tahap chain tidak aktif.', $invalidPreview['warnings']);
+    }
+
+    public function test_phase_seven_browser_fixture_menyediakan_penugasan_kepala_bagian_aktual_untuk_demo_pegawai(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(PhaseSevenBrowserQaSeeder::class);
+
+        $employee = User::query()
+            ->where('keycloak_username', 'demo-klabat-pegawai')
+            ->firstOrFail()
+            ->employee()
+            ->firstOrFail();
+        $approver = User::query()
+            ->where('keycloak_username', 'demo-klabat-kabag')
+            ->firstOrFail()
+            ->employee()
+            ->firstOrFail();
+
+        $this->assertSame($approver->id, $employee->currentSupervisor()?->kepala_bagian_id);
     }
 
     public function test_phase_seven_browser_fixture_menyimpan_fakta_manual_snapshot_secara_idempoten_tanpa_approval_ulang(): void

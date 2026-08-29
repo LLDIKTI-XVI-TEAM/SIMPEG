@@ -59,9 +59,9 @@ class MyFamilyTest extends TestCase
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        $this->actingAs($user)
+        $this->actingAsUnmapped($user)
             ->getJson(route('api.v1.profil-saya.keluarga.index'))
-            ->assertNotFound();
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_pegawai_without_family_read_permission_cannot_read_self_family(): void

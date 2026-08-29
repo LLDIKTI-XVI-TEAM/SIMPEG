@@ -8,7 +8,6 @@ use App\Actions\Employees\CreateEmployeeAction;
 use App\Actions\Employees\DeactivateEmployeeAction;
 use App\Actions\Employees\ExportEmployeeAction;
 use App\Actions\Employees\ListEmployeesAction;
-use App\Actions\Employees\ListInactiveEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeEditFormDataAction;
 use App\Actions\Employees\RestoreEmployeeAction;
 use App\Actions\Employees\StoreEmployeeHistoryAction;
@@ -17,8 +16,6 @@ use App\Actions\Employees\UpdateEmployeePerformanceFlagAction;
 use App\Actions\Employees\UpdateEmployeeSatyalancanaEligibilityAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Employee\AssignSupervisorRequest;
-use App\Http\Requests\Employee\BulkDeactivateEmployeesRequest;
-use App\Http\Requests\Employee\BulkRestoreEmployeesRequest;
 use App\Http\Requests\Employee\ChangeEmployeeStatusRequest;
 use App\Http\Requests\Employee\DeactivateEmployeeRequest;
 use App\Http\Requests\Employee\RestoreEmployeeRequest;
@@ -26,7 +23,6 @@ use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeePerformanceFlagRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeSatyalancanaEligibilityRequest;
-use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\EwsConfig;
 use App\Models\RefAgama;
@@ -60,10 +56,14 @@ class PegawaiController extends Controller
         $employee = Employee::findOrFail($validated['pegawai_id']);
 
         try {
-            $action->execute($employee, $validated, $request, $request->file('berkas'));
+            $result = $action->execute($employee, $validated, $request, $request->file('berkas'));
+            $message = $result->isScheduled()
+                ? 'Perubahan status pegawai '.$employee->nama_lengkap.
+                    " berhasil dijadwalkan untuk tanggal {$result->effectiveDate}."
+                : 'Status pegawai '.$employee->nama_lengkap.' berhasil diperbarui.';
 
             return redirect()->route('data-pegawai')
-                ->with('success', 'Status pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('success', $message)
                 // Daftar dimuat dari sessionStorage; flag ini memaksanya meminta
                 // baris terbaru sehingga status pada tabel tidak tertinggal.
                 ->with('employee_data_changed', true);
@@ -123,7 +123,6 @@ class PegawaiController extends Controller
             'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
             'status_pegawai_id' => trim((string) $request->query('status_pegawai_id', 'all')),
             'status_aktif' => trim((string) $request->query('status_aktif', '')),
-            'show_nonaktif' => $request->boolean('show_nonaktif'),
         ];
 
         // Backward-compatible query params from the pagination branch.
@@ -239,127 +238,10 @@ class PegawaiController extends Controller
         $unitKerja = RefUnitKerja::all();
         $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
-        $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
 
-        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'statusPegawai', 'golonganRefOptions', 'eselonOptions'));
-    }
-
-    public function inactive(Request $request, ListInactiveEmployeesAction $action)
-    {
-        $unitKerjaOptions = RefUnitKerja::query()
-            ->orderBy('nama')
-            ->get(['id', 'nama']);
-        $jenisPegawaiOptions = RefJenisPegawai::query()
-            ->orderBy('nama')
-            ->get(['id', 'nama']);
-        $golonganOptions = Employee::query()
-            ->whereNotNull('golongan_terakhir')
-            ->distinct()
-            ->orderBy('golongan_terakhir')
-            ->pluck('golongan_terakhir')
-            ->map(fn (?string $golongan) => $golongan ? strtok($golongan, '/') : null)
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($golonganOptions->isEmpty()) {
-            $golonganOptions = collect(['II', 'III', 'IV']);
-        }
-
-        $filters = [
-            'search' => trim((string) $request->query('search', '')),
-            'golongan' => trim((string) $request->query('golongan', '')),
-            'unit_kerja_id' => trim((string) $request->query('unit_kerja_id', '')),
-            'jenis_pegawai_id' => trim((string) $request->query('jenis_pegawai_id', '')),
-        ];
-
-        $employees = $action->execute($filters);
-
-        return view('admin.pegawai.nonaktif', compact(
-            'employees',
-            'filters',
-            'unitKerjaOptions',
-            'jenisPegawaiOptions',
-            'golonganOptions'
-        ));
-    }
-
-    /**
-     * Halaman Data Backup — daftar terpusat pegawai yang dinonaktifkan (soft deleted).
-     * Data tidak akan dihapus permanen secara otomatis. Dapat diakses Super Admin dan
-     * Admin Kepegawaian karena keduanya memegang permission employees.restore;
-     * pemulihan massal tetap terbatas pada Super Admin.
-     */
-    public function backup(Request $request)
-    {
-        $perPage = (int) $request->query('per_page', 10);
-        $perPage = in_array($perPage, [10, 25, 50, 100], true) ? $perPage : 10;
-        $search = trim((string) $request->query('search', ''));
-        $dataChanged = session()->pull('backup_data_changed', false);
-
-        $query = Employee::onlyTrashed()
-            ->with([
-                'jenisPegawai:id,nama',
-                'positionHistories' => fn ($q) => $q
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
-                    ->where('is_latest', true)
-                    ->limit(1),
-            ])
-            ->orderByDesc('deleted_at');
-
-        if ($search !== '') {
-            $keyword = '%'.mb_strtolower($search).'%';
-            $query->where(function ($q) use ($keyword): void {
-                $q->whereRaw('LOWER(nama_lengkap) LIKE ?', [$keyword])
-                    ->orWhereRaw('LOWER(nip) LIKE ?', [$keyword]);
-            });
-        }
-
-        $paginator = $query->paginate($perPage)->withQueryString();
-
-        $initialRows = $paginator->map(function (Employee $employee): array {
-            $latestPosition = $employee->positionHistories->first();
-            $deletedAt = $employee->deleted_at;
-
-            return [
-                'id' => $employee->id,
-                'nama_lengkap' => $employee->nama_lengkap,
-                'nip' => $employee->nip,
-                'foto_url' => $employee->foto_url,
-                'jabatan' => $latestPosition?->jabatan?->nama ?? $employee->jabatan_terakhir ?? '-',
-                'unit_kerja' => $latestPosition?->unitKerja?->nama ?? '-',
-                'golongan_terakhir' => $employee->golongan_terakhir ?? '-',
-                'jenis_pegawai' => $employee->jenisPegawai?->nama ?? '-',
-                'deleted_at_human' => $deletedAt?->format('d/m/Y H:i') ?? '-',
-            ];
-        })->values()->all();
-
-        $initialMeta = [
-            'total' => $paginator->total(),
-            'current_page' => $paginator->currentPage(),
-            'last_page' => $paginator->lastPage(),
-            'from' => $paginator->firstItem() ?? 0,
-            'to' => $paginator->lastItem() ?? 0,
-            'per_page' => $paginator->perPage(),
-        ];
-
-        $user = $request->user();
-
-        // Kontrol mengikuti role efektif agar simulasi role tidak menampilkan aksi Super Admin
-        // yang tetap akan ditolak oleh middleware saat formulir dikirim.
-        $canBulkRestore = $user?->getEffectiveRole() === 'super_admin'
-            && $user->hasPermission('employees.restore');
-
-        return view('admin.pegawai.backup', compact(
-            'perPage',
-            'search',
-            'initialRows',
-            'initialMeta',
-            'dataChanged',
-            'canBulkRestore',
-        ));
+        return view('admin.pegawai.create', compact('jenisPegawai', 'agama', 'statusKawin', 'unitKerja', 'jabatanOptions', 'jenisJabatanOptions', 'golonganRefOptions', 'eselonOptions'));
     }
 
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action)
@@ -495,12 +377,14 @@ class PegawaiController extends Controller
         $employee = Employee::findOrFail($id);
         $nama = $employee->nama_lengkap;
 
-        $action->execute($employee, $request);
+        $result = $action->execute($employee, $request);
+        $message = $result->isScheduled()
+            ? "Penonaktifan pegawai {$nama} berhasil dijadwalkan untuk tanggal {$result->effectiveDate}."
+            : 'Status kepegawaian '.$nama.' berhasil diubah menjadi nonaktif.';
 
         return redirect()->route('data-pegawai')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
-            ->with('employee_data_changed', true)
-            ->with('backup_data_changed', true);
+            ->with('success', $message)
+            ->with('employee_data_changed', true);
     }
 
     /**
@@ -549,117 +433,19 @@ class PegawaiController extends Controller
         ]);
     }
 
-    public function bulkDestroy(BulkDeactivateEmployeesRequest $request)
-    {
-        $ids = $request->validated('ids');
-
-        $employees = Employee::whereIn('id', $ids)->get(['id', 'nama_lengkap', 'nip']);
-
-        if ($employees->isEmpty()) {
-            return back()->with('error', 'Data pegawai tidak ditemukan.');
-        }
-
-        $validIds = $employees->pluck('id')->all();
-        $count = count($validIds);
-        $now = now();
-        $user = $request->user();
-
-        DB::transaction(function () use ($validIds, $employees, $now, $user, $request): void {
-            // Satu UPDATE soft-delete semua sekaligus
-            Employee::whereIn('id', $validIds)->update(['deleted_at' => $now]);
-
-            // Batch insert audit log
-            $auditRows = $employees->map(fn ($e) => [
-                'id' => (string) Str::uuid(),
-                'user_id' => $user?->id,
-                'user_name' => $user?->name,
-                'event' => 'SOFT_DELETE',
-                'auditable_type' => 'Employee',
-                'auditable_id' => $e->id,
-                'old_values' => json_encode(['deleted_at' => null]),
-                'new_values' => json_encode(['deleted_at' => $now->toIso8601String()]),
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => $now,
-            ])->all();
-
-            // Penulisan massal melewati cast dan model event audit, sehingga penyamaran nomor
-            // identitas maupun penjaga append-only tidak berjalan di sini. Payload dijaga tetap
-            // hanya berisi penanda waktu penghapusan; jangan menambahkan data pribadi pegawai.
-            AuditLog::insert($auditRows);
-        });
-
-        return back()
-            ->with('success', $count.' pegawai berhasil dinonaktifkan dan dipindahkan ke Data Backup.')
-            ->with('employee_data_changed', true)
-            ->with('backup_data_changed', true);
-    }
-
     public function restore(string $id, RestoreEmployeeRequest $request, RestoreEmployeeAction $action)
     {
-        $employee = Employee::onlyTrashed()->findOrFail($id);
+        $employee = Employee::query()->findOrFail($id);
         $nama = $employee->nama_lengkap;
 
-        $action->execute($employee, $request);
+        $result = $action->execute($employee, $request);
+        $message = $result->isScheduled()
+            ? "Pengaktifan kembali pegawai {$nama} berhasil dijadwalkan untuk tanggal {$result->effectiveDate}."
+            : 'Status kepegawaian '.$nama.' berhasil diaktifkan kembali.';
 
-        // Tujuan redirect dibatasi ke daftar nonaktif karena halaman itu memakai gate yang sama
-        // dengan aksi restore, yaitu role super_admin/admin_kepegawaian beserta permission
-        // employees.restore. Mengarahkan ke halaman khusus Super Admin akan membuat pemulihan
-        // oleh Admin Kepegawaian berakhir pada 403 walaupun mutasinya sudah berhasil.
-        return redirect()->route('data-nonaktif')
-            ->with('success', 'Data pegawai '.$nama.' berhasil dipulihkan ke daftar pegawai aktif.')
-            ->with('employee_data_changed', true)
-            ->with('backup_data_changed', true);
-    }
-
-    public function bulkRestore(BulkRestoreEmployeesRequest $request)
-    {
-        $ids = $request->validated('ids');
-
-        // Ambil hanya yang memang ada di trash — validasi sekaligus
-        $employees = Employee::onlyTrashed()
-            ->whereIn('id', $ids)
-            ->get(['id', 'nama_lengkap', 'nip']);
-
-        if ($employees->isEmpty()) {
-            return redirect()->route('data-backup')
-                ->with('error', 'Data pegawai tidak ditemukan di daftar nonaktif.');
-        }
-
-        $validIds = $employees->pluck('id')->all();
-        $count = count($validIds);
-        $now = now();
-        $user = $request->user();
-
-        DB::transaction(function () use ($validIds, $employees, $now, $user, $request): void {
-            // Satu UPDATE — set deleted_at = null untuk semua sekaligus
-            Employee::onlyTrashed()
-                ->whereIn('id', $validIds)
-                ->update(['deleted_at' => null]);
-
-            // Batch insert audit log — satu INSERT untuk semua, jauh lebih cepat dari N inserts
-            $auditRows = $employees->map(fn ($e) => [
-                'id' => (string) Str::uuid(),
-                'user_id' => $user?->id,
-                'user_name' => $user?->name,
-                'event' => 'RESTORE',
-                'auditable_type' => 'Employee',
-                'auditable_id' => $e->id,
-                'old_values' => json_encode(['deleted_at' => $now->toIso8601String()]),
-                'new_values' => json_encode(['deleted_at' => null]),
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => $now,
-            ])->all();
-
-            // Penulisan massal melewati cast dan model event audit, sehingga penyamaran nomor
-            // identitas maupun penjaga append-only tidak berjalan di sini. Payload dijaga tetap
-            // hanya berisi penanda waktu penghapusan; jangan menambahkan data pribadi pegawai.
-            AuditLog::insert($auditRows);
-        });
-
-        return redirect()->route('data-backup')
-            ->with('success', $count.' pegawai berhasil dipulihkan ke daftar pegawai aktif.');
+        return redirect()->route('data-pegawai')
+            ->with('success', $message)
+            ->with('employee_data_changed', true);
     }
 
     public function storeRiwayat($id, Request $request, StoreEmployeeHistoryAction $action)

@@ -10,7 +10,6 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefProgramStudi;
-use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\AuditService;
@@ -43,6 +42,21 @@ class UpdateEmployeeAction
      */
     public function execute(Employee $employee, array $validated, Request $request): Employee
     {
+        $lifecycleFields = array_intersect(
+            Employee::LIFECYCLE_SNAPSHOT_FIELDS,
+            array_keys($validated),
+        );
+
+        if ($lifecycleFields !== []) {
+            $messages = [];
+            foreach ($lifecycleFields as $field) {
+                $messages[$field] = 'Status pegawai hanya dapat diubah melalui alur perubahan status.';
+            }
+
+            // Defense-in-depth untuk caller non-HTTP yang tidak melewati FormRequest.
+            throw ValidationException::withMessages($messages);
+        }
+
         $storedEmployeeDocumentPaths = [];
 
         $transaction = function () use ($employee, $validated, $request, &$storedEmployeeDocumentPaths) {
@@ -480,12 +494,6 @@ class UpdateEmployeeAction
 
         if (! empty($data['jabatan_id']) && empty($data['jabatan_terakhir'])) {
             $data['jabatan_terakhir'] = RefJabatan::find($data['jabatan_id'])?->nama;
-        }
-
-        if (! empty($data['status_pegawai_id']) && empty($data['status_aktif'])) {
-            $data['status_aktif'] = RefStatusPegawai::whereKey($data['status_pegawai_id'])->value('nama') ?? 'Aktif';
-        } elseif (empty($data['status_pegawai_id']) && ! empty($data['status_aktif'])) {
-            $data['status_pegawai_id'] = RefStatusPegawai::where('nama', $data['status_aktif'])->value('id');
         }
 
         $clearProgramStudi = filter_var($data['clear_program_studi'] ?? false, FILTER_VALIDATE_BOOLEAN);

@@ -17,10 +17,13 @@ class PimpinanLeaveController extends Controller
     {
         $filters = $request->validated();
         $data = $leaves->execute($request->user(), $filters);
+        // Jangkar ke awal bulan agar opsi periode tetap berurutan pada tanggal 29-31.
+        $bulanBerjalan = now()->startOfMonth();
 
         return view('pimpinan.cuti.index', array_merge($data, [
             'filters' => $filters,
-            'optPeriodes' => collect(range(0, 11))->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m')),
+            'optPeriodes' => collect(range(0, 11))
+                ->map(fn (int $offset): string => $bulanBerjalan->copy()->subMonths($offset)->format('Y-m')),
             'jenisCutiOptions' => RefJenisCuti::query()->orderBy('nama')->get(['id', 'nama']),
             'unitKerjaOptions' => RefUnitKerja::query()->orderBy('nama')->get(['id', 'nama']),
         ]));

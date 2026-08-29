@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Services\AuditService;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +24,9 @@ class UserMappingControllerTest extends TestCase
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+        // Referensi status (termasuk kelompok Aktif/khusus) dibutuhkan agar
+        // klasifikasi aktif berbasis kelompok berfungsi seperti produksi.
+        $this->seed(ReferenceSeeder::class);
     }
 
     // -----------------------------------------------------------------------
@@ -86,7 +91,9 @@ class UserMappingControllerTest extends TestCase
             $response->assertSee(sprintf('<option value="%s">%s</option>', $role, $label), false);
         }
 
-        $dataResponse = $this->actingAs($admin)->getJson(route('user-management.data'));
+        $dataResponse = $this->actingAs($admin)->getJson(route('user-management.data', [
+            'search' => 'belum-berrole@example.com',
+        ]));
         $this->assertNull($dataResponse->json('data.0.role'));
     }
 
@@ -118,7 +125,7 @@ class UserMappingControllerTest extends TestCase
         ]);
 
         $dataResponse = $this->actingAs($admin)
-            ->getJson(route('user-management.data'))
+            ->getJson(route('user-management.data', ['search' => 'pegawai@example.com']))
             ->assertOk();
 
         $this->assertSame('canonical-keycloak-subject', $dataResponse->json('data.0.keycloak_id'));
@@ -206,6 +213,7 @@ class UserMappingControllerTest extends TestCase
         ] as $status => [$employeeId, $label]) {
             $response = $this->actingAs($admin)->getJson(route('user-management.data', [
                 'status' => $status,
+                'search' => Employee::query()->findOrFail($employeeId)->nama_lengkap,
             ]));
 
             $response->assertOk();
@@ -272,6 +280,93 @@ class UserMappingControllerTest extends TestCase
         ]));
 
         $this->assertSame(0, $ambiguousResponse->json('meta.total'));
+    }
+
+    public function test_kandidat_legacy_hanya_menghitung_pegawai_aktif_ketika_email_sama(): void
+    {
+        // Hitungan keamanan SQL dan transformasi hasil memakai klasifikasi aktif yang
+        // sama: pegawai nonaktif hasil backfill tidak menambah kandidat legacy, sehingga
+        // user legacy dengan satu pegawai aktif tetap dianggap aman & unik.
+        $admin = User::factory()->superAdmin()->create();
+        $legacyEmail = 'legacy-hybrid@example.com';
+        // Dua pegawai "berbagi" alamat lewat kolom berbeda (email vs email_pribadi)
+        // — set lewat query builder mem-bypass mutator yang menyalin email→email_pribadi.
+        $aktif = Employee::factory()->create();
+        DB::table('employees')->where('id', $aktif->id)->update(['email' => $legacyEmail]);
+
+        $nonaktif = Employee::factory()->create();
+        DB::table('employees')->where('id', $nonaktif->id)->update([
+            'email_pribadi' => $legacyEmail,
+        ]);
+
+        $nonaktifStatus = RefStatusPegawai::where('kode', 'NONAKTIF')->firstOrFail();
+        $nonaktif->update([
+            'status_aktif' => 'Nonaktif',
+            'status_pegawai_id' => $nonaktifStatus->id,
+        ]);
+
+        User::factory()->pegawai()->create([
+            'email' => $legacyEmail,
+            'keycloak_id' => 'kc-hybrid-legacy',
+        ]);
+
+        $response = $this->actingAs($admin)->getJson(route('user-management.data', [
+            'status' => 'terhubung',
+        ]));
+
+        // Hanya satu kandidat aktif → fallback legacy aman dan mapping tampil.
+        $this->assertSame(1, $response->json('meta.total'));
+        $this->assertSame($aktif->id, $response->json('data.0.id'));
+        $this->assertSame('kc-hybrid-legacy', $response->json('data.0.keycloak_id'));
+
+        // Kebalikannya bila keduanya aktif → ambigu dan mapping dibuang.
+        $aktif2 = Employee::factory()->create(['email_pribadi' => 'aktif-kedua@example.com']);
+        DB::table('employees')->where('id', $aktif2->id)->update(['email' => $legacyEmail]);
+
+        $ambiguous = $this->actingAs($admin)->getJson(route('user-management.data', [
+            'status' => 'terhubung',
+        ]));
+        $this->assertSame(0, $ambiguous->json('meta.total'));
+    }
+
+    public function test_fallback_legacy_menormalisasi_kelompok_aktif_tanpa_snapshot_legacy(): void
+    {
+        $admin = User::factory()->superAdmin()->create();
+        $legacyEmail = 'fallback-canonical@example.com';
+        $status = RefStatusPegawai::query()->where('kode', 'TUGAS_BELAJAR')->firstOrFail();
+        DB::table('ref_status_pegawai')->where('id', $status->id)->update([
+            'kelompok' => ' AKTIF/KHUSUS ',
+        ]);
+
+        $aktifKhusus = Employee::factory()->create([
+            'email_pribadi' => $legacyEmail,
+            'status_pegawai_id' => $status->id,
+        ]);
+        DB::table('employees')->where('id', $aktifKhusus->id)->update([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => 'Tugas Belajar',
+        ]);
+        $tanpaRelasi = Employee::factory()->create([
+            'email_pribadi' => 'snapshot-lama@example.com',
+            'status_aktif' => 'Aktif',
+        ]);
+        DB::table('employees')->where('id', $tanpaRelasi->id)->update([
+            'email' => $legacyEmail,
+            'status_pegawai_id' => null,
+            'status_aktif' => 'Aktif',
+        ]);
+        User::factory()->pegawai()->create([
+            'email' => $legacyEmail,
+            'keycloak_id' => 'kc-fallback-canonical',
+        ]);
+
+        $response = $this->actingAs($admin)->getJson(route('user-management.data', [
+            'status' => 'terhubung',
+        ]));
+
+        $this->assertSame(1, $response->json('meta.total'));
+        $this->assertSame($aktifKhusus->id, $response->json('data.0.id'));
+        $this->assertSame('kc-fallback-canonical', $response->json('data.0.keycloak_id'));
     }
 
     // -----------------------------------------------------------------------

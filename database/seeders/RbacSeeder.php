@@ -93,6 +93,9 @@ class RbacSeeder extends Seeder
                 'employees.update',
                 'employees.import',
                 'employees.deactivate',
+                // K-STATUS-04: reaktivasi boleh Super Admin ATAU Admin Kepegawaian
+                // selama role EFEKTIF memiliki employees.restore. Gate tetap memakai
+                // role efektif sehingga simulasi tidak dibypass oleh role asli.
                 'employees.restore',
                 'employee_histories.read',
                 'employee_histories.create',

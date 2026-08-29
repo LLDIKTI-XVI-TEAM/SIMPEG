@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Referensi;
 
 use App\Models\RefStatusPegawai;
-use App\Services\Referensi\ReferenceTableCatalog;
+use App\Services\Referensi\ReferenceUsageService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -34,12 +34,7 @@ class UpdateStatusPegawaiRequest extends FormRequest
         ];
     }
 
-    /**
-     * Kode dan nama baris status sistem dikunci: scheduler EWS memfilter
-     * pegawai berdasarkan nama status aktif dan followup pensiun mencari
-     * kode PENSIUN, sehingga mengubah identitas baris ini memutus alur
-     * tersebut diam-diam. Field lain (kelompok, keterangan) tetap bebas.
-     */
+    /** Menyamakan guard identitas dan klasifikasi dengan boundary Action. */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -49,18 +44,24 @@ class UpdateStatusPegawaiRequest extends FormRequest
                 return;
             }
 
-            if (ReferenceTableCatalog::protectionReason($status) === null) {
-                return;
-            }
+            $errors = app(ReferenceUsageService::class)
+                ->statusMutationErrors($status, $this->all());
 
-            if ($this->input('kode') !== $status->kode) {
-                $validator->errors()->add('kode', 'Kode status sistem tidak dapat diubah karena dipakai logika aplikasi.');
-            }
-
-            if ($this->input('nama') !== $status->nama) {
-                $validator->errors()->add('nama', 'Nama status sistem tidak dapat diubah karena dipakai logika aplikasi.');
+            foreach ($errors as $field => $message) {
+                if (! $validator->errors()->has($field)) {
+                    $validator->errors()->add($field, $message);
+                }
             }
         });
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'kelompok.required' => ReferenceUsageService::GROUP_INVALID_MESSAGE,
+            'kelompok.string' => ReferenceUsageService::GROUP_INVALID_MESSAGE,
+        ];
     }
 
     /** @return array<string, string> */

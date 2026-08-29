@@ -173,8 +173,7 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertDontSee('deletePegawai(p.id, p.nama_lengkap)', false)
             ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
             ->assertDontSee('showDeleteModal', false)
-            ->assertDontSee('showRestoreModal', false)
-            ->assertDontSee(route('data-nonaktif'), false);
+            ->assertDontSee('showRestoreModal', false);
     }
 
     public function test_daftar_admin_dengan_permission_mutasi_tetap_menampilkan_kontrol_lifecycle_pegawai(): void
@@ -182,12 +181,10 @@ class PimpinanEmployeeDetailTest extends TestCase
         $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('data-pegawai'))
             ->assertOk()
-            ->assertSee('aria-label="Tampilkan Pegawai Non-Aktif"', false)
+            ->assertDontSee('aria-label="Tampilkan Pegawai Non-Aktif"', false)
+            ->assertSee('aria-label="\'Nonaktifkan pegawai \' + p.nama_lengkap"', false)
             ->assertSee('deletePegawai(p.id, p.nama_lengkap)', false)
-            ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
-            ->assertSee('showDeleteModal', false)
-            ->assertSee('showRestoreModal', false)
-            ->assertSee(route('data-nonaktif'), false);
+            ->assertSee('showDeleteModal', false);
     }
 
     public function test_daftar_pimpinan_hanya_menjalankan_satu_query_untuk_setiap_koleksi_opsi_filter(): void
@@ -1213,12 +1210,12 @@ class PimpinanEmployeeDetailTest extends TestCase
 
     public function test_semua_route_mutasi_pegawai_memiliki_role_gate_admin_eksplisit(): void
     {
+        // Mutasi pegawai umum: Super Admin + Admin Kepegawaian.
         $mutationRoutes = [
             'api.v1.pegawai.store',
             'api.v1.pegawai.check-identity',
             'api.v1.pegawai.import.store',
             'api.v1.pegawai.destroy',
-            'api.v1.pegawai.restore',
             'api.v1.pegawai.keluarga.store',
             'api.v1.pegawai.keluarga.update',
             'api.v1.pegawai.keluarga.destroy',
@@ -1244,6 +1241,16 @@ class PimpinanEmployeeDetailTest extends TestCase
                 "Route {$routeName} harus tetap fail-closed untuk role Pimpinan.",
             );
         }
+
+        // Pemulihan pegawai adalah keputusan administrasi yang memerlukan permission employees.restore
+        // (US-2.10). Pimpinan tanpa permission tersebut tetap fail-closed.
+        $restoreRoute = app('router')->getRoutes()->getByName('api.v1.pegawai.restore');
+        $this->assertNotNull($restoreRoute, 'Route api.v1.pegawai.restore harus tersedia.');
+        $this->assertContains(
+            'permission:employees.restore',
+            $restoreRoute->gatherMiddleware(),
+            'Route api.v1.pegawai.restore harus fail-closed: hanya role dengan permission employees.restore.',
+        );
     }
 
     public function test_pimpinan_tetap_dilarang_menghapus_keluarga_dan_pendidikan_meski_permission_mutasi_diberikan(): void
