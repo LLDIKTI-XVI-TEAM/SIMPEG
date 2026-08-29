@@ -186,14 +186,13 @@
                     <p class="text-xs text-muted font-sans">Arsip bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari bagian Dokumen &amp; SK pada halaman detail pegawai.</p>
                     <a href="{{ route('data-pegawai') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Buka Data Pegawai</a>
                 </div>
-                <button type="button" @click="clearCache(); fetchPage(meta.current_page, true);"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer font-sans"
+                <x-ui.button type="button" variant="secondary" @click="clearCache(); fetchPage(meta.current_page, true);"
                     title="Refresh data dan periksa ulang status file di storage">
                     <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
                     Refresh
-                </button>
+                </x-ui.button>
             </div>
         </div>
 

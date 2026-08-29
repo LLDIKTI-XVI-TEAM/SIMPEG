@@ -285,18 +285,18 @@
                 </svg>
             </x-slot:icon>
             <x-slot:meta>
-                <span class="font-semibold text-danger">{{ $formatNumber($dashboardEwsUrgent) }} urgent &middot; {{ $formatNumber($dashboardEwsWarning) }} peringatan</span>
+                <span class="font-medium text-ink">{{ $formatNumber($dashboardEwsUrgent) }} urgent &middot; {{ $formatNumber($dashboardEwsWarning) }} peringatan</span>
                 <span>{{ $formatNumber($dashboardEwsInfo) }} informasi</span>
             </x-slot:meta>
         </x-ui.stat-card>
     </section>
 
     <section class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3" aria-label="Kenaikan pangkat dan komposisi pegawai">
-        <x-ui.card padding="none" class="overflow-hidden lg:col-span-2">
+        <x-ui.card padding="none" class="flex flex-col overflow-hidden lg:col-span-2">
             <div class="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-ink">Kenaikan Pangkat Terdekat</h3>
-                    <p class="text-xs text-muted">Pegawai yang dijadwalkan naik pangkat bulan ini.</p>
+                    <p class="mt-0.5 text-xs text-muted">Pegawai yang dijadwalkan naik pangkat bulan ini.</p>
                 </div>
                 <a href="{{ route('data-pegawai') }}" class="text-xs font-semibold text-primary transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
                     Kelola
@@ -304,9 +304,9 @@
             </div>
 
             @if ($daftarKenaikanPangkat === null)
-                <x-ui.empty-state icon="none" title="Data kenaikan pangkat belum tersedia." />
+                <x-ui.empty-state icon="none" title="Data kenaikan pangkat belum tersedia." class="flex-1 my-auto" />
             @elseif ($promotionRows->isEmpty())
-                <x-ui.empty-state icon="none" title="Tidak ada kenaikan pangkat pada bulan ini." />
+                <x-ui.empty-state icon="none" title="Tidak ada kenaikan pangkat pada bulan ini." class="flex-1 my-auto" />
             @else
                 <div class="overflow-x-auto">
                     <x-ui.table>
@@ -357,8 +357,8 @@
 
         <x-ui.card padding="lg">
             <div>
-                <h3 class="mb-1 text-sm font-bold text-ink">Komposisi Kepegawaian</h3>
-                <p class="text-[10px] text-muted">Rasio pegawai aktif per jenis.</p>
+                <h3 class="text-sm font-bold text-ink">Komposisi Kepegawaian</h3>
+                <p class="mt-0.5 text-xs text-muted">Rasio pegawai aktif per jenis.</p>
             </div>
 
             @if ($komposisiPegawai === null)
@@ -420,7 +420,7 @@
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <h3 class="text-sm font-bold text-ink">Status Cuti</h3>
-                    <p class="text-xs text-muted">Ringkasan pengajuan yang perlu dipantau.</p>
+                    <p class="mt-0.5 text-xs text-muted">Ringkasan pengajuan yang perlu dipantau.</p>
                 </div>
                 <svg class="h-6 w-6 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.25 3v2.25m7.5-2.25v2.25M3.75 9.75h16.5M5.25 4.5h13.5A1.5 1.5 0 0 1 20.25 6v13.5A1.5 1.5 0 0 1 18.75 21h-13.5a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5Z" />
@@ -444,11 +444,8 @@
                         <dd class="text-lg font-semibold text-muted">{{ $formatNumber($cutiDitangguhkan) }}</dd>
                     </div>
                 </dl>
-                <a href="{{ route('cuti') }}" class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-colors hover:text-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
+                <a href="{{ route('cuti') }}" class="mt-5 inline-block text-sm font-semibold text-primary transition-colors hover:text-primary-hover hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
                     Buka monitoring cuti
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                    </svg>
                 </a>
             @endif
         </x-ui.card>
@@ -456,11 +453,11 @@
         <x-ui.card padding="lg" class="lg:col-span-2">
             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div>
-                    <h3 class="mb-1 text-sm font-bold text-ink">Distribusi Golongan</h3>
-                    <p class="text-[10px] text-muted">Jumlah pegawai per golongan I/a sampai IV/e.</p>
+                    <h3 class="text-sm font-bold text-ink">Distribusi Golongan</h3>
+                    <p class="mt-0.5 text-xs text-muted">Jumlah pegawai per golongan I/a sampai IV/e.</p>
                 </div>
                 @if ($rankTotal > 0)
-                    <span class="text-sm font-semibold text-primary">{{ $formatNumber($rankTotal) }} pegawai</span>
+                    <span class="text-sm font-semibold text-ink">{{ $formatNumber($rankTotal) }} pegawai</span>
                 @endif
             </div>
 
@@ -500,7 +497,7 @@
             <div class="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
                 <div>
                     <h3 id="ews-title" class="text-sm font-bold text-ink">Daftar EWS Aktif</h3>
-                    <p class="text-xs text-muted">Peringatan otomatis masa berlaku dokumen dan kepegawaian.</p>
+                    <p class="mt-0.5 text-xs text-muted">Peringatan otomatis masa berlaku dokumen dan kepegawaian.</p>
                 </div>
                 <a href="{{ $dashboardEwsLink }}" class="text-xs font-semibold text-primary transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
                     Lihat Semua
@@ -597,8 +594,8 @@
     <section class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3" aria-label="Tren pegawai dan aktivitas audit">
         <x-ui.card padding="lg" class="lg:col-span-2">
             <div>
-                <h3 class="mb-1 text-sm font-bold text-ink">Tren Pegawai Aktif</h3>
-                <p class="text-[10px] text-muted">Grafik jumlah pegawai aktif bulanan dalam 12 bulan terakhir.</p>
+                <h3 class="text-sm font-bold text-ink">Tren Pegawai Aktif</h3>
+                <p class="mt-0.5 text-xs text-muted">Grafik jumlah pegawai aktif bulanan dalam 12 bulan terakhir.</p>
             </div>
 
             @if ($trenPegawai === null)
@@ -641,12 +638,12 @@
         </x-ui.card>
 
         <x-ui.card padding="none" class="overflow-hidden">
-            <div class="flex items-center justify-between border-b border-border bg-surface px-6 py-4">
+            <div class="flex items-start justify-between gap-4 border-b border-border bg-surface px-6 py-4">
                 <div>
                     <h3 class="text-sm font-bold text-ink">Aktivitas Terkini</h3>
-                    <p class="text-xs text-muted">Lima aktivitas terakhir tanpa detail perubahan sensitif.</p>
+                    <p class="mt-0.5 text-xs text-muted">Lima aktivitas terakhir tanpa<br>detail perubahan sensitif.</p>
                 </div>
-                <a href="{{ route('audit-log') }}" class="text-xs font-semibold text-primary transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
+                <a href="{{ route('audit-log') }}" class="shrink-0 whitespace-nowrap text-xs font-semibold text-primary transition-colors hover:underline focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
                     Audit Log
                 </a>
             </div>

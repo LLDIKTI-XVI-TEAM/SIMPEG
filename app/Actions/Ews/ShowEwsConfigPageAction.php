@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
 use App\Services\Ews\EwsConfigCatalog;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ShowEwsConfigPageAction
 {
@@ -16,13 +17,13 @@ class ShowEwsConfigPageAction
      *
      * @return array<string, mixed>
      */
-    public function execute(): array
+    public function execute(int $logPerPage = 10): array
     {
         $configs = $this->currentConfigs();
 
         return [
             'configs' => $configs,
-            'auditRows' => $this->auditRows(),
+            'auditRows' => $this->auditRows($logPerPage),
             'schedulerStatus' => $this->schedulerStatus($configs['ews_scheduler_time']),
             'title' => 'Konfigurasi EWS',
         ];
@@ -39,28 +40,30 @@ class ShowEwsConfigPageAction
         return $configs;
     }
 
-    /** @return array<int, array<string, mixed>> */
-    private function auditRows(): array
+    /** @return LengthAwarePaginator<int, array<string, mixed>> */
+    private function auditRows(int $perPage): LengthAwarePaginator
     {
-        $dbLogs = AuditLog::where('auditable_type', 'EwsConfig')
+        /** @var LengthAwarePaginator<int, array<string, mixed>> $auditRows */
+        $auditRows = AuditLog::where('auditable_type', 'EwsConfig')
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->orderBy('id', 'desc')
+            ->paginate($perPage, ['*'], 'log_page')
+            ->withQueryString()
+            ->through(function (AuditLog $log): array {
+                $configKey = $log->new_values['key'] ?? $log->old_values['key'] ?? 'Parameter';
 
-        $auditRows = [];
-        foreach ($dbLogs as $log) {
-            $configKey = $log->new_values['key'] ?? $log->old_values['key'] ?? 'Parameter';
-            $auditRows[] = [
-                'time' => $log->created_at ? $log->created_at->format('d M Y, H:i') : '-',
-                'actor' => $log->user_name ?? 'Sistem',
-                'event' => $log->event,
-                'field' => EwsConfigCatalog::labelFor($configKey),
-                'before' => $log->old_values['value'] ?? 'Tidak ada',
-                'after' => $log->new_values['value'] ?? 'Tidak ada',
-                'ip_address' => $log->ip_address ?? '127.0.0.1',
-                'user_agent' => $log->user_agent ?? '-',
-                'reason' => $log->new_values['reason'] ?? '-',
-            ];
-        }
+                return [
+                    'time' => $log->created_at ? $log->created_at->format('d M Y, H:i') : '-',
+                    'actor' => $log->user_name ?? 'Sistem',
+                    'event' => $log->event,
+                    'field' => EwsConfigCatalog::labelFor($configKey),
+                    'before' => $log->old_values['value'] ?? 'Tidak ada',
+                    'after' => $log->new_values['value'] ?? 'Tidak ada',
+                    'ip_address' => $log->ip_address ?? '127.0.0.1',
+                    'user_agent' => $log->user_agent ?? '-',
+                    'reason' => $log->new_values['reason'] ?? '-',
+                ];
+            });
 
         return $auditRows;
     }

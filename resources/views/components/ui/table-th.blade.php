@@ -22,7 +22,7 @@
 <th {{ $attributes->class([
     $paddings[$padding] ?? $paddings['md'],
     $alignments[$align] ?? $alignments['left'],
-    'text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border',
+    'text-xs font-semibold uppercase tracking-wide text-muted font-sans border-b border-border whitespace-nowrap',
 ]) }}>
     {{ $slot }}
 </th>

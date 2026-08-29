@@ -1,5 +1,5 @@
 @if ($paginator->hasPages())
-    <nav role="navigation" aria-label="Pagination Navigation" class="flex justify-end w-full overflow-x-auto pb-1" style="scrollbar-width: none;">
+    <nav role="navigation" aria-label="Pagination Navigation" class="flex w-full items-center justify-end overflow-x-auto pb-1 scrollbar-hide">
         <ul class="flex items-center gap-1.5 shrink-0">
             {{-- Previous Page Link --}}
             @if ($paginator->onFirstPage())
@@ -20,26 +20,28 @@
                 $lastPage = max(1, $paginator->lastPage());
 
                 $customElements = [];
-                if ($lastPage <= 5) {
+                if ($lastPage <= 7) {
                     $urls = [];
                     for ($i = 1; $i <= $lastPage; $i++) {
                         $urls[$i] = $paginator->url($i);
                     }
                     $customElements[] = $urls;
                 } else {
-                    if ($currentPage <= 3) {
+                    if ($currentPage <= 4) {
                         $urls1 = [];
-                        for ($i = 1; $i <= 4; $i++) {
+                        $end = max(5, $currentPage + 1);
+                        for ($i = 1; $i <= $end; $i++) {
                             $urls1[$i] = $paginator->url($i);
                         }
                         $customElements[] = $urls1;
                         $customElements[] = '...';
                         $customElements[] = [$lastPage => $paginator->url($lastPage)];
-                    } elseif ($currentPage >= $lastPage - 2) {
+                    } elseif ($currentPage >= $lastPage - 3) {
                         $customElements[] = [1 => $paginator->url(1)];
                         $customElements[] = '...';
                         $urls2 = [];
-                        for ($i = $lastPage - 3; $i <= $lastPage; $i++) {
+                        $start = min($currentPage - 1, $lastPage - 4);
+                        for ($i = $start; $i <= $lastPage; $i++) {
                             $urls2[$i] = $paginator->url($i);
                         }
                         $customElements[] = $urls2;

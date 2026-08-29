@@ -776,27 +776,27 @@
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                     <div>
-                        <a href="javascript:void(0)" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ route('data-pegawai') }}'; }" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button as="a" href="javascript:void(0)" variant="secondary" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ route('data-pegawai') }}'; }">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                             </svg>
                             Batal
-                        </a>
+                        </x-ui.button>
                     </div>
                     <div class="flex items-center gap-3">
                         {{-- Tombol Sebelumnya --}}
-                        <button type="button"
+                        <x-ui.button type="button" variant="secondary"
                                 x-show="activeTab !== 'utama'"
                                 @click="activeTab = activeTab === 'pengangkatan' ? 'kontak' : (activeTab === 'kontak' ? 'pelengkap' : 'utama')"
-                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft shadow-sm font-sans cursor-pointer">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                             </svg>
                             Sebelumnya
-                        </button>
+                        </x-ui.button>
 
                         {{-- Tombol Selanjutnya --}}
-                        <button type="button"
+                        <x-ui.button type="button"
                                 x-show="activeTab !== 'pengangkatan'"
                                 @click="
                                     if (activeTab === 'utama') {
@@ -810,24 +810,22 @@
                                         activeTab = 'pengangkatan';
                                     }
                                 "
-                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                >
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
                             </svg>
                             Selanjutnya
-                        </button>
+                        </x-ui.button>
 
                         {{-- Tombol Simpan --}}
-                        <button type="submit"
+                        <x-ui.button type="submit"
                                 x-show="activeTab === 'pengangkatan'"
-                                :disabled="isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== ''"
-                                :class="(isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== '') ? 'opacity-50 cursor-not-allowed' : ''"
-                                class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 font-sans cursor-pointer">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                ::disabled="isSubmitting || skPangkatError !== '' || skJabatanError !== '' || skKgbError !== '' || skPengangkatanError !== ''">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                             </svg>
                             <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Pegawai'"></span>
-                        </button>
+                        </x-ui.button>
                     </div>
                 </div>
             </form>

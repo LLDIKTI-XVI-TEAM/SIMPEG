@@ -4,7 +4,7 @@
             <h2 class="text-2xl font-semibold text-ink">Dokumen Pendukung Kepala Lembaga</h2>
             <x-ui.breadcrumb :items="[
                 ['label' => 'Dashboard', 'url' => route('dashboard')],
-                ['label' => 'Cuti', 'url' => route('cuti')],
+                ['label' => 'Monitoring Cuti', 'url' => route('cuti')],
                 ['label' => 'Dokumen Pendukung Kepala Lembaga'],
             ]" />
         </header>
@@ -24,7 +24,7 @@
                         @endforeach
                     </select>
                     <noscript>
-                        <button type="submit" class="w-fit rounded-lg border border-border px-3 py-2 text-sm font-semibold text-ink">Pilih pegawai</button>
+                        <x-ui.button type="submit" variant="secondary" size="sm">Pilih pegawai</x-ui.button>
                     </noscript>
                 </form>
             @endif
@@ -45,7 +45,7 @@
                 </div>
                 <p class="text-sm text-muted">Untuk: <span class="font-semibold text-ink">{{ $selected->nama_lengkap }}</span></p>
                 <div class="flex justify-end">
-                    <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">Unggah</button>
+                    <x-ui.button type="submit">Unggah</x-ui.button>
                 </div>
             </form>
 
@@ -71,19 +71,16 @@
                                     <td class="px-4 py-3 text-muted">{{ $document->uploader?->name ?? '-' }}</td>
                                     <td class="px-4 py-3">
                                         <div class="flex flex-wrap items-center justify-end gap-2" x-data="{ confirming: false }">
-                                            <a href="{{ route('cuti.dokumen-kepala-lembaga.view', $document) }}" target="_blank" rel="noopener"
-                                                class="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-soft">Lihat</a>
-                                            <a href="{{ route('cuti.dokumen-kepala-lembaga.download', $document) }}"
-                                                class="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-soft">Unduh</a>
-                                            <button type="button" x-show="! confirming" @click="confirming = true"
-                                                class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white">Hapus</button>
+                                            <x-ui.button href="{{ route('cuti.dokumen-kepala-lembaga.view', $document) }}" target="_blank" rel="noopener" variant="secondary" size="sm">Lihat</x-ui.button>
+                                            <x-ui.button href="{{ route('cuti.dokumen-kepala-lembaga.download', $document) }}" variant="secondary" size="sm">Unduh</x-ui.button>
+                                            <x-ui.button type="button" variant="danger-solid" size="sm" x-show="! confirming" @click="confirming = true">Hapus</x-ui.button>
                                             <form x-show="confirming" x-cloak method="POST" action="{{ route('cuti.dokumen-kepala-lembaga.destroy', $document) }}"
                                                 class="inline-flex items-center gap-2" @keydown.escape="confirming = false">
                                                 @csrf
                                                 @method('DELETE')
                                                 <span class="text-xs text-muted">Yakin?</span>
-                                                <button type="submit" class="rounded-lg bg-danger px-3 py-1.5 text-xs font-semibold text-white">Ya, hapus</button>
-                                                <button type="button" @click="confirming = false" class="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink">Batal</button>
+                                                <x-ui.button type="submit" variant="danger-solid" size="sm">Ya, hapus</x-ui.button>
+                                                <x-ui.button type="button" variant="secondary" size="sm" @click="confirming = false">Batal</x-ui.button>
                                             </form>
                                         </div>
                                     </td>

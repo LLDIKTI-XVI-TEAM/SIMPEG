@@ -76,8 +76,8 @@
                             <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold">
                                 <div class="flex items-center gap-1.5">Jabatan & Unit <svg class="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg></div>
                             </x-ui.table-th>
-                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold">
-                                <div class="flex items-center gap-1.5">Gol. / Jenis <svg class="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg></div>
+                            <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold whitespace-nowrap">
+                                <div class="flex items-center gap-1.5">Golongan & Jenis <svg class="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4"/></svg></div>
                             </x-ui.table-th>
                             <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">TMT</x-ui.table-th>
                             <x-ui.table-th padding="comfortable" class="text-xs text-muted font-bold uppercase tracking-wider">STATUS</x-ui.table-th>
@@ -114,8 +114,9 @@
                                     <p class="text-sm font-medium text-ink leading-tight">{{ $employee->jabatan_terakhir ?: '-' }}</p>
                                     <p class="text-xs text-muted mt-1">{{ $position?->unitKerja?->nama ?? '-' }}</p>
                                 </x-ui.table-td>
-                                <x-ui.table-td padding="comfortable">
-                                    <span class="text-sm font-medium text-ink">{{ $position?->golongan?->nama ?? '-' }} / {{ $employee->jenisPegawai?->nama ?? '-' }}</span>
+                                <x-ui.table-td padding="comfortable" class="whitespace-nowrap">
+                                    <p class="text-sm font-medium text-ink">{{ $position?->golongan?->nama ?? '-' }}</p>
+                                    <p class="text-xs text-muted">{{ $employee->jenisPegawai?->nama ?? '-' }}</p>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="comfortable">
                                     <p class="text-sm text-ink">{{ $position?->tmt_jabatan ? \Carbon\Carbon::parse($position->tmt_jabatan)->translatedFormat('d M Y') : '-' }}</p>

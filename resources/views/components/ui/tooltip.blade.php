@@ -8,11 +8,14 @@
 <div x-data="{ tooltipVisible: false }"
      @mouseenter="tooltipVisible = true"
      @mouseleave="tooltipVisible = false"
+     @focusin="tooltipVisible = true"
+     @focusout="tooltipVisible = false"
      {{ $attributes->merge(['class' => 'relative inline-flex']) }}>
     
     {{ $slot }}
 
     <div x-show="tooltipVisible"
+         role="tooltip"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"

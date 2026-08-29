@@ -229,8 +229,8 @@
             {{-- W1: Komposisi Pegawai PNS vs PPPK (SVG Pie/Donut Chart) --}}
             <x-ui.card padding="lg" class="flex flex-col justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-ink font-sans mb-1">Komposisi Kepegawaian</h3>
-                    <p class="text-[10px] text-muted font-sans mb-5">Rasio Pegawai PNS vs PPPK</p>
+                    <h3 class="text-sm font-bold text-ink font-sans">Komposisi Kepegawaian</h3>
+                    <p class="mt-0.5 text-xs text-muted font-sans mb-5">Rasio Pegawai PNS vs PPPK</p>
                     
                     @php
                         $pnsCount = $komposisi['PNS'] ?? 0;
@@ -433,8 +433,8 @@
             {{-- W5: Distribusi Golongan (Horizontal Bar Chart) --}}
             <x-ui.card padding="lg" class="flex flex-col justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-ink font-sans mb-1">Distribusi Golongan</h3>
-                    <p class="text-[10px] text-muted font-sans mb-5">Statistik jumlah pegawai per tingkat golongan</p>
+                    <h3 class="text-sm font-bold text-ink font-sans">Distribusi Golongan</h3>
+                    <p class="mt-0.5 text-xs text-muted font-sans mb-5">Statistik jumlah pegawai per tingkat golongan</p>
                     
                     <div class="space-y-4">
                         @forelse($distribusiGolongan as $rank => $count)
@@ -460,8 +460,8 @@
             {{-- W7: Tren Pegawai Aktif (SVG Line Chart) --}}
             <x-ui.card padding="lg" class="lg:col-span-2 flex flex-col justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-ink font-sans mb-1">Tren Pegawai Aktif</h3>
-                    <p class="text-[10px] text-muted font-sans mb-4">Grafik jumlah pegawai aktif bulanan dari data yang tersimpan</p>
+                    <h3 class="text-sm font-bold text-ink font-sans">Tren Pegawai Aktif</h3>
+                    <p class="mt-0.5 text-xs text-muted font-sans mb-4">Grafik jumlah pegawai aktif bulanan dari data yang tersimpan</p>
                     
                     @php
                         // Menghitung poin-poin SVG secara dinamis berdasarkan data trend ($trenPegawai).

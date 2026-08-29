@@ -36,7 +36,7 @@
 >
     <div class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-2xl font-bold leading-tight text-primary">Jabatan</h2>
+            <h2 class="text-2xl font-bold leading-tight text-ink">Jabatan</h2>
             <p class="mt-0.5 max-w-2xl text-[11px] leading-normal text-muted">
                 Referensi jabatan untuk riwayat kepegawaian, kategori jenis jabatan, eselon, dan batas usia pensiun.
                 Jabatan yang sudah dipakai hanya dapat dinonaktifkan.
@@ -44,15 +44,16 @@
         </div>
 
         @if ($jabatanCrudReady)
-            <button
+            <x-ui.button
                 type="button"
                 @click="showTambah = !showTambah"
-                :aria-expanded="showTambah.toString()"
+                x-bind:aria-expanded="showTambah.toString()"
                 aria-controls="form-tambah-jabatan"
-                class="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2"
+                variant="primary"
+                class="shrink-0"
             >
-                Tambah Jabatan
-            </button>
+                Tambah
+            </x-ui.button>
         @endif
     </div>
 
@@ -131,9 +132,9 @@
             </div>
 
             <div class="flex items-end">
-                <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
+                <x-ui.button type="submit" :full-width="true">
                     Simpan Jabatan
-                </button>
+                </x-ui.button>
             </div>
         </form>
     @endif
@@ -149,7 +150,7 @@
                     <x-ui.table-th align="center">Status</x-ui.table-th>
                     <x-ui.table-th align="center">Pemakaian</x-ui.table-th>
                     @if ($jabatanCrudReady)
-                        <x-ui.table-th align="right">Aksi</x-ui.table-th>
+                        <x-ui.table-th>Aksi</x-ui.table-th>
                     @endif
                 </x-ui.table-row>
             </x-ui.table-head>
@@ -174,34 +175,59 @@
                         </x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm" class="text-sm text-muted">{{ $dipakai }} pemakai</x-ui.table-td>
                         @if ($jabatanCrudReady)
-                            <x-ui.table-td align="right" padding="sm">
-                                {{-- Tab ini punya kolom paling banyak, sehingga aksi dijaga tetap ringkas:
-                                     Hapus memakai ikon dengan label pembaca layar agar ketiga aksi muat
-                                     dalam satu baris dan tidak terpotong di layar sempit. --}}
-                                <div class="ml-auto flex flex-nowrap items-center justify-end gap-1.5">
-                                    <button type="button" title="Ubah {{ $item->nama }}" @click="editId = editId === '{{ $item->id }}' ? null : '{{ $item->id }}'" class="inline-flex items-center rounded-lg border border-border bg-surface p-1.5 text-primary transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">
-                                        <span class="sr-only">Ubah {{ $item->nama }}</span>
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            <x-ui.table-td padding="sm" class="whitespace-nowrap">
+                                <div class="flex flex-nowrap items-center justify-start gap-1.5">
+                                    <x-ui.button
+                                        type="button"
+                                        title="Ubah {{ $item->nama }}"
+                                        tooltip-position="top-end"
+                                        aria-label="Ubah {{ $item->nama }}"
+                                        @click="editId = editId === '{{ $item->id }}' ? null : '{{ $item->id }}'"
+                                        variant="secondary"
+                                        size="icon"
+                                    >
+                                        <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                         </svg>
-                                    </button>
-                                    <form method="POST" action="{{ route('data-master.jabatan.toggle', $item) }}">
+                                    </x-ui.button>
+                                    <form method="POST" action="{{ route('data-master.jabatan.toggle', $item) }}" class="inline">
                                         @csrf
                                         <input type="hidden" name="tab" value="jabatan">
-                                        <button type="submit" class="whitespace-nowrap rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold {{ $item->is_active ? 'text-warning' : 'text-success' }} transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">
-                                            {{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}
-                                        </button>
+                                        <x-ui.button
+                                            type="submit"
+                                            variant="{{ $item->is_active ? 'warning' : 'success' }}"
+                                            size="icon"
+                                            title="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
+                                            tooltip-position="top-end"
+                                            aria-label="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
+                                        >
+                                            @if ($item->is_active)
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
+                                                </svg>
+                                            @else
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+                                                </svg>
+                                            @endif
+                                        </x-ui.button>
                                     </form>
                                     @if ($dipakai === 0)
-                                        <form method="POST" action="{{ route('data-master.jabatan.destroy', $item) }}" onsubmit="return confirm('Hapus jabatan ini secara permanen? Tindakan tercatat di audit log.')">
+                                        <form method="POST" action="{{ route('data-master.jabatan.destroy', $item) }}" class="inline" onsubmit="return confirm('Hapus jabatan ini secara permanen? Tindakan tercatat di audit log.')">
                                             @csrf
                                             <input type="hidden" name="tab" value="jabatan">
-                                            <button type="submit" title="Hapus {{ $item->nama }}" class="inline-flex items-center rounded-lg border border-danger/30 bg-surface p-1.5 text-danger transition-colors hover:bg-danger/10 focus:outline-none focus:ring-2 focus:ring-danger/30">
-                                                <span class="sr-only">Hapus {{ $item->nama }}</span>
-                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            <x-ui.button
+                                                type="submit"
+                                                variant="danger"
+                                                size="icon"
+                                                title="Hapus {{ $item->nama }}"
+                                                tooltip-position="top-end"
+                                                aria-label="Hapus {{ $item->nama }}"
+                                            >
+                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </form>
                                     @endif
                                 </div>
@@ -281,12 +307,12 @@
                                     </div>
 
                                     <div class="flex items-end gap-2">
-                                        <button type="submit" class="inline-flex flex-1 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2">
+                                        <x-ui.button type="submit" class="flex-1">
                                             Perbarui
-                                        </button>
-                                        <button type="button" @click="editId = null" class="rounded-lg px-3 py-2 text-sm font-semibold text-muted transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">
+                                        </x-ui.button>
+                                        <x-ui.button type="button" variant="secondary" size="sm" @click="editId = null">
                                             Batal
-                                        </button>
+                                        </x-ui.button>
                                     </div>
                                 </form>
                             </td>

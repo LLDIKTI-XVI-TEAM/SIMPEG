@@ -66,12 +66,12 @@
                             <input type="password" name="new_password_confirmation" required minlength="8" class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
                         </div>
                         <div class="pt-2">
-                            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                            <x-ui.button type="submit">
                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                                 </svg>
                                 Simpan Perubahan
-                            </button>
+                            </x-ui.button>
                         </div>
                     </form>
                 </div>

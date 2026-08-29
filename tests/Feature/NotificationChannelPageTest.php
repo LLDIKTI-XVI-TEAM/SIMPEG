@@ -157,8 +157,8 @@ class NotificationChannelPageTest extends TestCase
         $this->assertStringContainsString('aria-describedby="in-app-disable-warning"', $dialogMarkup);
         $this->assertStringContainsString('id="in-app-disable-warning"', $dialogMarkup);
         $this->assertStringContainsString($warning, $dialogMarkup);
-        $this->assertMatchesRegularExpression('/<button type="button"[^>]*>Batal<\/button>/', $dialogMarkup);
-        $this->assertMatchesRegularExpression('/<button type="submit"[^>]*>Ya, nonaktifkan<\/button>/', $dialogMarkup);
+        $this->assertMatchesRegularExpression('/<button\s+type="button"[^>]*>\s*Batal\s*<\/button>/s', $dialogMarkup);
+        $this->assertMatchesRegularExpression('/<button\s+type="submit"[^>]*>\s*Ya, nonaktifkan\s*<\/button>/s', $dialogMarkup);
         $this->assertStringContainsString('focus-visible:ring-2', $dialogMarkup);
     }
 

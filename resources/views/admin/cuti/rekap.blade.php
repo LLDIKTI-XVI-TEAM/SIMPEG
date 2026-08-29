@@ -18,10 +18,9 @@
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti Pegawai</h2>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti</h2>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
-                    ['label' => 'Cuti', 'url' => route('cuti')],
                     ['label' => 'Rekap Cuti']
                 ]" />
             </div>
@@ -73,8 +72,8 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2 border-t border-border pt-4">
-                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Terapkan Filter</button>
-                    <a data-filter-reset href="{{ route('cuti.rekap') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 py-2 text-sm font-semibold text-ink hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Reset</a>
+                    <x-ui.button type="submit">Terapkan Filter</x-ui.button>
+                    <x-ui.button href="{{ route('cuti.rekap') }}" variant="secondary" data-filter-reset>Reset</x-ui.button>
                 </div>
             </form>
         </section>

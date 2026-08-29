@@ -147,11 +147,14 @@ class ListActiveEwsAlertsAction
 
         $normalizedSearch = mb_strtolower(trim((string) $search));
         if ($normalizedSearch !== '') {
-            $like = '%'.$normalizedSearch.'%';
+            // Gunakan ! sebagai escape character agar %, _, dan ! dari input
+            // diperlakukan literal pada PostgreSQL, MySQL, maupun SQLite.
+            $escapedSearch = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $normalizedSearch);
+            $like = '%'.$escapedSearch.'%';
             $query->whereHas('employee', function (Builder $employeeQuery) use ($like): void {
                 $employeeQuery->where(function (Builder $identityQuery) use ($like): void {
-                    $identityQuery->whereRaw('LOWER(nama_lengkap) LIKE ?', [$like])
-                        ->orWhereRaw("LOWER(COALESCE(nip, '')) LIKE ?", [$like]);
+                    $identityQuery->whereRaw("LOWER(nama_lengkap) LIKE ? ESCAPE '!'", [$like])
+                        ->orWhereRaw("LOWER(COALESCE(nip, '')) LIKE ? ESCAPE '!'", [$like]);
                 });
             });
         }

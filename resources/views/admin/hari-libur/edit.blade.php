@@ -9,14 +9,6 @@
                 <span>/</span>
                 <span class="font-medium text-ink font-sans">Edit - {{ $hariLibur->nama }}</span>
             </x-slot:breadcrumb>
-            <x-slot:actions>
-                <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-danger shadow-sm">
-                    Akses: Khusus Super Admin
-                </span>
-                <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-info shadow-sm">
-                    Audit Trail Aktif
-                </span>
-            </x-slot:actions>
         </x-admin.page-header>
 
         @if ($errors->getBag('hariLiburEdit')->any())

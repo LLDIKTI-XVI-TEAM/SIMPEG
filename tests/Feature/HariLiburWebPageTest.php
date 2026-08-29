@@ -67,7 +67,6 @@ class HariLiburWebPageTest extends TestCase
         $response->assertSee('Kalender Hari Libur &amp; Cuti Bersama', false);
         $response->assertSee('kalender-hari-libur-container');
         $response->assertDontSee(self::NAMA_DATA_STATIS_LAMA);
-        $response->assertDontSee('aria-label="Pagination Navigation"', false);
     }
 
     public function test_hari_libur_tidak_lagi_tersedia_di_halaman_data_master(): void
@@ -151,7 +150,6 @@ class HariLiburWebPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Belum ada hari libur untuk filter yang dipilih.');
         $response->assertDontSee(self::NAMA_DATA_STATIS_LAMA);
-        $response->assertDontSee('aria-label="Pagination Navigation"', false);
     }
 
     public function test_filter_tahun_membatasi_baris_yang_tampil(): void

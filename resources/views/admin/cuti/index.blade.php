@@ -1,4 +1,4 @@
-<x-layouts.app title="Cuti Pegawai">
+<x-layouts.app :title="$isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti'">
 
     @php
         // Warna badge mengikuti ketetapan resmi: kuning menunggu, hijau disetujui, biru perubahan,
@@ -31,10 +31,10 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">{{ $isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti Pegawai' }}</h2>
+                <h2 class="text-2xl font-semibold text-ink font-sans">{{ $isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti' }}</h2>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
-                    ['label' => 'Cuti']
+                    ['label' => $isPegawai ? 'Pengajuan Cuti' : 'Monitoring Cuti']
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
@@ -45,7 +45,7 @@
                     Refresh
                 </x-ui.button>
                 @if(auth()->user()->getEffectiveRole() !== 'super_admin' && auth()->user()->hasPermission('cuti.create') && ! auth()->user()->employee?->is_kepala_lembaga)
-                <x-ui.button href="{{ route('cuti.create') }}" variant="secondary" size="md">
+                <x-ui.button href="{{ route('cuti.create') }}" variant="primary" size="md">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
@@ -255,42 +255,54 @@
             </div>
 
             {{-- TABLE FOOTER --}}
-            {{-- Footer: Pagination & Meta --}}
-            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-muted">Tampilkan</span>
-                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
-                            <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
-                            <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
-                            <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                <div class="flex items-center gap-3 text-sm text-muted">
+                    <form method="GET" action="{{ route('cuti') }}" class="flex items-center gap-2">
+                        @if(!$isPegawai && $search)
+                            <input type="hidden" name="search" value="{{ $search }}">
+                        @endif
+                        @if($status)
+                            <input type="hidden" name="status" value="{{ $status }}">
+                        @endif
+                        @if($jenis)
+                            <input type="hidden" name="jenis" value="{{ $jenis }}">
+                        @endif
+                        @if(!$isPegawai && $unit)
+                            <input type="hidden" name="unit" value="{{ $unit }}">
+                        @endif
+                        @if($periode)
+                            <input type="hidden" name="periode" value="{{ $periode }}">
+                        @endif
+
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="per_page" class="sr-only">Jumlah baris per halaman</label>
+                        <select
+                            id="per_page"
+                            name="per_page"
+                            onchange="this.form.submit()"
+                            class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
+                        >
+                            @foreach ([10, 25, 50] as $opsi)
+                                <option value="{{ $opsi }}" @selected((int) request('per_page', 10) === $opsi)>{{ $opsi }}</option>
+                            @endforeach
                         </select>
-                        <span class="text-sm text-muted">data per halaman</span>
+                        <span class="hidden sm:inline">data</span>
+                    </form>
+
+                    {{-- Meta Info --}}
+                    <div class="hidden md:block ml-2 border-l border-border pl-4">
+                        Menampilkan <span class="font-medium text-ink">{{ $riwayatCuti->firstItem() ?? 0 }}</span>
+                        - <span class="font-medium text-ink">{{ $riwayatCuti->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium text-ink">{{ $riwayatCuti->total() }}</span>
                     </div>
-                    @if($riwayatCuti->total() > 0)
-                    <p class="text-sm text-muted hidden sm:block">
-                        Menampilkan <span class="font-semibold text-ink">{{ $riwayatCuti->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $riwayatCuti->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $riwayatCuti->total() }}</span> hasil
-                    </p>
-                    @endif
                 </div>
 
-                <div class="w-full sm:w-auto flex justify-end">
-                    {{ $riwayatCuti->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                <div class="flex items-center gap-1.5">
+                    {{ $riwayatCuti->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
         </x-ui.card>
 
     </div>
-
-    @push('scripts')
-    <script>
-    function updatePerPage(val) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('per_page', val);
-        url.searchParams.delete('page');
-        window.location.assign(url.href);
-    }
-    </script>
-    @endpush
 
 </x-layouts.app>

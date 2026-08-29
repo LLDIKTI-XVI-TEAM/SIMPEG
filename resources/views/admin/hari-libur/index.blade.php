@@ -253,33 +253,35 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button
+                    <x-ui.button
                         type="button"
+                        variant="secondary"
+                        size="icon"
                         @click="prevMonth()"
-                        :disabled="bulan === 0"
-                        :aria-label="bulan === 0 ? 'Sudah bulan Januari' : 'Bulan sebelumnya'"
-                        :title="bulan === 0 ? 'Sudah bulan Januari' : 'Bulan sebelumnya'"
-                        class="cursor-pointer rounded-lg border border-border bg-surface p-2 text-ink transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
+                        ::disabled="bulan === 0"
+                        ::aria-label="bulan === 0 ? 'Sudah bulan Januari' : 'Bulan sebelumnya'"
+                        ::title="bulan === 0 ? 'Sudah bulan Januari' : 'Bulan sebelumnya'"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
                         </svg>
-                    </button>
+                    </x-ui.button>
 
                     <span class="text-sm font-semibold text-ink font-sans min-w-[130px] text-center" x-text="`${namaBulan[bulan]} ${tahun}`"></span>
 
-                    <button
+                    <x-ui.button
                         type="button"
+                        variant="secondary"
+                        size="icon"
                         @click="nextMonth()"
-                        :disabled="bulan === 11"
-                        :aria-label="bulan === 11 ? 'Sudah bulan Desember' : 'Bulan berikutnya'"
-                        :title="bulan === 11 ? 'Sudah bulan Desember' : 'Bulan berikutnya'"
-                        class="cursor-pointer rounded-lg border border-border bg-surface p-2 text-ink transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-surface"
+                        ::disabled="bulan === 11"
+                        ::aria-label="bulan === 11 ? 'Sudah bulan Desember' : 'Bulan berikutnya'"
+                        ::title="bulan === 11 ? 'Sudah bulan Desember' : 'Bulan berikutnya'"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                         </svg>
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
 
@@ -675,17 +677,18 @@
                                                 method="DELETE"
                                             >
                                                 <x-slot:trigger>
-                                                    <button
-                                                        type="button"
-                                                        data-hari-libur-action="delete"
-                                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-danger/20"
-                                                        title="Hapus {{ $item->nama }}"
-                                                        aria-label="Hapus {{ $item->nama }}"
-                                                    >
-                                                        <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                        </svg>
-                                                    </button>
+                                                    <x-ui.tooltip text="Hapus" position="top-end">
+                                                        <button
+                                                            type="button"
+                                                            data-hari-libur-action="delete"
+                                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-danger shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-danger/20 cursor-pointer"
+                                                            aria-label="Hapus {{ $item->nama }}"
+                                                        >
+                                                            <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                            </svg>
+                                                        </button>
+                                                    </x-ui.tooltip>
                                                 </x-slot:trigger>
                                             </x-ui.confirm-dialog>
                                         @endif
@@ -732,13 +735,11 @@
                     </form>
 
                     {{-- Meta Info --}}
-                    @if ($hariLibur->total() > 0)
-                        <div class="hidden md:block ml-2 border-l border-border pl-4">
-                            Menampilkan <span class="font-medium text-ink">{{ $hariLibur->firstItem() }}</span>
-                            - <span class="font-medium text-ink">{{ $hariLibur->lastItem() }}</span>
-                            dari <span class="font-medium text-ink">{{ $hariLibur->total() }}</span>
-                        </div>
-                    @endif
+                    <div class="hidden md:block ml-2 border-l border-border pl-4">
+                        Menampilkan <span class="font-medium text-ink">{{ $hariLibur->firstItem() ?? 0 }}</span>
+                        - <span class="font-medium text-ink">{{ $hariLibur->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium text-ink">{{ $hariLibur->total() }}</span>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-1.5">

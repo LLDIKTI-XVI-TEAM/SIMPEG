@@ -4,14 +4,15 @@
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-2xl font-semibold text-ink">Pusat Notifikasi & Peringatan</h2>
+            <h2 class="text-2xl font-semibold text-ink">Pusat Notifikasi</h2>
             <x-ui.breadcrumb :items="[
                 ['label' => 'Dashboard', 'url' => route('dashboard')],
                 ['label' => 'Notifikasi']
             ]" />
         </div>
-        <button
+        <x-ui.button
             type="button"
+            variant="secondary"
             x-data="{
                 unreadCount: @js($unreadCount),
                 isSubmitting: false,
@@ -40,8 +41,7 @@
             }"
             @click="markAll()"
             x-show="unreadCount > 0"
-            :disabled="isSubmitting"
-            class="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft disabled:cursor-not-allowed disabled:opacity-50 font-sans cursor-pointer"
+            ::disabled="isSubmitting"
         >
             <template x-if="isSubmitting">
                 <svg class="h-4 w-4 animate-spin text-primary shrink-0" fill="none" viewBox="0 0 24 24">
@@ -55,7 +55,7 @@
                 </svg>
             </template>
             <span x-text="isSubmitting ? 'Memproses...' : 'Tandai semua dibaca'"></span>
-        </button>
+        </x-ui.button>
     </div>
 
 
@@ -132,10 +132,12 @@
             @endforelse
 
 
-            {{-- Pagination --}}
-            <div class="mt-6">
-                {{ $notifications->onEachSide(1)->links('vendor.pagination.simpeg') }}
-            </div>
+            {{-- Pagination hanya diperlukan ketika total notifikasi melebihi batas tampil 10 data. --}}
+            @if($notifications->total() > $notifications->perPage())
+                <div class="mt-6">
+                    {{ $notifications->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                </div>
+            @endif
         </div>
 
 </x-layouts.app>

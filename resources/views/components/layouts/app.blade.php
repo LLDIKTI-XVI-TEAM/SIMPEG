@@ -151,7 +151,7 @@
                     'group' => 'Cuti',
                     'items' => array_filter([
                         $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
-                        ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                        ['label' => in_array($activeRole, ['pegawai'], true) ? 'Pengajuan Cuti' : 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                         $canAdministerLeaveBalance
                             ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
@@ -521,20 +521,20 @@
                         x-transition:leave="transition ease-in duration-75"
                         x-transition:leave-start="opacity-100 scale-100"
                         x-transition:leave-end="opacity-0 scale-95"
-                        class="absolute right-0 top-full mt-2 w-56 origin-top-right overflow-hidden rounded-lg border border-border bg-surface shadow-lg z-50"
+                        class="absolute right-0 top-full mt-2 w-64 origin-top-right overflow-hidden rounded-lg border border-border bg-surface shadow-lg z-50"
                         style="display: none;"
                     >
                         <div class="border-b border-border px-4 py-3">
                             <p class="text-xs font-semibold text-ink font-sans">{{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name ?? 'Pengguna') }}</p>
-                            <p class="mt-0.5 text-xs text-muted font-sans">{{ auth()->user()->email ?? '' }}</p>
+                            <p class="mt-0.5 text-xs text-muted font-sans truncate">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">
-                            <a href="{{ route('profil') }}" wire:navigate id="profile-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
+                            <a href="{{ route('profil') }}" wire:navigate id="profile-link" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
                                 {{-- heroicon: user-circle (outline) --}}
                                 <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                 </svg>
-                                Profil Saya
+                                <span>Profil Saya</span>
                             </a>
                             @if($activeRole === 'super_admin')
                                 <a href="{{ route('pengaturan') }}" wire:navigate id="settings-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
@@ -550,42 +550,84 @@
                             {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
                                  switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
                             @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
-                                <div class="border-t border-border/60 my-1 pt-1">
-                                    {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
-                                         selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
-                                         role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
-                                         yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
-                                    @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
-                                        <div class="px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
-                                            Simulasi Role
+                                {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
+                                     selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
+                                     role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
+                                     yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
+                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
+                                    <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
+                                        <button
+                                            type="button"
+                                            @click="switchRoleOpen = !switchRoleOpen"
+                                            class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium"
+                                            :class="{ 'bg-soft text-primary': switchRoleOpen }"
+                                        >
+                                            <div class="flex items-center gap-2.5">
+                                                {{-- heroicon: arrows-right-left (outline) --}}
+                                                <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                                </svg>
+                                                <span>Simulasi Role</span>
+                                            </div>
+                                            <svg
+                                                class="w-4 h-4 text-muted transition-transform duration-200 shrink-0"
+                                                :class="{ 'rotate-180 text-primary': switchRoleOpen }"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                viewBox="0 0 24 24"
+                                                stroke-width="1.5"
+                                            >
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                                            </svg>
+                                        </button>
+
+                                        <div
+                                            x-show="switchRoleOpen"
+                                            x-transition:enter="transition ease-out duration-150"
+                                            x-transition:enter-start="opacity-0 -translate-y-1"
+                                            x-transition:enter-end="opacity-100 translate-y-0"
+                                            x-transition:leave="transition ease-in duration-100"
+                                            x-transition:leave-start="opacity-100 translate-y-0"
+                                            x-transition:leave-end="opacity-0 -translate-y-1"
+                                            class="mt-1 space-y-0.5 rounded-lg bg-soft/60 p-1 border border-border/50"
+                                            style="display: none;"
+                                        >
+                                            @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
+                                                @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
+                                                    <form method="POST" action="{{ route('switch-role') }}">
+                                                        @csrf
+                                                        <input type="hidden" name="target_role" value="{{ $roleKey }}">
+                                                        <button
+                                                            type="submit"
+                                                            class="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-surface hover:text-primary transition-colors font-sans text-left group"
+                                                        >
+                                                            <div class="flex items-center gap-2 truncate">
+                                                                <span class="h-1.5 w-1.5 rounded-full bg-muted/60 group-hover:bg-primary shrink-0 transition-colors"></span>
+                                                                <span class="truncate">Switch ke {{ $roleLabel }}</span>
+                                                            </div>
+                                                            <svg class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-primary transition-opacity shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+                                                            </svg>
+                                                        </button>
+                                                    </form>
+                                                @endif
+                                            @endforeach
                                         </div>
-                                        @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
-                                            @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
-                                                <form method="POST" action="{{ route('switch-role') }}">
-                                                    @csrf
-                                                    <input type="hidden" name="target_role" value="{{ $roleKey }}">
-                                                    <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-4 py-1.5 text-xs text-ink hover:bg-soft transition-colors font-sans">
-                                                        <svg class="w-3.5 h-3.5 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                                                        </svg>
-                                                        Switch ke {{ $roleLabel }}
-                                                    </button>
-                                                </form>
-                                            @endif
-                                        @endforeach
-                                    @endif
-                                    @if(auth()->user()->temporary_role)
-                                        <form method="POST" action="{{ route('revert-role') }}" class="mt-1">
+                                    </div>
+                                @endif
+                                @if(auth()->user()->temporary_role)
+                                    <div class="border-t border-border/60 my-1 pt-1">
+                                        <form method="POST" action="{{ route('revert-role') }}">
                                             @csrf
-                                            <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-4 py-1.5 text-xs font-semibold text-warning hover:bg-warning/10 transition-colors font-sans">
-                                                <svg class="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-warning hover:bg-warning/10 transition-colors font-sans text-left">
+                                                <svg class="w-4 h-4 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                                                 </svg>
-                                                Kembalikan Role Asli
+                                                <span>Kembalikan Role Asli</span>
                                             </button>
                                         </form>
-                                    @endif
-                                </div>
+                                    </div>
+                                @endif
                             @endif
                         </div>
                         <div class="border-t border-border p-1.5">
@@ -594,13 +636,13 @@
                                 <button
                                     type="submit"
                                     id="logout-btn"
-                                    class="flex w-full items-center gap-2.5 rounded-lg px-4 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 font-sans"
+                                    class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 font-sans text-left"
                                 >
                                     {{-- heroicon: arrow-right-on-rectangle (outline) --}}
                                     <svg class="w-4 h-4 text-danger shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25" />
                                     </svg>
-                                    Keluar dari Sistem
+                                    <span>Keluar dari Sistem</span>
                                 </button>
                             </form>
                         </div>

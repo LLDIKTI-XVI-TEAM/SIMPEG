@@ -9,9 +9,9 @@
     $tag = in_array($as, ['div', 'section', 'article', 'form', 'a'], true) ? $as : 'div';
 
     $variants = [
-        'default' => 'border border-border bg-surface transition-all duration-300',
-        'soft' => 'border border-border bg-soft transition-all duration-300',
-        'interactive' => 'border border-border bg-surface transition-all duration-300 hover:bg-soft/40 hover:-translate-y-1 hover:shadow-lg cursor-pointer',
+        'default' => 'border border-border bg-surface transition-colors duration-200',
+        'soft' => 'border border-border bg-soft transition-colors duration-200',
+        'interactive' => 'cursor-pointer border border-border bg-surface transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-1 hover:bg-soft/40 hover:shadow-lg',
     ];
 
     $paddings = [
