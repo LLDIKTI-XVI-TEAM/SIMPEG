@@ -1455,6 +1455,72 @@ class KeycloakCallbackMappingTest extends TestCase
     }
 
     /**
+     * Race pengikatan subject antar proses: initial lookup keycloak_id belum menemukan
+     * user, lalu request/admin lain mengikat subject yang sama ke User B sebelum
+     * re-check transaksional. Resolver wajib merekonsiliasi userBySubject dan MENOLAK
+     * mapping secara terkontrol (bukan unique violation / HTTP 500), tanpa rebind,
+     * dengan audit rejection aktor sistem.
+     */
+    public function test_subject_bound_to_another_user_during_resolver_is_rejected_without_rebind(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kandidat Subject',
+            'email' => 'kandidat-subject@example.com',
+        ]);
+        $otherEmployee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemilik Subject',
+        ]);
+
+        $injected = false;
+        DB::listen(function (QueryExecuted $query) use (&$injected, $otherEmployee): void {
+            if ($injected
+                || ! str_contains((string) $query->sql, 'from "employees"')
+                || ! str_contains((string) $query->sql, 'for update')) {
+                return;
+            }
+
+            $injected = true;
+
+            // Pihak lain (admin mapping / callback paralel) mengikat subject yang sama
+            // ke User B — pegawai berbeda — tepat setelah callback kita memegang lock.
+            User::factory()->create([
+                'email' => 'pemilik-subject@example.com',
+                'keycloak_id' => 'kc-race-subject',
+                'employee_id' => $otherEmployee->id,
+                'role' => 'pegawai',
+            ]);
+        });
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-race-subject',
+            'nickname' => 'kandidat-subject',
+            'name' => 'Kandidat Subject',
+            'email' => 'kandidat-subject@example.com',
+            'raw' => ['email' => 'kandidat-subject@example.com', 'email_verified' => true, 'preferred_username' => 'kandidat-subject'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        // Controlled rejection, bukan HTTP 500 / unique violation yang bocor.
+        $response->assertOk();
+        $response->assertSee('Akun SIMPEG sudah terhubung ke SSO lain.');
+        $this->assertGuest();
+
+        // Tidak ada rebind: tidak ada user baru untuk pegawai kandidat, dan pegawai
+        // pemilik subject tidak kehilangan bindingnya (state transaksional rollback
+        // bersih — binding milik pemilik subject tetap satu).
+        $this->assertSame(0, User::where('employee_id', $employee->id)->count());
+
+        // Audit rejection aktor sistem tersedia tanpa payload mentah Keycloak.
+        $audit = AuditLog::query()->where('event', 'SSO_MAPPING_REJECTED')->latest('created_at')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('sso_subject_conflict', $audit->new_values['reason'] ?? null);
+        $this->assertNull($audit->user_id);
+        $this->assertSame('SSO Callback', $audit->user_name);
+        $this->assertStringNotContainsString('kc-race-subject', json_encode($audit->toArray()));
+    }
+
+    /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
     private function fakeKeycloakUser(array $attributes): void

@@ -157,8 +157,16 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 'email' => $user->exists ? $user->email : $email,
                 'role' => $user->exists ? $user->role : $role,
                 'employee_id' => $employee->id,
-                'email_verified_at' => $user->email_verified_at ?? now(),
             ]);
+
+            // Status verifikasi email user existing TIDAK disentuh: Keycloak tidak pernah
+            // memverifikasi email internal user, jadi menandainya terverifikasi berdasar
+            // fixture adalah klaim palsu (konsisten dengan kontrak runtime callback).
+            // Hanya placeholder baru yang emailnya memang berasal dari fixture yang
+            // ditandai terverifikasi.
+            if (! $user->exists && $user->email_verified_at === null) {
+                $user->email_verified_at = now();
+            }
 
             // Password acak hanya untuk placeholder user baru; user existing yang sudah
             // menetapkan password via profil tidak boleh ditimpa tanpa audit.

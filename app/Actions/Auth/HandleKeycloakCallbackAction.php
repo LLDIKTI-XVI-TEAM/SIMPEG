@@ -153,10 +153,12 @@ class HandleKeycloakCallbackAction
      *
      * Kontrak Issue #6: resolver deterministik keycloak_id → employee_id → controlled
      * email fallback, dengan database sebagai authority terakhir terhadap callback
-     * paralel. Seluruh lookup berjalan di dalam satu transaksi yang mengunci baris
-     * employee sehingga dua callback bersamaan untuk pegawai yang sama terserialisasi;
-     * re-check identitas setelah lock menghilangkan TOCTOU. Penolakan guard tetap
-     * diaudit SETELAH transaksi commit agar evidence tidak ikut ter-rollback.
+     * paralel. Seluruh lookup — termasuk re-check subject keycloak_id — berjalan di
+     * dalam satu transaksi yang mengunci baris employee sehingga dua callback bersamaan
+     * untuk pegawai yang sama terserialisasi; rekonsiliasi userBySubject + userByEmployee
+     * + userByEmail setelah lock menghilangkan TOCTOU pada ketiga jalur resolusi.
+     * Penolakan guard tetap diaudit SETELAH transaksi commit agar evidence tidak
+     * ikut ter-rollback.
      *
      * @throws SsoIdentityRejected bila state terkini inkonsisten (sudah ter-audit).
      */
@@ -167,6 +169,12 @@ class HandleKeycloakCallbackAction
             // sebelum re-check identitas (TOCTOU guard pada boundary database).
             Employee::query()->whereKey($employee->id)->lockForUpdate()->first();
 
+            // Re-check subject di dalam transaksi: initial lookup di execute() terjadi
+            // SEBELUM lock — admin mapping atau callback lain bisa saja mengikat subject
+            // yang sama ke user berbeda di sela waktu. Tanpa re-check ini, save akan
+            // menabrak unique constraint dan retry resolver yang sama tetap buta terhadap
+            // binding baru tersebut.
+            $userBySubject = User::where('keycloak_id', $keycloakId)->lockForUpdate()->first();
             $userByEmployee = User::where('employee_id', $employee->id)->lockForUpdate()->first();
             $userByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])->lockForUpdate()->first();
 
@@ -176,6 +184,13 @@ class HandleKeycloakCallbackAction
             }
 
             $user = $userByEmployee ?? $userByEmail;
+
+            // Rekonsiliasi tiga arah: subject yang sudah dimiliki user BERBEDA dari
+            // kandidat employee/email berarti percobaan rebind identitas — hentikan
+            // tanpa rebind (idempotent hanya bila subject menunjuk kandidat yang sama).
+            if ($userBySubject && ($user === null || $userBySubject->isNot($user))) {
+                return ['reject' => ['reason' => 'sso_subject_conflict', 'user' => $userBySubject]];
+            }
 
             if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
                 return ['reject' => ['reason' => 'employee_mismatch', 'user' => $user]];
