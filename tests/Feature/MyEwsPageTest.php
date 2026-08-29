@@ -89,8 +89,8 @@ class MyEwsPageTest extends TestCase
 
     public function test_pegawai_without_linked_employee_gets_not_found(): void
     {
-        $this->actingAs(User::factory()->pegawai()->create(['employee_id' => null]))
+        $this->actingAsUnmapped(User::factory()->pegawai()->create(['employee_id' => null]))
             ->get(route('ews.saya'))
-            ->assertNotFound();
+            ->assertRedirect(route('status-akun'));
     }
 }

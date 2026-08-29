@@ -9,7 +9,6 @@ use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefProgramStudi;
-use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
 use Livewire\Attributes\Layout;
@@ -28,7 +27,6 @@ class Create extends Component
         $unitKerja = RefUnitKerja::all();
         $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
         $jenisJabatanOptions = RefJenisJabatan::all();
-        $statusPegawai = RefStatusPegawai::where('is_active', true)->orderByDesc('is_default')->orderBy('nama')->get();
         $golonganRefOptions = RefGolongan::orderBy('kode')->get();
         $eselonOptions = RefEselon::orderBy('nama')->get();
         $programStudiOptions = RefProgramStudi::where('is_active', true)->orderBy('nama')->get();
@@ -40,7 +38,6 @@ class Create extends Component
             'unitKerja',
             'jabatanOptions',
             'jenisJabatanOptions',
-            'statusPegawai',
             'golonganRefOptions',
             'eselonOptions',
             'programStudiOptions'

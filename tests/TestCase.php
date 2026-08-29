@@ -3,14 +3,17 @@
 namespace Tests;
 
 use App\Data\Cuti\ManualExternalApprovalStepData;
+use App\Models\Employee;
 use App\Models\LeaveUsageExternalApprovalStep;
 use App\Models\LeaveUsageRecord;
 use App\Models\User;
 use App\Services\Cuti\ManualExternalApprovalChainService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Contracts\Auth\Authenticatable as UserContract;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 abstract class TestCase extends BaseTestCase
@@ -99,6 +102,36 @@ abstract class TestCase extends BaseTestCase
         $this->actingAs($user);
 
         return $user;
+    }
+
+    /**
+     * Test HTTP umum memakai akun yang memenuhi invariant mapping pegawai aktif.
+     * Employee fixture unik dibuat agar aktor tidak pernah tertaut ke target test lain.
+     * Test khusus fail-closed harus memakai actingAsUnmapped().
+     */
+    public function actingAs(UserContract $user, $guard = null): static
+    {
+        if ($user instanceof User
+            && $user->employee_id === null
+            && Schema::hasTable('employees')) {
+            $employee = Employee::factory()->createQuietly([
+                'nama_lengkap' => 'Aktor Pengujian SIMPEG',
+            ]);
+
+            $user->forceFill(['employee_id' => $employee->id])->saveQuietly();
+        }
+
+        parent::actingAs($user, $guard);
+
+        return $this;
+    }
+
+    /** Mengautentikasi fixture unmapped tanpa perbaikan otomatis untuk test fail-closed. */
+    protected function actingAsUnmapped(UserContract $user, $guard = null): static
+    {
+        parent::actingAs($user, $guard);
+
+        return $this;
     }
 
     /**

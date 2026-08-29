@@ -120,9 +120,9 @@ class LeaveBalancePreviewTest extends TestCase
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        $this->actingAs($user)
+        $this->actingAsUnmapped($user)
             ->getJson(route('api.v1.cuti.balance-preview', ['tanggal_mulai' => '2027-02-03']))
-            ->assertForbidden();
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_preview_mengarahkan_tamu_ke_login(): void

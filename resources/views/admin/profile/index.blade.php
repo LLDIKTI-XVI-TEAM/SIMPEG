@@ -96,7 +96,7 @@
             </div>
 
             {{-- EWS WARNING SECTION --}}
-            @if(count($ewsAlerts) > 0)
+            @if($ewsTotal > 0)
             <div class="rounded-lg border border-warning/20 bg-warning/10 px-4 py-3 flex items-start gap-3">
                 <svg class="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -109,7 +109,7 @@
                         @endif
                     </div>
                     <ul class="mt-1 space-y-1 text-xs text-warning">
-                        @foreach(array_slice($ewsAlerts, 0, 3) as $alert)
+                        @foreach($ewsAlerts as $alert)
                             <li>
                                 {{ $alert['jenis_event'] }} pada {{ date('d M Y', strtotime($alert['tanggal_target'])) }}
                                 ({{ $alert['sisa_hari'] }} hari, {{ $alert['followup_status_label'] }}).
@@ -732,18 +732,6 @@
                         <div>
                             <h4 class="font-bold text-ink text-sm">Audit Log</h4>
                             <p class="text-[11px] text-muted mt-1 leading-relaxed">Pusat pelacakan riwayat segala perubahan data yang terjadi pada sistem.</p>
-                        </div>
-                    </a>
-
-                    <a href="{{ route('data-backup') }}" class="flex h-full items-start gap-4 p-5 rounded-xl border border-border bg-surface hover:border-primary hover:shadow-lg transition-all duration-300 group">
-                        <div class="h-12 w-12 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-ink text-sm">Data Backup</h4>
-                            <p class="text-[11px] text-muted mt-1 leading-relaxed">Daftar pegawai yang dinonaktifkan. Data aman dan dapat dipulihkan kapan saja.</p>
                         </div>
                     </a>
 

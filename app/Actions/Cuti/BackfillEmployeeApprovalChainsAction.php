@@ -31,7 +31,7 @@ class BackfillEmployeeApprovalChainsAction
         ];
 
         Employee::query()
-            ->where('status_aktif', 'Aktif')
+            ->whereActiveStatus()
             ->chunkById(100, function (Collection $employees) use (&$result, $legacyApprovers, $actor, $reason, $request): void {
                 foreach ($employees as $employee) {
                     if (LeaveApprovalChain::where('employee_id', $employee->id)->where('is_active', true)->exists()) {

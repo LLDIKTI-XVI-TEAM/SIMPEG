@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -58,7 +59,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         ]);
 
         // Original employee still exists, no duplicate
-        $this->assertDatabaseCount('employees', 2); // 1 original + 1 new
+        $this->assertDatabaseCount('employees', 3); // Aktor autentikasi + 1 original + 1 new.
     }
 
     /** Duplikasi NIP dalam satu berkas harus menggagalkan impor atomik. */
@@ -86,7 +87,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $response->assertJsonPath('errors.0.errors.nip.0', 'NIP sudah ada pada baris 2.');
 
         // No rows inserted (all-or-nothing)
-        $this->assertDatabaseCount('employees', 0);
+        $this->assertDatabaseCount('employees', 1); // Hanya aktor autentikasi.
     }
 
     /** Email terdaftar harus ditolak karena dapat menunjuk pegawai berbeda. */
@@ -114,15 +115,18 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $response->assertJsonPath('errors.0.errors.email_pribadi.0', 'Email pegawai sudah terdaftar di database.');
 
         // No new employees created
-        $this->assertDatabaseCount('employees', 1); // Only the original
+        $this->assertDatabaseCount('employees', 2); // Aktor autentikasi + original.
     }
 
     /** Email pegawai nonaktif tetap merupakan identitas yang tidak boleh dipakai ulang. */
     public function test_legacy_endpoint_rejects_email_owned_by_soft_deleted_employee(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        $inactiveEmployee = Employee::factory()->create(['email_pribadi' => 'budi@example.com']);
-        $inactiveEmployee->delete();
+        $inactiveEmployee = Employee::factory()->create([
+            'email_pribadi' => 'budi@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
+        ]);
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf(self::LEGACY_ENDPOINT, [
@@ -137,7 +141,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
             'errors.0.errors.email_pribadi.0',
             'Email pegawai sudah terdaftar di database.',
         );
-        $this->assertSame(1, Employee::withTrashed()->count());
+        $this->assertSame(2, Employee::count());
     }
 
     /** NIP pegawai nonaktif tetap diperlakukan sebagai baris lama yang dilewati. */
@@ -147,8 +151,9 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $inactiveEmployee = Employee::factory()->create([
             'nip' => '198001012006041001',
             'email_pribadi' => 'arsip@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
-        $inactiveEmployee->delete();
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf(self::LEGACY_ENDPOINT, [
@@ -161,7 +166,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $response->assertJsonPath('inserted', 0);
         $response->assertJsonPath('skipped', 1);
         $response->assertJsonPath('failed', 0);
-        $this->assertSame(1, Employee::withTrashed()->count());
+        $this->assertSame(2, Employee::count());
     }
 
     /**
@@ -191,7 +196,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
             'errors.0.errors.email_pribadi.0',
             'Email pegawai sudah terdaftar di database.',
         );
-        $this->assertDatabaseCount('employees', 1);
+        $this->assertDatabaseCount('employees', 2);
     }
 
     /** Duplikasi NIP dalam berkas harus tetap dilaporkan walau NIP tersebut telah ada. */
@@ -222,7 +227,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $response->assertJsonPath('errors.0.errors.nip.0', 'NIP sudah ada pada baris 2.');
 
         // No new employees created
-        $this->assertDatabaseCount('employees', 1); // Only the original
+        $this->assertDatabaseCount('employees', 2); // Aktor autentikasi + original.
     }
 
     /** Satu error harus menggagalkan seluruh impor meski baris lain valid atau dapat dilewati. */
@@ -257,7 +262,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
         $response->assertJsonPath('message', 'Import gagal. Perbaiki baris bermasalah lalu unggah ulang. 1 baris dilewati karena NIP sudah terdaftar.');
 
         // All-or-nothing: no new rows inserted because of error
-        $this->assertDatabaseCount('employees', 2); // Only the 2 originals
+        $this->assertDatabaseCount('employees', 3); // Aktor autentikasi + 2 original.
     }
 
     /**
@@ -294,7 +299,7 @@ class LegacyEmployeeImportKus02Test extends TestCase
             'nama_lengkap' => 'Siti',
             'nip' => '198502122010042002',
         ]);
-        $this->assertDatabaseCount('employees', 2); // 1 original + 1 new
+        $this->assertDatabaseCount('employees', 3); // Aktor autentikasi + 1 original + 1 new.
     }
 
     private function buildCsv(array $rows): string

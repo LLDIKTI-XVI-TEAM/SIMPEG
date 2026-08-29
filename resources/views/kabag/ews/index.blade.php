@@ -17,10 +17,10 @@
     {{-- SUMMARY CARDS --}}
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         @php
-            $countMerah = collect($raw_alerts)->filter(fn($a) => $a['sisa_hari'] < 30)->count();
-            $countKuning = collect($raw_alerts)->filter(fn($a) => $a['sisa_hari'] >= 30 && $a['sisa_hari'] <= 90)->count();
-            $countHijau = collect($raw_alerts)->filter(fn($a) => $a['sisa_hari'] > 90)->count();
-            $countTotal = collect($raw_alerts)->count();
+            $countMerah = $summary['urgent'];
+            $countKuning = $summary['warning'];
+            $countHijau = $summary['info'];
+            $countTotal = $summary['total'];
         @endphp
         
         <x-ui.stat-card label="Total Peringatan" value="{{ $countTotal }}" variant="primary" size="lg" accent>
@@ -61,12 +61,15 @@
     </div>
 
     {{-- FILTER & SEARCH AREA --}}
-    <div x-data="{ search: '' }">
+    <div>
         <form method="GET" action="{{ route('kepala-bagian.ews.index') }}" class="mb-6">
             <input type="hidden" name="status" value="{{ request('status') }}">
-            <x-ui.filter-bar 
-                searchModel="search"
+            <x-ui.filter-bar
+                searchId="kabag-ews-search"
+                searchName="search"
+                :searchValue="$filterSearch"
                 searchPlaceholder="Cari nama atau NIP"
+                searchLabel="Cari nama atau NIP pegawai"
                 gridClass="sm:grid-cols-3 lg:grid-cols-5"
             >
                 <div class="relative">
@@ -76,6 +79,11 @@
                             <option value="{{ $label }}" @selected(request('event') === $label)>{{ $label }}</option>
                         @endforeach
                     </x-form.select>
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">
+                        Cari
+                    </button>
                 </div>
             </x-ui.filter-bar>
         </form>
@@ -108,8 +116,8 @@
                                 }
                                 $remaining = $alert['sisa_hari'] < 0 ? 'Lewat '.abs($alert['sisa_hari']).' hari' : $alert['sisa_hari'].' hari';
                             @endphp
-                            <x-ui.table-row x-show="search === '' || '{{ strtolower($alert['nama']) }}'.includes(search.toLowerCase()) || '{{ str_replace(' ', '', $alert['nip']) }}'.includes(search.replace(/\s+/g, ''))" class="align-middle hover:bg-soft transition-colors border-b border-border/50 group">
-                                <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ $index + 1 }}</x-ui.table-td>
+                            <x-ui.table-row class="align-middle hover:bg-soft transition-colors border-b border-border/50 group">
+                                <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ ($alerts->firstItem() ?? 1) + $index }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="w-full min-w-0">
                                         <x-ui.tooltip text="Buka detail {{ $alert['nama'] }}" position="right">

@@ -39,6 +39,10 @@ class ShowProfilePageAction
             $rule5Active = $leaveBalance['rule_5_active'];
         }
 
+        $ews = $employee !== null
+            ? $this->ewsAlerts->preview(3, employeeId: (string) $employee->id)
+            : ['alerts' => [], 'total' => 0, 'urgent' => 0, 'warning' => 0, 'info' => 0];
+
         return [
             'p' => $employee,
             'saldoCuti' => $leaveBalance,
@@ -58,9 +62,13 @@ class ShowProfilePageAction
             'estimasiKgbNext' => $this->estimateNextKgbDate($employee),
             'estimasiPensiun' => $this->estimateRetirementDate($employee),
             'sisaPensiunStr' => $this->retirementRemainingLabel($employee),
-            'ewsAlerts' => $employee
-                ? $this->ewsAlerts->execute(null, null, (string) $employee->id)['alerts']
-                : [],
+            'ewsAlerts' => $ews['alerts'],
+            'ewsTotal' => $ews['total'],
+            'ewsBuckets' => [
+                'urgent' => $ews['urgent'],
+                'warning' => $ews['warning'],
+                'info' => $ews['info'],
+            ],
         ];
     }
 

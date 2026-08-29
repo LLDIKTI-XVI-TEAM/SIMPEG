@@ -12,6 +12,7 @@ use App\Services\Notifications\WhatsApp\WhatsAppNotificationDispatcher;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\DB;
 
 class NotificationService
 {
@@ -172,22 +173,6 @@ class NotificationService
     }
 
     /**
-     * Menandai pengakuan pegawai terhadap alert EWS sehingga reminder tidak dikirim ulang.
-     */
-    private function acknowledgeEwsReminder(SimpegNotification $notification): void
-    {
-        $alertId = $notification->ews_alert_id ?? $notification->data['ews_alert_id'] ?? null;
-        if (! is_string($alertId) || $alertId === '') {
-            return;
-        }
-
-        EwsAlert::query()
-            ->whereKey($alertId)
-            ->whereNull('notification_acknowledged_at')
-            ->update(['notification_acknowledged_at' => now()]);
-    }
-
-    /**
      * Menjadwalkan email untuk event yang aktif channel email tanpa mengubah kontrak in-app notification.
      *
      * @param  SupportCollection<int, Employee>  $additionalRecipients
@@ -286,24 +271,47 @@ class NotificationService
             return null;
         }
 
-        $notification = SimpegNotification::query()
-            ->where('id', $notificationId)
-            ->where('user_id', $employeeId)
-            ->first();
+        return DB::transaction(function () use ($notificationId, $employeeId): ?SimpegNotification {
+            $snapshot = SimpegNotification::query()
+                ->where('id', $notificationId)
+                ->where('user_id', $employeeId)
+                ->first();
 
-        if ($notification === null) {
-            return null;
-        }
+            if ($snapshot === null) {
+                return null;
+            }
 
-        if (! $notification->is_read) {
-            $notification->forceFill([
-                'is_read' => true,
-                'read_at' => now(),
-            ])->save();
-            $this->acknowledgeEwsReminder($notification);
-        }
+            $snapshotAlertId = $this->ewsAlertId($snapshot);
+            $lockedAlert = $snapshotAlertId === null
+                ? null
+                : EwsAlert::query()->whereKey($snapshotAlertId)->lockForUpdate()->first();
 
-        return $notification->refresh();
+            // Engine selalu mengunci alert sebelum menyegarkan notifikasi. Jalur baca
+            // mengikuti urutan yang sama agar transaksi audit simulasi tidak membentuk
+            // siklus notification -> alert terhadap scheduler.
+            $notification = SimpegNotification::query()
+                ->where('id', $notificationId)
+                ->where('user_id', $employeeId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($notification === null || $this->ewsAlertId($notification) !== $snapshotAlertId) {
+                return null;
+            }
+
+            if (! $notification->is_read) {
+                $notification->forceFill([
+                    'is_read' => true,
+                    'read_at' => now(),
+                ])->save();
+
+                if ($lockedAlert !== null && $lockedAlert->notification_acknowledged_at === null) {
+                    $lockedAlert->forceFill(['notification_acknowledged_at' => now()])->save();
+                }
+            }
+
+            return $notification->refresh();
+        });
     }
 
     public function markAllAsReadForEmployee(?string $employeeId): int
@@ -312,38 +320,62 @@ class NotificationService
             return 0;
         }
 
-        $notifications = SimpegNotification::query()
-            ->where('user_id', $employeeId)
-            ->unread()
-            ->get();
+        return DB::transaction(function () use ($employeeId): int {
+            $snapshots = SimpegNotification::query()
+                ->where('user_id', $employeeId)
+                ->unread()
+                ->get();
+            $snapshotAlertIds = $snapshots
+                ->mapWithKeys(fn (SimpegNotification $notification): array => [
+                    $notification->id => $this->ewsAlertId($notification),
+                ]);
+            $alertIds = $snapshotAlertIds->filter()->unique()->sort()->values();
 
-        $now = now();
-        $updated = SimpegNotification::query()
-            ->whereKey($notifications->modelKeys())
-            ->update([
-                'is_read' => true,
-                'read_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-        // Samakan dengan jalur single-read: notifikasi lama (legacy) menyimpan ID alert
-        // di payload JSON data, bukan di kolom ews_alert_id. Keduanya harus diakui agar
-        // reminder EWS tidak muncul kembali setelah pengguna menandai semua terbaca.
-        $alertIds = $notifications
-            ->map(fn (SimpegNotification $notification): mixed => $notification->ews_alert_id
-                ?? $notification->data['ews_alert_id']
-                ?? null)
-            ->filter(fn (mixed $alertId): bool => is_string($alertId) && $alertId !== '')
-            ->unique()
-            ->values();
-
-        if ($alertIds->isNotEmpty()) {
-            EwsAlert::query()
+            // Bulk-read memakai urutan alert ID lalu notification ID yang deterministik,
+            // sama dengan single-read dan scheduler EWS.
+            $lockedAlerts = EwsAlert::query()
                 ->whereIn('id', $alertIds)
-                ->whereNull('notification_acknowledged_at')
-                ->update(['notification_acknowledged_at' => $now]);
-        }
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            $notifications = SimpegNotification::query()
+                ->whereKey($snapshots->modelKeys())
+                ->where('user_id', $employeeId)
+                ->unread()
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->filter(fn (SimpegNotification $notification): bool => $this->ewsAlertId($notification) === $snapshotAlertIds->get($notification->id));
 
-        return $updated;
+            $now = now();
+            $updated = SimpegNotification::query()
+                ->whereKey($notifications->modelKeys())
+                ->update([
+                    'is_read' => true,
+                    'read_at' => $now,
+                    'updated_at' => $now,
+                ]);
+
+            // Notifikasi lama menyimpan ID alert hanya di payload JSON; exact ID yang
+            // dibekukan sebelum lock tetap dipakai untuk acknowledgement keduanya.
+            foreach ($notifications as $notification) {
+                $alertId = $this->ewsAlertId($notification);
+                $alert = $alertId === null ? null : $lockedAlerts->get($alertId);
+                if ($alert instanceof EwsAlert && $alert->notification_acknowledged_at === null) {
+                    $alert->forceFill(['notification_acknowledged_at' => $now])->save();
+                }
+            }
+
+            return $updated;
+        });
+    }
+
+    /** Ambil identitas alert durable dari kolom baru atau payload legacy. */
+    private function ewsAlertId(SimpegNotification $notification): ?string
+    {
+        $alertId = $notification->ews_alert_id ?? $notification->data['ews_alert_id'] ?? null;
+
+        return is_string($alertId) && $alertId !== '' ? $alertId : null;
     }
 }

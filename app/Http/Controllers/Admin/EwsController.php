@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Actions\Ews\UpdateEwsAlertFollowupAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Ews\AdminEwsFilterRequest;
 use App\Http\Requests\Ews\UpdateEwsAlertFollowupRequest;
 use App\Models\EwsAlert;
 use App\Models\RefGolongan;
@@ -15,16 +16,21 @@ class EwsController extends Controller
     /**
      * Menampilkan daftar EWS aktif dari alert database dengan filter dan eligibility.
      */
-    public function index(Request $request, ListActiveEwsAlertsAction $action)
+    public function index(AdminEwsFilterRequest $request, ListActiveEwsAlertsAction $action)
     {
-        $filterEvent = (string) $request->query('event', '');
-        $filterStatus = (string) $request->query('status', '');
-        $data = $action->execute($filterEvent, $filterStatus);
+        $validated = $request->validated();
+        $filterSearch = trim((string) ($validated['search'] ?? ''));
+        $filterEvent = (string) ($validated['event'] ?? '');
+        $filterStatus = (string) ($validated['status'] ?? '');
+        $perPage = (int) ($validated['per_page'] ?? 25);
+        $data = $action->paginate($filterEvent, $filterStatus, $filterSearch, $perPage);
 
         return view('admin.ews.aktif', [
             'alerts' => $data['alerts'],
             'filterEvent' => $filterEvent,
             'filterStatus' => $filterStatus,
+            'filterSearch' => $filterSearch,
+            'summary' => $data['summary'],
             'typeLabels' => $data['type_labels'],
             'followupStatusLabels' => $data['followup_status_labels'],
             'golonganOptions' => RefGolongan::query()
@@ -43,7 +49,7 @@ class EwsController extends Controller
 
         abort_unless($employeeId, 404, 'Data pegawai untuk akun ini belum terhubung.');
 
-        $data = $action->execute(null, null, (string) $employeeId);
+        $data = $action->paginate(null, null, null, 25, (string) $employeeId);
 
         return view('admin.ews.saya', [
             'alerts' => $data['alerts'],

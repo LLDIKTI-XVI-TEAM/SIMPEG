@@ -4,15 +4,16 @@ namespace App\Actions\Dashboards;
 
 use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Models\AuditLog;
-use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RankHistory;
+use App\Queries\Dashboards\ActiveEmployeeSummaryQuery;
 use App\Queries\Dashboards\EmployeeTrendQuery;
 
 class BuildAdminDashboardAction
 {
     public function __construct(
         private readonly ListActiveEwsAlertsAction $ewsAlerts,
+        private readonly ActiveEmployeeSummaryQuery $employeeSummary,
         private readonly EmployeeTrendQuery $trenPegawai,
     ) {}
 
@@ -35,12 +36,8 @@ class BuildAdminDashboardAction
     public function execute(): array
     {
         $now = now();
-        $ews = $this->ewsAlerts->execute(null, null, null)['alerts'];
-
-        $employees = Employee::query()
-            ->with('jenisPegawai:id,nama')
-            ->where('status_aktif', 'Aktif')
-            ->get();
+        $ews = $this->ewsAlerts->preview(5);
+        $employees = $this->employeeSummary->execute();
 
         $daftarKenaikanPangkat = RankHistory::query()
             ->with(['employee.rankHistories.golongan', 'golongan'])
@@ -70,12 +67,6 @@ class BuildAdminDashboardAction
 
         $trenPegawai = collect($this->trenPegawai->monthlyActiveCounts($now));
 
-        $distribusiGolongan = $employees
-            ->map(fn (Employee $employee): string => (string) $employee->golongan_terakhir ?: 'Belum Diisi')
-            ->countBy()
-            ->sortKeys()
-            ->all();
-
         $auditTerbaru = AuditLog::query()
             ->latest()
             ->limit(5)
@@ -89,10 +80,8 @@ class BuildAdminDashboardAction
 
         return [
             // W1: Ringkasan kepegawaian
-            'totalPegawaiAktif' => $employees->count(),
-            'komposisiPegawai' => $employees->countBy(
-                fn (Employee $employee): string => $employee->jenisPegawai?->nama ?? 'Tidak Diketahui'
-            )->all(),
+            'totalPegawaiAktif' => $employees['total'],
+            'komposisiPegawai' => $employees['composition'],
 
             // W2: Kenaikan pangkat
             'kenaikanPangkatBulanIni' => RankHistory::query()
@@ -114,7 +103,7 @@ class BuildAdminDashboardAction
             'cutiDitangguhkan' => LeaveRequest::query()->where('status', 'ditangguhkan')->count(),
 
             // W4: Distribusi golongan
-            'distribusiGolongan' => $distribusiGolongan,
+            'distribusiGolongan' => $employees['rank_distribution'],
 
             // W5: Audit log terbaru
             'auditTerbaru' => $auditTerbaru,
@@ -123,13 +112,13 @@ class BuildAdminDashboardAction
             'trenPegawai' => $trenPegawai,
 
             // W7: EWS — Admin memonitor seluruh pegawai
-            'dashboardEwsAlerts' => array_slice($ews, 0, 5),
-            'dashboardEwsTotal' => count($ews),
-            'totalEwsAktif' => count($ews),
-            'ewsAktif' => array_slice($ews, 0, 5),
-            'dashboardEwsUrgent' => collect($ews)->where('urgency', 'danger')->count(),
-            'dashboardEwsWarning' => collect($ews)->where('urgency', 'warning')->count(),
-            'dashboardEwsInfo' => collect($ews)->where('urgency', 'success')->count(),
+            'dashboardEwsAlerts' => $ews['alerts'],
+            'dashboardEwsTotal' => $ews['total'],
+            'totalEwsAktif' => $ews['total'],
+            'ewsAktif' => $ews['alerts'],
+            'dashboardEwsUrgent' => $ews['urgent'],
+            'dashboardEwsWarning' => $ews['warning'],
+            'dashboardEwsInfo' => $ews['info'],
             'dashboardEwsLink' => route('ews'),
         ];
     }

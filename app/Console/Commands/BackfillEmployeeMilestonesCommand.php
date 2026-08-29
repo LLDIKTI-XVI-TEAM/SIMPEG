@@ -42,7 +42,7 @@ class BackfillEmployeeMilestonesCommand extends Command
         $query = Employee::query();
 
         if ($onlyActive) {
-            $query->where('status_aktif', 'Aktif');
+            $query->whereActiveStatus();
         }
 
         // Jumlah ini menjadi batas progress bar tanpa memuat seluruh pegawai ke memori.

@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -27,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $status_pegawai_id
  * @property string|null $program_studi_id
  * @property Carbon|null $status_tanggal
+ * @property string|null $status_note
  * @property string|null $kepala_bagian_id
  * @property string|null $kelas_jabatan
  * @property string|null $kelas_jabatan_terakhir
@@ -37,12 +37,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $tanggal_kenaikan_pangkat_berikutnya
  * @property Carbon|null $tanggal_kgb_berikutnya
  * @property Carbon|null $tanggal_akhir_kontrak
- * @property Carbon|null $deleted_at
+ * @property string|null $satyalancana_note
  * @property bool $is_kinerja_baik
  * @property bool $is_satyalancana_eligible
- * @property string|null $satyalancana_note
  * @property bool $is_kepala_lembaga
- * @property string|null $foto_url
+ * @property bool $has_pending_ews_retirement
  * @property string|null $nik
  * @property string|null $no_kk
  * @property string|null $nik_hash
@@ -57,7 +56,18 @@ use Illuminate\Support\Carbon;
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
-    use HasFactory, HasUuid, SoftDeletes;
+    use HasFactory, HasUuid;
+
+    /** Field snapshot lifecycle hanya boleh ditulis oleh primitive perubahan status resmi. */
+    public const LIFECYCLE_SNAPSHOT_FIELDS = [
+        'status_pegawai_id',
+        'status_aktif',
+        'status_keterangan',
+        'status_tanggal',
+        'status_note',
+        'status_berkas_path',
+        'status_nomor_berkas',
+    ];
 
     protected $fillable = [
         // Data Pribadi
@@ -109,6 +119,7 @@ class Employee extends Model
         'no_telepon_rumah',
         'status_alasan',
         'status_deskripsi',
+        'status_note',
         'status_tanggal',
         'status_berkas_path',
         'status_nomor_berkas',
@@ -181,8 +192,7 @@ class Employee extends Model
      */
     public function scopeWithActiveLifecycleStatus(Builder $query): void
     {
-        $query->whereHas('statusPegawai', fn (Builder $statuses) => $statuses
-            ->whereIn('kelompok', RefStatusPegawai::activeGroups()));
+        $query->whereActiveStatus();
     }
 
     /** @return BelongsTo<RefProgramStudi, $this> */
@@ -295,6 +305,12 @@ class Employee extends Model
         return $this->hasMany(EwsAlert::class);
     }
 
+    /** @return HasMany<EmployeeStatusTransition, $this> */
+    public function statusTransitions(): HasMany
+    {
+        return $this->hasMany(EmployeeStatusTransition::class);
+    }
+
     /** @return HasMany<SimpegNotification, $this> */
     public function notifications(): HasMany
     {
@@ -326,6 +342,56 @@ class Employee extends Model
     public function latestRank(): ?RankHistory
     {
         return $this->rankHistories()->where('is_latest', true)->first();
+    }
+
+    /**
+     * Menilai apakah pegawai masih berstatus aktif.
+     *
+     * Keaktifan ditentukan oleh kelompok status kepegawaian (kelompok "Aktif" dan
+     * "Aktif/khusus", mis. Tugas Belajar) — bukan kesamaan nama persis dengan
+     * "Aktif" — agar konsisten dengan presentasi profil. Bila kelompok tidak
+     * tersedia atau tidak dikenali, hasilnya nonaktif secara fail-closed.
+     */
+    public function isActive(): bool
+    {
+        // K-STATUS-02/-05: kelompok referensi adalah SINGLE SOURCE untuk keputusan
+        // keaktifan. Tidak ada fallback ke snapshot status_aktif — bila relasi status
+        // kosong/invalid (kelompok tidak dapat ditentukan), dianggap NONAKTIF (fail-closed)
+        // agar middleware, list, EWS, dan SSO tidak memberikan klasifikasi berbeda.
+        return RefStatusPegawai::isActiveGroup($this->statusPegawai?->kelompok);
+    }
+
+    /**
+     * Scope SQL untuk menyaring pegawai berstatus aktif berdasarkan kelompok
+     * status kepegawaian (ref_status_pegawai.kelompok), bukan nama snapshot.
+     * Sumber keputusan yang sama dengan isActive() di atas sehingga middleware,
+     * pencocokan SSO, dan daftar pegawai selalu berbagi satu klasifikasi:
+     * kelompok "Aktif" dan "Aktif/khusus" (mis. Tugas Belajar) tetap aktif.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeWhereActiveStatus(Builder $query): Builder
+    {
+        return $query->whereIn(
+            'status_pegawai_id',
+            RefStatusPegawai::query()->whereActiveGroup()->select('id'),
+        );
+    }
+
+    /**
+     * Scope komplemen fail-closed: relasi hilang dan kelompok invalid sama-sama nonaktif.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeWhereNotActiveStatus(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q): void {
+            $q->whereNull('status_pegawai_id')
+                ->orWhereNotIn(
+                    'status_pegawai_id',
+                    RefStatusPegawai::query()->whereActiveGroup()->select('id'),
+                );
+        });
     }
 
     public function latestPosition(): ?PositionHistory

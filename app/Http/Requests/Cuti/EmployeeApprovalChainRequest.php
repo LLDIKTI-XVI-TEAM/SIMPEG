@@ -49,9 +49,10 @@ class EmployeeApprovalChainRequest extends FormRequest
             'steps.*.role_label' => ['required', 'string', 'max:100'],
             'steps.*.approver_employee_id' => [
                 'required',
+                // Klasifikasi aktif dari kelompok referensi — satu sumber dengan
+                // Employee::whereActiveStatus()/isActive() (termasuk Aktif/khusus).
                 Rule::exists('employees', 'id')
-                    ->where('status_aktif', 'Aktif')
-                    ->whereNull('deleted_at'),
+                    ->where(fn ($query) => $query->whereIn('id', Employee::query()->whereActiveStatus()->select('id'))),
             ],
             'reason' => ['required', 'string', 'min:5', 'max:500'],
         ];

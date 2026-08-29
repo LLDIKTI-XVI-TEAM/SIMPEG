@@ -115,21 +115,6 @@
                             @endforeach
                         </x-form.select>
 
-                        {{-- Status Pegawai --}}
-                        <x-form.select
-                            name="status_pegawai_id"
-                            label="Status Pegawai"
-                            id="status_pegawai_id"
-                            value="{{ old('status_pegawai_id', $statusPegawai->firstWhere('is_default', true)?->id) }}"
-
-                        >
-                            <option value="" disabled>Pilih Status Pegawai</option>
-                            @foreach($statusPegawai as $status)
-                                <option value="{{ $status->id }}">{{ $status->nama }}</option>
-                            @endforeach
-                        </x-form.select>
-
-
                         {{-- Tanggal Lahir --}}
                         <x-form.date
                             name="tanggal_lahir"

@@ -380,6 +380,25 @@ class DatabaseSeederTest extends TestCase
         $this->assertContains('Approver pada salah satu tahap chain tidak aktif.', $invalidPreview['warnings']);
     }
 
+    public function test_phase_seven_browser_fixture_menyediakan_penugasan_kepala_bagian_aktual_untuk_demo_pegawai(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(PhaseSevenBrowserQaSeeder::class);
+
+        $employee = User::query()
+            ->where('keycloak_username', 'demo-klabat-pegawai')
+            ->firstOrFail()
+            ->employee()
+            ->firstOrFail();
+        $approver = User::query()
+            ->where('keycloak_username', 'demo-klabat-kabag')
+            ->firstOrFail()
+            ->employee()
+            ->firstOrFail();
+
+        $this->assertSame($approver->id, $employee->currentSupervisor()?->kepala_bagian_id);
+    }
+
     public function test_phase_seven_browser_fixture_menyimpan_fakta_manual_snapshot_secara_idempoten_tanpa_approval_ulang(): void
     {
         $this->seed(DatabaseSeeder::class);

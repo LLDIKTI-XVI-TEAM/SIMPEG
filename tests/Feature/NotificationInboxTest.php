@@ -110,22 +110,19 @@ class NotificationInboxTest extends TestCase
         $response->assertNotFound();
     }
 
-    public function test_user_without_employee_mapping_gets_empty_inbox_and_zero_unread_count(): void
+    public function test_user_without_employee_mapping_is_blocked_from_notification_inbox(): void
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        $this->actingAs($user);
+        $this->actingAsUnmapped($user);
 
         $response = $this->getJson(self::ENDPOINT);
 
-        $response->assertOk();
-        $response->assertJsonPath('data', []);
-        $response->assertJsonPath('meta.unread_count', 0);
+        $response->assertRedirect(route('status-akun'));
 
         $countResponse = $this->getJson(self::ENDPOINT.'/jumlah-belum-dibaca');
 
-        $countResponse->assertOk();
-        $countResponse->assertJsonPath('data.unread_count', 0);
+        $countResponse->assertRedirect(route('status-akun'));
     }
 
     public function test_user_only_sees_own_notifications_with_unread_count(): void

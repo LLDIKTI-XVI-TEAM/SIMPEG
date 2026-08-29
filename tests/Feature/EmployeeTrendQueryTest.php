@@ -7,11 +7,13 @@ use App\Actions\Dashboards\BuildPimpinanDashboardAction;
 use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Queries\Dashboards\EmployeeTrendQuery;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class EmployeeTrendQueryTest extends TestCase
@@ -46,6 +48,19 @@ class EmployeeTrendQueryTest extends TestCase
         $this->assertSame(now()->subMonths(11)->translatedFormat('M Y'), $titik[0]['label']);
     }
 
+    public function test_label_tren_tetap_mencakup_setiap_bulan_saat_hari_ini_di_akhir_bulan(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-29 09:00:00'));
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+        $expected = collect(range(11, 0))
+            ->map(fn (int $offset): string => now()->startOfMonth()->subMonths($offset)->translatedFormat('M Y'))
+            ->all();
+
+        $this->assertSame($expected, array_column($titik, 'label'));
+        $this->assertCount(12, array_unique(array_column($titik, 'label')));
+    }
+
     public function test_pegawai_aktif_terhitung_pada_bulan_berjalan(): void
     {
         Employee::factory()->create([
@@ -57,6 +72,52 @@ class EmployeeTrendQueryTest extends TestCase
         $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
 
         $this->assertSame(1, $titik[11]['jumlah']);
+    }
+
+    public function test_pegawai_aktif_khusus_dengan_variasi_kelompok_terhitung_dalam_tren(): void
+    {
+        $status = RefStatusPegawai::query()->where('kode', 'TUGAS_BELAJAR')->firstOrFail();
+        RefStatusPegawai::query()->whereKey($status->id)->update(['kelompok' => 'Aktif/khusus']);
+        DB::table('ref_status_pegawai')->where('id', $status->id)->update([
+            'kelompok' => ' AKTIF/KHUSUS ',
+        ]);
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'tanggal_pensiun' => null,
+        ]);
+        DB::table('employees')->where('id', $employee->id)->update([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => 'Tugas Belajar',
+        ]);
+        EmployeeStatusHistory::create([
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $status->id,
+            'status_nama' => 'Tugas Belajar',
+            'tanggal_efektif' => now()->subMonths(3)->startOfMonth()->toDateString(),
+            'is_latest' => true,
+        ]);
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+
+        $this->assertSame(1, $titik[11]['jumlah']);
+    }
+
+    public function test_pegawai_tanpa_relasi_status_gagal_tertutup_meski_snapshot_aktif(): void
+    {
+        $employee = Employee::factory()->create([
+            'status_aktif' => 'Aktif',
+            'tanggal_pensiun' => null,
+            'status_tanggal' => null,
+        ]);
+        DB::table('employees')->where('id', $employee->id)->update([
+            'status_pegawai_id' => null,
+            'status_aktif' => 'Aktif',
+        ]);
+
+        $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
+
+        $this->assertSame(0, $titik[0]['jumlah']);
+        $this->assertSame(0, $titik[11]['jumlah']);
     }
 
     public function test_pegawai_pensiun_tidak_terhitung_setelah_tanggal_pensiunnya(): void
@@ -80,11 +141,11 @@ class EmployeeTrendQueryTest extends TestCase
     public function test_pegawai_terhapus_lunak_tidak_pernah_terhitung(): void
     {
         $employee = Employee::factory()->create([
-            'status_aktif' => 'Aktif',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
             'tanggal_pensiun' => null,
             'created_at' => now()->subMonths(6),
         ]);
-        $employee->delete();
 
         $titik = app(EmployeeTrendQuery::class)->monthlyActiveCounts();
 

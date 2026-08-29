@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\UpdateEmployeeAction;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
@@ -14,6 +15,7 @@ use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefProgramStudi;
+use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\SalaryHistory;
 use App\Models\User;
@@ -23,11 +25,14 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Mockery\Expectation;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class EmployeeUpdateTest extends TestCase
@@ -84,6 +89,83 @@ class EmployeeUpdateTest extends TestCase
             'auditable_type' => 'Employee',
             'auditable_id' => $employee->id,
         ]);
+    }
+
+    public function test_api_update_rejects_lifecycle_fields_without_side_effects(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $aktif = RefStatusPegawai::query()->where('kode', 'AKTIF')->firstOrFail();
+        $pensiun = RefStatusPegawai::query()->where('kode', 'PENSIUN')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Nama Sebelum Bypass',
+            'status_aktif' => $aktif->nama,
+            'status_pegawai_id' => $aktif->id,
+            'status_keterangan' => 'Status awal',
+        ]);
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee),
+            $this->validPayload($employee, [
+                'nama_lengkap' => 'Nama Tidak Boleh Tersimpan',
+                'status_aktif' => $pensiun->nama,
+                'status_pegawai_id' => $pensiun->id,
+                'status_keterangan' => 'Bypass lifecycle',
+            ]),
+        );
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['status_aktif', 'status_pegawai_id', 'status_keterangan']);
+
+        $employee->refresh();
+        $this->assertSame('Nama Sebelum Bypass', $employee->nama_lengkap);
+        $this->assertSame($aktif->id, $employee->status_pegawai_id);
+        $this->assertSame('Status awal', $employee->status_keterangan);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_web_update_rejects_lifecycle_fields_without_side_effects(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $aktif = RefStatusPegawai::query()->where('kode', 'AKTIF')->firstOrFail();
+        $pensiun = RefStatusPegawai::query()->where('kode', 'PENSIUN')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'status_aktif' => $aktif->nama,
+            'status_pegawai_id' => $aktif->id,
+            'status_keterangan' => 'Status awal web',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from(route('pegawai.edit', $employee->id))
+            ->post(route('pegawai.update', $employee->id), $this->validPayload($employee, [
+                'status_aktif' => $pensiun->nama,
+                'status_pegawai_id' => $pensiun->id,
+                'status_keterangan' => 'Bypass lifecycle web',
+            ]));
+
+        $response->assertRedirect(route('pegawai.edit', $employee->id))
+            ->assertSessionHasErrors(['status_aktif', 'status_pegawai_id', 'status_keterangan']);
+
+        $employee->refresh();
+        $this->assertSame($aktif->id, $employee->status_pegawai_id);
+        $this->assertSame('Status awal web', $employee->status_keterangan);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_update_action_rejects_lifecycle_fields_from_non_http_caller(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $request = Request::create('/internal/pegawai-update', 'PUT');
+        $request->setUserResolver(static fn (): User => $user);
+        $this->actingAs($user);
+
+        $this->expectException(ValidationException::class);
+
+        app(UpdateEmployeeAction::class)->execute($employee, [
+            'status_aktif' => 'Pensiun',
+        ], $request);
     }
 
     public function test_admin_kepegawaian_can_update_kepala_lembaga_marker(): void
@@ -961,6 +1043,9 @@ class EmployeeUpdateTest extends TestCase
         $response->assertDontSee('pangkat_history_id');
         $response->assertDontSee('jabatan_history_id');
         $response->assertDontSee('kgb_history_id');
+        $response->assertDontSee('name="status_aktif"', false);
+        $response->assertDontSee('name="status_pegawai_id"', false);
+        $response->assertDontSee('name="status_keterangan"', false);
         $response->assertSee('append-only');
     }
 
@@ -1007,8 +1092,11 @@ class EmployeeUpdateTest extends TestCase
     {
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['email_pribadi' => 'aktif@example.com']);
-        $inactiveEmployee = Employee::factory()->create(['email_pribadi' => 'arsip@example.com']);
-        $inactiveEmployee->delete();
+        $inactiveEmployee = Employee::factory()->create([
+            'email_pribadi' => 'arsip@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
+        ]);
 
         $this->actingAs($user);
         $response = $this->putJsonWithCsrf($this->endpoint($employee), $this->validPayload($employee, [
@@ -1021,5 +1109,118 @@ class EmployeeUpdateTest extends TestCase
             'Email sudah terdaftar pada pegawai lain.',
             $response->json('errors.email_pribadi.0'),
         );
+    }
+
+    #[DataProvider('lifecycleSnapshotFieldProvider')]
+    public function test_api_update_rejects_every_lifecycle_snapshot_field_without_side_effects(
+        string $field,
+        mixed $attemptedValue,
+    ): void {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->lifecycleSnapshotEmployee();
+
+        $response = $this->actingAs($user)->putJsonWithCsrf(
+            $this->endpoint($employee),
+            $this->validPayload($employee, [
+                'nama_lengkap' => 'Nama Tidak Boleh Tersimpan',
+                $field => $attemptedValue,
+            ]),
+        );
+
+        $response->assertUnprocessable()->assertJsonValidationErrors([$field]);
+
+        $this->assertLifecycleSnapshotUnchanged($employee);
+    }
+
+    #[DataProvider('lifecycleSnapshotFieldProvider')]
+    public function test_web_update_rejects_every_lifecycle_snapshot_field_without_side_effects(
+        string $field,
+        mixed $attemptedValue,
+    ): void {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = $this->lifecycleSnapshotEmployee();
+
+        $response = $this->actingAs($user)
+            ->from(route('pegawai.edit', $employee->id))
+            ->post(route('pegawai.update', $employee->id), $this->validPayload($employee, [
+                'nama_lengkap' => 'Nama Tidak Boleh Tersimpan',
+                $field => $attemptedValue,
+            ]));
+
+        $response->assertRedirect(route('pegawai.edit', $employee->id))
+            ->assertSessionHasErrors([$field]);
+
+        $this->assertLifecycleSnapshotUnchanged($employee);
+    }
+
+    #[DataProvider('lifecycleSnapshotFieldProvider')]
+    public function test_update_action_rejects_every_lifecycle_snapshot_field_from_non_http_caller(
+        string $field,
+        mixed $attemptedValue,
+    ): void {
+        $employee = $this->lifecycleSnapshotEmployee();
+        $request = Request::create('/internal/pegawai-update', 'PUT');
+
+        try {
+            app(UpdateEmployeeAction::class)->execute($employee, [
+                'nama_lengkap' => 'Nama Tidak Boleh Tersimpan',
+                $field => $attemptedValue,
+            ], $request);
+            $this->fail("Update langsung tidak boleh menerima field snapshot lifecycle {$field}.");
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'Status pegawai hanya dapat diubah melalui alur perubahan status.',
+                $exception->errors()[$field][0],
+            );
+        }
+
+        $this->assertLifecycleSnapshotUnchanged($employee);
+    }
+
+    /** @return array<string, array{0: string, 1: mixed}> */
+    public static function lifecycleSnapshotFieldProvider(): array
+    {
+        return [
+            'status_pegawai_id' => ['status_pegawai_id', '00000000-0000-4000-8000-000000000001'],
+            'status_aktif' => ['status_aktif', 'Pensiun'],
+            'status_keterangan' => ['status_keterangan', 'Keterangan bypass lifecycle'],
+            'status_tanggal' => ['status_tanggal', '2026-08-28'],
+            'status_note' => ['status_note', 'Catatan bypass lifecycle'],
+            'status_berkas_path' => ['status_berkas_path', 'employees/status/bypass.pdf'],
+            'status_nomor_berkas' => ['status_nomor_berkas', 'SK-BYPASS-001'],
+        ];
+    }
+
+    private function lifecycleSnapshotEmployee(): Employee
+    {
+        $active = RefStatusPegawai::query()->where('kode', 'AKTIF')->firstOrFail();
+
+        return Employee::factory()->create([
+            'nama_lengkap' => 'Nama Snapshot Awal',
+            'status_pegawai_id' => $active->id,
+            'status_aktif' => $active->nama,
+            'status_keterangan' => 'Keterangan snapshot awal',
+            'status_tanggal' => '2026-08-01',
+            'status_note' => 'Catatan snapshot awal',
+            'status_berkas_path' => 'employees/status/awal.pdf',
+            'status_nomor_berkas' => 'SK-AWAL-001',
+        ]);
+    }
+
+    private function assertLifecycleSnapshotUnchanged(Employee $employee): void
+    {
+        $initialStatusId = $employee->status_pegawai_id;
+
+        $employee->refresh();
+        $this->assertSame('Nama Snapshot Awal', $employee->nama_lengkap);
+        $this->assertSame($initialStatusId, $employee->status_pegawai_id);
+        $this->assertSame('Aktif', $employee->status_aktif);
+        $this->assertSame('Keterangan snapshot awal', $employee->status_keterangan);
+        $this->assertSame('2026-08-01', $employee->status_tanggal?->toDateString());
+        $this->assertSame('Catatan snapshot awal', $employee->status_note);
+        $this->assertSame('employees/status/awal.pdf', $employee->status_berkas_path);
+        $this->assertSame('SK-AWAL-001', $employee->status_nomor_berkas);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
     }
 }

@@ -12,6 +12,7 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\RefStatusPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\ApprovalChainResolver;
@@ -992,6 +993,39 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'steps._pybmc.approver_employee_id',
         ]);
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
+    }
+
+    public function test_route_menerima_pegawai_tugas_belajar_sebagai_approver(): void
+    {
+        // Klasifikasi aktif memakai kelompok referensi: Tugas Belajar (Aktif/khusus)
+        // tetap sah sebagai approver — konsisten dengan isActive()/whereActiveStatus().
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        // Referensi Tugas Belajar (kelompok Aktif/khusus) — dibuat inline karena file
+        // test ini tidak meload ReferenceSeeder; isi sama dengan seeder produksi.
+        $tugasBelajarStatus = RefStatusPegawai::updateOrCreate(
+            ['kode' => 'TUGAS_BELAJAR'],
+            ['nama' => 'Tugas Belajar', 'kelompok' => 'Aktif/khusus', 'is_active' => true, 'is_default' => false, 'keterangan' => 'Pegawai menjalani tugas belajar.'],
+        );
+        $tugasBelajar = Employee::factory()->create([
+            'status_aktif' => 'Tugas Belajar',
+            'status_pegawai_id' => $tugasBelajarStatus->id,
+        ]);
+        $pybmc = Employee::factory()->create();
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $tugasBelajar->id],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
+            ],
+            'reason' => 'Uji verifikator tugas belajar.',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('leave_approval_chains', ['employee_id' => $pegawai->id]);
+        $this->assertTrue($tugasBelajar->refresh()->isActive());
     }
 
     public function test_route_menolak_verifikator_nonaktif(): void

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AuditRoleSimulationUsage;
+use App\Http\Middleware\EnsureActiveEmployeeAccount;
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // pada route yang benar-benar memiliki gate role atau permission internal.
         $middleware->web(append: [
             AuditRoleSimulationUsage::class,
+            EnsureActiveEmployeeAccount::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

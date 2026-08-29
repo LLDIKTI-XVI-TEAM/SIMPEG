@@ -12,6 +12,7 @@ use App\Jobs\ImportEmployeeBatchJob;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\ImportBatch;
+use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -199,8 +200,9 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $inactiveEmployee = Employee::factory()->create([
             'nip' => '199901010000000001',
             'email_pribadi' => 'budi@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
-        $inactiveEmployee->delete();
         $this->persistQueuedBatch($batchId, $user);
 
         $result = app(ExecuteImportBatchAction::class)->execute($batchId, $user);
@@ -209,7 +211,7 @@ class EmployeeImportExecutionRaceTest extends TestCase
         $this->assertSame(0, $result['skipped_count']);
         $this->assertSame(1, $result['failed_count']);
         $this->assertSame('gagal', data_get(ImportBatch::query()->findOrFail($batchId)->row_issues, '0.kategori'));
-        $this->assertSame(1, Employee::withTrashed()->count());
+        $this->assertSame(1, Employee::count());
     }
 
     /** Error saat eksekusi ditambahkan ke error validasi awal, bukan menimpa totalnya. */

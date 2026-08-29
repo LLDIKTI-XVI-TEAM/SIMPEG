@@ -11,11 +11,13 @@ class KepalaBagianEwsController extends Controller
     public function index(KepalaBagianEwsFilterRequest $request, ListKepalaBagianEwsAlertsAction $action)
     {
         abort_if($request->user()?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        $validated = $request->validated();
 
         return view('kabag.ews.index', $action->execute(
             $request->user(),
-            $request->validated('event'),
-            $request->validated('status'),
+            $validated['event'] ?? null,
+            $validated['status'] ?? null,
+            trim((string) ($validated['search'] ?? '')),
         ));
     }
 }

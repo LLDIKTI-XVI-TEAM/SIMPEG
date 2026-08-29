@@ -14,32 +14,25 @@ class ListKepalaBagianEwsAlertsAction
     ) {}
 
     /**
-     * @return array{alerts: LengthAwarePaginator, type_labels: array<string, string>, followup_status_labels: array<string, string>, raw_alerts: array<int, array<string, mixed>>}
+     * @return array{alerts: LengthAwarePaginator, type_labels: array<string, string>, followup_status_labels: array<string, string>, summary: array{total: int, urgent: int, warning: int, info: int}, filterSearch: string}
      */
-    public function execute(User $user, ?string $event, ?string $status, int $perPage = 10): array
+    public function execute(User $user, ?string $event, ?string $status, ?string $search = null, int $perPage = 10): array
     {
-        $data = $this->ewsAlerts->executeForEmployees(
-            $this->scope->directReportIds($user),
+        $data = $this->ewsAlerts->paginate(
             $event,
             $status,
-        );
-
-        $alerts = collect($data['alerts']);
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $paginated = new LengthAwarePaginator(
-            $alerts->forPage($page, $perPage)->values(),
-            $alerts->count(),
+            $search,
             $perPage,
-            $page,
-            ['path' => LengthAwarePaginator::resolveCurrentPath()]
+            null,
+            $this->scope->directReportIds($user),
         );
-        $paginated->withQueryString();
 
         return [
-            'alerts' => $paginated,
+            'alerts' => $data['alerts'],
             'type_labels' => $data['type_labels'],
             'followup_status_labels' => $data['followup_status_labels'],
-            'raw_alerts' => $data['alerts'],
+            'summary' => $data['summary'],
+            'filterSearch' => (string) $search,
         ];
     }
 }

@@ -213,6 +213,7 @@ class NotificationEventChannelManagementTest extends TestCase
             'event_key' => 'cuti.disetujui',
             'notification_channel_id' => $email->id,
             'is_enabled' => false,
+            '_effective_role' => 'super_admin',
         ], $audit->new_values);
 
         $this->actingAs($admin)

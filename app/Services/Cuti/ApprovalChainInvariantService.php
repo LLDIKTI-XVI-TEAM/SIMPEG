@@ -93,12 +93,11 @@ class ApprovalChainInvariantService
         $selectedApproverFound = false;
 
         $approvers = Employee::query()
-            ->withTrashed()
             ->where(function ($query) use ($activeChainApproverIds, $selectedApproverId): void {
                 $query->where('employees.id', $selectedApproverId)
                     ->orWhereIn('employees.id', $activeChainApproverIds);
             })
-            ->select(['employees.id', 'employees.status_aktif', 'employees.deleted_at'])
+            ->select(['employees.id', 'employees.status_pegawai_id', 'employees.status_aktif'])
             ->lockForUpdate()
             ->lazyById(100, 'employees.id', 'id');
 
@@ -174,11 +173,10 @@ class ApprovalChainInvariantService
         sort($employeeLockIds, SORT_STRING);
 
         $approvers = Employee::query()
-            ->withTrashed()
             ->whereIn('id', $employeeLockIds)
             ->orderBy('id')
             ->lockForUpdate()
-            ->get(['id', 'status_aktif', 'deleted_at'])
+            ->get(['id', 'status_pegawai_id', 'status_aktif'])
             ->keyBy('id');
 
         foreach ($uniqueApproverIds as $approverId) {
@@ -234,11 +232,9 @@ class ApprovalChainInvariantService
 
     private function ensureApproverIsUsable(Employee $approver): void
     {
-        if ($approver->getRawOriginal('deleted_at') !== null) {
-            throw new RuntimeException('Approver pada rantai approval cuti sudah dihapus.');
-        }
-
-        if ($approver->getRawOriginal('status_aktif') !== 'Aktif') {
+        // Klasifikasi aktif dari kelompok referensi — satu sumber dengan isActive()
+        // sehingga Tugas Belajar (Aktif/khusus) tetap sah sebagai approver.
+        if (! $approver->isActive()) {
             throw new RuntimeException('Approver pada rantai approval cuti wajib berstatus Aktif.');
         }
     }

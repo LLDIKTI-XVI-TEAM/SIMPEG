@@ -139,13 +139,13 @@ class EmployeeReportPdfExportTest extends TestCase
 
         $this->assertSame(
             ['Pegawai Aktif PDF'],
-            $this->capturedPdfNames($admin, []),
+            $this->capturedPdfNames($admin, ['search' => 'PDF']),
             'Tanpa parameter status, PDF hanya memuat pegawai aktif.',
         );
 
         $this->assertEqualsCanonicalizing(
             ['Pegawai Aktif PDF', 'Pegawai Pensiun PDF'],
-            $this->capturedPdfNames($admin, ['status' => '']),
+            $this->capturedPdfNames($admin, ['status' => '', 'search' => 'PDF']),
             'Status kosong berarti semua status ikut diekspor.',
         );
     }
@@ -153,11 +153,14 @@ class EmployeeReportPdfExportTest extends TestCase
     public function test_pdf_menolak_baris_melebihi_batas_tanpa_pemotongan(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
+        $this->actingAs($admin);
         $jumlah = ExportPegawaiPdfAction::MAX_ROWS + 1;
 
-        $this->insertBulkActiveEmployees($jumlah);
+        // Employee milik aktor autentikasi ikut laporan aktif, sehingga total
+        // tetap tepat satu baris di atas batas tanpa membuat fixture berlebih.
+        $this->insertBulkActiveEmployees($jumlah - 1);
 
-        $response = $this->actingAs($admin)
+        $response = $this
             ->from(route('laporan.pegawai'))
             ->get(route('laporan.pegawai.pdf'));
 
@@ -362,11 +365,13 @@ class EmployeeReportPdfExportTest extends TestCase
             'status_pegawai_id' => RefStatusPegawai::query()->where('nama', 'Pensiun')->value('id'),
         ]);
 
-        // "Semua Status" mengirim status_pegawai_id kosong. Nilai kosong tidak boleh
-        // membuat backend jatuh ke default Aktif, karena pilihan pengguna akan terabaikan.
+        // Kontrak backend: key status_pegawai_id yang ada walau kosong berarti
+        // "semua status" (dipakai konsumen API/laporan; halaman daftar kini justru
+        // meng-omit parameternya saat filter 'all' sesuai temuan Codex 24 Agustus,
+        // sehingga jatuh ke default aktif dan PDF selaras dengan tabel).
         $this->assertEqualsCanonicalizing(
             ['Aktif UUID', 'Pensiun UUID'],
-            $this->capturedPdfNames($admin, ['status_pegawai_id' => '']),
+            $this->capturedPdfNames($admin, ['status_pegawai_id' => '', 'search' => 'UUID']),
         );
     }
 

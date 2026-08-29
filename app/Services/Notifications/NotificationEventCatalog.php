@@ -119,6 +119,11 @@ final class NotificationEventCatalog
             'group' => 'Pegawai',
             'allowed_channels' => ['in_app', 'email'],
         ],
+        'status_pegawai.dinonaktifkan' => [
+            'label' => 'Akun dinonaktifkan',
+            'group' => 'Pegawai',
+            'allowed_channels' => ['in_app', 'email'],
+        ],
         'import_pegawai' => [
             'label' => 'Impor pegawai selesai',
             'group' => 'Impor Pegawai',

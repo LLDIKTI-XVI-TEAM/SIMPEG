@@ -15,6 +15,14 @@ Schedule::command('discipline-records:deactivate-expired')
     ->dailyAt('07:00')
     ->timezone(config('app.timezone'));
 
+// K-STATUS-06: transisi status terjadwal (future effective date) diterapkan otomatis
+// setiap 5 menit dalam zona Asia/Makassar. Idempoten & concurrency-safe (lock baris +
+// is_applied) sehingga retry/double worker tidak menciptakan history ganda.
+Schedule::command('employees:apply-status-transitions')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->timezone('Asia/Makassar');
+
 // Command menghitung tahun sumber saat dieksekusi agar aman untuk cron maupun scheduler worker yang berjalan lama.
 Schedule::command('cuti:rollover')
     ->yearlyOn(1, 1, '00:05')

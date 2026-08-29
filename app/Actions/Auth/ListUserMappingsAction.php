@@ -3,6 +3,7 @@
 namespace App\Actions\Auth;
 
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -112,19 +113,26 @@ class ListUserMappingsAction
      * Menambahkan kondisi untuk user canonical atau satu user legacy yang
      * terbukti aman bagi employee pada row yang sama.
      *
+     * @param  Builder<Employee>  $query
      * @param  Closure(mixed, string): void  $constraint
      */
     private function whereEffectiveUser(Builder $query, Closure $constraint): void
     {
-        $query->where(function (Builder $effectiveUserQuery) use ($constraint): void {
-            $effectiveUserQuery
-                ->whereHas('user', function (Builder $userQuery) use ($constraint): void {
-                    $constraint($userQuery, 'users');
-                })
-                ->orWhereExists(function (QueryBuilder $legacyUserQuery) use ($constraint): void {
-                    $this->constrainSafeLegacyUser($legacyUserQuery, $constraint);
-                });
-        });
+        // Row yang dievaluasi dibatasi klasifikasi aktif: pegawai nonaktif (termasuk
+        // hasil backfill) tidak boleh dianggap memiliki user efektif — baik user
+        // canonical maupun fallback legacy — agar daftar/filter tidak inkonsisten
+        // dengan hitungan kandidat aktif yang sama (lihat constrainSafeLegacyUser).
+        $query
+            ->whereActiveStatus()
+            ->where(function (Builder $effectiveUserQuery) use ($constraint): void {
+                $effectiveUserQuery
+                    ->whereHas('user', function (Builder $userQuery) use ($constraint): void {
+                        $constraint($userQuery, 'users');
+                    })
+                    ->orWhereExists(function (QueryBuilder $legacyUserQuery) use ($constraint): void {
+                        $this->constrainSafeLegacyUser($legacyUserQuery, $constraint);
+                    });
+            });
     }
 
     private function whereWithoutEffectiveUser(Builder $query): void
@@ -145,6 +153,12 @@ class ListUserMappingsAction
      */
     private function constrainSafeLegacyUser(QueryBuilder $query, ?Closure $constraint = null): void
     {
+        $activeGroupPlaceholders = implode(', ', array_fill(
+            0,
+            count(RefStatusPegawai::normalizedActiveGroups()),
+            '?',
+        ));
+
         $query
             ->selectRaw('1')
             ->from('users as legacy_users')
@@ -161,13 +175,18 @@ class ListUserMappingsAction
                     ->whereRaw('lower(legacy_users.email) = lower(employees.email)')
                     ->orWhereRaw('lower(legacy_users.email) = lower(employees.email_pribadi)');
             })
-            ->whereRaw(<<<'SQL'
+            ->whereRaw(<<<SQL
 (select count(distinct legacy_employees.id)
 from employees as legacy_employees
-where legacy_employees.deleted_at is null
+where exists (
+    select 1
+    from ref_status_pegawai as legacy_status
+    where legacy_status.id = legacy_employees.status_pegawai_id
+      and lower(trim(legacy_status.kelompok)) in ({$activeGroupPlaceholders})
+)
 and (lower(legacy_employees.email) = lower(legacy_users.email)
 or lower(legacy_employees.email_pribadi) = lower(legacy_users.email))) = 1
-SQL);
+SQL, RefStatusPegawai::normalizedActiveGroups());
 
         if ($constraint !== null) {
             $constraint($query, 'legacy_users');
@@ -218,8 +237,13 @@ SQL);
 
         $employeesByEmail = [];
 
+        // Kandidat legacy memakai klasifikasi aktif yang sama dengan hitungan keamanan
+        // SQL (constrainSafeLegacyUser): hanya pegawai berkelompok aktif yang dianggap
+        // sebagai kandidat pemetaan, sehingga transformasi dan predikat tidak kontradiksi
+        // (mis. satu pegawai aktif + satu hasil backfill nonaktif berbagi email).
         Employee::query()
             ->select(['id', 'email', 'email_pribadi'])
+            ->whereActiveStatus()
             ->where(function (Builder $query) use ($emails): void {
                 $query
                     ->whereIn(DB::raw('lower(email)'), $emails)

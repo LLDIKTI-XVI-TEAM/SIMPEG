@@ -1,10 +1,10 @@
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">
     @php
         $dashboardEwsAlerts = $dashboardEwsAlerts ?? [];
-        $dashboardEwsTotal = $dashboardEwsTotal ?? count($dashboardEwsAlerts);
-        $dashboardEwsUrgent = $dashboardEwsUrgent ?? collect($dashboardEwsAlerts)->where('urgency', 'danger')->count();
-        $dashboardEwsWarning = $dashboardEwsWarning ?? collect($dashboardEwsAlerts)->where('urgency', 'warning')->count();
-        $dashboardEwsInfo = $dashboardEwsInfo ?? collect($dashboardEwsAlerts)->where('urgency', 'success')->count();
+        $dashboardEwsTotal = $dashboardEwsTotal ?? 0;
+        $dashboardEwsUrgent = $dashboardEwsUrgent ?? 0;
+        $dashboardEwsWarning = $dashboardEwsWarning ?? 0;
+        $dashboardEwsInfo = $dashboardEwsInfo ?? 0;
         $dashboardEwsLink = $dashboardEwsLink ?? route('ews');
         $saldoCuti = $saldoCuti ?? null;
         $cutiAktif = $cutiAktif ?? collect([]);

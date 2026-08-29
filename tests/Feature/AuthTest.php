@@ -13,6 +13,12 @@ class AuthTest extends TestCase
 
     public function test_login_redirects_to_keycloak(): void
     {
+        config([
+            'services.keycloak.base_url' => 'https://sso-lldikti16.kemdiktisaintek.go.id',
+            'services.keycloak.realms' => 'sso',
+            'services.keycloak.realm' => 'sso',
+        ]);
+
         $response = $this->get(route('login'));
 
         $response->assertRedirect();

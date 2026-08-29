@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -159,18 +160,16 @@ class DataMasterProgramStudiTest extends TestCase
         $employee = Employee::factory()->create([
             'program_studi_id' => $programStudi->id,
             'prodi_pendidikan_terakhir' => 'Nama Lama Pegawai Nonaktif',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
-        $employee->delete();
 
         $this->actingAs($user)->postWithCsrf(route('data-master.program-studi.update', $programStudi), [
             'nama' => 'Nama Baru Pegawai Nonaktif',
         ])->assertRedirect();
 
-        $trashedEmployee = Employee::withTrashed()->findOrFail($employee->id);
-        $this->assertSame('Nama Baru Pegawai Nonaktif', $trashedEmployee->prodi_pendidikan_terakhir);
-
-        $trashedEmployee->restore();
-        $this->assertSame('Nama Baru Pegawai Nonaktif', $trashedEmployee->fresh()->prodi_pendidikan_terakhir);
+        $employee->refresh();
+        $this->assertSame('Nama Baru Pegawai Nonaktif', $employee->prodi_pendidikan_terakhir);
     }
 
     private function postWithCsrf(string $uri, array $data): TestResponse

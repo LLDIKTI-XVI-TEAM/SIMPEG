@@ -51,7 +51,7 @@ class EmployeeIndexTest extends TestCase
         Employee::factory()->create(['nama_lengkap' => 'Budi Santoso']);
 
         $this->actingAs($user);
-        $response = $this->getJson(self::PEGAWAI_ENDPOINT);
+        $response = $this->getJson(self::PEGAWAI_ENDPOINT.'?search=Budi%20Santoso');
 
         $response->assertOk();
         $response->assertJsonPath('message', 'Daftar pegawai berhasil diambil.');
@@ -87,11 +87,34 @@ class EmployeeIndexTest extends TestCase
         Employee::factory()->create(['nama_lengkap' => 'Pegawai Nonaktif', 'status_aktif' => 'Non-Aktif']);
 
         $this->actingAs($user);
-        $response = $this->getJson(self::PEGAWAI_ENDPOINT);
+        $response = $this->getJson(self::PEGAWAI_ENDPOINT.'?search=Pegawai');
 
         $response->assertOk();
         $response->assertJsonCount(1, 'employees.data');
         $response->assertJsonPath('employees.data.0.nama_lengkap', 'Pegawai Aktif');
+    }
+
+    public function test_filter_status_menjelaskan_bahwa_daftar_hanya_memuat_pegawai_aktif(): void
+    {
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertSee('Semua Status Pegawai Aktif');
+    }
+
+    public function test_modal_lifecycle_memakai_toast_dan_tidak_memakai_alert_browser(): void
+    {
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('data-pegawai'))
+            ->assertOk();
+
+        $response
+            ->assertSee("new CustomEvent('notify'", false)
+            ->assertSee("this.notify('success', 'Penonaktifan Diproses'", false)
+            ->assertSee("this.notify('success', 'Pengaktifan Diproses'", false)
+            ->assertDontSee("alert('Tanggal efektif wajib diisi.')", false)
+            ->assertDontSee("alert(data.message || 'Permintaan penonaktifan pegawai berhasil diproses.')", false)
+            ->assertDontSee("alert(data.message || 'Permintaan pengaktifan kembali pegawai berhasil diproses.')", false);
     }
 
     public function test_search_matches_name_and_nip(): void
@@ -150,15 +173,15 @@ class EmployeeIndexTest extends TestCase
     public function test_sorting_and_pagination_follow_allowed_parameters(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
-        Employee::factory()->create(['nama_lengkap' => 'Charlie']);
-        Employee::factory()->create(['nama_lengkap' => 'Bravo']);
-        Employee::factory()->create(['nama_lengkap' => 'Alpha']);
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Urut Charlie']);
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Urut Bravo']);
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Urut Alpha']);
 
         $this->actingAs($user);
-        $response = $this->getJson(self::PEGAWAI_ENDPOINT.'?sort=nama_lengkap&direction=desc&per_page=10');
+        $response = $this->getJson(self::PEGAWAI_ENDPOINT.'?search=Pegawai%20Urut&sort=nama_lengkap&direction=desc&per_page=10');
 
         $response->assertOk();
-        $response->assertJsonPath('employees.data.0.nama_lengkap', 'Charlie');
+        $response->assertJsonPath('employees.data.0.nama_lengkap', 'Pegawai Urut Charlie');
         $response->assertJsonPath('employees.per_page', 10);
         $response->assertJsonPath('employees.total', 3);
     }

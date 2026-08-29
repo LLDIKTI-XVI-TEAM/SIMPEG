@@ -192,15 +192,16 @@ class HandleKeycloakCallbackAction
                     // pegawai nonaktif hanya memegang email_pribadi kanonisnya.
                     ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
             })
-                // Permukaan autentikasi hanya memetakan pegawai aktif; pegawai yang sudah
-                // di-soft-delete tidak boleh menjadi pintu masuk akun SSO baru.
-                ->whereNull('deleted_at')
+                // Permukaan autentikasi hanya memetakan pegawai aktif menurut kelompok
+                // status kepegawaian (termasuk "Aktif/khusus" seperti Tugas Belajar);
+                // pegawai yang dinonaktifkan tidak boleh menjadi pintu masuk akun SSO baru.
+                ->whereActiveStatus()
                 ->limit(2)
                 ->get();
         }
 
         return Employee::whereRaw('lower('.$employeeField.') = ?', [$matchedEmail])
-            ->whereNull('deleted_at')
+            ->whereActiveStatus()
             ->limit(2)
             ->get();
     }
@@ -226,12 +227,17 @@ class HandleKeycloakCallbackAction
     }
 
     /**
-     * Apakah pegawai terpeta sudah dinonaktifkan (soft-delete). Pegawai nonaktif tidak berhak
-     * atas inisialisasi role baru lewat SSO.
+     * Apakah pegawai terpeta sudah dinonaktifkan. Klasifikasi memakai kelompok status
+     * kepegawaian (satu sumber dengan middleware dan isActive()), sehingga status
+     * "Aktif/khusus" seperti Tugas Belajar tidak dianggap dinonaktifkan hanya karena
+     * nama snapshotnya bukan "Aktif".
      */
     private function employeeIsSoftDeleted(string $employeeId): bool
     {
-        return (bool) Employee::withTrashed()->whereKey($employeeId)->value('deleted_at');
+        return ! Employee::query()
+            ->whereKey($employeeId)
+            ->whereActiveStatus()
+            ->exists();
     }
 
     /**

@@ -420,7 +420,6 @@
                             </p>
                         </div>
 
-                        <input type="hidden" name="status_pegawai_id" value="{{ $p->status_pegawai_id }}">
                         <div class="space-y-1">
                             <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status
                                 Pegawai</label>

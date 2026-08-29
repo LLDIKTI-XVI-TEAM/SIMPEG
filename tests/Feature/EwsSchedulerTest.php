@@ -24,6 +24,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery\Expectation;
@@ -811,7 +812,7 @@ class EwsSchedulerTest extends TestCase
         $this->assertNotNull($alert->notification_acknowledged_at);
     }
 
-    public function test_scheduler_dan_fanout_ews_hanya_memproses_kelompok_status_aktif_kanonis(): void
+    public function test_scheduler_dan_fanout_ews_memakai_kelompok_status_aktif_ternormalisasi(): void
     {
         $statuses = RefStatusPegawai::query()->whereIn('kode', [
             'AKTIF', 'TUGAS_BELAJAR', 'PENSIUN', 'MUTASI',
@@ -830,6 +831,11 @@ class EwsSchedulerTest extends TestCase
         $inactiveAdmin = $this->employeeWithLifecycleStatus($statuses['PENSIUN']);
         User::factory()->create(['role' => 'admin_kepegawaian', 'employee_id' => $activeAdmin->id]);
         User::factory()->create(['role' => 'admin_kepegawaian', 'employee_id' => $inactiveAdmin->id]);
+
+        // Fixture raw merepresentasikan data lama sebelum mutator kanonisasi tersedia.
+        DB::table('ref_status_pegawai')
+            ->where('id', $statuses['AKTIF']->id)
+            ->update(['kelompok' => ' aktif ']);
 
         // Resolver tidak boleh melakukan fan-out ke akun admin yang pegawai tertautnya tidak aktif.
         $recipients = app(NotificationRecipientResolver::class)->additionalRecipients($active, 'ews.kgb');
@@ -864,6 +870,11 @@ class EwsSchedulerTest extends TestCase
             'role' => 'super_admin',
             'employee_id' => $superAdminEmployee->id,
         ]);
+
+        // Super Admin dengan variasi legacy tetap aktif menurut predicate lifecycle.
+        DB::table('ref_status_pegawai')
+            ->where('id', $superAdminEmployee->status_pegawai_id)
+            ->update(['kelompok' => ' AKTIF/KHUSUS ']);
 
         // Mock failure by binding a service that throws exception
         $this->mock(EwsEngineService::class, function ($mock) {
@@ -919,6 +930,34 @@ class EwsSchedulerTest extends TestCase
             $this->assertSame('gagal', $run->status);
             $this->assertStringContainsString('Service failure simulation', $run->error_message);
         }
+    }
+
+    public function test_admin_pekerja_nonaktif_tidak_menjadi_penerima_notifikasi_ews(): void
+    {
+        // Deaktivasi akun admin juga menghentikan distribusi data EWS keluar aplikasi:
+        // admin yang pegawainya nonaktif tidak lagi dihitung sebagai additionalRecipients.
+        $nonaktifStatus = RefStatusPegawai::where('kode', 'NONAKTIF')->firstOrFail();
+        $adminNonaktif = Employee::factory()->create([
+            'status_aktif' => 'Nonaktif',
+            'status_pegawai_id' => $nonaktifStatus->id,
+        ]);
+        User::factory()->create([
+            'role' => 'admin_kepegawaian',
+            'employee_id' => $adminNonaktif->id,
+        ]);
+
+        $adminAktif = Employee::factory()->create();
+        User::factory()->create([
+            'role' => 'admin_kepegawaian',
+            'employee_id' => $adminAktif->id,
+        ]);
+
+        $recipient = Employee::factory()->create();
+        $resolver = app(NotificationRecipientResolver::class);
+        $recipients = $resolver->additionalRecipients($recipient, 'ews.kgb_30');
+
+        $this->assertCount(1, $recipients);
+        $this->assertSame($adminAktif->id, $recipients->first()?->id);
     }
 
     /** Menyiapkan status melalui referensi agar uji tidak bergantung pada snapshot status_aktif. */

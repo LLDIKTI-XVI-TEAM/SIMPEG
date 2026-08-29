@@ -77,6 +77,7 @@ class LeaveDecisionAuditTest extends TestCase
             'approver_id' => $approver->id,
             'acted_at' => $audit->new_values['acted_at'],
             'komentar' => $komentar,
+            '_effective_role' => 'pegawai',
         ], $audit->new_values);
     }
 
@@ -122,6 +123,7 @@ class LeaveDecisionAuditTest extends TestCase
             'approver_id' => $approver->id,
             'acted_at' => $audit->new_values['acted_at'],
             'komentar' => $komentar,
+            '_effective_role' => 'pegawai',
         ], $audit->new_values);
     }
 

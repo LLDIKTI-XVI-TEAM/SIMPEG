@@ -10,6 +10,7 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefJenisCuti;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -64,6 +65,30 @@ class KepalaBagianFrontendTest extends TestCase
 
         $this->assertNotNull($directReport->id);
         $this->assertNotNull($otherEmployee->id);
+    }
+
+    public function test_dashboard_menghitung_bawahan_aktif_khusus_dengan_kelompok_bervariasi(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $status = RefStatusPegawai::query()->where('kode', 'TUGAS_BELAJAR')->firstOrFail();
+        DB::table('ref_status_pegawai')->where('id', $status->id)->update([
+            'kelompok' => ' aktif/KHUSUS ',
+        ]);
+        $bawahan = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Tugas Belajar Dashboard',
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'status_pegawai_id' => $status->id,
+        ]);
+        DB::table('employees')->where('id', $bawahan->id)->update([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => 'Tugas Belajar',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.dashboard'))
+            ->assertOk()
+            ->assertViewHas('totalBawahanAktif', 1)
+            ->assertSee('Bawahan Tugas Belajar Dashboard');
     }
 
     public function test_navigation_menampilkan_cuti_bawahan_dan_pengajuan_cuti_sendiri(): void
@@ -170,8 +195,12 @@ class KepalaBagianFrontendTest extends TestCase
         $directReport = Employee::factory()->create([
             'nama_lengkap' => 'Bawahan Dengan Status Legacy',
             'kepala_bagian_id' => $kepalaBagian->id,
-            'status_aktif' => 'Pensiun',
+            'status_aktif' => 'Aktif',
         ]);
+        // Simulasi data lama: kolom snapshot status berisi nilai legacy 'Pensiun' tetapi
+        // relasi status (satu sumber klasifikasi) tetap mengarah ke kelompok Aktif —
+        // halaman bawahan tetap menuntut pengklasifikasian aktif berdasarkan referensi.
+        Employee::query()->whereKey($directReport->id)->update(['status_aktif' => 'Pensiun']);
 
         $this->actingAs($user)
             ->get(route('kepala-bagian.bawahan.index'))
@@ -210,8 +239,11 @@ class KepalaBagianFrontendTest extends TestCase
         $directReport = Employee::factory()->create([
             'nama_lengkap' => 'Bawahan Dengan Status Legacy',
             'kepala_bagian_id' => $kepalaBagian->id,
-            'status_aktif' => 'Pensiun',
+            'status_aktif' => 'Aktif',
         ]);
+        // Snapshot legacy 'Pensiun' tanpa menyentuh relasi status: klasifikasi aktif tetap
+        // memakai kelompok referensi, bukan string snapshot yang kedaluwarsa.
+        Employee::query()->whereKey($directReport->id)->update(['status_aktif' => 'Pensiun']);
 
         $this->actingAs($user)
             ->get(route('kepala-bagian.bawahan.index'))

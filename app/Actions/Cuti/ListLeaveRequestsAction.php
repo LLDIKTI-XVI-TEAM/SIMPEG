@@ -34,6 +34,8 @@ class ListLeaveRequestsAction
      */
     public function execute(User $user, Request $request): array
     {
+        // Jangkar ke awal bulan agar Februari tidak terlewati saat tanggal berjalan 29-31.
+        $bulanBerjalan = now()->startOfMonth();
         $isPegawai = ! $user->hasPermission('cuti.read_all');
         $search = $isPegawai ? '' : trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
@@ -122,7 +124,8 @@ class ListLeaveRequestsAction
                     ->orderBy('jabatan_terakhir')
                     ->pluck('jabatan_terakhir'),
             // Portable periode options (verified current producer): 12 bulan terakhir, tanpa SQL PostgreSQL-only.
-            'optPeriodes' => collect(range(0, 11))->map(fn (int $offset): string => now()->subMonths($offset)->format('Y-m')),
+            'optPeriodes' => collect(range(0, 11))
+                ->map(fn (int $offset): string => $bulanBerjalan->copy()->subMonths($offset)->format('Y-m')),
             'optTahuns' => $this->tahunOptions($baseQuery),
             'search' => $search,
             'status' => $status,

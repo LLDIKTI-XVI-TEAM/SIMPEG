@@ -79,6 +79,15 @@
                     </x-ui.table-body>
                 </x-ui.table>
             </div>
+            @if($alerts->hasPages())
+                <div class="border-t border-border bg-surface px-6 py-4">
+                    {{ $alerts->links('vendor.pagination.simpeg') }}
+                </div>
+            @elseif($alerts->total() > 0)
+                <div class="border-t border-border bg-surface px-6 py-3">
+                    <p class="text-sm text-muted">Menampilkan {{ $alerts->total() }} peringatan EWS pribadi.</p>
+                </div>
+            @endif
         </x-ui.card>
     </div>
 </x-layouts.app>

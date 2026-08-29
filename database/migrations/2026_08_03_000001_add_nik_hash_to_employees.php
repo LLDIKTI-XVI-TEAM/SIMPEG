@@ -20,11 +20,11 @@ return new class extends Migration
                 ->comment('HMAC-SHA256 blind index of NIK for uniqueness checks. Must be recomputed after APP_KEY rotation.');
         });
 
-        // Fase 2: Backfill semua baris termasuk soft-deleted.
+        // Fase 2: Backfill semua baris.
         // 'encrypted' cast mendekripsi saat read — harus iterasi di PHP, tidak bisa pakai SQL langsung.
         $appKey = config('app.key');
 
-        Employee::withTrashed()
+        Employee::query()
             ->whereNotNull('nik')
             ->chunkById(200, function ($employees) use ($appKey): void {
                 foreach ($employees as $employee) {
@@ -65,8 +65,10 @@ return new class extends Migration
         foreach ($duplicateHashes as $hash) {
             $rows = DB::table('employees')
                 ->where('nik_hash', $hash)
-                ->orderByRaw('deleted_at IS NOT NULL ASC') // utamakan record aktif (deleted_at NULL)
-                ->orderBy('created_at', 'desc')            // di antara yang setara, pilih yang terbaru
+                // Pada titik migration ini deleted_at masih tersedia. Record aktif
+                // wajib menang agar validasi NIK sesudah cutover tidak menunjuk data lama.
+                ->orderByRaw('deleted_at IS NOT NULL ASC')
+                ->orderBy('created_at', 'desc')
                 ->get(['id', 'deleted_at', 'created_at']);
 
             // Baris pertama adalah "pemenang" — nik_hash-nya dipertahankan.
@@ -82,7 +84,6 @@ return new class extends Migration
                     '[Migration] Duplikat NIK ditemukan: nik_hash dinullifikasi untuk rekonsiliasi. Lakukan verifikasi manual pada record ini.',
                     [
                         'employee_id' => $loser->id,
-                        'nik_hash' => $hash,
                         'deleted_at' => $loser->deleted_at,
                     ]
                 );

@@ -179,6 +179,83 @@ class EmployeeFileStorageService
         return $this->storeOnDisk($file, $directory, Document::STORAGE_DISK);
     }
 
+    /**
+     * Menyimpan SK status dengan manifest durable sebelum byte ditulis agar crash
+     * sebelum commit metadata dapat dipulihkan tanpa menghapus file milik pegawai lain.
+     *
+     * @return array{path:string,recovery_task_id:string}
+     */
+    public function storeEmployeeStatusDocument(UploadedFile $file, string $employeeId): array
+    {
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (! in_array($extension, ['pdf', 'jpg', 'jpeg', 'png'], true)) {
+            throw new \InvalidArgumentException('Format SK status pegawai tidak diizinkan.');
+        }
+
+        $storedName = Str::uuid().'.'.$extension;
+        $directory = $employeeId.'/sk_status_pegawai';
+        $expectedPath = $directory.'/'.$storedName;
+        $realPath = $file->getRealPath();
+        $sha256 = is_string($realPath) ? hash_file('sha256', $realPath) : false;
+        if (! is_string($sha256)) {
+            throw new \RuntimeException('SK status pegawai gagal dihitung sebelum disimpan.');
+        }
+
+        $recoveryTask = $this->recovery->prepareEmployeeStatusDocumentCreationTarget(
+            $expectedPath,
+            $employeeId,
+            $sha256,
+        );
+        $path = Storage::disk(Document::STORAGE_DISK)->putFileAs($directory, $file, $storedName);
+
+        if ($path === false || $path !== $expectedPath) {
+            throw new \RuntimeException('Gagal menyimpan SK status pegawai.');
+        }
+
+        // Bila middleware membatalkan transaksi request setelah Action selesai, cleanup
+        // tetap dicatat durable; manifest PREPARED menjadi pagar untuk crash sebelum callback.
+        $this->sideEffects->afterRollback(
+            fn () => $this->deleteEmployeeStatusDocument($path, $employeeId),
+        );
+
+        return ['path' => $path, 'recovery_task_id' => $recoveryTask->id];
+    }
+
+    /** Adoption ditunda oleh middleware transaksi; recovery tetap dapat mengadopsi manifest bila proses crash. */
+    public function adoptEmployeeStatusDocument(string $taskId, string $employeeId, string $path): bool
+    {
+        if ($this->sideEffects->afterCommit(
+            fn () => $this->attemptEmployeeStatusDocumentAdoption($taskId, $employeeId, $path),
+        )) {
+            return true;
+        }
+
+        return $this->attemptEmployeeStatusDocumentAdoption($taskId, $employeeId, $path);
+    }
+
+    /** Cleanup gagal-transaksi dicatat durable dan owner-scoped sebelum penghapusan dicoba. */
+    public function deleteEmployeeStatusDocument(?string $path, string $employeeId): bool
+    {
+        if ($path === null || $path === '') {
+            return true;
+        }
+
+        if (! $this->recovery->isCanonicalEmployeeStatusDocumentPath($path, $employeeId)) {
+            Log::warning('Menolak menghapus SK status pegawai dengan path tidak kanonis.');
+
+            return false;
+        }
+
+        $task = $this->recovery->scheduleDelete(
+            StorageRecoveryService::CATEGORY_EMPLOYEE_STATUS_DOCUMENT,
+            Document::STORAGE_DISK,
+            $path,
+            $employeeId,
+        );
+
+        return $this->recovery->attempt($task->id);
+    }
+
     public function deletePublicFile(?string $path): void
     {
         if ($path === null || $path === '') {
@@ -246,6 +323,28 @@ class EmployeeFileStorageService
                 ]);
             } catch (\Throwable) {
                 // Pelaporan sekunder tidak boleh mengubah pengajuan yang sudah committed.
+            }
+
+            return false;
+        }
+    }
+
+    /** Kegagalan adoption dicatat tanpa path privat; worker recovery dapat menyelesaikannya idempoten. */
+    private function attemptEmployeeStatusDocumentAdoption(string $taskId, string $employeeId, string $path): bool
+    {
+        try {
+            $this->recovery->markEmployeeStatusDocumentCreationTargetAdopted($taskId, $employeeId, $path);
+
+            return true;
+        } catch (\Throwable $exception) {
+            try {
+                Log::critical('Intent target SK status pegawai gagal diadopsi setelah commit.', [
+                    'task_id' => $taskId,
+                    'employee_id' => $employeeId,
+                    'error_type' => $exception::class,
+                ]);
+            } catch (\Throwable) {
+                // Pelaporan sekunder tidak boleh mengubah jadwal status yang sudah committed.
             }
 
             return false;

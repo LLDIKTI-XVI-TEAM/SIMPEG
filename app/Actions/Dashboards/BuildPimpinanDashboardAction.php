@@ -4,28 +4,26 @@ namespace App\Actions\Dashboards;
 
 use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Models\AuditLog;
-use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RankHistory;
 use App\Models\User;
+use App\Queries\Dashboards\ActiveEmployeeSummaryQuery;
 use App\Queries\Dashboards\EmployeeTrendQuery;
 
 class BuildPimpinanDashboardAction
 {
     public function __construct(
         private readonly ListActiveEwsAlertsAction $ewsAlerts,
+        private readonly ActiveEmployeeSummaryQuery $employeeSummary,
         private readonly EmployeeTrendQuery $trenPegawai,
     ) {}
 
     public function execute(User $user): array
     {
-        $employees = Employee::query()
-            ->with('jenisPegawai:id,nama')
-            ->where('status_aktif', 'Aktif')
-            ->get();
+        $employees = $this->employeeSummary->execute();
         $now = now();
         $pendingLeaves = $this->pendingLeaves($user->employee_id);
-        $ews = $this->ewsAlerts->execute(null, null)['alerts'];
+        $ews = $this->ewsAlerts->preview(5);
         $trenPegawai = collect($this->trenPegawai->monthlyActiveCounts($now));
 
         $chartWidth = 440;
@@ -64,8 +62,8 @@ class BuildPimpinanDashboardAction
         }
 
         return [
-            'totalPegawai' => $employees->count(),
-            'komposisi' => $employees->countBy(fn (Employee $employee): string => $employee->jenisPegawai?->nama ?? 'Tidak Diketahui')->all(),
+            'totalPegawai' => $employees['total'],
+            'komposisi' => $employees['composition'],
             'promotionRows' => RankHistory::query()
                 ->with(['employee.rankHistories.golongan', 'golongan'])
                 ->whereYear('tmt_pangkat', $now->year)
@@ -107,8 +105,8 @@ class BuildPimpinanDashboardAction
                 ->count(),
             'cutiDitunda' => LeaveRequest::query()->where('status', 'ditangguhkan')->count(),
             'pendingLeaves' => $pendingLeaves,
-            'totalEwsAktif' => count($ews),
-            'ewsAktif' => array_slice($ews, 0, 5),
+            'totalEwsAktif' => $ews['total'],
+            'ewsAktif' => $ews['alerts'],
             'auditTerbaru' => AuditLog::query()
                 ->latest()
                 ->limit(5)
@@ -119,11 +117,7 @@ class BuildPimpinanDashboardAction
                     'target' => $audit->new_values['nama_lengkap'] ?? class_basename($audit->auditable_type ?? 'Data'),
                     'waktu' => $audit->created_at?->translatedFormat('d M Y H:i') ?? '-',
                 ]),
-            'distribusiGolongan' => $employees
-                ->map(fn (Employee $employee): string => (string) $employee->golongan_terakhir ?: 'Belum Diisi')
-                ->countBy()
-                ->sortKeys()
-                ->all(),
+            'distribusiGolongan' => $employees['rank_distribution'],
             'trenPegawai' => $trenPegawai,
             'trendPoints' => $points,
             'trendPathD' => $pathD,

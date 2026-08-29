@@ -7,12 +7,14 @@ use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Services\Ews\EwsEligibilityService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use RuntimeException;
 
 class ListActiveEwsAlertsAction
 {
     /** @var array<string, string> */
-    private array $typeLabels = [
+    private const TYPE_LABELS = [
         'KENAIKAN_PANGKAT' => 'Kenaikan Pangkat',
         'KGB' => 'KGB',
         'PENSIUN' => 'Pensiun',
@@ -21,7 +23,7 @@ class ListActiveEwsAlertsAction
     ];
 
     /** @var array<string, string> */
-    private array $followupStatusLabels = [
+    private const FOLLOWUP_STATUS_LABELS = [
         'aktif' => 'Aktif',
         'ditangani' => 'Ditangani',
         'tidak_perlu' => 'Tidak Perlu',
@@ -30,20 +32,93 @@ class ListActiveEwsAlertsAction
 
     public function __construct(private readonly EwsEligibilityService $eligibility) {}
 
+    /** @return list<string> */
+    public static function allowedEventFilters(): array
+    {
+        return ['semua', ...array_values(self::TYPE_LABELS)];
+    }
+
+    /** @return list<string> */
+    public static function allowedStatusFilters(): array
+    {
+        return ['semua', ...array_keys(self::FOLLOWUP_STATUS_LABELS)];
+    }
+
     /**
-     * Mengambil alert EWS aktif untuk halaman admin/pimpinan atau pegawai tertentu.
-     * Alert non-eligible tetap tampil agar data pegawai bisa ditindaklanjuti.
+     * Pagination dilakukan sebelum eager load dan mapping agar jumlah row serta query
+     * tetap bounded. Search hanya menyentuh field identitas minimum pegawai.
      *
-     * @return array{alerts: array<int, array<string, mixed>>, type_labels: array<string, string>, followup_status_labels: array<string, string>}
+     * @param  list<string>|null  $employeeIds
+     * @return array{alerts: LengthAwarePaginator, type_labels: array<string, string>, followup_status_labels: array<string, string>, summary: array{total: int, urgent: int, warning: int, info: int}}
      */
-    public function execute(
+    public function paginate(
         ?string $filterEvent,
-        ?string $filterStatus = null,
+        ?string $filterStatus,
+        ?string $search,
+        int $perPage,
         ?string $employeeId = null,
         ?array $employeeIds = null,
     ): array {
+        $query = $this->query($filterEvent, $filterStatus, $search, $employeeId, $employeeIds);
+        $summary = $this->summary(clone $query);
+        $thresholdMap = $this->thresholdMap($this->configValues());
+        $alerts = $query
+            ->with(['employee.disciplineRecords', 'handledBy'])
+            ->orderBy('target_date')
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->withQueryString();
+        $alerts->through(fn (EwsAlert $alert): array => $this->mapAlert($alert, $thresholdMap));
+
+        return [
+            'alerts' => $alerts,
+            'type_labels' => self::TYPE_LABELS,
+            'followup_status_labels' => self::FOLLOWUP_STATUS_LABELS,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Dashboard hanya menerima preview terbatas, sedangkan total dan bucket urgensi
+     * dihitung set-based di database dari filter yang sama.
+     *
+     * @param  list<string>|null  $employeeIds
+     * @return array{alerts: array<int, array<string, mixed>>, total: int, urgent: int, warning: int, info: int}
+     */
+    public function preview(
+        int $limit,
+        ?string $filterEvent = null,
+        ?string $filterStatus = null,
+        ?string $search = null,
+        ?string $employeeId = null,
+        ?array $employeeIds = null,
+    ): array {
+        $query = $this->query($filterEvent, $filterStatus, $search, $employeeId, $employeeIds);
+        $summary = $this->summary(clone $query);
+        $thresholdMap = $this->thresholdMap($this->configValues());
+        $alerts = $query
+            ->with(['employee.disciplineRecords', 'handledBy'])
+            ->orderBy('target_date')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (EwsAlert $alert): array => $this->mapAlert($alert, $thresholdMap))
+            ->all();
+
+        return ['alerts' => $alerts] + $summary;
+    }
+
+    /** @param list<string>|null $employeeIds */
+    private function query(
+        ?string $filterEvent,
+        ?string $filterStatus,
+        ?string $search,
+        ?string $employeeId,
+        ?array $employeeIds,
+    ): Builder {
+        // Predicate aktif tetap berasal dari relasi status canonical dan gagal tertutup.
         $query = EwsAlert::query()
-            ->with(['employee.disciplineRecords', 'handledBy']);
+            ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'));
 
         if ($employeeId !== null && $employeeId !== '') {
             $query->where('employee_id', $employeeId);
@@ -57,7 +132,7 @@ class ListActiveEwsAlertsAction
 
         $status = $this->statusFromFilter($filterStatus);
         if ($filterStatus === 'semua') {
-            // Do not filter by followup_status
+            // Tidak ada filter status tindak lanjut.
         } elseif ($filterStatus === '' || $filterStatus === null) {
             $query->where('followup_status', EwsAlert::FOLLOWUP_STATUS_ACTIVE);
         } elseif ($status === null) {
@@ -66,35 +141,46 @@ class ListActiveEwsAlertsAction
             $query->where('followup_status', $status);
         }
 
-        if ($filterEvent !== null && $filterEvent !== '') {
+        if ($filterEvent !== null && $filterEvent !== '' && $filterEvent !== 'semua') {
             $query->where('type', $this->typeFromLabel($filterEvent) ?? '__invalid__');
         }
 
-        $alerts = $query
-            ->orderBy('target_date')
-            ->get()
-            ->filter(fn (EwsAlert $alert): bool => $alert->employee !== null)
-            ->map(fn (EwsAlert $alert): array => $this->mapAlert($alert))
-            ->sortBy('sisa_hari')
-            ->values()
-            ->all();
+        $normalizedSearch = mb_strtolower(trim((string) $search));
+        if ($normalizedSearch !== '') {
+            $like = '%'.$normalizedSearch.'%';
+            $query->whereHas('employee', function (Builder $employeeQuery) use ($like): void {
+                $employeeQuery->where(function (Builder $identityQuery) use ($like): void {
+                    $identityQuery->whereRaw('LOWER(nama_lengkap) LIKE ?', [$like])
+                        ->orWhereRaw("LOWER(COALESCE(nip, '')) LIKE ?", [$like]);
+                });
+            });
+        }
 
-        return [
-            'alerts' => $alerts,
-            'type_labels' => $this->typeLabels,
-            'followup_status_labels' => $this->followupStatusLabels,
-        ];
+        return $query;
     }
 
-    /**
-     * Mengambil alert aktif untuk daftar pegawai yang sudah dibatasi oleh scope pemanggil.
-     *
-     * @param  list<string>  $employeeIds
-     * @return array{alerts: array<int, array<string, mixed>>, type_labels: array<string, string>, followup_status_labels: array<string, string>}
-     */
-    public function executeForEmployees(array $employeeIds, ?string $filterEvent, ?string $filterStatus = null): array
+    /** @return array{total: int, urgent: int, warning: int, info: int} */
+    private function summary(Builder $query): array
     {
-        return $this->execute($filterEvent, $filterStatus, null, $employeeIds);
+        $today = now()->startOfDay();
+        $dangerBoundary = $today->copy()->addDays(30)->toDateString();
+        $infoBoundary = $today->copy()->addDays(90)->toDateString();
+        $row = $query->selectRaw(
+            <<<'SQL'
+COUNT(*) AS total,
+COALESCE(SUM(CASE WHEN target_date < ? THEN 1 ELSE 0 END), 0) AS urgent,
+COALESCE(SUM(CASE WHEN target_date >= ? AND target_date <= ? THEN 1 ELSE 0 END), 0) AS warning,
+COALESCE(SUM(CASE WHEN target_date > ? THEN 1 ELSE 0 END), 0) AS info
+SQL,
+            [$dangerBoundary, $dangerBoundary, $infoBoundary, $infoBoundary],
+        )->firstOrFail();
+
+        return [
+            'total' => (int) $row->getAttribute('total'),
+            'urgent' => (int) $row->getAttribute('urgent'),
+            'warning' => (int) $row->getAttribute('warning'),
+            'info' => (int) $row->getAttribute('info'),
+        ];
     }
 
     private function typeFromLabel(?string $label): ?string
@@ -103,7 +189,7 @@ class ListActiveEwsAlertsAction
             return null;
         }
 
-        $type = array_search($label, $this->typeLabels, true);
+        $type = array_search($label, self::TYPE_LABELS, true);
 
         return $type === false ? null : $type;
     }
@@ -114,11 +200,11 @@ class ListActiveEwsAlertsAction
             return null;
         }
 
-        return array_key_exists($status, $this->followupStatusLabels) ? $status : null;
+        return array_key_exists($status, self::FOLLOWUP_STATUS_LABELS) ? $status : null;
     }
 
-    /** @return array<string, mixed> */
-    private function mapAlert(EwsAlert $alert): array
+    /** @param array<string, array<int, string>> $thresholdMap */
+    private function mapAlert(EwsAlert $alert, array $thresholdMap): array
     {
         $employee = $alert->employee;
         if (! $employee instanceof Employee) {
@@ -126,7 +212,6 @@ class ListActiveEwsAlertsAction
         }
 
         $sisaHari = (int) now()->startOfDay()->diffInDays(Carbon::parse($alert->target_date)->startOfDay(), false);
-        $thresholdMap = $this->thresholdMap();
         $thresholdConfig = $thresholdMap[$alert->type] ?? [];
         $eligibility = $this->eligibilityFor($alert, $employee);
 
@@ -136,11 +221,11 @@ class ListActiveEwsAlertsAction
             'type' => $alert->type,
             'nama' => $employee->nama_lengkap,
             'nip' => $employee->nip,
-            'jenis_event' => $this->typeLabels[$alert->type] ?? $alert->type,
+            'jenis_event' => self::TYPE_LABELS[$alert->type] ?? $alert->type,
             'tanggal_target' => Carbon::parse($alert->target_date)->format('Y-m-d'),
             'sisa_hari' => $sisaHari,
             'followup_status' => $alert->followup_status,
-            'followup_status_label' => $this->followupStatusLabels[$alert->followup_status] ?? $alert->followup_status,
+            'followup_status_label' => self::FOLLOWUP_STATUS_LABELS[$alert->followup_status] ?? $alert->followup_status,
             'handled_at' => $alert->handled_at?->format('Y-m-d H:i'),
             'handled_by_name' => $alert->handledBy?->name,
             'handled_note' => $alert->handled_note,
@@ -164,63 +249,72 @@ class ListActiveEwsAlertsAction
             return $this->eligibility->satyalancana($employee);
         }
 
+        return ['is_eligible' => true, 'reason' => 'Perlu tindak lanjut', 'checks' => []];
+    }
+
+    /** @return array<string, string> */
+    private function configValues(): array
+    {
+        try {
+            return EwsConfig::query()
+                ->whereIn('key', $this->configKeys())
+                ->pluck('value', 'key')
+                ->map(fn ($value): string => (string) $value)
+                ->all();
+        } catch (\Throwable) {
+            // Default formula tetap tersedia ketika tabel config belum siap saat recovery.
+            return [];
+        }
+    }
+
+    /** @return list<string> */
+    private function configKeys(): array
+    {
         return [
-            'is_eligible' => true,
-            'reason' => 'Perlu tindak lanjut',
-            'checks' => [],
+            'pangkat_h90', 'pangkat_h60', 'pangkat_h30',
+            'kgb_h60', 'kgb_h30', 'kgb_h14',
+            'pensiun_y1', 'pensiun_m6', 'pensiun_m3',
+            'pppk_m6', 'pppk_m3', 'pppk_m1',
+            'satyalancana_h180', 'satyalancana_h90', 'satyalancana_h30',
         ];
     }
 
-    /** @return array<string, array<int, string>> */
-    private function thresholdMap(): array
+    /**
+     * @param  array<string, string>  $values
+     * @return array<string, array<int, string>>
+     */
+    private function thresholdMap(array $values): array
     {
-        $configDays = fn (string $key, int $default): int => (int) EwsConfig::getVal($key, (string) $default);
+        $configDays = fn (string $key, int $default): int => (int) ($values[$key] ?? $default);
         $dayLabel = fn (int $days): string => 'H-'.$days;
         $monthLabel = function (int $days): string {
             if ($days >= 365 && $days % 365 === 0) {
                 return 'H-'.((int) ($days / 365)).' tahun';
             }
 
-            if ($days >= 28) {
-                return 'H-'.((int) round($days / 30)).' bulan';
-            }
-
-            return 'H-'.$days.' hari';
+            return $days >= 28 ? 'H-'.((int) round($days / 30)).' bulan' : 'H-'.$days.' hari';
         };
 
         return [
             'KENAIKAN_PANGKAT' => $this->points([
-                $configDays('pangkat_h90', 90),
-                $configDays('pangkat_h60', 60),
-                $configDays('pangkat_h30', 30),
+                $configDays('pangkat_h90', 90), $configDays('pangkat_h60', 60), $configDays('pangkat_h30', 30),
             ], $dayLabel),
             'KGB' => $this->points([
-                $configDays('kgb_h60', 60),
-                $configDays('kgb_h30', 30),
-                $configDays('kgb_h14', 14),
+                $configDays('kgb_h60', 60), $configDays('kgb_h30', 30), $configDays('kgb_h14', 14),
             ], $dayLabel),
             'PENSIUN' => $this->points([
-                $configDays('pensiun_y1', 365),
-                $configDays('pensiun_m6', 180),
-                $configDays('pensiun_m3', 90),
+                $configDays('pensiun_y1', 365), $configDays('pensiun_m6', 180), $configDays('pensiun_m3', 90),
             ], $monthLabel),
             'KONTRAK_PPPK' => $this->points([
-                $configDays('pppk_m6', 180),
-                $configDays('pppk_m3', 90),
-                $configDays('pppk_m1', 30),
+                $configDays('pppk_m6', 180), $configDays('pppk_m3', 90), $configDays('pppk_m1', 30),
             ], $monthLabel),
             'SATYALANCANA' => $this->points([
-                $configDays('satyalancana_h180', 180),
-                $configDays('satyalancana_h90', 90),
-                $configDays('satyalancana_h30', 30),
+                $configDays('satyalancana_h180', 180), $configDays('satyalancana_h90', 90), $configDays('satyalancana_h30', 30),
             ], $dayLabel),
         ];
     }
 
-    /**
-     * @param  array<int, int>  $days
-     * @return array<int, string>
-     */
+    /** @param array<int, int> $days @return array<int, string> */
     private function points(array $days, callable $labeler): array
     {
         $mapped = [];
@@ -233,14 +327,10 @@ class ListActiveEwsAlertsAction
 
     private function urgency(int $sisaHari): string
     {
-        if ($sisaHari < 30) {
-            return 'danger';
-        }
-
-        if ($sisaHari <= 90) {
-            return 'warning';
-        }
-
-        return 'success';
+        return match (true) {
+            $sisaHari < 30 => 'danger',
+            $sisaHari <= 90 => 'warning',
+            default => 'success',
+        };
     }
 }

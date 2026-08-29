@@ -53,7 +53,7 @@ class AppServiceProvider extends ServiceProvider
             $authenticated = auth()->user();
             $actor = $authenticated instanceof User ? $authenticated : null;
             $permissionNames = in_array($actor?->role, ['super_admin', 'admin_kepegawaian'], true)
-                ? ['employees.restore', 'cuti.balance.reconcile', 'cuti.manual.manage']
+                ? ['cuti.balance.reconcile', 'cuti.manual.manage']
                 : [];
 
             $view->with(

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -57,6 +58,26 @@ class AuditService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * Memilih snapshot status untuk payload audit perubahan status (US-2.9/2.10).
+     *
+     * Hanya kolom status yang dicatat, bukan seluruh row Employee: payload audit tidak
+     * perlu membawa PII (kontak, NIK, dsb.) yang tidak berkaitan dengan perubahannya.
+     *
+     * @param  array<int|string, mixed>  $values
+     * @return array<string, mixed>
+     */
+    public static function statusPayload(array $values): array
+    {
+        return Arr::only($values, [
+            'status_pegawai_id',
+            'status_aktif',
+            'status_tanggal',
+            'status_keterangan',
+            'status_note',
+        ]);
     }
 
     /**
@@ -254,17 +275,22 @@ class AuditService
     ): array {
         $user = Auth::user();
 
-        // Sertakan konteks simulasi role bila user sedang berada dalam mode switch role
-        if ($user && $user->temporary_role) {
-            $simulationMeta = [
-                '_simulation' => true,
-                '_original_role' => $user->role,
-                '_effective_role' => $user->getEffectiveRole(),
-            ];
+        // K-STATUS-07: konteks role EFEKTIF wajib tercatat pada setiap audit lifecycle
+        // (bukan hanya saat simulasi). Saat simulasi aktif, role asli + penanda simulasi
+        // ikut disertakan agar jejak membedakan pemeran (impersonator) dari role efektif.
+        if ($user) {
+            $roleMeta = ['_effective_role' => $user->getEffectiveRole()];
+
+            if ($user->temporary_role) {
+                $roleMeta += [
+                    '_simulation' => true,
+                    '_original_role' => $user->role,
+                ];
+            }
 
             $newValues = is_array($newValues)
-                ? array_merge($newValues, $simulationMeta)
-                : $simulationMeta;
+                ? array_merge($newValues, $roleMeta)
+                : $roleMeta;
         }
 
         return [

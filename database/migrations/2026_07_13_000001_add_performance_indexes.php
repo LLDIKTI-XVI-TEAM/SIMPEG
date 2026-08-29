@@ -30,9 +30,6 @@ return new class extends Migration
             if (! $this->hasIndex('employees', 'employees_status_pegawai_id_idx')) {
                 $table->index('status_pegawai_id', 'employees_status_pegawai_id_idx');
             }
-            if (! $this->hasIndex('employees', 'employees_deleted_at_idx')) {
-                $table->index('deleted_at', 'employees_deleted_at_idx');
-            }
         });
 
         // ── documents ─────────────────────────────────────────────────────────
@@ -67,7 +64,6 @@ return new class extends Migration
                 'employees_nip_idx',
                 'employees_jenis_pegawai_id_idx',
                 'employees_status_pegawai_id_idx',
-                'employees_deleted_at_idx',
             ] as $index) {
                 if ($this->hasIndex('employees', $index)) {
                     $table->dropIndex($index);

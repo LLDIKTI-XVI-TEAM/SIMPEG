@@ -7,7 +7,6 @@ use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
-use App\Models\RefStatusPegawai;
 use App\Services\AuditService;
 use App\Services\TransactionSideEffectManager;
 use Illuminate\Http\UploadedFile;
@@ -64,8 +63,6 @@ class StoreDocumentAction
                     $this->syncHistory($employee, $document, $category, $payload);
                 }
 
-                $this->syncEmployeeStatus($employee, $category);
-
                 // Payload audit dibatasi pada metadata arsip. Isi berkas tidak pernah masuk audit,
                 // dan jalur berkas cukup untuk menelusuri dokumen mana yang dimaksud.
                 AuditService::logOrFail(
@@ -84,27 +81,6 @@ class StoreDocumentAction
             Storage::disk(Document::STORAGE_DISK)->delete($filePath);
 
             throw $exception;
-        }
-    }
-
-    private function syncEmployeeStatus(Employee $employee, string $category): void
-    {
-        $statusName = match ($category) {
-            'sk_mutasi' => 'Mutasi',
-            'sk_pensiun' => 'Pensiun',
-            default => null,
-        };
-
-        if ($statusName === null) {
-            return;
-        }
-
-        $status = RefStatusPegawai::query()->where('nama', $statusName)->first();
-        if ($status) {
-            $employee->update([
-                'status_pegawai_id' => $status->id,
-                'status_aktif' => $status->nama,
-            ]);
         }
     }
 

@@ -17,6 +17,11 @@ class ExampleTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        config([
+            'services.keycloak.base_url' => 'https://sso-lldikti16.kemdiktisaintek.go.id',
+            'services.keycloak.realms' => 'sso',
+            'services.keycloak.realm' => 'sso',
+        ]);
     }
 
     public function test_guest_home_redirects_to_login(): void

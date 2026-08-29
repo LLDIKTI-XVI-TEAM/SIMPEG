@@ -15,7 +15,16 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
         // Tindak lanjut EWS memutasi riwayat pangkat/KGB dan status pensiun pegawai,
         // sehingga permission dicek di backend dan tidak boleh hanya mengandalkan
         // pembatasan role di route atau penyembunyian tombol di UI.
-        return $this->user()?->hasPermission('employees.update') ?? false;
+        $user = $this->user();
+
+        if ($user === null || ! $user->hasPermission('employees.update')) {
+            return false;
+        }
+
+        // Persetujuan pensiun adalah penonaktifan lifecycle, sehingga permission
+        // update umum tidak cukup untuk mengubah akses akun pegawai.
+        return ! $this->isPensionApproval()
+            || $user->hasPermission('employees.deactivate');
     }
 
     /** @return array<string, array<int, mixed>> */
@@ -62,7 +71,26 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
 
     private function requiresHistoryCompletion(): bool
     {
-        return $this->isRankApproval() || $this->isKgbApproval() || $this->isPensionApproval();
+        return ! $this->isClosedNotificationRecovery()
+            && ($this->isRankApproval() || $this->isKgbApproval() || $this->isPensionApproval());
+    }
+
+    /** Retry alert tertutup hanya memulihkan marker; dokumen lifecycle tidak dibuat ulang. */
+    private function isClosedNotificationRecovery(): bool
+    {
+        /** @var EwsAlert|null $alert */
+        $alert = $this->route('alert');
+        if (! $alert instanceof EwsAlert
+            || $alert->followup_status === EwsAlert::FOLLOWUP_STATUS_ACTIVE
+            || $alert->followup_status !== $this->input('followup_status')) {
+            return false;
+        }
+
+        return $alert->followup_notified_at === null
+            || ($alert->type === 'PENSIUN'
+                && $alert->followup_status === EwsAlert::FOLLOWUP_STATUS_HANDLED
+                && $alert->lifecycle_notified_at === null
+                && $alert->lifecycle_notification_superseded_at === null);
     }
 
     private function isRankApproval(): bool

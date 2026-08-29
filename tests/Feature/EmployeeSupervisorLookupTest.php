@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\Permission;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -77,26 +78,35 @@ class EmployeeSupervisorLookupTest extends TestCase
             ->assertJsonMissing(['nama_lengkap' => 'Kepala Bagian 16']);
     }
 
-    public function test_lookup_tidak_memfilter_status_pegawai_atau_status_aktif(): void
+    public function test_lookup_menyaring_pegawai_nonaktif_agar_opsi_sesuai_validasi_simpan(): void
     {
+        // Validasi penyimpanan (AssignSupervisorRequest) hanya menerima pegawai berkelompok
+        // aktif; autocomplete harus konsisten agar opsi yang disajikan benar-benar dapat
+        // disimpan. Pegawai Nonaktif tidak ditampilkan.
         $target = Employee::factory()->create();
-        $candidate = Employee::factory()->create([
-            'nama_lengkap' => 'Kandidat Status Berbeda',
+        $aktif = Employee::factory()->create([
+            'nama_lengkap' => 'Kandidat Aktif',
             'nip' => '198765432100000002',
-            'status_aktif' => 'Non-Aktif',
+        ]);
+        $nonaktifStatus = RefStatusPegawai::where('kode', 'NONAKTIF')->firstOrFail();
+        $nonaktif = Employee::factory()->create([
+            'nama_lengkap' => 'Kandidat Nonaktif',
+            'status_aktif' => 'Nonaktif',
+            'status_pegawai_id' => $nonaktifStatus->id,
             'role' => 'pimpinan',
         ]);
 
         $this->actingAs(User::factory()->adminKepegawaian()->create())
-            ->getJson(route('pegawai.supervisor-lookup', ['id' => $target->id, 'q' => 'Status Berbeda']))
+            ->getJson(route('pegawai.supervisor-lookup', ['id' => $target->id, 'q' => 'Kandidat']))
             ->assertOk()
             ->assertExactJson([
                 'data' => [[
-                    'id' => $candidate->id,
-                    'nama_lengkap' => 'Kandidat Status Berbeda',
+                    'id' => $aktif->id,
+                    'nama_lengkap' => 'Kandidat Aktif',
                     'nip' => '198765432100000002',
                 ]],
-            ]);
+            ])
+            ->assertJsonMissing(['id' => $nonaktif->id]);
     }
 
     public function test_lookup_memvalidasi_query_setelah_merapikan_spasi(): void

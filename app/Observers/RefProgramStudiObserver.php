@@ -17,8 +17,8 @@ class RefProgramStudiObserver
         // Sinkronkan snapshot agar ekspor dan tampilan legacy tidak menyajikan nama lama.
         EducationHistory::where('program_studi_id', $programStudi->id)
             ->update(['jurusan' => $programStudi->nama]);
-        // Pegawai nonaktif tetap dapat dipulihkan, sehingga snapshot-nya wajib ikut diperbarui.
-        Employee::withTrashed()
+        // Sinkronkan snapshot pada seluruh pegawai, termasuk yang berstatus nonaktif.
+        Employee::query()
             ->where('program_studi_id', $programStudi->id)
             ->update(['prodi_pendidikan_terakhir' => $programStudi->nama]);
     }

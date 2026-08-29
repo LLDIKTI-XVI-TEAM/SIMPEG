@@ -31,9 +31,8 @@ class BuildPegawaiDashboardAction
         // Pegawai yang belum terpetakan ke data employee (mapping SSO belum
         // lengkap) tetap mendapat dashboard kosong yang aman tanpa query null.
         $dashboardEwsData = $employeeId !== null
-            ? $this->ewsAlerts->execute(null, null, (string) $employeeId)
-            : ['alerts' => []];
-        $dashboardEwsAlerts = $dashboardEwsData['alerts'];
+            ? $this->ewsAlerts->preview(5, employeeId: (string) $employeeId)
+            : ['alerts' => [], 'total' => 0, 'urgent' => 0, 'warning' => 0, 'info' => 0];
 
         $employee = null;
         $saldoCuti = null;
@@ -78,11 +77,11 @@ class BuildPegawaiDashboardAction
         }
 
         return [
-            'dashboardEwsAlerts' => array_slice($dashboardEwsAlerts, 0, 5),
-            'dashboardEwsTotal' => count($dashboardEwsAlerts),
-            'dashboardEwsUrgent' => collect($dashboardEwsAlerts)->where('urgency', 'danger')->count(),
-            'dashboardEwsWarning' => collect($dashboardEwsAlerts)->where('urgency', 'warning')->count(),
-            'dashboardEwsInfo' => collect($dashboardEwsAlerts)->where('urgency', 'success')->count(),
+            'dashboardEwsAlerts' => $dashboardEwsData['alerts'],
+            'dashboardEwsTotal' => $dashboardEwsData['total'],
+            'dashboardEwsUrgent' => $dashboardEwsData['urgent'],
+            'dashboardEwsWarning' => $dashboardEwsData['warning'],
+            'dashboardEwsInfo' => $dashboardEwsData['info'],
             'dashboardEwsLink' => route('ews.saya'),
             'employee' => $employee,
             'saldoCuti' => $saldoCuti,

@@ -134,17 +134,15 @@ class PegawaiDashboardTest extends TestCase
             && $cuti->first()->status === 'menunggu_approval');
     }
 
-    public function test_dashboard_pegawai_tanpa_mapping_employee_tetap_dapat_membuka_dashboard(): void
+    public function test_dashboard_pegawai_tanpa_mapping_employee_dialihkan_ke_status_akun(): void
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
 
-        // Pegawai yang belum terpetakan ke data employee (mapping SSO belum
-        // lengkap) tidak boleh membuat dashboard error.
-        $this->actingAs($user)
+        // Mapping pegawai adalah bagian identitas akun; relasi yang belum lengkap
+        // harus ditangani fail-closed tanpa membuat dashboard error.
+        $this->actingAsUnmapped($user)
             ->get(route('dashboard'))
-            ->assertOk()
-            ->assertViewHas('saldoCuti', null)
-            ->assertSee('Belum ada notifikasi', false);
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_dashboard_pegawai_rule_5_menampilkan_sisa_efektif_nol_tanpa_mengubah_saldo_tercatat(): void

@@ -29,7 +29,7 @@ class ShowCutiRekapAction
         $jenisId = $this->stringFilter($filters, 'jenis');
         $balanceQuery = $this->rekapQuery->balanceRows($filters);
         $summary = [
-            ['label' => 'Total Pegawai', 'value' => Employee::query()->where('status_aktif', 'Aktif')->count(), 'caption' => 'Pegawai aktif', 'tone' => 'primary'],
+            ['label' => 'Total Pegawai', 'value' => Employee::query()->whereActiveStatus()->count(), 'caption' => 'Pegawai aktif', 'tone' => 'primary'],
             ['label' => 'Cuti Terpakai', 'value' => (clone $balanceQuery)->sum('terpakai'), 'caption' => 'Hari kerja tahun ini', 'tone' => 'info'],
             ['label' => 'Sisa Saldo', 'value' => (clone $balanceQuery)->sum('sisa'), 'caption' => 'Akumulasi hari', 'tone' => 'success'],
             ['label' => 'Saldo Kritis', 'value' => (clone $balanceQuery)->where('sisa', '<=', 3)->count(), 'caption' => 'Sisa <= 3 hari', 'tone' => 'danger'],

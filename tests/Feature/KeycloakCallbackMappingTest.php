@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -193,6 +194,8 @@ class KeycloakCallbackMappingTest extends TestCase
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Nonaktif Terpeta',
             'email' => 'softdel-account@example.com',
+            'status_aktif' => 'Non-Aktif',
+            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
         ]);
         $user = User::factory()->create([
             'email' => 'softdel-account@example.com',
@@ -200,7 +203,6 @@ class KeycloakCallbackMappingTest extends TestCase
             'employee_id' => $employee->id,
             'role' => null,
         ]);
-        $employee->delete();
 
         $this->fakeKeycloakUser([
             'id' => 'kc-softdel-account',

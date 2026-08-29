@@ -10,6 +10,7 @@ use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class PimpinanFrontendViewTest extends TestCase
@@ -176,6 +177,34 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Detail Pegawai')
             ->assertDontSee('Edit Pegawai')
             ->assertDontSee('/pimpinan/laporan/pegawai/custom', false);
+    }
+
+    public function test_opsi_periode_cuti_pimpinan_tidak_menduplikasi_bulan_di_akhir_bulan(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-29 09:00:00'));
+
+        try {
+            $response = $this->actingAs($this->pimpinan())
+                ->get(route('pimpinan.cuti.index'));
+
+            $response->assertOk();
+            $this->assertSame([
+                '2026-08',
+                '2026-07',
+                '2026-06',
+                '2026-05',
+                '2026-04',
+                '2026-03',
+                '2026-02',
+                '2026-01',
+                '2025-12',
+                '2025-11',
+                '2025-10',
+                '2025-09',
+            ], $response->viewData('optPeriodes')->all());
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_ews_presentation_exposes_required_fields_without_fake_navigation_or_pagination(): void

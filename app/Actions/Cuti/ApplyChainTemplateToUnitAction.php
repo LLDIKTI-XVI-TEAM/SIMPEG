@@ -47,7 +47,7 @@ class ApplyChainTemplateToUnitAction
     {
         return $this->statusKepalaBagian[$kepalaBagianId] ??= Employee::query()
             ->whereKey($kepalaBagianId)
-            ->where('status_aktif', 'Aktif')
+            ->whereActiveStatus()
             ->exists();
     }
 
@@ -101,7 +101,9 @@ class ApplyChainTemplateToUnitAction
                             continue;
                         }
 
-                        if ($pegawai->status_aktif !== 'Aktif') {
+                        // Klasifikasi aktif dari kelompok referensi (satu sumber dengan
+                        // isActive()/whereActiveStatus): Tugas Belajar tetap diproses.
+                        if (! $pegawai->isActive()) {
                             $hasil['skipped_inactive_employee_ids'][] = $pegawai->id;
 
                             continue;
@@ -257,8 +259,7 @@ class ApplyChainTemplateToUnitAction
         // dilanjutkan sebagian supaya admin memperbaiki rantai sumber lebih dulu.
         $approverNonaktif = Employee::query()
             ->whereIn('id', $langkahDisalin->pluck('approver_employee_id')->filter()->unique())
-            ->where(fn ($query) => $query->where('status_aktif', '!=', 'Aktif')->orWhereNotNull('deleted_at'))
-            ->withTrashed()
+            ->whereNotActiveStatus()
             ->pluck('nama_lengkap');
 
         if ($approverNonaktif->isNotEmpty()) {
@@ -345,7 +346,7 @@ class ApplyChainTemplateToUnitAction
     private function jumlahPegawaiTanpaRiwayatTerkini(): int
     {
         return Employee::query()
-            ->where('status_aktif', 'Aktif')
+            ->whereActiveStatus()
             ->whereDoesntHave('positionHistories', fn ($query) => $query->where('is_latest', true))
             ->count();
     }

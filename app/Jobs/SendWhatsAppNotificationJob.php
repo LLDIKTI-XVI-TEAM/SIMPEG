@@ -6,7 +6,6 @@ use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\LeaveApproval;
 use App\Models\LeaveRequest;
-use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Models\WhatsAppNotificationDelivery;
 use App\Services\Ews\EwsEligibilityService;
@@ -327,8 +326,7 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                 $isAdmin = User::query()
                     ->where('employee_id', $this->employeeId)
                     ->where('role', 'admin_kepegawaian')
-                    ->whereHas('employee.statusPegawai', fn ($statuses) => $statuses
-                        ->whereIn('kelompok', RefStatusPegawai::activeGroups()))
+                    ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
                     ->exists();
 
                 if (! $isAdmin) {

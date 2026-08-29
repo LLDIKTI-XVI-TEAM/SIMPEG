@@ -24,6 +24,15 @@ class StoreEmployeeRequest extends FormRequest
     public function rules(): array
     {
         $rules = EmployeeValidationRules::create();
+        // Status awal bukan input create. Seluruh perubahan setelah pegawai dibuat
+        // wajib melalui lifecycle resmi agar histori, audit, dan otorisasi tidak dilewati.
+        $rules['status_aktif'] = ['prohibited'];
+        $rules['status_pegawai_id'] = ['prohibited'];
+        $rules['status_keterangan'] = ['prohibited'];
+        $rules['status_note'] = ['prohibited'];
+        $rules['status_tanggal'] = ['prohibited'];
+        $rules['status_berkas_path'] = ['prohibited'];
+        $rules['status_nomor_berkas'] = ['prohibited'];
 
         // Aturan tambahan khusus form UI web
         if (! $this->wantsJson() && ! $this->is('api/*')) {
