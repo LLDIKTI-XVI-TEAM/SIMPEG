@@ -7,6 +7,7 @@ use App\Models\EmployeeMilestone;
 use App\Models\EwsAlert;
 use App\Models\EwsConfig;
 use App\Models\EwsSchedulerRun;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -87,13 +88,16 @@ class EwsEngineService
             // Muat relasi untuk perhitungan cadangan agar tidak terjadi N+1 sebelum milestone direkonsiliasi.
             Employee::with([
                 'milestones' => fn ($q) => $q->where('is_active', true),
+                'statusPegawai:id,kelompok',
                 'jenisPegawai',
                 'disciplineRecords',
                 'rankHistories',
                 'salaryHistories',
                 'appointments',
             ])
-                ->where('status_aktif', 'Aktif')
+                // Satu-satunya predicate lifecycle: Aktif dan Aktif/khusus boleh diproses.
+                // Status hilang/tidak valid tidak boleh menghasilkan alert maupun fan-out admin.
+                ->withActiveLifecycleStatus()
                 ->chunkById(100, function ($employees) use (
                     $pangkatDays, $kgbDays, $pensiunDays, $pppkDays, $satyalancanaDays,
                     $pangkatRequiredYears, $kgbRequiredYears, $pensiunRequiredAgeYears,
@@ -262,10 +266,13 @@ class EwsEngineService
             // Notify Super Admin if scheduler fails
             $superAdmins = User::where('role', 'super_admin')
                 ->whereNotNull('employee_id')
+                ->whereHas('employee.statusPegawai', fn ($statuses) => $statuses
+                    ->whereIn('kelompok', RefStatusPegawai::activeGroups()))
+                ->with(['employee.statusPegawai'])
                 ->get();
 
             foreach ($superAdmins as $admin) {
-                $employee = Employee::find($admin->employee_id);
+                $employee = $admin->employee;
                 if ($employee) {
                     // Pesan exception mentah tidak boleh tampil di notifikasi karena bisa
                     // membocorkan detail sensitif (kredensial, struktur query, path server).

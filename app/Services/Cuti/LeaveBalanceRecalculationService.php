@@ -316,15 +316,22 @@ final class LeaveBalanceRecalculationService
                     );
                 }
 
-                $allocation = $this->calculator->allocateDeduction([
+                $availableBuckets = [
                     'n2' => $opening['n2'],
                     'n1' => $opening['n1'],
                     'current' => $opening['current'],
-                ], $yearUsage);
+                ];
+                $allocation = $this->calculator->allocateDeduction($availableBuckets, $yearUsage);
 
                 if (! $allocation['success']) {
                     throw ValidationException::withMessages([
-                        "usage.{$year}" => "Pemakaian {$yearUsage} hari melebihi hak cuti yang dapat direplay pada {$year}.",
+                        "usage.{$year}" => $this->usageAllocationFailureMessage(
+                            $lockedEmployee,
+                            $year,
+                            $yearUsage,
+                            $annualEntitlement,
+                            $this->calculator->availableTotal($availableBuckets),
+                        ),
                     ]);
                 }
 
@@ -651,6 +658,25 @@ final class LeaveBalanceRecalculationService
     {
         return $tmt !== null
             && $tmt->copy()->addYearNoOverflow()->toDateString() <= "{$year}-12-31";
+    }
+
+    /** Menjelaskan penyebab penolakan tanpa membocorkan istilah teknis rekalkulasi kepada admin. */
+    private function usageAllocationFailureMessage(
+        Employee $employee,
+        int $year,
+        int $usage,
+        int $annualEntitlement,
+        int $available,
+    ): string {
+        if ($annualEntitlement === 0) {
+            if ($this->employmentStartDate->earliestAppointmentTmt($employee) === null) {
+                return "Hak cuti tahun {$year} belum dapat dihitung karena TMT pengangkatan pegawai belum tersedia.";
+            }
+
+            return "Pegawai belum memenuhi masa kerja minimum untuk memperoleh hak cuti tahunan pada tahun {$year}.";
+        }
+
+        return "Pemakaian {$usage} hari melebihi hak cuti yang tersedia pada tahun {$year}, yaitu {$available} hari.";
     }
 
     /**

@@ -394,8 +394,10 @@ class DutyPostponementWorkflowTest extends TestCase
             'Pengajuan Cuti Tahunan Anda ditutup karena tugas dinas mendesak. Hak yang memenuhi ketentuan dapat digunakan melalui pengajuan baru pada tahun berikutnya.',
             $notification->body,
         );
+        $approval = LeaveApproval::query()->where('leave_request_id', $result->id)->sole();
         $this->assertSame([
             'leave_request_id' => $result->id,
+            'leave_approval_id' => $approval->id,
             'source_year' => 2026,
             'protected_days' => 5,
             'url' => route('cuti.show', ['id' => $result->id], false),
@@ -632,6 +634,25 @@ class DutyPostponementWorkflowTest extends TestCase
         $this->assertSame(LeaveRequest::STATUS_DUTY_POSTPONED, $second->status);
         $this->assertSame($counts, $this->effectCounts($first->id));
         $this->assertSame([1, 1, 1, 1, 1], array_values($counts));
+    }
+
+    public function test_same_actor_retry_accepts_legacy_terminal_notification_without_approval_id(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        $first = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $counts = $this->effectCounts($first->id);
+        $notification = SimpegNotification::query()
+            ->where('user_id', $fixture['applicant']->id)
+            ->where('type', 'cuti.ditangguhkan_tugas_dinas')
+            ->sole();
+        $legacyData = $notification->data;
+        unset($legacyData['leave_approval_id']);
+        $notification->forceFill(['data' => $legacyData])->save();
+
+        $second = $this->action()->execute($first, $fixture['actor'], $fixture['actingUser'], self::REASON);
+
+        $this->assertTrue($first->is($second));
+        $this->assertSame($counts, $this->effectCounts($first->id));
     }
 
     /**

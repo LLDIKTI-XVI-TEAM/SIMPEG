@@ -1341,6 +1341,14 @@ class SubmitLeaveRequestTest extends TestCase
             'user_id' => $aktor['pybmc']->id,
             'type' => 'cuti.pengajuan_baru',
         ]);
+
+        $resubmitNotification = SimpegNotification::query()
+            ->where('user_id', $aktor['supervisor']->id)
+            ->where('type', 'cuti.pengajuan_baru')
+            ->latest('id')
+            ->firstOrFail();
+        $this->assertIsString($resubmitNotification->data['notification_cycle_id'] ?? null);
+        $this->assertNotSame('', $resubmitNotification->data['notification_cycle_id']);
     }
 
     public function test_resubmit_rollover_rolls_back_request_and_reservation_when_approver_notification_fails(): void

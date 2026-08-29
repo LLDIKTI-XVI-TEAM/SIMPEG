@@ -14,6 +14,7 @@ use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\EwsEngineService;
@@ -810,6 +811,52 @@ class EwsSchedulerTest extends TestCase
         $this->assertNotNull($alert->notification_acknowledged_at);
     }
 
+    public function test_scheduler_dan_fanout_ews_hanya_memproses_kelompok_status_aktif_kanonis(): void
+    {
+        $statuses = RefStatusPegawai::query()->whereIn('kode', [
+            'AKTIF', 'TUGAS_BELAJAR', 'PENSIUN', 'MUTASI',
+        ])->get()->keyBy('kode');
+
+        $active = $this->employeeWithLifecycleStatus($statuses['AKTIF']);
+        $activeSpecial = $this->employeeWithLifecycleStatus($statuses['TUGAS_BELAJAR']);
+        $pensiun = $this->employeeWithLifecycleStatus($statuses['PENSIUN']);
+        $mutasi = $this->employeeWithLifecycleStatus($statuses['MUTASI']);
+
+        foreach ([$active, $activeSpecial, $pensiun, $mutasi] as $employee) {
+            $employee->forceFill(['tanggal_kgb_berikutnya' => now()->addDays(60)->toDateString()])->save();
+        }
+
+        $activeAdmin = $this->employeeWithLifecycleStatus($statuses['AKTIF']);
+        $inactiveAdmin = $this->employeeWithLifecycleStatus($statuses['PENSIUN']);
+        User::factory()->create(['role' => 'admin_kepegawaian', 'employee_id' => $activeAdmin->id]);
+        User::factory()->create(['role' => 'admin_kepegawaian', 'employee_id' => $inactiveAdmin->id]);
+
+        // Resolver tidak boleh melakukan fan-out ke akun admin yang pegawai tertautnya tidak aktif.
+        $recipients = app(NotificationRecipientResolver::class)->additionalRecipients($active, 'ews.kgb');
+        $this->assertSame([$activeAdmin->id], $recipients->pluck('id')->all());
+
+        app(EwsEngineService::class)->run();
+
+        foreach ([$active, $activeSpecial] as $employee) {
+            $this->assertDatabaseHas('ews_alerts', [
+                'employee_id' => $employee->id,
+                'type' => 'KGB',
+                'interval_days' => 60,
+            ]);
+        }
+
+        foreach ([$pensiun, $mutasi] as $employee) {
+            $this->assertDatabaseMissing('ews_alerts', [
+                'employee_id' => $employee->id,
+                'type' => 'KGB',
+            ]);
+            $this->assertDatabaseMissing('notifications', [
+                'user_id' => $employee->id,
+                'type' => 'ews.kgb',
+            ]);
+        }
+    }
+
     public function test_scheduler_records_failure_and_notifies_super_admin(): void
     {
         $superAdminEmployee = Employee::factory()->create();
@@ -872,5 +919,15 @@ class EwsSchedulerTest extends TestCase
             $this->assertSame('gagal', $run->status);
             $this->assertStringContainsString('Service failure simulation', $run->error_message);
         }
+    }
+
+    /** Menyiapkan status melalui referensi agar uji tidak bergantung pada snapshot status_aktif. */
+    private function employeeWithLifecycleStatus(RefStatusPegawai $status): Employee
+    {
+        $employee = Employee::factory()->create();
+        $employee->statusPegawai()->associate($status);
+        $employee->save();
+
+        return $employee->refresh();
     }
 }

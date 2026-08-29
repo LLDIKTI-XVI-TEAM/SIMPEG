@@ -234,11 +234,12 @@ class SubmitLeaveRequestAction
      */
     private function notifyActiveApprover(LeaveRequest $leaveRequest): void
     {
-        $approver = $leaveRequest->steps()
+        $activeStep = $leaveRequest->steps()
             ->with('approver')
             ->where('status', 'active')
             ->orderBy('step_order')
-            ->first()?->approver;
+            ->first();
+        $approver = $activeStep?->approver;
 
         if ($approver === null) {
             return;
@@ -250,7 +251,12 @@ class SubmitLeaveRequestAction
             'Pengajuan Cuti Menunggu Persetujuan',
             "{$leaveRequest->employee?->nama_lengkap} mengajukan cuti dan menunggu persetujuan Anda.",
             // Approver diarahkan ke antrean approval; path relatif internal agar link aman dan tidak bergantung host.
-            ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.approval', [], false)],
+            [
+                'leave_request_id' => $leaveRequest->id,
+                'leave_request_step_id' => $activeStep->id,
+                'leave_request_version' => $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z'),
+                'url' => route('cuti.approval', [], false),
+            ],
         );
     }
 }

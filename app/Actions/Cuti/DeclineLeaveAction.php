@@ -48,6 +48,7 @@ class DeclineLeaveAction
         });
 
         $pemohon = $leaveRequest->employee;
+        $approvalId = $leaveRequest->getRelation('lastRecordedApproval')?->id;
 
         if ($pemohon !== null) {
             $this->notifications->createForEmployee(
@@ -56,7 +57,11 @@ class DeclineLeaveAction
                 'Pengajuan Cuti Tidak Disetujui',
                 'Pengajuan cuti Anda tidak disetujui. Silakan periksa catatan keputusan.',
                 // Pemohon diarahkan ke detail pengajuannya; path relatif internal agar link aman lintas host.
-                ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.show', ['id' => $leaveRequest->id], false)],
+                [
+                    'leave_request_id' => $leaveRequest->id,
+                    'leave_approval_id' => $approvalId,
+                    'url' => route('cuti.show', ['id' => $leaveRequest->id], false),
+                ],
             );
         }
 

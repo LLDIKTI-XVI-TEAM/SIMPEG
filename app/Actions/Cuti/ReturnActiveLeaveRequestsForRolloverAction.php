@@ -80,10 +80,11 @@ class ReturnActiveLeaveRequestsForRolloverAction
             [
                 'leave_request_id' => $detailRequestId,
                 'leave_request_ids' => $returnedRequestIds,
+                'jumlah_pengajuan' => count($returnedRequestIds),
                 'reason' => 'Pengajuan dikembalikan karena rollover saldo cuti tahunan.',
                 'source_year' => $sourceYear,
                 'target_year' => $targetYear,
-                'url' => route('cuti.show', ['id' => $detailRequestId], false),
+                'url' => route('cuti.index', [], false),
             ],
         );
 

@@ -121,10 +121,9 @@ class ResubmitLeaveRequestAction
 
                 $this->reservations->adjustForResubmission($locked, $mulai, $newWorkdays, $actor);
 
-                if ($isRolloverReturn) {
-                    // Notifikasi approver adalah bagian transaksi resubmit agar status dan reservasi tidak berubah sendiri.
-                    $this->notifyActiveApprover($locked);
-                }
+                // Setiap resubmit menghasilkan data tindakan baru untuk approver aktif.
+                // Siklus sebelumnya tidak boleh dipakai kembali setelah pemohon memperbaiki pengajuan.
+                $this->notifyActiveApprover($locked, $isRolloverReturn);
 
                 $changedFlags = [
                     'alamat_selama_cuti_diubah' => ($oldValues['alamat_selama_cuti'] ?? null) !== $locked->alamat_selama_cuti,
@@ -198,13 +197,14 @@ class ResubmitLeaveRequestAction
     }
 
     /** Mengirim ulang notifikasi kepada approver yang sama pada snapshot langkah aktif. */
-    private function notifyActiveApprover(LeaveRequest $leaveRequest): void
+    private function notifyActiveApprover(LeaveRequest $leaveRequest, bool $isRolloverReturn): void
     {
-        $approver = $leaveRequest->steps()
+        $activeStep = $leaveRequest->steps()
             ->with('approver')
             ->where('status', 'active')
             ->orderBy('step_order')
-            ->first()?->approver;
+            ->first();
+        $approver = $activeStep?->approver;
 
         if ($approver === null) {
             return;
@@ -214,8 +214,21 @@ class ResubmitLeaveRequestAction
             $approver,
             'cuti.pengajuan_baru',
             'Pengajuan Cuti Menunggu Persetujuan',
-            "{$leaveRequest->employee?->nama_lengkap} mengajukan ulang cuti setelah rollover dan menunggu persetujuan Anda.",
-            ['leave_request_id' => $leaveRequest->id, 'url' => route('cuti.approval', [], false)],
+            "{$leaveRequest->employee?->nama_lengkap} mengajukan ulang cuti dan menunggu persetujuan Anda.",
+            [
+                'leave_request_id' => $leaveRequest->id,
+                'leave_request_step_id' => $activeStep->id,
+                'leave_request_version' => $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z'),
+                // Versi persistent request sesudah resubmit membedakan siklus pengajuan
+                // baru dari delivery awal, tanpa mengubah snapshot approver yang dipakai.
+                'notification_cycle_id' => sprintf(
+                    '%s-resubmit:%s:%s',
+                    $isRolloverReturn ? 'rollover' : 'perubahan',
+                    $leaveRequest->id,
+                    $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z'),
+                ),
+                'url' => route('cuti.approval', [], false),
+            ],
         );
     }
 

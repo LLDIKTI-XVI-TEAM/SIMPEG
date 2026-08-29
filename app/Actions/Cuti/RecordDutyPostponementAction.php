@@ -112,7 +112,7 @@ class RecordDutyPostponementAction
                     'skipped_reason' => LeaveRequestStep::SKIPPED_DUTY_POSTPONEMENT_TERMINAL,
                     'acted_at' => $actedAt,
                 ]);
-            LeaveApproval::create([
+            $approval = LeaveApproval::create([
                 'leave_request_id' => $locked->id,
                 'approver_id' => $actor->id,
                 'stage' => $activeStep->step_order,
@@ -131,6 +131,7 @@ class RecordDutyPostponementAction
                 'Pengajuan Cuti Tahunan Anda ditutup karena tugas dinas mendesak. Hak yang memenuhi ketentuan dapat digunakan melalui pengajuan baru pada tahun berikutnya.',
                 [
                     'leave_request_id' => $locked->id,
+                    'leave_approval_id' => $approval->id,
                     'source_year' => $sourceYear,
                     'protected_days' => $protectedDays,
                     'url' => route('cuti.show', ['id' => $locked->id], false),
@@ -254,6 +255,17 @@ class RecordDutyPostponementAction
         }
 
         $notificationData = $notification?->data ?? [];
+        $expectedNotificationData = [
+            'leave_request_id' => $request->id,
+            'leave_approval_id' => $approval?->id,
+            'source_year' => $sourceYear,
+            'protected_days' => $days,
+            'url' => route('cuti.show', ['id' => $request->id], false),
+        ];
+        // Notifikasi terminal yang dibuat sebelum asosiasi immutable approval
+        // ditambahkan tetap merupakan bukti retry yang sah bila seluruh fakta lain cocok.
+        $legacyNotificationData = $expectedNotificationData;
+        unset($legacyNotificationData['leave_approval_id']);
 
         $matches = $step?->approver_employee_id === $actor->id
             && $step?->decision_note === $reason
@@ -304,12 +316,8 @@ class RecordDutyPostponementAction
             && (! $notificationRecorded || (
                 $notification?->title === 'Cuti Tahunan Ditangguhkan karena Tugas Dinas'
                 && $notification?->body === 'Pengajuan Cuti Tahunan Anda ditutup karena tugas dinas mendesak. Hak yang memenuhi ketentuan dapat digunakan melalui pengajuan baru pada tahun berikutnya.'
-                && $notificationData === [
-                    'leave_request_id' => $request->id,
-                    'source_year' => $sourceYear,
-                    'protected_days' => $days,
-                    'url' => route('cuti.show', ['id' => $request->id], false),
-                ]
+                && ($notificationData === $expectedNotificationData
+                    || $notificationData === $legacyNotificationData)
             ));
 
         if (! $matches) {
