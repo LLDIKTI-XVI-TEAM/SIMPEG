@@ -119,18 +119,9 @@ return [
                 'label' => 'Pegawai',
             ],
         ],
-        // Fixture akun UAT (HANYA local/testing) — dikonsumsi SsoRoleMappedAccountSeeder
-        // untuk menanam pegawai + user placeholder agar login SSO pertama menemukan tepat
-        // satu pegawai. BUKAN sumber otorisasi: auth callback tidak pernah membaca config
-        // ini; role internal ditentukan aplikasi SIMPEG (blank role → pegawai, akun pertama
-        // sistem → super_admin sebagai bootstrap).
-        'role_mapping' => [
-            'dayensite@gmail.com' => 'super_admin',
-            'sitedayen@gmail.com' => 'admin_kepegawaian',
-            'dionkobi08@gmail.com' => 'pimpinan',
-            'dayen6153@gmail.com' => 'kepala_bagian',
-            'dionleonn05@gmail.com' => 'pegawai',
-        ],
+        // Tidak ada role_mapping di sini: Keycloak hanya autentikasi (K-MTG-02). Fixture
+        // akun uji UAT hidup di SsoRoleMappedAccountSeeder (local/testing only) dan auth
+        // callback tidak pernah memberi role dari email/claim SSO.
     ],
 
     'simpeg' => [

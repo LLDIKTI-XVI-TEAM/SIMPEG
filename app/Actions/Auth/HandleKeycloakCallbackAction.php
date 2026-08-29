@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,18 @@ class HandleKeycloakCallbackAction
 {
     private const ALLOWED_EMPLOYEE_MATCH_FIELDS = [
         'email',
+    ];
+
+    /**
+     * Pesan pengguna per alasan penolakan mapping (tidak membocorkan detail internal).
+     *
+     * @var array<string, string>
+     */
+    private const REJECT_MESSAGES = [
+        'identity_conflict' => 'Konflik identitas akun SIMPEG terdeteksi.',
+        'employee_mismatch' => 'Akun SIMPEG sudah terhubung ke pegawai lain.',
+        'manual_binding_required' => 'Akun SIMPEG perlu ditautkan manual oleh admin.',
+        'sso_subject_conflict' => 'Akun SIMPEG sudah terhubung ke SSO lain.',
     ];
 
     /**
@@ -69,7 +82,19 @@ class HandleKeycloakCallbackAction
         if ($matchedEmail) {
             $employees = $this->matchedEmployees($employeeField, $matchedEmail);
 
-            if ($employees->count() !== 1) {
+            if ($employees->isEmpty()) {
+                // Kontrak Issue #6: respons terkontrol + audit untuk nol kecocokan.
+                $this->auditMappingRejected(null, 'employee_match_not_found', $matchedEmail, null, $request);
+
+                return view('auth.unregistered', [
+                    'message' => 'Akun Keycloak belum terdaftar sebagai pegawai SIMPEG.',
+                ]);
+            }
+
+            if ($employees->count() > 1) {
+                // Lebih dari satu pegawai cocok → ambigu, fail-closed + audit.
+                $this->auditMappingRejected(null, 'employee_match_ambiguous', $matchedEmail, null, $request);
+
                 return view('auth.unregistered', [
                     'message' => 'Akun Keycloak belum terdaftar sebagai pegawai SIMPEG.',
                 ]);
@@ -90,78 +115,27 @@ class HandleKeycloakCallbackAction
             // Kontrak Issue #6: resolver user deterministik keycloak_id → employee_id →
             // controlled email fallback. User existing milik pegawai yang sama wajib dipakai
             // ulang meskipun email internalnya berbeda dari email SSO terverifikasi.
-            $userByEmployee = User::where('employee_id', $employee->id)->first();
-            $userByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])->first();
-
-            if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
-                // Dua user berbeda menunjuk identitas yang sama → fail-closed, jangan menebak.
-                $this->auditMappingRejected($userByEmployee, 'identity_conflict', $matchedEmail, $employee->id, $request);
-
-                return view('auth.unregistered', [
-                    'message' => 'Konflik identitas akun SIMPEG terdeteksi.',
-                ]);
+            try {
+                $user = $this->resolveUserForEmployee($employee, $keycloakId, $username, $keycloakUser->getName(), $matchedEmail, $request);
+            } catch (SsoIdentityRejected $rejected) {
+                return view('auth.unregistered', ['message' => $rejected->userMessage]);
             }
 
-            $user = $userByEmployee ?? $userByEmail;
+            try {
+                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
+            } catch (UniqueConstraintViolationException) {
+                // Database adalah authority terakhir: benturan unik berarti callback
+                // paralel sudah membuat/mengikat user setelah resolusi kita. Re-resolve
+                // dengan state terbaru; bila state terbaru tetap inkonsisten, resolver
+                // melempar SsoIdentityRejected (fail-closed) — tidak pernah menebak.
+                try {
+                    $user = $this->resolveUserForEmployee($employee, $keycloakId, $username, $keycloakUser->getName(), $matchedEmail, $request);
+                } catch (SsoIdentityRejected $rejected) {
+                    return view('auth.unregistered', ['message' => $rejected->userMessage]);
+                }
 
-            if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
-                $this->auditMappingRejected($user, 'employee_mismatch', $matchedEmail, $employee->id, $request);
-
-                return view('auth.unregistered', [
-                    'message' => 'Akun SIMPEG sudah terhubung ke pegawai lain.',
-                ]);
+                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
             }
-
-            if ($user && $user->employee_id === null && $user->role !== 'pegawai') {
-                $this->auditMappingRejected($user, 'manual_binding_required', $matchedEmail, $employee->id, $request);
-
-                return view('auth.unregistered', [
-                    'message' => 'Akun SIMPEG perlu ditautkan manual oleh admin.',
-                ]);
-            }
-
-            if ($user && $user->keycloak_id !== null && $user->keycloak_id !== $keycloakId) {
-                $this->auditMappingRejected($user, 'sso_subject_conflict', $matchedEmail, $employee->id, $request);
-
-                return view('auth.unregistered', [
-                    'message' => 'Akun SIMPEG sudah terhubung ke SSO lain.',
-                ]);
-            }
-
-            if ($user) {
-                // Reuse user existing: email internal TIDAK ditimpa agar identitas kanonis
-                // aplikasi tetap; yang diikat hanyalah subject Keycloak dan metadata login.
-                $user->fill([
-                    'name' => $keycloakUser->getName() ?: $username ?: $employee->nama_lengkap,
-                    'keycloak_id' => $keycloakId,
-                    'employee_id' => $employee->id,
-                    'email_verified_at' => $user->email_verified_at ?? now(),
-                ]);
-            } else {
-                $user = new User(['email' => $matchedEmail]);
-                $user->fill([
-                    'name' => $keycloakUser->getName() ?: $username ?: $employee->nama_lengkap,
-                    'keycloak_id' => $keycloakId,
-                    'employee_id' => $employee->id,
-                    'email_verified_at' => now(),
-                ]);
-            }
-
-            // Guard benturan juga di jalur user baru: username hanya diambil jika belum
-            // dipakai user lain; identitas kanonis tetap keycloak_id (subject Keycloak).
-            if ($this->usernameIsAvailable($user, $username)) {
-                $user->keycloak_username = $username;
-            }
-
-            if (! $user->exists) {
-                // SSO hanya membuktikan identitas: role internal akun baru selalu default
-                // Pegawai; akun pertama sistem diberi super_admin sebagai bootstrap agar
-                // dapat dikonfigurasi (keputusan stakeholder, bukan otorisasi dari email).
-                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
-                $user->password = Str::random(48);
-            }
-
-            return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request);
         }
 
         // Akun tanpa email terverifikasi tidak memiliki jalur khusus: seluruh login
@@ -169,6 +143,90 @@ class HandleKeycloakCallbackAction
         return view('auth.unregistered', [
             'message' => 'Akun Keycloak belum terdaftar di SIMPEG.',
         ]);
+    }
+
+    /**
+     * Meresolusi user untuk pegawai yang cocok dan menyiapkan binding identitas.
+     *
+     * Kontrak Issue #6: resolver deterministik keycloak_id → employee_id → controlled
+     * email fallback, dengan database sebagai authority terakhir terhadap callback
+     * paralel. Seluruh lookup berjalan di dalam satu transaksi yang mengunci baris
+     * employee sehingga dua callback bersamaan untuk pegawai yang sama terserialisasi;
+     * re-check identitas setelah lock menghilangkan TOCTOU. Penolakan guard tetap
+     * diaudit SETELAH transaksi commit agar evidence tidak ikut ter-rollback.
+     *
+     * @throws SsoIdentityRejected bila state terkini inkonsisten (sudah ter-audit).
+     */
+    private function resolveUserForEmployee(Employee $employee, string $keycloakId, ?string $username, ?string $name, string $matchedEmail, Request $request): User
+    {
+        $state = DB::transaction(function () use ($employee, $keycloakId, $username, $name, $matchedEmail): array {
+            // Serialisasi callback paralel untuk pegawai yang sama: kunci baris employee
+            // sebelum re-check identitas (TOCTOU guard pada boundary database).
+            Employee::withTrashed()->whereKey($employee->id)->lockForUpdate()->first();
+
+            $userByEmployee = User::where('employee_id', $employee->id)->lockForUpdate()->first();
+            $userByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])->lockForUpdate()->first();
+
+            if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
+                // Dua user berbeda menunjuk identitas yang sama → fail-closed, jangan menebak.
+                return ['reject' => ['reason' => 'identity_conflict', 'user' => $userByEmployee]];
+            }
+
+            $user = $userByEmployee ?? $userByEmail;
+
+            if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
+                return ['reject' => ['reason' => 'employee_mismatch', 'user' => $user]];
+            }
+
+            if ($user && $user->employee_id === null && $user->role !== 'pegawai') {
+                return ['reject' => ['reason' => 'manual_binding_required', 'user' => $user]];
+            }
+
+            if ($user && $user->keycloak_id !== null && $user->keycloak_id !== $keycloakId) {
+                return ['reject' => ['reason' => 'sso_subject_conflict', 'user' => $user]];
+            }
+
+            if ($user) {
+                // Reuse user existing: email internal TIDAK ditimpa agar identitas kanonis
+                // aplikasi tetap; yang diikat hanyalah subject Keycloak dan metadata login.
+                $user->fill([
+                    'name' => $name ?: $username ?: $employee->nama_lengkap,
+                    'keycloak_id' => $keycloakId,
+                    'employee_id' => $employee->id,
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ]);
+            } else {
+                $user = new User(['email' => $matchedEmail]);
+                $user->fill([
+                    'name' => $name ?: $username ?: $employee->nama_lengkap,
+                    'keycloak_id' => $keycloakId,
+                    'employee_id' => $employee->id,
+                    'email_verified_at' => now(),
+                ]);
+
+                // SSO hanya membuktikan identitas: role internal akun baru selalu default
+                // Pegawai; akun pertama sistem diberi super_admin sebagai bootstrap agar
+                // dapat dikonfigurasi (keputusan stakeholder, bukan otorisasi dari email).
+                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
+                $user->password = Str::random(48);
+            }
+
+            // Guard benturan sebagai fast-path saja: pemeriksaan ulang di boundary
+            // database tetap dilakukan lewat unique constraint saat save (loginMappedUser).
+            if ($this->usernameIsAvailable($user, $username)) {
+                $user->keycloak_username = $username;
+            }
+
+            return ['user' => $user];
+        });
+
+        if (isset($state['reject'])) {
+            $this->auditMappingRejected($state['reject']['user'], $state['reject']['reason'], $matchedEmail, $employee->id, $request);
+
+            throw new SsoIdentityRejected($state['reject']['reason'], self::REJECT_MESSAGES[$state['reject']['reason']]);
+        }
+
+        return $state['user'];
     }
 
     private function loginMappedUser(User $user, string $keycloakId, ?string $username, ?string $name, Request $request): RedirectResponse|View
@@ -214,7 +272,29 @@ class HandleKeycloakCallbackAction
             && $user->keycloak_id !== '';
 
         DB::transaction(function () use ($user, $previousRole, $roleInitialized, $firstBinding, $request): void {
-            $user->save();
+            // Save (termasuk retry username) dibungkus savepoint via transaction nested:
+            // di PostgreSQL statement yang gagal men-abort transaksi, jadi rollback ke
+            // savepoint diperlukan sebelum save ulang. Audit tetap dieksekusi setelahnya.
+            try {
+                DB::transaction(function () use ($user): void {
+                    $user->save();
+                });
+            } catch (UniqueConstraintViolationException $e) {
+                // Authority terakhir adalah constraint DB: satu-satunya benturan yang
+                // mungkin di titik ini adalah keycloak_username yang baru diklaim bersamaan
+                // (identitas kanonis sudah divalidasi resolver + kunci transaksinya).
+                // Ulangi save tanpa username tersebut; identitas login tetap keycloak_id.
+                // Benturan lain diteruskan agar execute() re-resolve / fail-closed.
+                if (! $this->usernameWasJustClaimed($user)) {
+                    throw $e;
+                }
+
+                $user->keycloak_username = $user->getRawOriginal('keycloak_username');
+
+                DB::transaction(function () use ($user): void {
+                    $user->save();
+                });
+            }
 
             if ($firstBinding) {
                 $this->auditIdentityBinding($user, $request);
@@ -375,6 +455,17 @@ class HandleKeycloakCallbackAction
         }
 
         return $value;
+    }
+
+    /**
+     * True bila keycloak_username pada model ini adalah klaim BARU (sebelumnya null/kosong),
+     * sehingga unique violation saat save layak dicoba ulang tanpa username tersebut.
+     */
+    private function usernameWasJustClaimed(User $user): bool
+    {
+        return is_string($user->keycloak_username)
+            && $user->keycloak_username !== ''
+            && in_array($user->getRawOriginal('keycloak_username'), [null, ''], true);
     }
 
     /**

@@ -10,9 +10,28 @@ use Illuminate\Support\Str;
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Menanam pegawai + user placeholder untuk setiap email yang terdaftar di
-     * config services.keycloak.role_mapping (fixture UAT local/testing), sehingga
-     * login SSO pertama akun tersebut langsung menemukan tepat satu pegawai.
+     * Fixture akun uji UAT (HANYA local/testing): email Keycloak terverifikasi →
+     * role internal yang diharapkan untuk AKUN PLACEHOLDER baru.
+     *
+     * Dataset ini sengaja hidup di seeder — bukan di config/ — agar production config
+     * tidak pernah membawa pemetaan email → elevated role (Issue #6: daftar akun uji
+     * adalah evidence UAT, bukan konfigurasi otorisasi). Auth callback TIDAK PERNAH
+     * membaca dataset ini; role internal ditentukan aplikasi SIMPEG.
+     *
+     * @var array<string, string>
+     */
+    public const ROLE_MAPPING = [
+        'dayensite@gmail.com' => 'super_admin',
+        'sitedayen@gmail.com' => 'admin_kepegawaian',
+        'dionkobi08@gmail.com' => 'pimpinan',
+        'dayen6153@gmail.com' => 'kepala_bagian',
+        'dionleonn05@gmail.com' => 'pegawai',
+    ];
+
+    /**
+     * Menanam pegawai + user placeholder untuk setiap email pada fixture ROLE_MAPPING
+     * di atas, sehingga login SSO pertama akun tersebut langsung menemukan tepat satu
+     * pegawai.
      *
      * Seeder ini BUKAN sumber otorisasi: auth callback tidak pernah membaca
      * role_mapping; role internal ditentukan aplikasi SIMPEG.
@@ -36,9 +55,9 @@ class SsoRoleMappedAccountSeeder extends Seeder
             return;
         }
 
-        foreach ((array) config('services.keycloak.role_mapping', []) as $email => $role) {
-            $email = trim((string) $email);
-            $role = trim((string) $role);
+        foreach (self::ROLE_MAPPING as $mappedEmail => $mappedRole) {
+            $email = trim((string) $mappedEmail);
+            $role = trim((string) $mappedRole);
 
             if ($email === '' || $role === '') {
                 continue;
@@ -46,13 +65,29 @@ class SsoRoleMappedAccountSeeder extends Seeder
 
             // Lookup kanonis case-insensitive pada email legacy + email_pribadi kanonis,
             // agar pegawai existing tidak terlewat hanya karena kapitalisasi/kolom berbeda.
-            $employee = Employee::query()
+            // withTrashed() menjaga idempotensi pada baseline yang masih memakai SoftDeletes:
+            // Employee trashed dengan email kanonis sama TETAP ditemukan sehingga seeder
+            // tidak membuat duplikat Employee. (Setelah PR lifecycle #19 menghapus
+            // SoftDeletes, kompatibilitas ini dapat disederhanakan saat rebase.)
+            $employee = Employee::withTrashed()
                 ->where(function ($query) use ($email): void {
                     $query
                         ->whereRaw('lower(email) = ?', [strtolower($email)])
                         ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
                 })
                 ->first();
+
+            if ($employee && $employee->trashed()) {
+                // Pegawai existing sudah dihapus: JANGAN restore dan JANGAN mengubah
+                // status/lifecycle-nya. Mapping dilewati agar tidak ada duplikat Employee
+                // dengan email kanonis yang sama dan tidak ada akun dihidupkan kembali
+                // lewat seeder.
+                $this->command?->warn(
+                    "SSO mapped account '{$email}' dilewati: pegawai existing berstatus terhapus (trashed)."
+                );
+
+                continue;
+            }
 
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.

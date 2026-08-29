@@ -18,6 +18,7 @@ use App\Services\Cuti\LeaveUsageReconciliationService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\PhaseSevenBrowserQaSeeder;
+use Database\Seeders\SsoRoleMappedAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +39,7 @@ class DatabaseSeederTest extends TestCase
             'role' => 'admin_kepegawaian',
         ]);
 
-        foreach ((array) config('services.keycloak.role_mapping', []) as $email => $role) {
+        foreach (SsoRoleMappedAccountSeeder::ROLE_MAPPING as $email => $role) {
             $this->assertDatabaseHas('users', [
                 'email' => $email,
                 'role' => $role,
@@ -58,7 +59,7 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        foreach ((array) config('services.keycloak.role_mapping', []) as $email => $role) {
+        foreach (SsoRoleMappedAccountSeeder::ROLE_MAPPING as $email => $role) {
             $this->assertDatabaseHas('users', [
                 'email' => $email,
                 'role' => $role,
@@ -72,7 +73,7 @@ class DatabaseSeederTest extends TestCase
 
     public function test_seeder_does_not_reactivate_existing_employee(): void
     {
-        $email = collect(config('services.keycloak.role_mapping'))->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
 
         // Pegawai existing berstatus Pensiun — seeder ulang tidak boleh
         // menghidupkannya kembali hanya agar login SSO lulus.
@@ -91,7 +92,7 @@ class DatabaseSeederTest extends TestCase
 
     public function test_seeder_does_not_move_user_to_another_employee(): void
     {
-        $email = collect(config('services.keycloak.role_mapping'))->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
 
         $pegawaiAsal = Employee::factory()->create([
             'nama_lengkap' => 'Pegawai Asal',
@@ -116,7 +117,7 @@ class DatabaseSeederTest extends TestCase
 
     public function test_seeder_preserves_existing_user_name_on_reseed(): void
     {
-        $email = collect(config('services.keycloak.role_mapping'))->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
         $customName = 'Nama Kustom Yang Sudah Ada';
 
         // User existing dengan nama yang sudah ditetapkan (bukan derived dari email).
@@ -142,7 +143,7 @@ class DatabaseSeederTest extends TestCase
     /** Seeder memakai kontrak kanonis Issue #6: user milik pegawai di-resolve via employee_id, email internal tetap. */
     public function test_seeder_resolves_user_via_employee_id_with_different_internal_email(): void
     {
-        $email = collect(config('services.keycloak.role_mapping'))->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
 
         // Pegawai kanonis memegang email mapping pada email_pribadi; user internalnya
         // memakai email kantor yang berbeda.
@@ -168,6 +169,45 @@ class DatabaseSeederTest extends TestCase
 
         // Tidak ada user duplikat untuk pegawai yang sama.
         $this->assertSame(1, User::where('employee_id', $employee->id)->count());
+    }
+
+    /**
+     * Seeder idempotent terhadap Employee trashed (baseline masih memakai SoftDeletes):
+     * record trashed dengan email kanonis sama TIDAK diduplikasi, TIDAK di-restore,
+     * status/lifecycle tidak berubah, dan tidak ada user yang diikat ke pegawai itu.
+     */
+    public function test_seeder_skips_trashed_employee_without_duplicate_or_reactivation(): void
+    {
+        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+
+        $employee = Employee::factory()->create([
+            'email_pribadi' => $email,
+        ]);
+        $statusBefore = $employee->status_aktif;
+        $employee->delete();
+
+        $this->seed(DatabaseSeeder::class);
+
+        // Tidak ada duplikat Employee dengan email kanonis yang sama.
+        $this->assertSame(
+            1,
+            Employee::withTrashed()
+                ->where(function ($query) use ($email): void {
+                    $query
+                        ->whereRaw('lower(email) = ?', [strtolower($email)])
+                        ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
+                })
+                ->count(),
+        );
+
+        // Record trashed tetap trashed dan statusnya tidak berubah.
+        $trashed = Employee::withTrashed()->whereKey($employee->id)->first();
+        $this->assertNotNull($trashed);
+        $this->assertNotNull($trashed->deleted_at);
+        $this->assertSame($statusBefore, $trashed->status_aktif);
+
+        // Tidak ada user yang diikat ke pegawai trashed tersebut.
+        $this->assertSame(0, User::where('employee_id', $employee->id)->count());
     }
 
     public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void
