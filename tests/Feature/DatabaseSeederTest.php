@@ -139,6 +139,37 @@ class DatabaseSeederTest extends TestCase
         );
     }
 
+    /** Seeder memakai kontrak kanonis Issue #6: user milik pegawai di-resolve via employee_id, email internal tetap. */
+    public function test_seeder_resolves_user_via_employee_id_with_different_internal_email(): void
+    {
+        $email = collect(config('services.keycloak.role_mapping'))->keys()->first();
+
+        // Pegawai kanonis memegang email mapping pada email_pribadi; user internalnya
+        // memakai email kantor yang berbeda.
+        $employee = Employee::factory()->create([
+            'email_pribadi' => $email,
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'dayen-internal@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+            'name' => 'Nama Internal Asli',
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        $user->refresh();
+        // User yang sama dipakai ulang: email internal, role, dan nama tidak ditimpa.
+        $this->assertSame('dayen-internal@lldikti.go.id', $user->email);
+        $this->assertSame('pimpinan', $user->role);
+        $this->assertSame('Nama Internal Asli', $user->name);
+        $this->assertSame($employee->id, $user->employee_id);
+
+        // Tidak ada user duplikat untuk pegawai yang sama.
+        $this->assertSame(1, User::where('employee_id', $employee->id)->count());
+    }
+
     public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void
     {
         $this->seed(DatabaseSeeder::class);

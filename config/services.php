@@ -89,9 +89,11 @@ return [
                 'label' => 'Pegawai',
             ],
         ],
-        // Email SSO (terverifikasi) yang saat login pertama di-bootstrap ke role internal SIMPEG.
-        // Berlaku hanya untuk akun baru / role internal masih kosong; role yang sudah ditetapkan
-        // tidak pernah dioverwrite oleh pemetaan ini.
+        // Fixture akun UAT (HANYA local/testing) — dikonsumsi SsoRoleMappedAccountSeeder
+        // untuk menanam pegawai + user placeholder agar login SSO pertama menemukan tepat
+        // satu pegawai. BUKAN sumber otorisasi: auth callback tidak pernah membaca config
+        // ini; role internal ditentukan aplikasi SIMPEG (blank role → pegawai, akun pertama
+        // sistem → super_admin sebagai bootstrap).
         'role_mapping' => [
             'dayensite@gmail.com' => 'super_admin',
             'sitedayen@gmail.com' => 'admin_kepegawaian',

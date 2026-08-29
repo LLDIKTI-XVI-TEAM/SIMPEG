@@ -21,17 +21,13 @@ class HandleKeycloakCallbackAction
         'email',
     ];
 
-    /** Role internal SIMPEG yang sah sebagai target pemetaan email SSO. */
-    private const ALLOWED_INTERNAL_ROLES = [
-        'super_admin',
-        'admin_kepegawaian',
-        'pimpinan',
-        'kepala_bagian',
-        'pegawai',
-    ];
-
     /**
-     * Memproses callback Keycloak tanpa memakai role claim Keycloak sebagai sumber RBAC SIMPEG.
+     * Memproses callback Keycloak.
+     *
+     * Kontrak K-MTG-02 / Issue #6: Keycloak hanya membuktikan identitas; RBAC tetap
+     * sumber internal SIMPEG. Callback tidak pernah memberi elevated role dari
+     * email/claim SSO — role kosong diinisialisasi ke default Pegawai, kecuali akun
+     * pertama sistem yang di-bootstrap menjadi Super Admin (keputusan stakeholder).
      */
     public function execute(Request $request): RedirectResponse|View
     {
@@ -84,46 +80,72 @@ class HandleKeycloakCallbackAction
             // Pegawai nonaktif tidak boleh mendapat akun baru ber-privilege — cek sebelum role assignment
             // (matchedEmployees hanya filter deleted_at; kelompok Nonaktif/Pensiun/Mutasi harus ditolak di sini).
             if ($this->employeeIsInactive($employee->id)) {
+                $this->auditMappingRejected(null, 'employee_inactive', $matchedEmail, $employee->id, $request);
+
                 return view('auth.unregistered', [
                     'message' => 'Akun pegawai tidak aktif.',
                 ]);
             }
 
-            // Fail-closed untuk mapping invalid: email tercantum di role_mapping tetapi nilainya
-            // di luar allowlist tidak boleh jatuh ke fallback pegawai/super_admin.
-            if ($this->isInvalidRoleMapping($matchedEmail)) {
+            // Kontrak Issue #6: resolver user deterministik keycloak_id → employee_id →
+            // controlled email fallback. User existing milik pegawai yang sama wajib dipakai
+            // ulang meskipun email internalnya berbeda dari email SSO terverifikasi.
+            $userByEmployee = User::where('employee_id', $employee->id)->first();
+            $userByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])->first();
+
+            if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
+                // Dua user berbeda menunjuk identitas yang sama → fail-closed, jangan menebak.
+                $this->auditMappingRejected($userByEmployee, 'identity_conflict', $matchedEmail, $employee->id, $request);
+
                 return view('auth.unregistered', [
-                    'message' => 'Konfigurasi role mapping tidak valid.',
+                    'message' => 'Konflik identitas akun SIMPEG terdeteksi.',
                 ]);
             }
 
-            $user = User::whereRaw('lower(email) = ?', [$matchedEmail])->first();
+            $user = $userByEmployee ?? $userByEmail;
 
             if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
+                $this->auditMappingRejected($user, 'employee_mismatch', $matchedEmail, $employee->id, $request);
+
                 return view('auth.unregistered', [
                     'message' => 'Akun SIMPEG sudah terhubung ke pegawai lain.',
                 ]);
             }
 
             if ($user && $user->employee_id === null && $user->role !== 'pegawai') {
+                $this->auditMappingRejected($user, 'manual_binding_required', $matchedEmail, $employee->id, $request);
+
                 return view('auth.unregistered', [
                     'message' => 'Akun SIMPEG perlu ditautkan manual oleh admin.',
                 ]);
             }
 
             if ($user && $user->keycloak_id !== null && $user->keycloak_id !== $keycloakId) {
+                $this->auditMappingRejected($user, 'sso_subject_conflict', $matchedEmail, $employee->id, $request);
+
                 return view('auth.unregistered', [
                     'message' => 'Akun SIMPEG sudah terhubung ke SSO lain.',
                 ]);
             }
 
-            $user ??= new User(['email' => $matchedEmail]);
-            $user->fill([
-                'name' => $keycloakUser->getName() ?: $username ?: $employee->nama_lengkap,
-                'keycloak_id' => $keycloakId,
-                'employee_id' => $employee->id,
-                'email_verified_at' => $user->email_verified_at ?? now(),
-            ]);
+            if ($user) {
+                // Reuse user existing: email internal TIDAK ditimpa agar identitas kanonis
+                // aplikasi tetap; yang diikat hanyalah subject Keycloak dan metadata login.
+                $user->fill([
+                    'name' => $keycloakUser->getName() ?: $username ?: $employee->nama_lengkap,
+                    'keycloak_id' => $keycloakId,
+                    'employee_id' => $employee->id,
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ]);
+            } else {
+                $user = new User(['email' => $matchedEmail]);
+                $user->fill([
+                    'name' => $keycloakUser->getName() ?: $username ?: $employee->nama_lengkap,
+                    'keycloak_id' => $keycloakId,
+                    'employee_id' => $employee->id,
+                    'email_verified_at' => now(),
+                ]);
+            }
 
             // Guard benturan juga di jalur user baru: username hanya diambil jika belum
             // dipakai user lain; identitas kanonis tetap keycloak_id (subject Keycloak).
@@ -132,12 +154,10 @@ class HandleKeycloakCallbackAction
             }
 
             if (! $user->exists) {
-                // Mapping pegawai valid + role internal belum ada → role mengikuti pemetaan
-                // email SSO bila tersedia; tanpa pemetaan, default SSO Pegawai berperan
-                // sebagai Pegawai; akun pertama sistem diberi akses super_admin agar dapat dikonfigurasi.
-                // Invalid mapping sudah ditolak di atas, jadi fallback hanya untuk missing mapping.
-                $user->role = $this->mappedRoleForEmail($matchedEmail)
-                    ?? (User::query()->exists() ? 'pegawai' : 'super_admin');
+                // SSO hanya membuktikan identitas: role internal akun baru selalu default
+                // Pegawai; akun pertama sistem diberi super_admin sebagai bootstrap agar
+                // dapat dikonfigurasi (keputusan stakeholder, bukan otorisasi dari email).
+                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
                 $user->password = Str::random(48);
             }
 
@@ -166,20 +186,9 @@ class HandleKeycloakCallbackAction
             $user->keycloak_username = $claimedUsername;
         }
 
-        // Fail-closed untuk mapping invalid: email tercantum di role_mapping tetapi nilainya
-        // di luar allowlist tidak boleh jatuh ke fallback pegawai.
-        if ($user->employee_id !== null
-            && is_string($user->employee_id)
-            && in_array($user->role, [null, ''], true)
-            && $this->isInvalidRoleMapping($user->email)) {
-            return view('auth.unregistered', [
-                'message' => 'Konfigurasi role mapping tidak valid.',
-            ]);
-        }
-
-        // Role internal kosong (null atau string kosong) pada mapping pegawai valid
-        // diinisialisasi mengikuti pemetaan email SSO bila tersedia, selain itu sebagai
-        // Pegawai; role yang sudah ditetapkan tidak pernah dioverwrite.
+        // Role internal kosong (null atau string kosong) pada pegawai valid selalu
+        // diinisialisasi ke default internal Pegawai — SSO tidak pernah menjadi sumber
+        // elevated role (K-MTG-02); role yang sudah ditetapkan tidak pernah dioverwrite.
         // Inisialisasi hanya untuk pegawai yang masih aktif: pegawai yang sudah dinonaktifkan
         // (soft-delete maupun status referensi Non-Aktif/Pensiun/Mutasi) tidak layak menerima
         // role baru, agar akses yang dicabut lewat deaktivasi tidak pulih.
@@ -187,25 +196,34 @@ class HandleKeycloakCallbackAction
             && is_string($user->employee_id)
             && ! $this->employeeIsInactive($user->employee_id)
             && in_array($user->role, [null, ''], true)) {
-            $user->role = $this->mappedRoleForEmail($user->email) ?? 'pegawai';
+            $user->role = 'pegawai';
         }
 
-        // Inisialisasi role adalah mutasi penting: disimpan bersama jejak auditnya dalam satu
-        // transaksi (old role null/kosong → role baru) agar perubahan mapping/role selalu punya evidence.
+        // Binding keycloak_id pertama dan inisialisasi role adalah mutasi penting: keduanya
+        // disimpan bersama jejak auditnya dalam satu transaksi agar selalu punya evidence,
+        // dan kegagalan audit membatalkan perubahan (fail-closed).
         $rawPreviousRole = $user->getRawOriginal('role');
         $previousRole = is_string($rawPreviousRole) ? $rawPreviousRole : null;
         $roleInitialized = in_array($previousRole, [null, ''], true)
             && $user->role !== null
             && $user->role !== '';
 
-        if ($roleInitialized) {
-            DB::transaction(function () use ($user, $previousRole, $request): void {
-                $user->save();
-                $this->auditRoleInitialization($user, $previousRole, $request);
-            });
-        } else {
+        $rawPreviousSubject = $user->getRawOriginal('keycloak_id');
+        $firstBinding = in_array($rawPreviousSubject, [null, ''], true)
+            && is_string($user->keycloak_id)
+            && $user->keycloak_id !== '';
+
+        DB::transaction(function () use ($user, $previousRole, $roleInitialized, $firstBinding, $request): void {
             $user->save();
-        }
+
+            if ($firstBinding) {
+                $this->auditIdentityBinding($user, $request);
+            }
+
+            if ($roleInitialized) {
+                $this->auditRoleInitialization($user, $previousRole, $request);
+            }
+        });
 
         Auth::login($user);
         $request->session()->regenerate();
@@ -237,8 +255,9 @@ class HandleKeycloakCallbackAction
                     // pegawai nonaktif hanya memegang email_pribadi kanonisnya.
                     ->orWhereRaw('lower(email) = ?', [$matchedEmail]);
             })
-                // Permukaan autentikasi hanya memetakan pegawai aktif; pegawai yang sudah
-                // di-soft-delete tidak boleh menjadi pintu masuk akun SSO baru.
+                // Kelayakan aktif kanonis berasal dari ref_status_pegawai.kelompok
+                // (diperiksa employeeIsInactive). Filter deleted_at hanya pelengkap
+                // sementara Employee masih memakai SoftDeletes (selaras PR #19).
                 ->whereNull('deleted_at')
                 ->limit(2)
                 ->get();
@@ -251,7 +270,7 @@ class HandleKeycloakCallbackAction
     }
 
     /**
-     * Mencatat inisialisasi role internal hasil mapping SSO (role kosong → role baru).
+     * Mencatat inisialisasi role internal saat login SSO (role kosong → role baru).
      *
      * Fail-closed: kegagalan menulis audit membatalkan perubahan role. Payload memuat old/new
      * role, pegawai yang dipetakan, dan sumber perubahan yang aman (tanpa claim mentah).
@@ -265,7 +284,45 @@ class HandleKeycloakCallbackAction
             'User',
             $user->id,
             ['role' => $previousRole],
-            ['role' => $user->role, 'employee_id' => $user->employee_id, 'source' => 'sso_mapping'],
+            ['role' => $user->role, 'employee_id' => $user->employee_id, 'source' => 'sso_bootstrap'],
+            $request,
+        );
+    }
+
+    /**
+     * Mencatat pengikatan pertama subject Keycloak (keycloak_id) pada user SIMPEG.
+     *
+     * Fail-closed: kegagalan menulis audit membatalkan binding. Payload hanya memuat
+     * identitas kanonis (subject, employee) tanpa payload/token mentah Keycloak.
+     */
+    private function auditIdentityBinding(User $user, Request $request): void
+    {
+        AuditService::logAsOrFail(
+            $user->id,
+            $user->name,
+            'SSO_BINDING',
+            'User',
+            $user->id,
+            ['keycloak_id' => null],
+            ['keycloak_id' => $user->keycloak_id, 'employee_id' => $user->employee_id, 'source' => 'sso_callback'],
+            $request,
+        );
+    }
+
+    /**
+     * Mencatat penolakan mapping identitas SSO (pegawai nonaktif / konflik identitas)
+     * sebagai evidence keamanan tanpa menyimpan payload mentah Keycloak.
+     */
+    private function auditMappingRejected(?User $user, string $reason, ?string $email, ?string $employeeId, Request $request): void
+    {
+        AuditService::logAsOrFail(
+            $user?->id ?? 'system',
+            $user?->name ?? 'SSO Callback',
+            'SSO_MAPPING_REJECTED',
+            'User',
+            $user?->id,
+            null,
+            ['reason' => $reason, 'email' => $email, 'employee_id' => $employeeId, 'source' => 'sso_callback'],
             $request,
         );
     }
@@ -318,58 +375,6 @@ class HandleKeycloakCallbackAction
         }
 
         return $value;
-    }
-
-    /**
-     * Role internal yang ditetapkan untuk email SSO tertentu lewat config role_mapping.
-     *
-     * Hanya dipakai pada saat bootstrap (user baru / role internal masih kosong); role yang
-     * sudah terisi tidak pernah dioverwrite. Role di luar allowlist ditolak fail-closed.
-     */
-    private function mappedRoleForEmail(?string $email): ?string
-    {
-        if (! is_string($email) || trim($email) === '') {
-            return null;
-        }
-
-        $roleMapping = (array) config('services.keycloak.role_mapping', []);
-
-        // Normalisasi key case-insensitive agar pemetaan dengan kapitalisasi
-        // berbeda (mis. 'Admin@Example.com') tetap terurai ke role terpetakan,
-        // konsisten dengan isInvalidRoleMapping().
-        $normalizedMap = array_change_key_case($roleMapping, CASE_LOWER);
-
-        $mapped = $normalizedMap[strtolower(trim($email))] ?? null;
-
-        if (! is_string($mapped) || ! in_array($mapped, self::ALLOWED_INTERNAL_ROLES, true)) {
-            return null;
-        }
-
-        return $mapped;
-    }
-
-    /**
-     * True bila email tercantum di role_mapping tetapi nilainya di luar allowlist.
-     * Bedakan dari missing mapping (tidak tercantum) yang masih boleh fallback ke pegawai/super_admin.
-     */
-    private function isInvalidRoleMapping(?string $email): bool
-    {
-        if (! is_string($email) || trim($email) === '') {
-            return false;
-        }
-
-        $roleMapping = (array) config('services.keycloak.role_mapping', []);
-        // Normalisasi key case-insensitive agar typo kapitalisasi tetap terdeteksi.
-        $normalizedMap = array_change_key_case($roleMapping, CASE_LOWER);
-        $normalizedEmail = strtolower(trim($email));
-
-        if (! array_key_exists($normalizedEmail, $normalizedMap)) {
-            return false;
-        }
-
-        $mapped = $normalizedMap[$normalizedEmail];
-
-        return ! is_string($mapped) || ! in_array($mapped, self::ALLOWED_INTERNAL_ROLES, true);
     }
 
     /**

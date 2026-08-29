@@ -81,10 +81,11 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame(['role' => null], $audit->old_values);
         $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
         $this->assertSame($employee->id, $audit->new_values['employee_id'] ?? null);
-        $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
+        $this->assertSame('sso_bootstrap', $audit->new_values['source'] ?? null);
     }
 
-    public function test_first_login_with_mapped_email_gets_mapped_role_instead_of_bootstrap_super_admin(): void
+    /** Login pertama dengan email ter-map tetap di-bootstrap super_admin (keputusan stakeholder), BUKAN role dari email. */
+    public function test_first_login_with_mapped_email_still_bootstraps_super_admin_without_email_authorization(): void
     {
         config()->set('services.keycloak.role_mapping', [
             'kabag@example.com' => 'kepala_bagian',
@@ -110,7 +111,8 @@ class KeycloakCallbackMappingTest extends TestCase
             'email' => 'kabag@example.com',
             'keycloak_id' => 'kc-kabag',
             'employee_id' => $employee->id,
-            'role' => 'kepala_bagian',
+            // Akun pertama sistem → super_admin via bootstrap internal, bukan karena email ter-map.
+            'role' => 'super_admin',
         ]);
     }
 
@@ -146,11 +148,12 @@ class KeycloakCallbackMappingTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $this->assertAuthenticated();
 
-        // Login sukses: keycloak_id terisi, role dari mapping tetap diberikan,
-        // dan keycloak_username yang bentrok TIDAK menimpa milik user demo.
+        // Login sukses: keycloak_id terisi, role internal default (bootstrap super_admin
+        // sudah dikonsumsi akun demo, mapping tidak pernah meng-elevate), dan
+        // keycloak_username yang bentrok TIDAK menimpa milik user demo.
         $mappedUser = User::where('email', 'dayensite@gmail.com')->first();
         $this->assertSame('kc-dayensite', $mappedUser->keycloak_id);
-        $this->assertSame('super_admin', $mappedUser->role);
+        $this->assertSame('pegawai', $mappedUser->role);
         $this->assertNotSame('demo-klabat', $mappedUser->keycloak_username);
 
         // Pemilik asli username tidak berubah.
@@ -160,8 +163,8 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    /** User baru ter-map valid dengan email di role_mapping mendapat role pemetaan, bukan default pegawai. */
-    public function test_new_mapped_login_after_bootstrap_gets_mapped_role_instead_of_pegawai(): void
+    /** User baru ter-map valid TETAP pegawai: email SSO tidak pernah memberi elevated role (K-MTG-02). */
+    public function test_new_mapped_login_after_bootstrap_gets_pegawai_role_not_elevated(): void
     {
         User::factory()->superAdmin()->create();
 
@@ -189,13 +192,13 @@ class KeycloakCallbackMappingTest extends TestCase
             'email' => 'kepeg@example.com',
             'keycloak_id' => 'kc-kepeg',
             'employee_id' => $employee->id,
-            'role' => 'admin_kepegawaian',
+            'role' => 'pegawai',
         ]);
 
         $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_type', 'User')->sole();
         $this->assertSame(['role' => null], $audit->old_values);
-        $this->assertSame('admin_kepegawaian', $audit->new_values['role'] ?? null);
-        $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
+        $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
+        $this->assertSame('sso_bootstrap', $audit->new_values['source'] ?? null);
     }
 
     /** Role internal yang sudah ditetapkan tidak pernah dioverwrite oleh role_mapping email SSO. */
@@ -233,8 +236,8 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    /** User lama ber-role kosong dengan email ter-map diinisialisasi ke role pemetaan saat login; inisialisasi diaudit. */
-    public function test_existing_mapped_user_with_blank_role_gets_mapped_role_on_login(): void
+    /** User lama ber-role kosong dengan email ter-map diinisialisasi ke pegawai (bukan role pemetaan); inisialisasi diaudit. */
+    public function test_existing_mapped_user_with_blank_role_gets_pegawai_role_on_login(): void
     {
         config()->set('services.keycloak.role_mapping', [
             'dayen@example.com' => 'kepala_bagian',
@@ -264,13 +267,13 @@ class KeycloakCallbackMappingTest extends TestCase
         $response->assertRedirect(route('dashboard'));
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
-            'role' => 'kepala_bagian',
+            'role' => 'pegawai',
         ]);
 
         $audit = AuditLog::query()->where('event', 'UPDATE')->where('auditable_type', 'User')->sole();
         $this->assertSame(['role' => null], $audit->old_values);
-        $this->assertSame('kepala_bagian', $audit->new_values['role'] ?? null);
-        $this->assertSame('sso_mapping', $audit->new_values['source'] ?? null);
+        $this->assertSame('pegawai', $audit->new_values['role'] ?? null);
+        $this->assertSame('sso_bootstrap', $audit->new_values['source'] ?? null);
     }
 
     /** User lama ber-role kosong dengan mapping valid diinisialisasi menjadi pegawai saat login; inisialisasi diaudit. */
@@ -912,8 +915,8 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    /** Key role_mapping dengan kapitalisasi berbeda harus tetap terurai ke role terpetakan (bukan fallback pegawai). */
-    public function test_mixed_case_role_mapping_key_grants_mapped_role_to_new_login(): void
+    /** Key role_mapping kapitalisasi campuran tidak pernah meng-elevate role; akun baru tetap pegawai. */
+    public function test_mixed_case_role_mapping_key_does_not_elevate_new_login(): void
     {
         User::factory()->superAdmin()->create();
 
@@ -941,12 +944,12 @@ class KeycloakCallbackMappingTest extends TestCase
             'email' => 'kabag@example.com',
             'keycloak_id' => 'kc-kabag-case',
             'employee_id' => $employee->id,
-            'role' => 'kepala_bagian',
+            'role' => 'pegawai',
         ]);
     }
 
-    /** User existing dengan role kosong + email mapping bergaya kapitalisasi campuran diinisialisasi ke role terpetakan. */
-    public function test_existing_blank_role_resolves_mixed_case_mapping_key(): void
+    /** User existing ber-role kosong mengabaikan role_mapping (termasuk key mixed-case) dan diinisialisasi pegawai. */
+    public function test_existing_blank_role_ignores_mixed_case_mapping_key(): void
     {
         config()->set('services.keycloak.role_mapping', [
             'Admin@Example.com' => 'admin_kepegawaian',
@@ -957,7 +960,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'email' => 'admin@example.com',
         ]);
 
-        User::factory()->create([
+        $user = User::factory()->create([
             'email' => 'admin@example.com',
             'employee_id' => $employee->id,
             'role' => null,
@@ -975,10 +978,139 @@ class KeycloakCallbackMappingTest extends TestCase
 
         $response->assertRedirect(route('dashboard'));
         $this->assertDatabaseHas('users', [
-            'email' => 'admin@example.com',
-            'keycloak_id' => 'kc-admin-case',
-            'role' => 'admin_kepegawaian',
+            'id' => $user->id,
+            'role' => 'pegawai',
         ]);
+    }
+
+    /**
+     * Regression defect utama Issue #6: user existing milik pegawai yang sama wajib dipakai
+     * ulang via employee_id meskipun email internalnya berbeda dari email SSO terverifikasi.
+     * Jumlah user tidak bertambah, role existing dipertahankan, dan binding pertama diaudit.
+     */
+    public function test_existing_user_is_reused_via_employee_id_before_email_fallback(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Dayen Kanonis',
+            'email_pribadi' => 'dayensite@gmail.com',
+        ]);
+
+        $existingUser = User::factory()->create([
+            'email' => 'dayen-internal@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+        ]);
+
+        $usersBefore = User::query()->count();
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-new-subject',
+            'nickname' => 'dayen-sso',
+            'name' => 'Dayen SSO',
+            'email' => 'dayensite@gmail.com',
+            'raw' => ['email' => 'dayensite@gmail.com', 'email_verified' => true, 'preferred_username' => 'dayen-sso'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($existingUser);
+
+        // Jumlah user tidak bertambah: user existing dipakai ulang, bukan dibuat baru.
+        $this->assertSame($usersBefore, User::query()->count());
+
+        $existingUser->refresh();
+        // Subject Keycloak baru terikat pada user yang sama.
+        $this->assertSame('kc-new-subject', $existingUser->keycloak_id);
+        // Role internal existing dipertahankan.
+        $this->assertSame('pimpinan', $existingUser->role);
+        // Email internal tidak ditimpa oleh email SSO.
+        $this->assertSame('dayen-internal@lldikti.go.id', $existingUser->email);
+        $this->assertSame($employee->id, $existingUser->employee_id);
+
+        // Binding keycloak_id pertama tercatat sebagai audit.
+        $binding = AuditLog::query()->where('event', 'SSO_BINDING')->where('auditable_id', $existingUser->id)->sole();
+        $this->assertSame('kc-new-subject', $binding->new_values['keycloak_id'] ?? null);
+    }
+
+    /**
+     * Konflik identitas: resolver employee_id dan email fallback menunjuk dua user berbeda
+     * → login ditolak fail-closed, tidak ada binding, dan penolakan tercatat audit.
+     */
+    public function test_identity_conflict_between_employee_user_and_email_user_is_rejected(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Korban Konflik',
+            'email_pribadi' => 'dayensite@gmail.com',
+        ]);
+
+        $userByEmployee = User::factory()->create([
+            'email' => 'internal-a@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+        ]);
+        $userByEmail = User::factory()->create([
+            'email' => 'dayensite@gmail.com',
+            'role' => 'pegawai',
+        ]);
+
+        $usersBefore = User::query()->count();
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-conflict-subject',
+            'nickname' => 'conflict-sso',
+            'name' => 'Konflik SSO',
+            'email' => 'dayensite@gmail.com',
+            'raw' => ['email' => 'dayensite@gmail.com', 'email_verified' => true, 'preferred_username' => 'conflict-sso'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Konflik identitas akun SIMPEG terdeteksi.');
+        $this->assertGuest();
+
+        // Tidak ada user baru maupun binding yang terjadi.
+        $this->assertSame($usersBefore, User::query()->count());
+        $this->assertNull($userByEmployee->refresh()->keycloak_id);
+        $this->assertNull($userByEmail->refresh()->keycloak_id);
+
+        // Penolakan konflik identitas tercatat audit tanpa payload mentah Keycloak.
+        $audit = AuditLog::query()->where('event', 'SSO_MAPPING_REJECTED')->latest('created_at')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('identity_conflict', $audit->new_values['reason'] ?? null);
+        $this->assertSame($userByEmployee->id, $audit->auditable_id ?? null);
+    }
+
+    /** Percobaan login pegawai nonaktif (tanpa soft-delete) ditolak dan tercatat audit keamanan. */
+    public function test_mapping_rejection_for_inactive_employee_is_audited(): void
+    {
+        Employee::factory()->create([
+            'nama_lengkap' => 'Pensiunan Baru',
+            'email' => 'pensiun-baru@example.com',
+            'status_aktif' => 'Pensiun',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-pensiun-baru',
+            'nickname' => 'pensiun-baru',
+            'name' => 'Pensiunan Baru',
+            'email' => 'pensiun-baru@example.com',
+            'raw' => ['email' => 'pensiun-baru@example.com', 'email_verified' => true, 'preferred_username' => 'pensiun-baru'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Akun pegawai tidak aktif.');
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', [
+            'email' => 'pensiun-baru@example.com',
+        ]);
+
+        $audit = AuditLog::query()->where('event', 'SSO_MAPPING_REJECTED')->latest('created_at')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('employee_inactive', $audit->new_values['reason'] ?? null);
     }
 
     /**

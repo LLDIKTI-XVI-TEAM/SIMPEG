@@ -11,8 +11,11 @@ class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
      * Menanam pegawai + user placeholder untuk setiap email yang terdaftar di
-     * config services.keycloak.role_mapping, sehingga login SSO pertama akun
-     * tersebut langsung menemukan tepat satu pegawai dan mendapat role internalnya.
+     * config services.keycloak.role_mapping (fixture UAT local/testing), sehingga
+     * login SSO pertama akun tersebut langsung menemukan tepat satu pegawai.
+     *
+     * Seeder ini BUKAN sumber otorisasi: auth callback tidak pernah membaca
+     * role_mapping; role internal ditentukan aplikasi SIMPEG.
      *
      * Seeder ini fail-closed: hanya berjalan di local/testing. Di produksi, pegawai
      * dengan email itu dibuat lewat alur admin/import yang normal.
@@ -22,9 +25,10 @@ class SsoRoleMappedAccountSeeder extends Seeder
      *   status aktif hanya ditetapkan ketika placeholder pegawai benar-benar baru;
      * - relasi user → employee yang sudah ada TIDAK ditimpa; bila user sudah terhubung
      *   ke pegawai lain, mapping untuk email tersebut dilewati (reject, bukan overwrite)
-     *   agar identitas SSO tidak berpindah pegawai secara diam-diam.
-     * - nama user yang sudah ada TIDAK ditimpa; displayName hanya dipakai untuk
-     *   placeholder baru atau bila nama existing kosong (seeder non-destructive).
+     *   agar identitas SSO tidak berpindah pegawai secara diam-diam;
+     * - nama, email internal, dan role user existing TIDAK ditimpa;
+     * - resolver user memakai kontrak kanonis Issue #6: employee_id dulu, baru
+     *   email case-insensitive (termasuk email_pribadi pegawai).
      */
     public function run(): void
     {
@@ -40,7 +44,15 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 continue;
             }
 
-            $employee = Employee::where('email', $email)->first();
+            // Lookup kanonis case-insensitive pada email legacy + email_pribadi kanonis,
+            // agar pegawai existing tidak terlewat hanya karena kapitalisasi/kolom berbeda.
+            $employee = Employee::query()
+                ->where(function ($query) use ($email): void {
+                    $query
+                        ->whereRaw('lower(email) = ?', [strtolower($email)])
+                        ->orWhereRaw('lower(email_pribadi) = ?', [strtolower($email)]);
+                })
+                ->first();
 
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.
@@ -55,7 +67,11 @@ class SsoRoleMappedAccountSeeder extends Seeder
             // tidak menghidupkan kembali pegawai Non-Aktif/Pensiun/Mutasi, dan tidak
             // menaikkan/menurunkan role yang sudah ditetapkan admin.
 
-            $user = User::where('email', $email)->first() ?? new User;
+            // Resolver user kanonis: employee_id dulu (kontrak Issue #6), baru
+            // fallback email case-insensitive — duplicate identity terhindar.
+            $user = User::where('employee_id', $employee->id)->first()
+                ?? User::whereRaw('lower(email) = ?', [strtolower($email)])->first()
+                ?? new User;
 
             // Tolak ketidakcocokan relasi: user yang sudah terhubung ke pegawai lain
             // tidak boleh dipindahkan ke pegawai hasil lookup email (email pegawai asal
@@ -72,7 +88,9 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 // Nama hanya untuk placeholder baru atau bila nama existing kosong;
                 // nama yang sudah ditetapkan admin/pengguna tidak boleh ditimpa (non-destructive).
                 'name' => $user->exists && filled($user->name) ? $user->name : $this->displayName($email),
-                'email' => $email,
+                // Email existing tidak ditimpa (user hasil resolver employee_id boleh
+                // memegang email internal berbeda); email mapping hanya untuk user baru.
+                'email' => $user->exists ? $user->email : $email,
                 'role' => $user->exists ? $user->role : $role,
                 'employee_id' => $employee->id,
                 'email_verified_at' => $user->email_verified_at ?? now(),
