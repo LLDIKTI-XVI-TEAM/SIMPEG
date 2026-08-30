@@ -11,6 +11,7 @@ use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use App\Services\Cuti\ApprovalChainInvariantService;
 use App\Services\Employees\SupervisorAssignmentTimelineService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -52,10 +53,9 @@ class AssignSupervisorAction
         $today = today();
 
         DB::transaction(function () use ($employee, $kepalaBagianId, $effective, $today, $request): void {
-            if ($effective->lte($today)) {
-                $this->configurationLock->acquire();
-            }
-
+            // Penugasan mendatang tetap memengaruhi sumber Kepala Bagian yang kelak dibaca resolver;
+            // seluruh writer timeline wajib masuk melalui urutan lock konfigurasi yang sama.
+            $this->configurationLock->acquire();
             $this->lockAssignmentTimeline($employee);
 
             /** @var Collection<int, SupervisorAssignment> $assignments */
@@ -161,6 +161,9 @@ class AssignSupervisorAction
             // Target dan seluruh calon approver dikunci bersama dalam urutan UUID global agar
             // penugasan silang tidak membentuk siklus lock antarpegawai.
             $this->invariants->validateApproverIds([$kepalaBagianId], [$employee->id]);
+        } catch (QueryException $exception) {
+            // Detail SQL dan binding merupakan error infrastruktur, bukan pesan validasi pengguna.
+            throw $exception;
         } catch (RuntimeException $exception) {
             throw ValidationException::withMessages([
                 'kepala_bagian_id' => $exception->getMessage(),
@@ -202,6 +205,9 @@ class AssignSupervisorAction
                 $additionalApprovers,
                 [$employee->id],
             );
+        } catch (QueryException $exception) {
+            // Detail SQL dan binding merupakan error infrastruktur, bukan pesan validasi pengguna.
+            throw $exception;
         } catch (RuntimeException $exception) {
             throw ValidationException::withMessages([
                 'kepala_bagian_id' => $exception->getMessage(),

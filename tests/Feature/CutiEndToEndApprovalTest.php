@@ -16,6 +16,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -202,6 +203,296 @@ class CutiEndToEndApprovalTest extends TestCase
         ]);
         // Pemohon menerima notifikasi hasil keputusan final.
         $this->assertTrue(SimpegNotification::query()->where('user_id', $pemohon->id)->exists());
+    }
+
+    public static function jumlahVerifierProvider(): array
+    {
+        return [
+            'satu verifier' => [1],
+            'banyak verifier' => [2],
+        ];
+    }
+
+    #[DataProvider('jumlahVerifierProvider')]
+    public function test_alur_generic_mengaktifkan_verifier_sebelum_kepala_bagian_dan_pybmc(int $jumlahVerifier): void
+    {
+        $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $kepalaBagian = Employee::factory()->create(['nama_lengkap' => 'Kepala Bagian Dinamis']);
+        $pybmc = Employee::factory()->create(['nama_lengkap' => 'PYBMC Dinamis']);
+        $verifiers = collect(range(1, $jumlahVerifier))
+            ->map(fn (int $urutan): Employee => Employee::factory()->create([
+                'nama_lengkap' => "Verifikator Dinamis {$urutan}",
+            ]));
+        $pemohon = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Chain Dinamis',
+            'jenis_pegawai_id' => $jenisPegawai->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+
+        Appointment::create([
+            'employee_id' => $pemohon->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK-E2E-DINAMIS',
+            'tanggal_sk' => '2020-01-01',
+        ]);
+        SupervisorAssignment::create([
+            'employee_id' => $pemohon->id,
+            'supervisor_id' => $kepalaBagian->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
+
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $pemohon->id,
+            'name' => 'Chain E2E verifier dinamis',
+            'effective_from' => '2026-01-01',
+            'change_reason' => 'Fixture alur verifier dinamis.',
+        ]);
+        $chain->steps()->createMany([
+            ...$verifiers->values()->map(fn (Employee $verifier, int $index): array => [
+                'step_order' => $index + 1,
+                'step_type' => 'verifier',
+                'role_label' => 'Verifikator '.($index + 1),
+                'approver_employee_id' => $verifier->id,
+                'is_final' => false,
+            ])->all(),
+            [
+                'step_order' => $jumlahVerifier + 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $kepalaBagian->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => $jumlahVerifier + 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $pybmc->id,
+                'is_final' => true,
+            ],
+        ]);
+
+        $pemohonUser = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
+        $approverEmployees = $verifiers->push($kepalaBagian)->push($pybmc)->values();
+        $approverUsers = $approverEmployees->mapWithKeys(fn (Employee $approver): array => [
+            $approver->id => User::factory()->pegawai()->create(['employee_id' => $approver->id]),
+        ]);
+        $jenis = RefJenisCuti::create([
+            'nama' => "Cuti Sakit E2E {$jumlahVerifier} Verifier",
+            'code' => "cuti_sakit_e2e_{$jumlahVerifier}",
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+
+        $this->actingAs($pemohonUser)
+            ->post(route('cuti.store'), [
+                'jenis_cuti_id' => $jenis->id,
+                'tanggal_mulai' => '2026-08-03',
+                'tanggal_selesai' => '2026-08-04',
+                'alasan' => 'Menguji urutan chain dinamis.',
+                'alamat_selama_cuti' => 'Jl. E2E Dinamis, Manado',
+                'nomor_telepon' => '+62 431 555',
+            ])
+            ->assertRedirect(route('cuti'));
+
+        $leave = LeaveRequest::query()->sole();
+        $steps = $leave->steps()->orderBy('step_order')->get();
+        $expectedTypes = [
+            ...array_fill(0, $jumlahVerifier, 'verifier'),
+            'kepala_bagian',
+            'pybmc',
+        ];
+        $this->assertSame($expectedTypes, $steps->pluck('step_type')->all());
+        $this->assertSame(
+            ['active', ...array_fill(0, $steps->count() - 1, 'pending')],
+            $steps->pluck('status')->all(),
+        );
+
+        $initialNotification = SimpegNotification::query()
+            ->where('user_id', $approverEmployees->firstOrFail()->id)
+            ->where('type', 'cuti.pengajuan_baru')
+            ->sole();
+        $this->assertSame($leave->id, $initialNotification->data['leave_request_id'] ?? null);
+        $this->assertSame($steps->firstOrFail()->id, $initialNotification->data['leave_request_step_id'] ?? null);
+
+        foreach ($steps as $index => $step) {
+            $approver = $approverEmployees[$index];
+            $user = $approverUsers->get($approver->id);
+            $this->assertInstanceOf(User::class, $user);
+
+            if ($index + 1 < $steps->count()) {
+                $nextStep = $steps[$index + 1];
+                $this->assertFalse(SimpegNotification::query()
+                    ->where('user_id', $nextStep->approver_employee_id)
+                    ->where('type', 'cuti.menunggu_persetujuan')
+                    ->where('data->leave_request_step_id', $nextStep->id)
+                    ->exists());
+            }
+
+            $this->actingAs($user)
+                ->post(route('cuti.approve', $leave->id), [
+                    'komentar' => "Menyetujui tahap {$step->step_order}.",
+                ])
+                ->assertRedirect(route('cuti.approval'));
+
+            $this->assertDatabaseHas('leave_request_steps', [
+                'id' => $step->id,
+                'status' => 'approved',
+            ]);
+
+            if ($index + 1 < $steps->count()) {
+                $nextStep = $steps[$index + 1];
+                $this->assertDatabaseHas('leave_request_steps', [
+                    'id' => $nextStep->id,
+                    'status' => 'active',
+                ]);
+                $nextNotification = SimpegNotification::query()
+                    ->where('user_id', $nextStep->approver_employee_id)
+                    ->where('type', 'cuti.menunggu_persetujuan')
+                    ->where('data->leave_request_step_id', $nextStep->id)
+                    ->sole();
+                $this->assertSame($leave->id, $nextNotification->data['leave_request_id'] ?? null);
+                $this->assertSame($nextStep->id, $nextNotification->data['leave_request_step_id'] ?? null);
+            }
+        }
+
+        $this->assertSame('disetujui', $leave->refresh()->status);
+        foreach ($approverEmployees as $approver) {
+            $this->assertSame(1, $leave->approvals()->where('approver_id', $approver->id)->count());
+        }
+    }
+
+    public static function duplicateApproverProvider(): array
+    {
+        return [
+            'verifier juga Kepala Bagian' => ['verifier_kepala_bagian'],
+            'Kepala Bagian juga PYBMC' => ['kepala_bagian_pybmc'],
+        ];
+    }
+
+    #[DataProvider('duplicateApproverProvider')]
+    public function test_submit_mempertahankan_duplikat_dan_hanya_meminta_actor_terakhir_bertindak(string $skenario): void
+    {
+        $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
+        $actorDuplikat = Employee::factory()->create(['nama_lengkap' => 'Actor Duplikat E2E']);
+        $verifierEfektif = Employee::factory()->create(['nama_lengkap' => 'Verifier Efektif E2E']);
+        $pybmcLain = Employee::factory()->create(['nama_lengkap' => 'PYBMC Lain E2E']);
+        $pemohon = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Duplikat E2E',
+            'jenis_pegawai_id' => $jenisPegawai->id,
+            'kepala_bagian_id' => $actorDuplikat->id,
+        ]);
+        Appointment::create([
+            'employee_id' => $pemohon->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK-E2E-DUPLIKAT',
+            'tanggal_sk' => '2020-01-01',
+        ]);
+        SupervisorAssignment::create([
+            'employee_id' => $pemohon->id,
+            'supervisor_id' => $actorDuplikat->id,
+            'kepala_bagian_id' => $actorDuplikat->id,
+            'tanggal_mulai' => '2026-01-01',
+            'tanggal_berakhir' => null,
+        ]);
+
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $pemohon->id,
+            'name' => 'Chain E2E actor duplikat',
+            'effective_from' => '2026-01-01',
+            'change_reason' => 'Fixture duplicate last occurrence.',
+        ]);
+        $stepDefinitions = $skenario === 'verifier_kepala_bagian'
+            ? [
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator Duplikat', 'approver' => $actorDuplikat, 'is_final' => false],
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator Efektif', 'approver' => $verifierEfektif, 'is_final' => false],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver' => $actorDuplikat, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver' => $pybmcLain, 'is_final' => true],
+            ]
+            : [
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator Efektif', 'approver' => $verifierEfektif, 'is_final' => false],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian Duplikat', 'approver' => $actorDuplikat, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC Duplikat', 'approver' => $actorDuplikat, 'is_final' => true],
+            ];
+        $chain->steps()->createMany(collect($stepDefinitions)->map(
+            fn (array $definition, int $index): array => [
+                'step_order' => $index + 1,
+                'step_type' => $definition['step_type'],
+                'role_label' => $definition['role_label'],
+                'approver_employee_id' => $definition['approver']->id,
+                'is_final' => $definition['is_final'],
+            ],
+        )->all());
+
+        $pemohonUser = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
+        $approverUsers = collect([$actorDuplikat, $verifierEfektif, $pybmcLain])
+            ->mapWithKeys(fn (Employee $approver): array => [
+                $approver->id => User::factory()->pegawai()->create(['employee_id' => $approver->id]),
+            ]);
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit Duplicate '.str($skenario)->headline(),
+            'code' => 'cuti_sakit_duplicate_'.$skenario,
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+
+        $this->actingAs($pemohonUser)
+            ->post(route('cuti.store'), [
+                'jenis_cuti_id' => $jenis->id,
+                'tanggal_mulai' => '2026-08-03',
+                'tanggal_selesai' => '2026-08-04',
+                'alasan' => 'Menguji actor duplikat.',
+                'alamat_selama_cuti' => 'Jl. E2E Duplikat, Manado',
+                'nomor_telepon' => '+62 431 556',
+            ])
+            ->assertRedirect(route('cuti'));
+
+        $leave = LeaveRequest::query()->sole();
+        $steps = $leave->steps()->orderBy('step_order')->get();
+        $latestOrderByActor = collect($stepDefinitions)
+            ->mapWithKeys(fn (array $definition, int $index): array => [$definition['approver']->id => $index + 1]);
+        $expectedStatuses = collect($stepDefinitions)->map(function (array $definition, int $index) use ($latestOrderByActor): string {
+            if ($latestOrderByActor[$definition['approver']->id] !== $index + 1) {
+                return 'skipped';
+            }
+
+            return $latestOrderByActor->filter(fn (int $order): bool => $order < $index + 1)->isEmpty()
+                ? 'active'
+                : 'pending';
+        })->all();
+        $this->assertSame($expectedStatuses, $steps->pluck('status')->all());
+
+        foreach ($steps->where('status', 'skipped') as $skippedStep) {
+            $this->assertSame('duplicate_approver', $skippedStep->skipped_reason);
+        }
+
+        $effectiveSteps = $steps->where('status', '!=', 'skipped')->values();
+        $firstEffective = $effectiveSteps->firstOrFail();
+        $initialNotification = SimpegNotification::query()
+            ->where('user_id', $firstEffective->approver_employee_id)
+            ->where('type', 'cuti.pengajuan_baru')
+            ->sole();
+        $this->assertSame($firstEffective->id, $initialNotification->data['leave_request_step_id'] ?? null);
+
+        foreach ($effectiveSteps as $step) {
+            $user = $approverUsers->get($step->approver_employee_id);
+            $this->assertInstanceOf(User::class, $user);
+            $this->actingAs($user)
+                ->post(route('cuti.approve', $leave->id), ['komentar' => 'Satu tindakan per actor efektif.'])
+                ->assertRedirect(route('cuti.approval'));
+        }
+
+        $this->assertSame('disetujui', $leave->refresh()->status);
+        foreach ($effectiveSteps->pluck('approver_employee_id')->unique() as $approverId) {
+            $this->assertSame(1, $leave->approvals()->where('approver_id', $approverId)->count());
+        }
+        $this->assertSame(
+            $effectiveSteps->count(),
+            $leave->approvals()->where('action', 'APPROVE')->count(),
+        );
     }
 
     private function actorRequest(User $actor): Request

@@ -41,6 +41,16 @@ final class LeaveBalanceRolloverRaceWorker
             if ($input['operation'] === 'rollover') {
                 app(RolloverLeaveBalanceAction::class)->execute((int) $input['source_year']);
                 $result = ['ok' => true, 'operation' => 'rollover'];
+            } elseif ($input['operation'] === 'status') {
+                DB::transaction(function () use ($input): void {
+                    // Writer lifecycle mengunci pegawai sebelum mengganti klasifikasi status.
+                    $employee = Employee::query()
+                        ->whereKey($input['target_employee_id'])
+                        ->lockForUpdate()
+                        ->firstOrFail();
+                    $employee->forceFill(['status_pegawai_id' => $input['status_id']])->saveOrFail();
+                });
+                $result = ['ok' => true, 'operation' => 'status'];
             } else {
                 $employee = Employee::query()->findOrFail($input['employee_id']);
                 $actor = User::query()->findOrFail($input['actor_user_id']);

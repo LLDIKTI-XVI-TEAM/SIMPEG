@@ -8,7 +8,9 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeavePybmcGlobalConfig;
 use App\Models\PositionHistory;
 use App\Models\RefUnitKerja;
+use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 /**
  * Menyiapkan data terbatas untuk halaman konfigurasi chain cuti.
@@ -26,7 +28,7 @@ class ShowCutiConfigPageAction
      *
      * @return array<string, mixed>
      */
-    public function execute(?string $search, ?string $selectedEmployeeId, ?string $approverSearch): array
+    public function execute(?string $search, ?string $selectedEmployeeId, ?string $approverSearch, mixed $oldSteps = null): array
     {
         $targetEmployees = $this->targetEmployees($search);
         $selectedEmployee = $this->selectedEmployee($selectedEmployeeId);
@@ -36,16 +38,16 @@ class ShowCutiConfigPageAction
             ->orderByDesc('effective_from')
             ->orderByDesc('created_at')
             ->first();
-        $selectedKepalaBagian = $selectedEmployee?->kepalaBagian
-            ?? $selectedEmployee?->supervisorAssignments->first()?->kepalaBagian;
+        $selectedKepalaBagian = $this->selectedKepalaBagian($selectedEmployee);
 
         return [
             'search' => $search,
             'targetEmployees' => $targetEmployees,
             'selectedEmployee' => $selectedEmployee,
             'selectedKepalaBagian' => $selectedKepalaBagian,
+            'canAssignKepalaBagian' => $this->canAssignKepalaBagian(),
             'approverSearch' => $approverSearch,
-            'approverCandidates' => $this->approverCandidates($approverSearch, $activeChain, $globalPybmc),
+            'approverCandidates' => $this->approverCandidates($approverSearch, $activeChain, $globalPybmc, $oldSteps),
             'initialVerifierSteps' => $this->initialVerifierSteps($activeChain),
             'initialPybmcEmployeeId' => $this->initialPybmcEmployeeId($activeChain),
             'auditRows' => $this->auditRows(),
@@ -59,6 +61,37 @@ class ShowCutiConfigPageAction
             'templateSourceHasActiveChain' => $activeChain !== null,
             'templateSourceUnitKerjaId' => $this->unitKerjaTerkini($selectedEmployee),
         ];
+    }
+
+    /**
+     * Membaca Kepala Bagian dari penugasan bertanggal yang efektif hari ini.
+     * Pointer snapshot pegawai tidak dipakai agar penugasan lama atau mendatang tidak bocor ke chain baru.
+     */
+    private function selectedKepalaBagian(?Employee $selectedEmployee): ?Employee
+    {
+        $currentSupervisor = $selectedEmployee?->currentSupervisor();
+
+        if ($currentSupervisor === null) {
+            return null;
+        }
+
+        $kepalaBagian = $currentSupervisor->kepalaBagian()
+            ->first(['id', 'nama_lengkap', 'nip']);
+
+        return $kepalaBagian instanceof Employee ? $kepalaBagian : null;
+    }
+
+    /**
+     * Menyiapkan flag presentasi di Action supaya Blade tidak menjalankan query permission saat render.
+     * Gate backend pada route dan FormRequest tetap menjadi otorisasi utama.
+     */
+    private function canAssignKepalaBagian(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true)
+            && $user->hasPermission('employees.update');
     }
 
     /** @return Collection<int, RefUnitKerja> */
@@ -115,30 +148,23 @@ class ShowCutiConfigPageAction
 
         return Employee::query()
             ->select(['id', 'nama_lengkap', 'nip', 'jabatan_terakhir', 'kepala_bagian_id'])
-            ->with([
-                'kepalaBagian:id,nama_lengkap,nip',
-                'supervisorAssignments' => fn ($query) => $query
-                    // Hanya penugasan efektif hari ini yang boleh mengisi chain; penugasan mendatang belum dipilih dan tanggal akhir hari ini tetap inklusif.
-                    ->whereDate('tanggal_mulai', '<=', today()->toDateString())
-                    ->where(function ($active): void {
-                        $active->whereNull('tanggal_berakhir')
-                            ->orWhereDate('tanggal_berakhir', '>=', today()->toDateString());
-                    })
-                    ->with('kepalaBagian:id,nama_lengkap,nip'),
-            ])
             ->whereActiveStatus()
             ->find($selectedEmployeeId);
     }
 
     /** @return Collection<int, Employee> */
-    private function approverCandidates(?string $search, ?LeaveApprovalChain $activeChain, ?LeavePybmcGlobalConfig $globalPybmc): Collection
-    {
-        $preservedIds = $activeChain?->steps
-            ->pluck('approver_employee_id')
+    private function approverCandidates(
+        ?string $search,
+        ?LeaveApprovalChain $activeChain,
+        ?LeavePybmcGlobalConfig $globalPybmc,
+        mixed $oldSteps,
+    ): Collection {
+        $preservedIds = ($activeChain?->steps?->pluck('approver_employee_id') ?? collect())
             ->push($globalPybmc?->approver_employee_id)
+            ->merge($this->oldApproverIds($oldSteps))
             ->filter()
             ->unique()
-            ->values() ?? collect();
+            ->values();
 
         $activeCandidates = collect();
 
@@ -167,6 +193,25 @@ class ShowCutiConfigPageAction
             ->merge($activeCandidates)
             ->unique('id')
             ->sortBy('nama_lengkap')
+            ->values();
+    }
+
+    /** @return Collection<int, non-empty-string> */
+    private function oldApproverIds(mixed $oldSteps): Collection
+    {
+        if (! is_array($oldSteps)) {
+            return collect();
+        }
+
+        // Form menerima maksimal sepuluh tahap; old input dibatasi dengan kontrak yang sama
+        // agar redirect validasi tidak memperluas query kandidat pegawai.
+        return collect($oldSteps)
+            ->filter(fn (mixed $step): bool => is_array($step))
+            ->take(10)
+            ->map(fn (array $step): mixed => $step['approver_employee_id'] ?? null)
+            ->filter(fn (mixed $id): bool => is_string($id) && Str::isUuid($id))
+            ->map(fn (mixed $id): string => (string) $id)
+            ->unique()
             ->values();
     }
 

@@ -12,7 +12,7 @@ class ApprovalChainInvariantService
     /**
      * Memastikan kandidat rantai dapat dipakai sebagai satu alur approval cuti yang utuh.
      *
-     * Approver dikunci dalam urutan UUID yang konsisten agar status aktif atau soft delete tidak
+     * Approver dikunci dalam urutan UUID yang konsisten agar status aktif atau ketersediaan ID tidak
      * berubah di antara validasi dan penyimpanan, sekaligus mengurangi risiko deadlock antarproses.
      *
      * @param  list<array{
@@ -30,12 +30,48 @@ class ApprovalChainInvariantService
         array $additionalApproverIds = [],
         array $additionalEmployeeLockIds = [],
     ): void {
-        $approverIds = $this->validateShape($steps);
+        $this->assertCanonicalShape($steps);
+        $approverIds = $this->approverIdsFromSteps($steps);
 
         $this->validateApproverIds(
             [...$approverIds, ...$additionalApproverIds],
             $additionalEmployeeLockIds,
         );
+    }
+
+    /**
+     * Memvalidasi bentuk dan approver chain, lalu memastikan Kepala Bagian berasal dari penugasan efektif.
+     * Target ikut dikunci bersama approver sebelum penugasan dibaca agar urutan lock tetap deterministik.
+     *
+     * @param  array<array-key, array<string, mixed>>  $steps
+     * @param  list<mixed>  $additionalApproverIds
+     * @param  list<mixed>  $additionalEmployeeLockIds
+     */
+    public function validateForEmployee(
+        Employee $employee,
+        array $steps,
+        array $additionalApproverIds = [],
+        array $additionalEmployeeLockIds = [],
+    ): void {
+        $this->validate(
+            $steps,
+            $additionalApproverIds,
+            [...$additionalEmployeeLockIds, $employee->id],
+        );
+
+        $effectiveKepalaBagianId = $employee->currentSupervisor()?->kepala_bagian_id;
+        $configuredKepalaBagianId = collect($steps)
+            ->firstWhere('step_type', 'kepala_bagian')['approver_employee_id'] ?? null;
+
+        if ($effectiveKepalaBagianId === null) {
+            throw new RuntimeException('Pegawai belum memiliki Kepala Bagian efektif.');
+        }
+
+        if ($configuredKepalaBagianId !== $effectiveKepalaBagianId) {
+            throw new RuntimeException(
+                'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
+            );
+        }
     }
 
     /**
@@ -55,7 +91,9 @@ class ApprovalChainInvariantService
         );
 
         foreach ($chains as $steps) {
-            foreach ($this->validateShape($steps) as $approverId) {
+            $this->assertCanonicalShape($steps);
+
+            foreach ($this->approverIdsFromSteps($steps) as $approverId) {
                 if (! isset($lockedApproverIdMap[$approverId])) {
                     throw new RuntimeException(
                         'Rantai approval aktif berubah saat konfigurasi PYBMC global diproses. Silakan ulangi.',
@@ -69,7 +107,7 @@ class ApprovalChainInvariantService
      * Mengunci semua approver chain aktif dan approver global dalam urutan UUID yang monoton.
      *
      * Lazy chunk menjaga penggunaan memori tetap terbatas. Set ID yang dikembalikan menjadi bukti
-     * approver telah ada, aktif, belum dihapus, dan terkunci di transaksi pemanggil.
+     * approver telah ada, aktif, tersedia, dan terkunci di transaksi pemanggil.
      *
      * @return list<string>
      */
@@ -115,11 +153,50 @@ class ApprovalChainInvariantService
     }
 
     /**
-     * @param  list<array<string, mixed>>  $steps
-     * @return list<string>
+     * Memastikan bentuk rantai mengikuti urutan kewenangan tanpa membaca database.
+     *
+     * @param  array<array-key, array<string, mixed>>  $steps
      */
-    private function validateShape(array $steps): array
+    public function assertCanonicalShape(array $steps): void
     {
+        if (! array_is_list($steps)) {
+            throw new RuntimeException('Langkah rantai approval cuti wajib berupa daftar berurutan.');
+        }
+
+        $stepTypes = array_column($steps, 'step_type');
+
+        foreach ($stepTypes as $stepType) {
+            if (! in_array($stepType, ['verifier', 'kepala_bagian', 'pybmc'], true)) {
+                throw new RuntimeException('Tipe langkah rantai approval cuti tidak valid.');
+            }
+        }
+
+        $kepalaBagianIndexes = array_keys($stepTypes, 'kepala_bagian', true);
+        $verifierIndexes = array_keys($stepTypes, 'verifier', true);
+        $pybmcIndexes = array_keys($stepTypes, 'pybmc', true);
+
+        if (count($kepalaBagianIndexes) !== 1) {
+            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu step Kepala Bagian.');
+        }
+
+        if (count($pybmcIndexes) !== 1) {
+            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu step PYBMC.');
+        }
+
+        $kepalaBagianIndex = $kepalaBagianIndexes[0];
+
+        foreach ($verifierIndexes as $verifierIndex) {
+            if ($verifierIndex > $kepalaBagianIndex) {
+                throw new RuntimeException('Semua Verifikator harus ditempatkan sebelum Kepala Bagian.');
+            }
+        }
+
+        $lastIndex = count($steps) - 1;
+
+        if ($pybmcIndexes[0] !== $lastIndex) {
+            throw new RuntimeException('Step PYBMC cuti wajib berada pada urutan terakhir.');
+        }
+
         $finalIndexes = [];
 
         foreach ($steps as $index => $step) {
@@ -132,14 +209,8 @@ class ApprovalChainInvariantService
             throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu approver final.');
         }
 
-        if ($finalIndexes[0] !== array_key_last($steps)) {
+        if ($finalIndexes[0] !== $lastIndex) {
             throw new RuntimeException('Approver final cuti wajib berada pada urutan terakhir.');
-        }
-
-        if (! collect($steps)->contains(
-            fn (array $step): bool => ($step['step_type'] ?? null) === 'kepala_bagian',
-        )) {
-            throw new RuntimeException('Rantai approval cuti wajib memiliki step Kepala Bagian.');
         }
 
         $finalStep = $steps[$finalIndexes[0]];
@@ -147,7 +218,14 @@ class ApprovalChainInvariantService
         if (($finalStep['step_type'] ?? null) !== 'pybmc') {
             throw new RuntimeException('Approver final cuti wajib bertipe PYBMC.');
         }
+    }
 
+    /**
+     * @param  list<array<string, mixed>>  $steps
+     * @return list<string>
+     */
+    private function approverIdsFromSteps(array $steps): array
+    {
         return $this->validateApproverIdFormats(
             array_map(
                 fn (array $step): mixed => $step['approver_employee_id'] ?? null,
@@ -157,7 +235,7 @@ class ApprovalChainInvariantService
     }
 
     /**
-     * Memastikan daftar approver terpilih berbentuk UUID, masih ada, aktif, dan belum dihapus.
+     * Memastikan daftar approver terpilih berbentuk UUID, masih tersedia, dan aktif.
      *
      * @param  list<mixed>  $approverIds
      * @param  list<mixed>  $additionalEmployeeLockIds
@@ -173,6 +251,7 @@ class ApprovalChainInvariantService
         sort($employeeLockIds, SORT_STRING);
 
         $approvers = Employee::query()
+            ->with('statusPegawai:id,kelompok')
             ->whereIn('id', $employeeLockIds)
             ->orderBy('id')
             ->lockForUpdate()

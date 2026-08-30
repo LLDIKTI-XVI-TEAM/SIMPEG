@@ -1,73 +1,241 @@
 <x-layouts.app title="Konfigurasi Approval Cuti">
     @php
         $oldSteps = old('steps');
-        $verifierSteps = is_array($oldSteps)
-            ? collect($oldSteps)
-                ->filter(fn (array $step): bool => ($step['step_type'] ?? null) === 'verifier')
-                ->values()
-                ->map(fn (array $step, int $index): array => [
-                    'role_label' => $step['role_label'] ?? 'Verifikator '.($index + 1),
-                    'approver_employee_id' => $step['approver_employee_id'] ?? '',
-                ])
-                ->all()
-            : $initialVerifierSteps;
+        $oldStepItems = is_array($oldSteps)
+            ? collect($oldSteps)->filter(fn (mixed $step): bool => is_array($step))
+            : collect();
         $pybmcEmployeeId = is_array($oldSteps)
-            ? collect($oldSteps)->firstWhere('step_type', 'pybmc')['approver_employee_id'] ?? ''
+            ? $oldStepItems->firstWhere('step_type', 'pybmc')['approver_employee_id'] ?? ''
             : $initialPybmcEmployeeId;
+        $isCanonicalNumericStepKey = static function (int|string $key): bool {
+            $isNonNegativeInteger = is_int($key) && $key >= 0;
+            $isCanonicalNumericString = is_string($key)
+                && ctype_digit($key)
+                && (string) (int) $key === $key;
+
+            return $isNonNegativeInteger || $isCanonicalNumericString;
+        };
+        $hydrateVerifier = function (array $step, int $renderIndex, int|string $errorKey) use ($errors): array {
+            return [
+                'role_label' => $step['role_label'] ?? 'Verifikator '.($renderIndex + 1),
+                'approver_employee_id' => $step['approver_employee_id'] ?? '',
+                'client_key' => "existing-{$renderIndex}",
+                'validation_errors' => [
+                    'role_label' => $errors->first("steps.{$errorKey}.role_label"),
+                    'approver_employee_id' => $errors->first("steps.{$errorKey}.approver_employee_id"),
+                ],
+            ];
+        };
+
+        if (is_array($oldSteps)) {
+            $verifierSteps = $oldStepItems
+                ->filter(fn (array $step): bool => ($step['step_type'] ?? null) === 'verifier')
+                // Simpan key request sebelum values() mengurutkan ulang row untuk kebutuhan editor.
+                ->map(fn (array $step, int|string $originalKey): array => [
+                    'step' => $step,
+                    'original_key' => $originalKey,
+                ])
+                ->values()
+                ->map(fn (array $entry, int $renderIndex): array => $hydrateVerifier(
+                    $entry['step'],
+                    $renderIndex,
+                    $entry['original_key'],
+                ))
+                ->all();
+            $kepalaBagianKey = $oldStepItems->search(
+                fn (array $step): bool => ($step['step_type'] ?? null) === 'kepala_bagian',
+            );
+            $pybmcKey = $oldStepItems->search(
+                fn (array $step): bool => ($step['step_type'] ?? null) === 'pybmc',
+            );
+            $kepalaBagianError = $kepalaBagianKey === false
+                ? ''
+                : $errors->first("steps.{$kepalaBagianKey}.approver_employee_id");
+            $pybmcError = $pybmcKey === false
+                ? ''
+                : $errors->first("steps.{$pybmcKey}.approver_employee_id");
+
+            if ($pybmcKey === '_pybmc' && $pybmcError === '') {
+                // FormRequest memindahkan _pybmc setelah seluruh entry numeric, termasuk entry malformed.
+                $numericStepKeys = collect(array_keys($oldSteps))
+                    ->reject(fn (int|string $key): bool => $key === '_pybmc');
+
+                if ($numericStepKeys->every($isCanonicalNumericStepKey)) {
+                    $normalizedPybmcKey = $numericStepKeys->count();
+                    $pybmcError = $errors->first("steps.{$normalizedPybmcKey}.approver_employee_id");
+                }
+            }
+        } else {
+            $verifierSteps = collect($initialVerifierSteps)
+                ->values()
+                ->map(fn (array $step, int $index): array => $hydrateVerifier($step, $index, $index))
+                ->all();
+            $kepalaBagianError = $errors->first('steps.'.count($verifierSteps).'.approver_employee_id');
+            $pybmcError = $errors->first('steps.'.(count($verifierSteps) + 1).'.approver_employee_id');
+        }
     @endphp
 
     <div class="space-y-6" x-data="{
+        nextVerifierKey: @js(count($verifierSteps)),
         verifiers: @js($verifierSteps),
         pybmcEmployeeId: @js($pybmcEmployeeId),
-        errors: @js($errors->messages()),
+        kepalaBagianEmployeeId: @js($selectedKepalaBagian?->id ?? ''),
+        globalPybmcEmployeeId: @js($globalPybmc?->approver_employee_id ?? ''),
+        kepalaBagianError: @js($kepalaBagianError),
+        pybmcError: @js($pybmcError),
+        announcement: '',
         maxVerifierSteps: 8,
+        approverLookupEndpoint: @js(route('cuti.employee-lookup')),
+        approverSearch: @js($approverSearch),
+        approverSearchLoading: false,
+        approverSearchMessage: '',
+        approverSearchError: '',
+        initialApproverCandidateIds: @js($approverCandidates->pluck('id')->map(fn (mixed $id): string => (string) $id)->values()),
+        approverLookupCandidates: [],
         backfillHelpOpen: false,
         openBackfillHelp() {
             this.backfillHelpOpen = true;
-            this.$nextTick(() => this.$refs.backfillHelpClose.focus());
         },
         closeBackfillHelp() {
             if (! this.backfillHelpOpen) return;
             this.backfillHelpOpen = false;
-            this.$nextTick(() => this.$refs.backfillHelpTrigger.focus());
         },
-        trapBackfillHelpFocus(event) {
-            const focusable = [...this.$refs.backfillHelpDialog.querySelectorAll('button, [href], input, select, textarea, [tabindex]')]
-                .filter((element) => ! element.disabled && element.tabIndex >= 0 && element.offsetParent !== null);
-            const first = focusable[0];
-            const last = focusable.at(-1);
-            if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last.focus();
-            } else if (! event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first.focus();
+        async searchApproverCandidates() {
+            const query = this.approverSearch.trim();
+            this.approverSearchMessage = '';
+            this.approverSearchError = '';
+
+            if (query.length < 2) {
+                this.approverSearchError = 'Ketik minimal 2 karakter.';
+                return;
+            }
+
+            this.approverSearchLoading = true;
+
+            try {
+                const response = await fetch(`${this.approverLookupEndpoint}?q=${encodeURIComponent(query)}`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                if (! response.ok) {
+                    throw new Error('Lookup kandidat tidak tersedia.');
+                }
+
+                const result = await response.json();
+                const candidates = Array.isArray(result.data) ? result.data : [];
+                const selectedIds = new Set([
+                    ...this.verifiers.map((verifier) => verifier.approver_employee_id),
+                    this.pybmcEmployeeId,
+                ].filter(Boolean));
+                const preservedCandidates = this.approverLookupCandidates
+                    .filter((candidate) => selectedIds.has(candidate.id));
+                const uniqueCandidates = new Map(
+                    [...preservedCandidates, ...candidates]
+                        .filter((candidate) => ! this.initialApproverCandidateIds.includes(candidate.id))
+                        .map((candidate) => [candidate.id, candidate]),
+                );
+
+                this.approverLookupCandidates = [...uniqueCandidates.values()];
+                this.approverSearchMessage = candidates.length > 0
+                    ? `${candidates.length} kandidat ditemukan.`
+                    : 'Kandidat tidak ditemukan.';
+            } catch (error) {
+                this.approverSearchError = 'Pencarian kandidat gagal. Coba lagi.';
+            } finally {
+                this.approverSearchLoading = false;
             }
         },
         addVerifier() {
             if (this.verifiers.length >= this.maxVerifierSteps) return;
             let number = 1;
             while (this.verifiers.some((verifier) => verifier.role_label === `Verifikator ${number}`)) number++;
-            this.verifiers.push({ role_label: `Verifikator ${number}`, approver_employee_id: '' });
+            const clientKey = `new-${++this.nextVerifierKey}`;
+            this.verifiers.push({
+                role_label: `Verifikator ${number}`,
+                approver_employee_id: '',
+                client_key: clientKey,
+                validation_errors: {
+                    role_label: '',
+                    approver_employee_id: '',
+                },
+            });
+            this.announce('Verifikator ditambahkan. Status tahap duplikat diperbarui.');
+            this.$nextTick(() => this.focusVerifier(clientKey));
         },
         removeVerifier(index) {
+            const neighborKey = this.verifiers[index + 1]?.client_key
+                ?? this.verifiers[index - 1]?.client_key
+                ?? null;
             this.verifiers.splice(index, 1);
+            this.announce('Verifikator dihapus. Status tahap duplikat diperbarui.');
+            this.$nextTick(() => {
+                if (neighborKey) {
+                    this.focusVerifier(neighborKey);
+                } else {
+                    this.$refs.addVerifierButton?.focus();
+                }
+            });
         },
         moveVerifier(index, direction) {
             const nextIndex = index + direction;
             if (nextIndex < 0 || nextIndex >= this.verifiers.length) return;
+            const verifier = this.verifiers[index];
             [this.verifiers[index], this.verifiers[nextIndex]] = [this.verifiers[nextIndex], this.verifiers[index]];
+            this.announce(direction < 0
+                ? 'Verifikator dipindahkan naik. Status tahap duplikat diperbarui.'
+                : 'Verifikator dipindahkan turun. Status tahap duplikat diperbarui.');
+            this.$nextTick(() => this.focusVerifier(verifier.client_key));
         },
-        isDuplicate(employeeId, index) {
-            if (! employeeId) return false;
-            return this.verifiers.some((verifier, verifierIndex) => verifierIndex !== index && verifier.approver_employee_id === employeeId)
-                || employeeId === this.pybmcEmployeeId;
+        focusVerifier(clientKey) {
+            const row = document.querySelector(`[data-verifier-key=${clientKey}]`);
+            row?.querySelector('[data-verifier-label]')?.focus();
         },
-        errorFor(key) {
-            return this.errors[key]?.[0] ?? '';
+        announce(message) {
+            this.announcement = '';
+            this.$nextTick(() => { this.announcement = message; });
+        },
+        announceDuplicateDisposition() {
+            this.announce('Status tahap duplikat diperbarui.');
+        },
+        effectivePybmcEmployeeId() {
+            return this.pybmcEmployeeId || this.globalPybmcEmployeeId;
+        },
+        duplicateDisposition(employeeId, index) {
+            if (! employeeId) return null;
+
+            const appearsLater = this.verifiers
+                .slice(index + 1)
+                .some((verifier) => verifier.approver_employee_id === employeeId)
+                || employeeId === this.kepalaBagianEmployeeId
+                || employeeId === this.effectivePybmcEmployeeId();
+
+            if (appearsLater) return 'skipped';
+
+            const appearedEarlier = this.verifiers
+                .slice(0, index)
+                .some((verifier) => verifier.approver_employee_id === employeeId);
+
+            return appearedEarlier ? 'effective' : null;
+        },
+        kepalaBagianDisposition() {
+            if (! this.kepalaBagianEmployeeId) return null;
+            if (this.kepalaBagianEmployeeId === this.effectivePybmcEmployeeId()) return 'skipped';
+
+            return this.verifiers.some((verifier) => verifier.approver_employee_id === this.kepalaBagianEmployeeId)
+                ? 'effective'
+                : null;
+        },
+        pybmcDisposition() {
+            const employeeId = this.effectivePybmcEmployeeId();
+            if (! employeeId) return null;
+
+            const appearedEarlier = employeeId === this.kepalaBagianEmployeeId
+                || this.verifiers.some((verifier) => verifier.approver_employee_id === employeeId);
+
+            return appearedEarlier ? 'effective' : null;
         }
     }">
         {{-- PAGE HEADER & BREADCRUMB --}}
+        <p class="sr-only" aria-live="polite" aria-atomic="true" x-text="announcement"></p>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Konfigurasi Approval Cuti</h2>
@@ -149,21 +317,23 @@
 
             @if ($selectedEmployee)
                 @if ($selectedKepalaBagian)
-                    <form method="GET" action="{{ route('cuti.config') }}" class="space-y-1 border-b border-border bg-soft/20 px-5 py-4">
+                    <form method="GET" action="{{ route('cuti.config') }}" @submit.prevent="searchApproverCandidates()" class="space-y-1 border-b border-border bg-soft/20 px-5 py-4">
                         <input type="hidden" name="search" value="{{ $search }}">
                         <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
                         <label for="approver-search" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kandidat Approver</label>
                         <div class="flex items-start gap-3">
-                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" placeholder="Nama atau NIP" aria-describedby="approver-search-help" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            <x-ui.button type="submit" variant="secondary">Cari Kandidat</x-ui.button>
+                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" x-model="approverSearch" placeholder="Nama atau NIP" aria-describedby="approver-search-help approver-search-status" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <x-ui.button type="submit" variant="secondary" class="min-h-11 shrink-0" ::disabled="approverSearchLoading" x-text="approverSearchLoading ? 'Mencari...' : 'Cari Kandidat'">Cari Kandidat</x-ui.button>
                         </div>
-                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC Khusus.</p>
+                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC.</p>
+                        <p id="approver-search-status" class="text-[11px]" aria-live="polite" aria-atomic="true">
+                            <span x-show="approverSearchMessage" x-text="approverSearchMessage" class="text-muted"></span>
+                            <span x-show="approverSearchError" x-text="approverSearchError" class="font-semibold text-danger"></span>
+                        </p>
                     </form>
                 @endif
 
                 @php
-                    $canAssignKepalaBagian = in_array(auth()->user()?->role, ['super_admin', 'admin_kepegawaian'], true)
-                        && (auth()->user()?->hasPermission('employees.update') ?? false);
                     $kabagFormOpen = ! $selectedKepalaBagian
                         || $errors->hasAny(['kepala_bagian_id', 'effective_date', 'redirect_to']);
                 @endphp
@@ -262,9 +432,9 @@
                                 <h4 class="text-sm font-semibold text-ink">Penetapan Kepala Bagian</h4>
                                 <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">
                                     @if ($selectedKepalaBagian)
-                                        Kepala Bagian aktif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>
+                                        Kepala Bagian efektif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>
                                     @else
-                                        Belum ada Kepala Bagian aktif — tetapkan di bawah ini.
+                                        Belum ada Kepala Bagian efektif — tetapkan di bawah ini.
                                     @endif
                                 </p>
                             </div>
@@ -378,12 +548,12 @@
                             <p class="text-sm font-semibold text-ink">Susun Chain Approval</p>
                         </div>
                         @if ($selectedKepalaBagian)
-                            <p class="rounded-xl border border-primary/15 bg-soft px-4 py-2 text-center text-xs font-semibold text-primary" aria-live="polite">
+                            <p class="rounded-xl border border-primary/15 bg-soft px-4 py-2 text-center text-xs font-semibold text-primary">
+                                <span x-text="verifiers.length ? `Verifikator ×${verifiers.length}` : 'Tanpa Verifikator'"></span>
+                                <span aria-hidden="true">→</span>
                                 Kepala Bagian
                                 <span aria-hidden="true">→</span>
-                                <span x-text="verifiers.length ? `Verifikator ×${verifiers.length}` : 'Tanpa verifikator'"></span>
-                                <span aria-hidden="true">→</span>
-                                <span x-text="pybmcEmployeeId ? 'PYBMC khusus' : 'PYBMC global'"></span>
+                                PYBMC
                             </p>
                         @endif
                     </div>
@@ -398,26 +568,37 @@
                         </div>
                         <div>
                             <label for="kepala-bagian-display" class="text-xs font-bold uppercase tracking-wider text-muted">Kepala Bagian</label>
-                            <input id="kepala-bagian-display" type="text" readonly value="{{ $selectedKepalaBagian ? $selectedKepalaBagian->nama_lengkap . ' (' . $selectedKepalaBagian->nip . ')' : 'Belum ditetapkan' }}" class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm">
+                            <input
+                                id="kepala-bagian-display"
+                                type="text"
+                                readonly
+                                value="{{ $selectedKepalaBagian ? $selectedKepalaBagian->nama_lengkap . ' (' . $selectedKepalaBagian->nip . ')' : 'Belum ditetapkan' }}"
+                                :aria-describedby="`${kepalaBagianDisposition() ? 'kepala-bagian-disposition ' : ''}${kepalaBagianError ? 'kepala-bagian-error' : ''}`.trim() || null"
+                                :aria-invalid="Boolean(kepalaBagianError)"
+                                class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm"
+                            >
+                            <p
+                                id="kepala-bagian-disposition"
+                                x-show="kepalaBagianDisposition()"
+                                x-text="kepalaBagianDisposition() === 'skipped' ? 'Dilewati karena actor digunakan lagi pada tahap yang lebih akhir.' : 'Tahap efektif untuk actor ini.'"
+                                class="mt-1 text-[11px] font-semibold text-warning"
+                            ></p>
+                            <p id="kepala-bagian-error" x-show="kepalaBagianError" x-text="kepalaBagianError" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                         </div>
                     </div>
 
                     @if (! $selectedKepalaBagian)
                         <div class="px-5 pb-5">
-                            <x-ui.alert variant="warning">Pegawai belum memiliki Kepala Bagian aktif. Tetapkan struktur pegawai sebelum menyimpan chain.</x-ui.alert>
+                            <x-ui.alert variant="warning">Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.</x-ui.alert>
                         </div>
                     @else
-                        <input type="hidden" name="steps[0][step_type]" value="kepala_bagian">
-                        <input type="hidden" name="steps[0][role_label]" value="Kepala Bagian">
-                        <input type="hidden" name="steps[0][approver_employee_id]" value="{{ $selectedKepalaBagian->id }}">
-
                         <fieldset class="space-y-4 px-5 py-5">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
                                     <legend class="text-sm font-semibold text-ink">Verifikator</legend>
                                     <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Approver duplikat dilewati otomatis.</p>
                                 </div>
-                                <x-ui.button type="button" variant="secondary" size="sm" @click="addVerifier()" ::disabled="verifiers.length >= maxVerifierSteps">Tambah Verifikator</x-ui.button>
+                                <x-ui.button type="button" variant="secondary" size="sm" class="min-h-11" x-ref="addVerifierButton" @click="addVerifier()" ::disabled="verifiers.length >= maxVerifierSteps">Tambah Verifikator</x-ui.button>
                             </div>
 
                             <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator.</p>
@@ -425,25 +606,28 @@
                                 <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
                             @enderror
 
-                            <template x-for="(verifier, index) in verifiers" :key="index">
-                                <div class="grid gap-3 rounded-xl border border-border bg-soft/30 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                            <template x-for="(verifier, index) in verifiers" :key="verifier.client_key">
+                                <div :data-verifier-key="verifier.client_key" class="grid gap-3 rounded-xl border border-border bg-soft/30 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                                     <div class="grid gap-3 sm:grid-cols-2">
-                                        <input type="hidden" :name="`steps[${index + 1}][step_type]`" value="verifier">
+                                        <input type="hidden" :name="`steps[${index}][step_type]`" value="verifier">
                                         <div>
-                                            <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-label-${index}`" x-text="`Label Verifikator ${index + 1}`"></label>
-                                            <input :id="`verifier-label-${index}`" :name="`steps[${index + 1}][role_label]`" x-model="verifier.role_label" required maxlength="100" :aria-invalid="Boolean(errorFor(`steps.${index + 1}.role_label`))" class="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                                            <p x-show="errorFor(`steps.${index + 1}.role_label`)" x-text="errorFor(`steps.${index + 1}.role_label`)" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                            <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-label-${verifier.client_key}`" x-text="`Label Verifikator ${index + 1}`"></label>
+                                            <input data-verifier-label :id="`verifier-label-${verifier.client_key}`" :name="`steps[${index}][role_label]`" x-model="verifier.role_label" required maxlength="100" :aria-describedby="verifier.validation_errors.role_label ? `verifier-label-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.role_label)" class="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <p :id="`verifier-label-error-${verifier.client_key}`" x-show="verifier.validation_errors.role_label" x-text="verifier.validation_errors.role_label" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                                         </div>
                                         <div>
-                                            <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-${index}`" x-text="`Pegawai Verifikator ${index + 1}`"></label>
-                                            <select :id="`verifier-${index}`" :name="`steps[${index + 1}][approver_employee_id]`" x-model="verifier.approver_employee_id" required :aria-describedby="`${isDuplicate(verifier.approver_employee_id, index) ? `verifier-duplicate-${index} ` : ''}${errorFor(`steps.${index + 1}.approver_employee_id`) ? `verifier-error-${index}` : ''}`" :aria-invalid="Boolean(errorFor(`steps.${index + 1}.approver_employee_id`))" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-${verifier.client_key}`" x-text="`Pegawai Verifikator ${index + 1}`"></label>
+                                            <select :id="`verifier-${verifier.client_key}`" :name="`steps[${index}][approver_employee_id]`" x-model="verifier.approver_employee_id" @change="announceDuplicateDisposition()" required :aria-describedby="`${duplicateDisposition(verifier.approver_employee_id, index) ? `verifier-disposition-${verifier.client_key} ` : ''}${verifier.validation_errors.approver_employee_id ? `verifier-error-${verifier.client_key}` : ''}`.trim() || null" :aria-invalid="Boolean(verifier.validation_errors.approver_employee_id)" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                                 <option value="">Pilih verifikator</option>
                                                 @foreach ($approverCandidates as $approver)
                                                     <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
                                                 @endforeach
+                                                <template x-for="approver in approverLookupCandidates" :key="`lookup-verifier-${approver.id}`">
+                                                    <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
+                                                </template>
                                             </select>
-                                            <p :id="`verifier-duplicate-${index}`" x-show="isDuplicate(verifier.approver_employee_id, index)" class="mt-1 text-[11px] text-warning">Approver sama akan dilewati otomatis saat approval.</p>
-                                            <p :id="`verifier-error-${index}`" x-show="errorFor(`steps.${index + 1}.approver_employee_id`)" x-text="errorFor(`steps.${index + 1}.approver_employee_id`)" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                            <p :id="`verifier-disposition-${verifier.client_key}`" x-show="duplicateDisposition(verifier.approver_employee_id, index)" x-text="duplicateDisposition(verifier.approver_employee_id, index) === 'skipped' ? 'Dilewati karena actor digunakan lagi pada tahap yang lebih akhir.' : 'Tahap efektif untuk actor ini.'" class="mt-1 text-[11px] font-semibold text-warning"></p>
+                                            <p :id="`verifier-error-${verifier.client_key}`" x-show="verifier.validation_errors.approver_employee_id" x-text="verifier.validation_errors.approver_employee_id" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                                         </div>
                                     </div>
                                     <div class="flex flex-wrap gap-2" aria-label="Aksi urutan verifikator">
@@ -455,21 +639,30 @@
                             </template>
                         </fieldset>
 
+                        <input type="hidden" :name="`steps[${verifiers.length}][step_type]`" value="kepala_bagian">
+                        <input type="hidden" :name="`steps[${verifiers.length}][role_label]`" value="Kepala Bagian">
+                        <input type="hidden" :name="`steps[${verifiers.length}][approver_employee_id]`" value="{{ $selectedKepalaBagian->id }}">
+
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
                             <div>
-                                <label for="employee-pybmc" class="text-sm font-semibold text-ink">PYBMC Khusus</label>
-                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional — kosongkan untuk memakai PYBMC global.</p>
+                                <label for="employee-pybmc" class="text-sm font-semibold text-ink">PYBMC</label>
+                                <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional — kosongkan untuk memakai konfigurasi global.</p>
                             </div>
                             <div>
                                 <input type="hidden" name="steps[_pybmc][step_type]" value="pybmc" x-bind:disabled="! pybmcEmployeeId">
                                 <input type="hidden" name="steps[_pybmc][role_label]" value="PYBMC" x-bind:disabled="! pybmcEmployeeId">
-                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" aria-describedby="employee-pybmc-help" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" @change="announceDuplicateDisposition()" :aria-describedby="`employee-pybmc-help ${pybmcDisposition() ? 'employee-pybmc-disposition ' : ''}${pybmcError ? 'employee-pybmc-error' : ''}`.trim()" :aria-invalid="Boolean(pybmcError)" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                     <option value="">Gunakan PYBMC global</option>
                                     @foreach ($approverCandidates as $approver)
                                         <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
                                     @endforeach
+                                    <template x-for="approver in approverLookupCandidates" :key="`lookup-pybmc-${approver.id}`">
+                                        <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
+                                    </template>
                                 </select>
                                 <p id="employee-pybmc-help" class="mt-1 text-[11px] text-muted">Perubahan chain berlaku untuk pengajuan berikutnya.</p>
+                                <p id="employee-pybmc-disposition" x-show="pybmcDisposition()" class="mt-1 text-[11px] font-semibold text-warning">Tahap efektif untuk actor ini.</p>
+                                <p id="employee-pybmc-error" x-show="pybmcError" x-text="pybmcError" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                             </div>
                         </div>
 
@@ -695,7 +888,6 @@
                 </div>
                 <button
                     type="button"
-                    x-ref="backfillHelpTrigger"
                     @click="openBackfillHelp()"
                     class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-surface text-sm font-bold text-primary shadow-sm transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
                     aria-label="Pelajari Backfill Chain Dinamis"
@@ -837,8 +1029,6 @@
 
         <x-ui.modal
             id="backfill-help-dialog"
-            x-ref="backfillHelpDialog"
-            @keydown.tab="trapBackfillHelpFocus($event)"
             show="backfillHelpOpen"
             title="Apa itu Backfill Chain Dinamis?"
             title-id="backfill-help-title"
@@ -850,11 +1040,11 @@
                 <p>Backfill membuat alur persetujuan cuti secara otomatis untuk pegawai aktif yang belum mempunyai chain.</p>
 
                 <div class="rounded-xl border border-primary/15 bg-soft px-4 py-3 text-center font-semibold text-primary">
-                    Kepala Bagian <span aria-hidden="true">→</span> Verifikator (jika tersedia) <span aria-hidden="true">→</span> PYBMC
+                    Verifikator (jika tersedia) -> Kepala Bagian -> PYBMC
                 </div>
 
                 <ul class="list-disc space-y-2 pl-5">
-                    <li>Chain dibuat dari Kepala Bagian pegawai, Verifikator lama, dan PYBMC lama yang tersedia.</li>
+                    <li>Chain dibuat dari Verifikator lama, Kepala Bagian efektif pegawai, dan PYBMC lama yang tersedia.</li>
                     <li>Pegawai yang sudah mempunyai chain aktif dilewati dan tidak diubah.</li>
                     <li>Pegawai tanpa Kepala Bagian atau approver final belum dapat dibuatkan chain.</li>
                     <li>Backfill dapat dijalankan kembali setelah data pegawai diperbaiki.</li>
@@ -868,9 +1058,9 @@
                 <div class="flex justify-end">
                     <button
                         id="backfill-help-close"
-                        x-ref="backfillHelpClose"
                         type="button"
                         @click="closeBackfillHelp()"
+                        data-modal-initial-focus="true"
                         class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2"
                     >Mengerti</button>
                 </div>

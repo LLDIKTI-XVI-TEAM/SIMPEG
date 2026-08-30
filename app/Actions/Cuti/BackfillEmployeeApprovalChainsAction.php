@@ -15,6 +15,9 @@ use Illuminate\Support\Collection;
  */
 class BackfillEmployeeApprovalChainsAction
 {
+    /** @var array<string, bool> */
+    private array $kepalaBagianAktifById = [];
+
     public function __construct(private readonly SaveEmployeeApprovalChainAction $saveChain) {}
 
     /**
@@ -22,6 +25,9 @@ class BackfillEmployeeApprovalChainsAction
      */
     public function execute(User $actor, string $reason, ?Request $request = null): array
     {
+        // Instance Action dapat dipakai ulang oleh container; cache harus selalu mengikuti status
+        // pegawai terbaru pada setiap eksekusi backfill administratif.
+        $this->kepalaBagianAktifById = [];
         $legacyApprovers = $this->legacyApproverEmployees();
         $result = [
             'created_employee_ids' => [],
@@ -40,21 +46,38 @@ class BackfillEmployeeApprovalChainsAction
                         continue;
                     }
 
-                    if ($employee->kepala_bagian_id === null) {
+                    $kepalaBagianId = $employee->currentSupervisor()?->kepala_bagian_id;
+
+                    // Penugasan efektif masih dapat menunjuk pejabat yang sudah nonaktif. Target
+                    // tersebut dilaporkan sebagai Kepala Bagian tidak tersedia agar satu data
+                    // bermasalah tidak menghentikan target valid lain dalam proses backfill.
+                    if ($kepalaBagianId === null || ! $this->kepalaBagianAktif($kepalaBagianId)) {
                         $result['missing_kepala_bagian_employee_ids'][] = $employee->id;
 
                         continue;
                     }
 
-                    $steps = [[
-                        'step_type' => 'kepala_bagian',
-                        'role_label' => 'Kepala Bagian',
-                        'approver_employee_id' => $employee->kepala_bagian_id,
-                        'is_final' => false,
-                    ]];
+                    $steps = [];
 
                     foreach ($legacyApprovers as $legacyApprover) {
-                        $steps[] = $legacyApprover;
+                        if ($legacyApprover['step_type'] === 'verifier') {
+                            $steps[] = $legacyApprover;
+                        }
+                    }
+
+                    // Kepala Bagian selalu berasal dari penugasan efektif. Kolom snapshot pegawai
+                    // tidak dipakai sebagai fallback agar backfill tidak mengabadikan atasan lama.
+                    $steps[] = [
+                        'step_type' => 'kepala_bagian',
+                        'role_label' => 'Kepala Bagian',
+                        'approver_employee_id' => $kepalaBagianId,
+                        'is_final' => false,
+                    ];
+
+                    foreach ($legacyApprovers as $legacyApprover) {
+                        if ($legacyApprover['step_type'] === 'pybmc') {
+                            $steps[] = $legacyApprover;
+                        }
                     }
 
                     if (collect($steps)->where('is_final', true)->count() !== 1) {
@@ -69,6 +92,14 @@ class BackfillEmployeeApprovalChainsAction
             });
 
         return $result;
+    }
+
+    private function kepalaBagianAktif(string $employeeId): bool
+    {
+        return $this->kepalaBagianAktifById[$employeeId] ??= Employee::query()
+            ->whereKey($employeeId)
+            ->whereActiveStatus()
+            ->exists();
     }
 
     /**

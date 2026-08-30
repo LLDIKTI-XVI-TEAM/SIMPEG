@@ -15,11 +15,17 @@ use App\Models\RefJenisCuti;
 use App\Models\RefStatusPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Services\Cuti\ApprovalChainInvariantService;
 use App\Services\Cuti\ApprovalChainResolver;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Mockery\Expectation;
+use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -42,7 +48,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmc = Employee::factory()->create();
 
         $chain = $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute(
@@ -87,7 +93,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmc = Employee::factory()->create();
 
         $chain = $this->app->make(SaveEmployeeApprovalChainAction::class)->execute(
@@ -113,7 +119,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $approverAwal = Employee::factory()->create();
         $approverBaru = Employee::factory()->create();
 
@@ -136,7 +142,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $approverAwal = Employee::factory()->create();
         $approverBaru = Employee::factory()->create();
 
@@ -179,13 +185,169 @@ class EmployeeApprovalChainConfigTest extends TestCase
         ]);
     }
 
+    public function test_save_action_menolak_verifikator_setelah_kepala_bagian_tanpa_mutasi_parsial(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+        $verifikator = Employee::factory()->create();
+
+        $this->assertSaveChainInvalidTidakMengubahChainLama(
+            $fixture,
+            [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
+            ],
+            'Semua Verifikator harus ditempatkan sebelum Kepala Bagian.',
+        );
+    }
+
+    public function test_save_action_menolak_dua_step_kepala_bagian_tanpa_mutasi_parsial(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+
+        $this->assertSaveChainInvalidTidakMengubahChainLama(
+            $fixture,
+            [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian Utama', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian Duplikat', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
+            ],
+            'Rantai approval cuti wajib memiliki tepat satu step Kepala Bagian.',
+        );
+    }
+
+    public function test_save_action_menolak_pybmc_yang_tidak_final_tanpa_mutasi_parsial(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+
+        $this->assertSaveChainInvalidTidakMengubahChainLama(
+            $fixture,
+            [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => false],
+            ],
+            'Rantai approval cuti wajib memiliki tepat satu approver final.',
+        );
+    }
+
+    public function test_save_action_menolak_kepala_bagian_yang_bukan_penugasan_efektif_tanpa_mutasi_parsial(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+        $kepalaBagianLain = Employee::factory()->create();
+
+        $this->assertSaveChainInvalidTidakMengubahChainLama(
+            $fixture,
+            [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianLain->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
+            ],
+            'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
+        );
+    }
+
+    public function test_save_action_dengan_request_menerjemahkan_kepala_bagian_stale_menjadi_error_validasi(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+        $kepalaBagianLain = Employee::factory()->create();
+        $exception = null;
+
+        try {
+            $fixture['action']->execute(
+                $fixture['employee'],
+                [
+                    ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianLain->id, 'is_final' => false],
+                    ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
+                ],
+                $fixture['actor'],
+                'Kandidat stale dari boundary HTTP harus ditolak.',
+                Request::create('/cuti/konfigurasi-approval', 'POST'),
+            );
+        } catch (\Throwable $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertInstanceOf(ValidationException::class, $exception);
+        $this->assertSame([
+            'steps' => ['Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.'],
+        ], $exception->errors());
+        $this->assertTrue($fixture['chain']->fresh()->is_active);
+        $this->assertSame(
+            $fixture['step_ids'],
+            $fixture['chain']->steps()->orderBy('step_order')->pluck('id')->all(),
+        );
+        $this->assertSame(
+            1,
+            LeaveApprovalChain::query()->where('employee_id', $fixture['employee']->id)->count(),
+        );
+        $this->assertSame(
+            $fixture['audit_count'],
+            AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count(),
+        );
+    }
+
+    public function test_save_action_dengan_request_tetap_mempropagasikan_kegagalan_database(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+        $queryException = new QueryException(
+            'pgsql',
+            'select * from employees where id = ?',
+            [$fixture['employee']->id],
+            new RuntimeException('Koneksi database terputus.'),
+        );
+        $this->mock(ApprovalChainInvariantService::class, function (MockInterface $mock) use ($queryException): void {
+            /** @var Expectation $expectation */
+            $expectation = $mock->shouldReceive('validateForEmployee');
+            $expectation->once()
+                ->andThrow($queryException);
+        });
+        $exception = null;
+
+        try {
+            $this->app->make(SaveEmployeeApprovalChainAction::class)->execute(
+                $fixture['employee'],
+                [
+                    ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
+                    ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
+                ],
+                $fixture['actor'],
+                'Kegagalan database tidak boleh menjadi pesan validasi.',
+                Request::create('/cuti/konfigurasi-approval', 'POST'),
+            );
+        } catch (\Throwable $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertSame($queryException, $exception);
+        $this->assertTrue($fixture['chain']->fresh()->is_active);
+        $this->assertSame(
+            $fixture['audit_count'],
+            AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count(),
+        );
+    }
+
+    public function test_save_action_menolak_array_step_non_list_tanpa_mutasi_parsial(): void
+    {
+        $fixture = $this->buatFixtureChainAktifValid();
+        $verifikator = Employee::factory()->create();
+
+        $this->assertSaveChainInvalidTidakMengubahChainLama(
+            $fixture,
+            [
+                2 => ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
+                0 => ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+                1 => ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
+            ],
+            'Langkah rantai approval cuti wajib berupa daftar berurutan.',
+        );
+    }
+
     public function test_save_action_menolak_approver_null_sebelum_chain_lama_dimutasi(): void
     {
         $fixture = $this->buatFixtureChainAktifValid();
 
         $this->assertSaveChainInvalidTidakMengubahChainLama($fixture, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => null, 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
         ]);
     }
@@ -195,8 +357,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $fixture = $this->buatFixtureChainAktifValid();
 
         $this->assertSaveChainInvalidTidakMengubahChainLama($fixture, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => '', 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
         ]);
     }
@@ -206,8 +368,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $fixture = $this->buatFixtureChainAktifValid();
 
         $this->assertSaveChainInvalidTidakMengubahChainLama($fixture, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => 'bukan-uuid', 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
         ]);
     }
@@ -217,8 +379,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $fixture = $this->buatFixtureChainAktifValid();
 
         $this->assertSaveChainInvalidTidakMengubahChainLama($fixture, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => '00000000-0000-4000-8000-000000000001', 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
         ]);
     }
@@ -229,21 +391,21 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $approverNonaktif = Employee::factory()->create(['status_aktif' => 'Non-Aktif']);
 
         $this->assertSaveChainInvalidTidakMengubahChainLama($fixture, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $approverNonaktif->id, 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
         ]);
     }
 
-    public function test_save_action_menolak_approver_soft_deleted_sebelum_chain_lama_dimutasi(): void
+    public function test_save_action_menolak_id_pegawai_yang_tidak_lagi_tersedia_sebelum_chain_lama_dimutasi(): void
     {
         $fixture = $this->buatFixtureChainAktifValid();
         $approverDihapus = Employee::factory()->create();
         $approverDihapus->delete();
 
         $this->assertSaveChainInvalidTidakMengubahChainLama($fixture, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $approverDihapus->id, 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id, 'is_final' => true],
         ]);
     }
@@ -263,8 +425,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'tanggal_berakhir' => null,
         ]);
         $chain = $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($pegawai, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianLama->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianLama->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
         ], $actor, 'Chain sebelum pergantian Kepala Bagian.');
 
@@ -279,11 +441,11 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
         $response->assertOk();
         $this->assertSame(
-            [$kepalaBagianBaru->id, $verifikator->id, $pybmc->id],
+            [$verifikator->id, $kepalaBagianBaru->id, $pybmc->id],
             $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
         );
         $this->assertSame(
-            ['kepala_bagian', 'verifier', 'pybmc'],
+            ['verifier', 'kepala_bagian', 'pybmc'],
             $chain->steps()->orderBy('step_order')->pluck('step_type')->all(),
         );
         $this->assertSame(1, LeaveApprovalChain::where('employee_id', $pegawai->id)->where('is_active', true)->count());
@@ -320,13 +482,13 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $kepalaBagianSatu = Employee::factory()->create();
         $kepalaBagianDua = Employee::factory()->create();
         $verifikator = Employee::factory()->create();
-        $pegawaiSatu = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagianSatu->id]);
-        $pegawaiDua = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagianDua->id]);
+        $pegawaiSatu = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagianSatu);
+        $pegawaiDua = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagianDua);
         $action = $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class);
 
         $chainSatu = $action->execute($pegawaiSatu, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianSatu->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagianSatu->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmcLama->id, 'is_final' => true],
         ], $actor, 'Chain pegawai satu.');
         $chainDua = $action->execute($pegawaiDua, [
@@ -366,7 +528,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         );
 
         $this->assertSame(
-            [$kepalaBagianSatu->id, $verifikator->id, $pybmcBaru->id],
+            [$verifikator->id, $kepalaBagianSatu->id, $pybmcBaru->id],
             $chainSatu->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
         );
         $this->assertSame(
@@ -449,7 +611,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $kepalaBagian = Employee::factory()->create();
         $verifikator = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $chain = LeaveApprovalChain::create([
             'employee_id' => $pegawai->id,
             'name' => 'Chain legacy tanpa final',
@@ -539,7 +701,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         );
     }
 
-    public function test_global_pybmc_direct_menolak_approver_soft_deleted_tanpa_chain_aktif(): void
+    public function test_global_pybmc_direct_menolak_id_pegawai_yang_tidak_lagi_tersedia_tanpa_chain_aktif(): void
     {
         $approver = Employee::factory()->create();
         $approver->delete();
@@ -794,7 +956,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmc = Employee::factory()->create();
 
         $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmc, $actor, 'PYBMC global.');
@@ -813,7 +975,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         // kewenangan dapat ditelusuri, bukan hanya diketahui siapa aktornya.
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmc = Employee::factory()->create();
 
         $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmc, $actor, 'PYBMC global.');
@@ -850,7 +1012,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         // Test ini menjaga sifat itu agar penulisan audit tidak dipindahkan ke luar transaksi.
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
 
         $this->tolakPenulisanAuditRantai();
 
@@ -909,11 +1071,128 @@ class EmployeeApprovalChainConfigTest extends TestCase
         SQL);
     }
 
+    public function test_route_resave_chain_legacy_membuat_successor_auditabel_tanpa_mengubah_snapshot(): void
+    {
+        $fixture = $this->buatFixtureRantaiLegacyDenganSnapshot();
+
+        $this->actingAs($fixture['actor'])
+            ->post(route('cuti.config.employee-chain.store', $fixture['employee']), [
+                'steps' => [
+                    ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $fixture['verifier']->id],
+                    ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id],
+                    ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id],
+                ],
+                'reason' => 'Menyusun ulang chain legacy secara auditabel.',
+            ])
+            ->assertRedirect(route('cuti.config'));
+
+        $predecessor = $fixture['predecessor']->fresh();
+        $this->assertNotNull($predecessor);
+        $this->assertFalse($predecessor->is_active);
+        $this->assertNotNull($predecessor->effective_until);
+
+        $successor = LeaveApprovalChain::query()
+            ->where('employee_id', $fixture['employee']->id)
+            ->where('is_active', true)
+            ->sole();
+        $this->assertSame(
+            ['verifier', 'kepala_bagian', 'pybmc'],
+            $successor->steps()->orderBy('step_order')->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            [$fixture['verifier']->id, $fixture['kepala_bagian']->id, $fixture['pybmc']->id],
+            $successor->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+
+        $audit = AuditLog::query()
+            ->where('auditable_type', 'LeaveApprovalChain')
+            ->where('auditable_id', $successor->id)
+            ->where('event', 'CREATE')
+            ->sole();
+        $this->assertSame(
+            1,
+            AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count(),
+        );
+        $this->assertSame($fixture['actor']->id, $audit->user_id);
+        $this->assertSame($fixture['actor']->name, $audit->user_name);
+        $this->assertSame($fixture['predecessor']->id, $audit->old_values['id'] ?? null);
+        $this->assertTrue($audit->old_values['is_active'] ?? false);
+        $oldAuditSteps = collect($audit->old_values['steps'] ?? []);
+        $this->assertSame([1, 2, 3], $oldAuditSteps->pluck('step_order')->all());
+        $this->assertSame(
+            ['kepala_bagian', 'verifier', 'pybmc'],
+            $oldAuditSteps->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            [$fixture['kepala_bagian']->id, $fixture['verifier']->id, $fixture['pybmc']->id],
+            $oldAuditSteps->pluck('approver_employee_id')->all(),
+        );
+        $this->assertSame(
+            ['Kepala Bagian', 'Verifikator Kepegawaian', 'PYBMC'],
+            $oldAuditSteps->pluck('role_label')->all(),
+        );
+        $this->assertSame([false, false, true], $oldAuditSteps->pluck('is_final')->all());
+        $this->assertSame('Menyusun ulang chain legacy secara auditabel.', $audit->new_values['reason'] ?? null);
+        $this->assertSame(
+            ['verifier', 'kepala_bagian', 'pybmc'],
+            collect($audit->new_values['steps'] ?? [])->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            [$fixture['verifier']->id, $fixture['kepala_bagian']->id, $fixture['pybmc']->id],
+            collect($audit->new_values['steps'] ?? [])->pluck('approver_employee_id')->all(),
+        );
+        $this->assertSame(
+            $fixture['snapshot'],
+            $this->snapshotLangkahPengajuan($fixture['leave_request']->id),
+        );
+    }
+
+    public function test_route_resave_chain_legacy_rollback_saat_audit_gagal_dan_snapshot_tetap_identik(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Rollback re-save chain legacy diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $fixture = $this->buatFixtureRantaiLegacyDenganSnapshot();
+        $this->tolakPenulisanAuditRantai();
+        $this->withoutExceptionHandling();
+        $exception = null;
+
+        try {
+            $this->actingAs($fixture['actor'])
+                ->post(route('cuti.config.employee-chain.store', $fixture['employee']), [
+                    'steps' => [
+                        ['step_type' => 'verifier', 'role_label' => 'Verifikator Kepegawaian', 'approver_employee_id' => $fixture['verifier']->id],
+                        ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $fixture['kepala_bagian']->id],
+                        ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $fixture['pybmc']->id],
+                    ],
+                    'reason' => 'Re-save chain legacy yang auditnya gagal.',
+                ]);
+        } catch (QueryException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertInstanceOf(QueryException::class, $exception);
+        $predecessor = $fixture['predecessor']->fresh();
+        $this->assertNotNull($predecessor);
+        $this->assertTrue($predecessor->is_active);
+        $this->assertNull($predecessor->effective_until);
+        $this->assertSame(
+            1,
+            LeaveApprovalChain::query()->where('employee_id', $fixture['employee']->id)->count(),
+        );
+        $this->assertSame(0, AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count());
+        $this->assertSame(
+            $fixture['snapshot'],
+            $this->snapshotLangkahPengajuan($fixture['leave_request']->id),
+        );
+    }
+
     public function test_super_admin_bisa_menyimpan_chain_pegawai_melalui_route(): void
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmc = Employee::factory()->create();
 
         $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmc, $actor, 'PYBMC global.');
@@ -929,13 +1208,83 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
         $response->assertRedirect(route('cuti.config'));
         $this->assertDatabaseHas('leave_approval_chains', ['employee_id' => $pegawai->id, 'is_active' => true]);
+
+        $chain = LeaveApprovalChain::query()
+            ->where('employee_id', $pegawai->id)
+            ->where('is_active', true)
+            ->sole();
+        $this->assertSame(
+            ['kepala_bagian', 'pybmc'],
+            $chain->steps()->orderBy('step_order')->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            [$kepalaBagian->id, $pybmc->id],
+            $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+    }
+
+    public function test_route_menyimpan_satu_verifikator_sebelum_kepala_bagian(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => [
+                ['step_type' => 'verifier', 'role_label' => 'Ketua Tim Kerja', 'approver_employee_id' => $verifikator->id],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
+            ],
+            'reason' => 'Menyimpan Ketua Tim sebagai verifikator.',
+        ]);
+
+        $response->assertRedirect(route('cuti.config'));
+        $chain = LeaveApprovalChain::query()
+            ->where('employee_id', $pegawai->id)
+            ->where('is_active', true)
+            ->sole();
+
+        $this->assertSame(
+            ['verifier', 'kepala_bagian', 'pybmc'],
+            $chain->steps()->orderBy('step_order')->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            [$verifikator->id, $kepalaBagian->id, $pybmc->id],
+            $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+    }
+
+    public function test_route_menolak_verifikator_setelah_kepala_bagian_secara_actionable(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => [
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikator->id],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
+            ],
+            'reason' => 'Menguji urutan legacy yang tidak sah.',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'steps' => 'Semua Verifikator harus ditempatkan sebelum Kepala Bagian. Pindahkan Verifikator yang berada setelah Kepala Bagian.',
+        ]);
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
+        $this->assertSame(0, AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count());
     }
 
     public function test_route_menyimpan_payload_browser_dengan_pybmc_kosong_menggunakan_pybmc_global(): void
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmcGlobal = Employee::factory()->create();
         $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute(
             $pybmcGlobal,
@@ -964,11 +1313,148 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $this->assertTrue($chain->steps()->orderByDesc('step_order')->firstOrFail()->is_final);
     }
 
+    public function test_route_menormalisasi_key_numeric_tidak_berurutan_sebelum_menyimpan_chain(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikatorSatu = Employee::factory()->create();
+        $verifikatorDua = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => [
+                2 => ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
+                0 => ['step_type' => 'verifier', 'role_label' => 'Verifikator 1', 'approver_employee_id' => $verifikatorSatu->id],
+                1 => ['step_type' => 'verifier', 'role_label' => 'Ketua Tim Kerja', 'approver_employee_id' => $verifikatorDua->id],
+                '_pybmc' => ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
+            ],
+            'reason' => 'Menguji normalisasi key numeric pada boundary HTTP.',
+        ]);
+
+        $response->assertRedirect(route('cuti.config'));
+        $chain = LeaveApprovalChain::query()
+            ->where('employee_id', $pegawai->id)
+            ->where('is_active', true)
+            ->sole();
+
+        $this->assertSame(
+            ['verifier', 'verifier', 'kepala_bagian', 'pybmc'],
+            $chain->steps()->orderBy('step_order')->pluck('step_type')->all(),
+        );
+        $this->assertSame(
+            [$verifikatorSatu->id, $verifikatorDua->id, $kepalaBagian->id, $pybmc->id],
+            $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+    }
+
+    public function test_route_menolak_payload_transport_dengan_sebelas_step_tanpa_mutasi(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikators = Employee::factory()->count(9)->create();
+        $pybmc = Employee::factory()->create();
+        $steps = $verifikators->map(fn (Employee $verifikator): array => [
+            'step_type' => 'verifier',
+            'role_label' => 'Verifikator',
+            'approver_employee_id' => $verifikator->id,
+        ])->all();
+        $steps[] = [
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+            'approver_employee_id' => $kepalaBagian->id,
+        ];
+        $steps[] = [
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $pybmc->id,
+        ];
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => $steps,
+            'reason' => 'Menguji guard ukuran payload transport existing.',
+        ]);
+
+        $response->assertSessionHasErrors(['steps']);
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
+        $this->assertSame(0, AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count());
+    }
+
+    #[DataProvider('keyStepHttpTidakValid')]
+    public function test_route_menolak_key_step_http_tidak_valid_tanpa_mutasi(int|string $invalidKey): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => [
+                0 => ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
+                $invalidKey => ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikator->id],
+                '_pybmc' => ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
+            ],
+            'reason' => 'Menguji key payload yang tidak sah.',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'steps' => 'Struktur langkah approval tidak valid. Muat ulang halaman dan susun kembali chain.',
+        ]);
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
+        $this->assertSame(0, AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count());
+    }
+
+    /** @return iterable<string, array{int|string}> */
+    public static function keyStepHttpTidakValid(): iterable
+    {
+        yield 'nama key arbitrer' => ['legacy'];
+        yield 'key numeric negatif' => [-1];
+        yield 'numeric string tidak kanonis' => ['01'];
+    }
+
+    #[DataProvider('nilaiPybmcMalformed')]
+    public function test_route_menolak_pybmc_malformed_tanpa_fallback_global(mixed $malformedPybmc): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $pybmcGlobal = Employee::factory()->create();
+        $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute(
+            $pybmcGlobal,
+            $actor,
+            'PYBMC global tidak boleh menjadi fallback payload malformed.',
+        );
+
+        $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
+            'steps' => [
+                0 => ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
+                '_pybmc' => $malformedPybmc,
+            ],
+            'reason' => 'Menguji nilai PYBMC malformed.',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'steps' => 'Struktur langkah approval tidak valid. Muat ulang halaman dan susun kembali chain.',
+        ]);
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
+        $this->assertSame(0, AuditLog::query()->where('auditable_type', 'LeaveApprovalChain')->count());
+    }
+
+    /** @return iterable<string, array{mixed}> */
+    public static function nilaiPybmcMalformed(): iterable
+    {
+        yield 'null eksplisit' => [null];
+        yield 'scalar string' => ['teks'];
+        yield 'boolean' => [false];
+    }
+
     public function test_route_tetap_menolak_entry_pybmc_parsial(): void
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmcGlobal = Employee::factory()->create();
         $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmcGlobal, $actor, 'PYBMC global.');
 
@@ -989,8 +1475,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors([
-            'steps._pybmc.role_label',
-            'steps._pybmc.approver_employee_id',
+            'steps.1.role_label',
+            'steps.1.approver_employee_id',
         ]);
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
     }
@@ -1001,7 +1487,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         // tetap sah sebagai approver — konsisten dengan isActive()/whereActiveStatus().
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         // Referensi Tugas Belajar (kelompok Aktif/khusus) — dibuat inline karena file
         // test ini tidak meload ReferenceSeeder; isi sama dengan seeder produksi.
         $tugasBelajarStatus = RefStatusPegawai::updateOrCreate(
@@ -1016,8 +1502,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
 
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
             'steps' => [
-                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
                 ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $tugasBelajar->id],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
                 ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
             ],
             'reason' => 'Uji verifikator tugas belajar.',
@@ -1032,21 +1518,21 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $verifikatorNonaktif = Employee::factory()->create(['status_aktif' => 'Non-Aktif']);
         $pybmc = Employee::factory()->create();
 
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
             'steps' => [
-                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
                 ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikatorNonaktif->id],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
                 ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
             ],
             'reason' => 'Uji verifikator nonaktif.',
         ]);
 
         $response->assertSessionHasErrors([
-            'steps.1.approver_employee_id' => 'Approver chain harus merupakan pegawai aktif.',
+            'steps.0.approver_employee_id' => 'Approver chain harus merupakan pegawai aktif.',
         ]);
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
     }
@@ -1055,22 +1541,22 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $verifikatorDihapus = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
         $verifikatorDihapus->delete();
 
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
             'steps' => [
-                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
                 ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikatorDihapus->id],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id],
                 ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id],
             ],
             'reason' => 'Uji verifikator yang sudah dihapus.',
         ]);
 
         $response->assertSessionHasErrors([
-            'steps.1.approver_employee_id' => 'Approver chain harus merupakan pegawai aktif.',
+            'steps.0.approver_employee_id' => 'Approver chain harus merupakan pegawai aktif.',
         ]);
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
     }
@@ -1079,7 +1565,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $pybmcNonaktif = Employee::factory()->create(['status_aktif' => 'Non-Aktif']);
 
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
@@ -1100,7 +1586,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
 
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
             'steps' => [[
@@ -1121,7 +1607,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $verifikatorSatu = Employee::factory()->create();
         $verifikatorDua = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
@@ -1129,19 +1615,19 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
             'steps' => [
                 [
-                    'step_type' => 'kepala_bagian',
-                    'role_label' => 'Kepala Bagian',
-                    'approver_employee_id' => $kepalaBagian->id,
-                ],
-                [
                     'step_type' => 'verifier',
                     'role_label' => 'Verifikator',
                     'approver_employee_id' => $verifikatorSatu->id,
                 ],
                 [
                     'step_type' => 'verifier',
-                    'role_label' => 'Verifikator',
+                    'role_label' => 'Ketua Tim Kerja',
                     'approver_employee_id' => $verifikatorDua->id,
+                ],
+                [
+                    'step_type' => 'kepala_bagian',
+                    'role_label' => 'Kepala Bagian',
+                    'approver_employee_id' => $kepalaBagian->id,
                 ],
                 [
                     'step_type' => 'pybmc',
@@ -1160,18 +1646,28 @@ class EmployeeApprovalChainConfigTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(
-            [$kepalaBagian->id, $verifikatorSatu->id, $verifikatorDua->id, $pybmc->id],
+            [$verifikatorSatu->id, $verifikatorDua->id, $kepalaBagian->id, $pybmc->id],
             $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all(),
+        );
+        $this->assertSame(
+            ['verifier', 'verifier', 'kepala_bagian', 'pybmc'],
+            $chain->steps()->orderBy('step_order')->pluck('step_type')->all(),
         );
         $this->assertTrue($chain->steps()->orderByDesc('step_order')->firstOrFail()->is_final);
     }
 
-    public function test_route_menolak_kepala_bagian_pertama_yang_bukan_relasi_pegawai(): void
+    public function test_route_menolak_kepala_bagian_snapshot_yang_bukan_penugasan_efektif_pegawai(): void
     {
         $actor = User::factory()->superAdmin()->create();
-        $kepalaBagianAktif = Employee::factory()->create();
-        $kepalaBagianLain = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagianAktif->id]);
+        $kepalaBagianSnapshot = Employee::factory()->create();
+        $kepalaBagianEfektif = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagianSnapshot->id]);
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagianEfektif->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
+        ]);
         $pybmc = Employee::factory()->create();
         $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmc, $actor, 'PYBMC global.');
 
@@ -1179,34 +1675,36 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'steps' => [[
                 'step_type' => 'kepala_bagian',
                 'role_label' => 'Kepala Bagian',
-                'approver_employee_id' => $kepalaBagianLain->id,
+                'approver_employee_id' => $kepalaBagianSnapshot->id,
             ]],
             'reason' => 'Menguji relasi Kepala Bagian.',
         ]);
 
         $response->assertSessionHasErrors([
-            'steps.0.approver_employee_id' => 'Approver pertama harus sama dengan Kepala Bagian aktif pegawai.',
+            'steps.0.approver_employee_id' => 'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
         ]);
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
     }
 
-    public function test_route_menolak_chain_saat_pegawai_tidak_memiliki_kepala_bagian_aktif(): void
+    public function test_route_menolak_chain_saat_pegawai_tidak_memiliki_kepala_bagian_efektif(): void
     {
         $actor = User::factory()->superAdmin()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => null]);
-        $approver = Employee::factory()->create();
+        $approverSnapshot = Employee::factory()->create();
+        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $approverSnapshot->id]);
+        $pybmc = Employee::factory()->create();
+        $this->actingAs($actor)->app->make(ApplyGlobalPybmcAction::class)->execute($pybmc, $actor, 'PYBMC global.');
 
         $response = $this->actingAs($actor)->post(route('cuti.config.employee-chain.store', $pegawai), [
             'steps' => [[
                 'step_type' => 'kepala_bagian',
                 'role_label' => 'Kepala Bagian',
-                'approver_employee_id' => $approver->id,
+                'approver_employee_id' => $approverSnapshot->id,
             ]],
             'reason' => 'Menguji pegawai tanpa Kepala Bagian.',
         ]);
 
         $response->assertSessionHasErrors([
-            'steps.0.approver_employee_id' => 'Pegawai belum memiliki Kepala Bagian aktif. Tetapkan relasi Kepala Bagian terlebih dahulu.',
+            'steps.0.approver_employee_id' => 'Pegawai belum memiliki Kepala Bagian efektif. Tetapkan penugasan Kepala Bagian terlebih dahulu.',
         ]);
         $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $pegawai->id]);
     }
@@ -1227,26 +1725,84 @@ class EmployeeApprovalChainConfigTest extends TestCase
         ]);
 
         $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($pegawai, [
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $approverSama->id, 'is_final' => false],
             ['step_type' => 'verifier', 'role_label' => 'Verifikator', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $approverSama->id, 'is_final' => false],
             ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $approverSama->id, 'is_final' => true],
         ], $actor, 'Chain dengan duplikasi approver.');
 
         $steps = $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
 
         $this->assertCount(3, $steps);
-        $this->assertSame([$approverSama->id, $verifikator->id, $approverSama->id], $steps->pluck('approver_employee_id')->all());
+        $this->assertSame([$verifikator->id, $approverSama->id, $approverSama->id], $steps->pluck('approver_employee_id')->all());
         $this->assertTrue($steps->last()->is_final);
         $this->assertSame('pybmc', $steps->last()->step_type);
     }
 
-    public function test_resolver_fail_closed_jika_chain_tidak_punya_final(): void
+    public function test_resolver_menolak_chain_legacy_dengan_verifikator_setelah_kepala_bagian_tanpa_efek_samping(): void
+    {
+        $pegawai = Employee::factory()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
+        ]);
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $pegawai->id,
+            'name' => 'Chain legacy invalid untuk resolver',
+            'effective_from' => today(),
+        ]);
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $kepalaBagian->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'verifier',
+                'role_label' => 'Verifikator Kepegawaian',
+                'approver_employee_id' => $verifikator->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 3,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $pybmc->id,
+                'is_final' => true,
+            ],
+        ]);
+        $jumlahAuditSebelum = AuditLog::query()->count();
+
+        try {
+            $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
+            $this->fail('Resolver harus menolak chain aktif legacy yang tidak mengikuti urutan kanonis.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(
+                'Semua Verifikator harus ditempatkan sebelum Kepala Bagian.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertDatabaseCount('leave_requests', 0);
+        $this->assertDatabaseCount('leave_request_steps', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertSame($jumlahAuditSebelum, AuditLog::query()->count());
+    }
+
+    public function test_resolver_fail_closed_jika_chain_tidak_punya_pybmc(): void
     {
         $actor = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create();
         $kepalaBagian = Employee::factory()->create();
 
-        // Kepala Bagian efektif wajib ada agar resolusi lolos gerbang fail-closed dan justru gagal karena tidak ada approver final.
+        // Kepala Bagian efektif wajib ada agar resolver mencapai guard bentuk dan menolak chain tanpa PYBMC.
         SupervisorAssignment::create([
             'employee_id' => $pegawai->id,
             'kepala_bagian_id' => $kepalaBagian->id,
@@ -1260,7 +1816,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'effective_from' => today(),
             'created_by' => $actor->id,
             'updated_by' => $actor->id,
-            'change_reason' => 'Uji chain tanpa final.',
+            'change_reason' => 'Uji chain tanpa PYBMC.',
         ])->steps()->create([
             'step_order' => 1,
             'step_type' => 'kepala_bagian',
@@ -1270,7 +1826,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Rantai approval cuti wajib memiliki tepat satu approver final.');
+        $this->expectExceptionMessage('Rantai approval cuti wajib memiliki tepat satu step PYBMC.');
 
         $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
     }
@@ -1304,14 +1860,17 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
     }
 
-    public function test_backfill_membuat_chain_dari_kepala_bagian_dan_approval_config_lama(): void
+    public function test_backfill_membuat_chain_verifikator_sebelum_kepala_bagian_dan_pybmc(): void
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
         $verifikator = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
-        $tanpaKepalaBagian = Employee::factory()->create(['kepala_bagian_id' => null]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $kepalaBagianSnapshotLama = Employee::factory()->create();
+        $tanpaPenugasanEfektif = Employee::factory()->create([
+            'kepala_bagian_id' => $kepalaBagianSnapshotLama->id,
+        ]);
         $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
         $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
 
@@ -1321,17 +1880,184 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $result = $this->actingAs($actor)->app->make(BackfillEmployeeApprovalChainsAction::class)->execute($actor, 'Backfill awal Phase 3.');
 
         $this->assertContains($pegawai->id, $result['created_employee_ids']);
-        $this->assertContains($tanpaKepalaBagian->id, $result['missing_kepala_bagian_employee_ids']);
+        $this->assertContains($tanpaPenugasanEfektif->id, $result['missing_kepala_bagian_employee_ids']);
+        $this->assertDatabaseMissing('leave_approval_chains', [
+            'employee_id' => $tanpaPenugasanEfektif->id,
+        ]);
 
         $chain = LeaveApprovalChain::where('employee_id', $pegawai->id)->firstOrFail();
-        $this->assertSame([$kepalaBagian->id, $verifikator->id, $pybmc->id], $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all());
+        $this->assertSame([$verifikator->id, $kepalaBagian->id, $pybmc->id], $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all());
+    }
+
+    public function test_backfill_tidak_mengubah_snapshot_pengajuan_existing(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
+        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit Backfill',
+            'code' => 'sakit_backfill',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $pengajuan = LeaveRequest::create([
+            'employee_id' => $pegawai->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-08-10',
+            'tanggal_selesai' => '2026-08-11',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Menjaga snapshot pengajuan lama saat backfill.',
+            'status' => 'menunggu_approval',
+        ]);
+        $pengajuan->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian Lama',
+                'approver_employee_id' => $kepalaBagian->id,
+                'status' => 'disetujui',
+                'is_final' => false,
+                'acted_at' => '2026-08-12 08:00:00',
+                'decision_note' => 'Snapshot lama yang sudah diputuskan.',
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC Lama',
+                'approver_employee_id' => $pybmc->id,
+                'status' => 'menunggu',
+                'is_final' => true,
+                'skipped_reason' => null,
+            ],
+        ]);
+
+        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
+        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
+
+        $snapshotSebelum = DB::table('leave_request_steps')
+            ->where('leave_request_id', $pengajuan->id)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (object $row): array => (array) $row)
+            ->all();
+
+        $result = $this->app->make(BackfillEmployeeApprovalChainsAction::class)->execute(
+            $actor,
+            'Backfill tanpa mengubah snapshot pengajuan existing.',
+        );
+
+        $snapshotSesudah = DB::table('leave_request_steps')
+            ->where('leave_request_id', $pengajuan->id)
+            ->orderBy('id')
+            ->get()
+            ->map(fn (object $row): array => (array) $row)
+            ->all();
+
+        $this->assertContains($pegawai->id, $result['created_employee_ids']);
+        $this->assertSame($snapshotSebelum, $snapshotSesudah);
+    }
+
+    public function test_backfill_melanjutkan_target_lain_saat_kepala_bagian_efektif_nonaktif(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagianAktif = Employee::factory()->create();
+        $statusNonaktif = RefStatusPegawai::firstOrCreate(
+            ['kode' => 'PENSIUN_BACKFILL'],
+            [
+                'nama' => 'Pensiun Backfill',
+                'kelompok' => 'Nonaktif',
+                'keterangan' => 'Fixture Kepala Bagian nonaktif untuk backfill.',
+                'is_default' => false,
+                'is_active' => true,
+            ],
+        );
+        $kepalaBagianNonaktif = Employee::factory()->create();
+        $kepalaBagianNonaktif->update(['status_pegawai_id' => $statusNonaktif->id]);
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
+        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
+
+        $targetSebelum = Employee::factory()->make(['nama_lengkap' => 'Target Sebelum KB Nonaktif']);
+        $targetSebelum->id = '10000000-0000-4000-8000-000000000001';
+        $targetSebelum->save();
+        $targetKepalaBagianNonaktif = Employee::factory()->make(['nama_lengkap' => 'Target KB Nonaktif']);
+        $targetKepalaBagianNonaktif->id = '20000000-0000-4000-8000-000000000002';
+        $targetKepalaBagianNonaktif->save();
+        $targetSesudah = Employee::factory()->make(['nama_lengkap' => 'Target Sesudah KB Nonaktif']);
+        $targetSesudah->id = '30000000-0000-4000-8000-000000000003';
+        $targetSesudah->save();
+
+        SupervisorAssignment::insert([
+            [
+                'id' => (string) str()->uuid(),
+                'employee_id' => $targetSebelum->id,
+                'supervisor_id' => $kepalaBagianAktif->id,
+                'kepala_bagian_id' => $kepalaBagianAktif->id,
+                'tanggal_mulai' => today()->subDay(),
+                'tanggal_berakhir' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => (string) str()->uuid(),
+                'employee_id' => $targetKepalaBagianNonaktif->id,
+                'supervisor_id' => $kepalaBagianNonaktif->id,
+                'kepala_bagian_id' => $kepalaBagianNonaktif->id,
+                'tanggal_mulai' => today()->subDay(),
+                'tanggal_berakhir' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => (string) str()->uuid(),
+                'employee_id' => $targetSesudah->id,
+                'supervisor_id' => $kepalaBagianAktif->id,
+                'kepala_bagian_id' => $kepalaBagianAktif->id,
+                'tanggal_mulai' => today()->subDay(),
+                'tanggal_berakhir' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $this->assertFalse($kepalaBagianNonaktif->fresh()->isActive());
+        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
+        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
+
+        $result = $this->app->make(BackfillEmployeeApprovalChainsAction::class)->execute(
+            $actor,
+            'Backfill tetap melanjutkan setelah Kepala Bagian nonaktif.',
+        );
+
+        $this->assertContains($targetSebelum->id, $result['created_employee_ids']);
+        $this->assertContains($targetSesudah->id, $result['created_employee_ids']);
+        $this->assertContains(
+            $targetKepalaBagianNonaktif->id,
+            $result['missing_kepala_bagian_employee_ids'],
+        );
+        $this->assertDatabaseHas('leave_approval_chains', [
+            'employee_id' => $targetSebelum->id,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseHas('leave_approval_chains', [
+            'employee_id' => $targetSesudah->id,
+            'is_active' => true,
+        ]);
+        $this->assertDatabaseMissing('leave_approval_chains', [
+            'employee_id' => $targetKepalaBagianNonaktif->id,
+        ]);
     }
 
     public function test_backfill_memisahkan_skip_karena_final_approver_tidak_tersedia(): void
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
 
         $result = $this->actingAs($actor)->app->make(BackfillEmployeeApprovalChainsAction::class)->execute($actor, 'Backfill tanpa PYBMC.');
 
@@ -1361,6 +2087,12 @@ class EmployeeApprovalChainConfigTest extends TestCase
             ]);
             $pegawai->id = $id;
             $pegawai->save();
+            SupervisorAssignment::create([
+                'employee_id' => $pegawai->id,
+                'kepala_bagian_id' => $kepalaBagian->id,
+                'tanggal_mulai' => today()->subDay(),
+                'tanggal_berakhir' => null,
+            ]);
             $targetIds[] = $id;
         }
 
@@ -1443,7 +2175,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $kepalaBagian = Employee::factory()->create();
         $verifikator = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
         $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
 
@@ -1474,9 +2206,8 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create(['nama_lengkap' => 'Kepala Bagian Uji']);
-        $pegawai = Employee::factory()->create([
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian, [
             'nama_lengkap' => 'Pegawai Konfigurasi',
-            'kepala_bagian_id' => $kepalaBagian->id,
         ]);
 
         $response = $this->actingAs($actor)->get(route('cuti.config', [
@@ -1488,11 +2219,49 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $response->assertSee('Pilih Pegawai');
         $response->assertSee('Kepala Bagian');
         $response->assertSee('Tambah Verifikator');
-        $response->assertSee('PYBMC Khusus');
+        $response->assertSee('for="employee-pybmc"', false);
         $response->assertSee('aria-label="Naikkan urutan verifikator"', false);
         $response->assertSee('aria-label="Turunkan urutan verifikator"', false);
         $response->assertDontSee('Approver Stage 2');
         $response->assertDontSee('Approver Stage 3');
+    }
+
+    public function test_editor_task_2_merender_index_payload_dan_error_sesuai_urutan_kanonis(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $verifikator = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+
+        $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute(
+            $pegawai,
+            [
+                ['step_type' => 'verifier', 'role_label' => 'Ketua Tim Kerja', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+            ],
+            $actor,
+            'Fixture editor Task 2.',
+        );
+
+        $response = $this->actingAs($actor)->get(route('cuti.config', [
+            'employee_id' => $pegawai->id,
+        ]));
+
+        $response->assertOk()
+            ->assertSee(':name="`steps[${index}][step_type]`"', false)
+            ->assertSee(':name="`steps[${verifiers.length}][step_type]`"', false)
+            ->assertSee('verifier.validation_errors.role_label', false)
+            ->assertSee('verifier.validation_errors.approver_employee_id', false)
+            ->assertSee('kepalaBagianError', false)
+            ->assertSee('pybmcError', false)
+            ->assertSee(':aria-describedby="verifier.validation_errors.role_label ? `verifier-label-error-${verifier.client_key}` : null"', false)
+            ->assertSee(':id="`verifier-label-error-${verifier.client_key}`"', false)
+            ->assertDontSee('errorFor(`steps.${index}', false)
+            ->assertDontSee('errorFor(`steps.${verifiers.length}', false)
+            ->assertSee(':key="verifier.client_key"', false)
+            ->assertSee('aria-live="polite" aria-atomic="true" x-text="announcement"', false);
     }
 
     public function test_halaman_konfigurasi_membatasi_hasil_pegawai_dan_menampilkan_audit_chain_dinamis(): void
@@ -1502,6 +2271,12 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $pegawai = Employee::factory()->create([
             'nama_lengkap' => 'Pegawai Batas 00',
             'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
         ]);
 
         foreach (range(1, 50) as $number) {
@@ -1540,7 +2315,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $verifikatorPegawai = Employee::factory()->create(['nama_lengkap' => 'Approver Pegawai 00']);
         User::factory()->pegawai()->create(['employee_id' => $verifikatorPegawai->id]);
 
@@ -1566,21 +2341,21 @@ class EmployeeApprovalChainConfigTest extends TestCase
     {
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
-        $pegawai = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $verifikatorTersimpan = Employee::factory()->create(['nama_lengkap' => 'Verifikator Tersimpan']);
         $hasilPencarianLain = Employee::factory()->create(['nama_lengkap' => 'Kandidat Hasil Lain']);
 
         $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class)->execute(
             $pegawai,
             [[
-                'step_type' => 'kepala_bagian',
-                'role_label' => 'Kepala Bagian',
-                'approver_employee_id' => $kepalaBagian->id,
-                'is_final' => false,
-            ], [
                 'step_type' => 'verifier',
                 'role_label' => 'Verifikator',
                 'approver_employee_id' => $verifikatorTersimpan->id,
+                'is_final' => false,
+            ], [
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $kepalaBagian->id,
                 'is_final' => false,
             ], [
                 'step_type' => 'pybmc',
@@ -1635,7 +2410,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $actor = User::factory()->superAdmin()->create();
         $kepalaBagian = Employee::factory()->create();
         $pybmc = Employee::factory()->create();
-        $employee = Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]);
+        $employee = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
         $action = $this->actingAs($actor)->app->make(SaveEmployeeApprovalChainAction::class);
         $chain = $action->execute($employee, [
             ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => $kepalaBagian->id, 'is_final' => false],
@@ -1668,10 +2443,13 @@ class EmployeeApprovalChainConfigTest extends TestCase
      *     step_ids: list<string>,
      *     audit_count: int
      * }  $fixture
-     * @param  list<array{step_type:string, role_label:string, approver_employee_id:string|null, is_final:bool}>  $steps
+     * @param  array<int, array{step_type:string, role_label:string, approver_employee_id:string|null, is_final:bool}>  $steps
      */
-    private function assertSaveChainInvalidTidakMengubahChainLama(array $fixture, array $steps): void
-    {
+    private function assertSaveChainInvalidTidakMengubahChainLama(
+        array $fixture,
+        array $steps,
+        ?string $expectedMessage = null,
+    ): void {
         $exception = null;
 
         try {
@@ -1716,6 +2494,10 @@ class EmployeeApprovalChainConfigTest extends TestCase
         );
         $this->assertNotNull($exception);
         $this->assertSame(RuntimeException::class, $exception::class);
+
+        if ($expectedMessage !== null) {
+            $this->assertSame($expectedMessage, $exception->getMessage());
+        }
     }
 
     /**
@@ -1742,5 +2524,132 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $this->assertSame($jumlahAuditSebelum, AuditLog::count());
         $this->assertNotNull($exception);
         $this->assertSame(RuntimeException::class, $exception::class);
+    }
+
+    /**
+     * Membentuk predecessor legacy dan snapshot pengajuan yang sengaja tidak melewati writer kanonis.
+     *
+     * @return array{
+     *     actor: User,
+     *     employee: Employee,
+     *     kepala_bagian: Employee,
+     *     verifier: Employee,
+     *     pybmc: Employee,
+     *     predecessor: LeaveApprovalChain,
+     *     leave_request: LeaveRequest,
+     *     snapshot: list<array<string, mixed>>
+     * }
+     */
+    private function buatFixtureRantaiLegacyDenganSnapshot(): array
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $kepalaBagian = Employee::factory()->create();
+        $verifier = Employee::factory()->create();
+        $pybmc = Employee::factory()->create();
+        $employee = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
+        $predecessor = LeaveApprovalChain::create([
+            'employee_id' => $employee->id,
+            'name' => 'Chain legacy sebelum re-save',
+            'is_active' => true,
+            'effective_from' => today()->subDay(),
+            'created_by' => $actor->id,
+            'updated_by' => $actor->id,
+            'change_reason' => 'Fixture predecessor legacy.',
+        ]);
+        $predecessor->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $kepalaBagian->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'verifier',
+                'role_label' => 'Verifikator Kepegawaian',
+                'approver_employee_id' => $verifier->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 3,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $pybmc->id,
+                'is_final' => true,
+            ],
+        ]);
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit Snapshot Re-save Legacy',
+            'code' => 'cuti_sakit_snapshot_resave_legacy',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-08-03',
+            'tanggal_selesai' => '2026-08-04',
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Snapshot historis sebelum re-save.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        foreach ($predecessor->steps()->orderBy('step_order')->get() as $index => $step) {
+            $leaveRequest->steps()->create([
+                'step_order' => $step->step_order,
+                'step_type' => $step->step_type,
+                'role_label' => $step->role_label,
+                'approver_employee_id' => $step->approver_employee_id,
+                'status' => $index === 0 ? 'active' : 'pending',
+                'is_final' => $step->is_final,
+                'skipped_reason' => null,
+                'decision_note' => $index === 0 ? 'Snapshot aktif sebelum re-save.' : null,
+            ]);
+        }
+
+        return [
+            'actor' => $actor,
+            'employee' => $employee,
+            'kepala_bagian' => $kepalaBagian,
+            'verifier' => $verifier,
+            'pybmc' => $pybmc,
+            'predecessor' => $predecessor,
+            'leave_request' => $leaveRequest,
+            'snapshot' => $this->snapshotLangkahPengajuan($leaveRequest->id),
+        ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function snapshotLangkahPengajuan(string $leaveRequestId): array
+    {
+        return DB::table('leave_request_steps')
+            ->where('leave_request_id', $leaveRequestId)
+            ->orderBy('step_order')
+            ->get()
+            ->map(fn (object $row): array => (array) $row)
+            ->all();
+    }
+
+    /**
+     * Membuat relasi Kepala Bagian bertanggal efektif agar fixture memakai sumber lifecycle kanonis.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function buatPegawaiDenganKepalaBagianEfektif(Employee $kepalaBagian, array $attributes = []): Employee
+    {
+        $pegawai = Employee::factory()->create([
+            'kepala_bagian_id' => $kepalaBagian->id,
+            ...$attributes,
+        ]);
+
+        SupervisorAssignment::create([
+            'employee_id' => $pegawai->id,
+            'kepala_bagian_id' => $kepalaBagian->id,
+            'tanggal_mulai' => today()->subDay(),
+            'tanggal_berakhir' => null,
+        ]);
+
+        return $pegawai;
     }
 }

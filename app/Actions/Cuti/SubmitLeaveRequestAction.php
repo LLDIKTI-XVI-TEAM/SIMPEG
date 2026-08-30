@@ -7,6 +7,7 @@ use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveEligibilityService;
@@ -14,6 +15,7 @@ use App\Services\Cuti\LeaveUsageOverlapService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\NotificationService;
 use App\Services\WorkdayCalculator;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +36,7 @@ class SubmitLeaveRequestAction
         private readonly LeaveBalanceReservationService $reservations,
         private readonly LeaveEligibilityService $eligibility,
         private readonly LeaveUsageOverlapService $overlap,
+        private readonly ApprovalChainConfigurationLockService $configurationLock,
     ) {}
 
     /**
@@ -49,17 +52,6 @@ class SubmitLeaveRequestAction
         if ($employee->is_kepala_lembaga) {
             throw ValidationException::withMessages([
                 'jenis_cuti_id' => 'Pengajuan cuti Kepala Lembaga diproses melalui kementerian, bukan melalui SIMPEG.',
-            ]);
-        }
-
-        $steps = $this->approvalChains->resolveEffectiveSteps($employee)
-            // Pemohon tidak boleh menjadi approver pengajuannya sendiri; step konflik dihilangkan dari snapshot.
-            ->reject(fn ($step) => $step->approver_employee_id === $employee->id)
-            ->values();
-
-        if ($steps->isEmpty()) {
-            throw ValidationException::withMessages([
-                'jenis_cuti_id' => 'Pengajuan cuti tidak dapat diproses karena tidak ada approver lain yang valid.',
             ]);
         }
 
@@ -88,8 +80,34 @@ class SubmitLeaveRequestAction
             $requestUser = $request->user();
             $actor = $requestUser instanceof User ? $requestUser : null;
 
-            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, &$lampiranPath, &$storedLampiran, $steps, $actor, $leaveType, $request) {
+            $leaveRequest = DB::transaction(function () use ($employee, $data, $mulai, $selesai, $jumlahHariKerja, &$lampiranPath, &$storedLampiran, $actor, $leaveType, $request) {
+                // Submit mengambil lock konfigurasi sebelum row pegawai agar tidak membentuk siklus
+                // dengan writer rantai atau penugasan Kepala Bagian yang mengunci approver lebih dulu.
+                $this->configurationLock->acquire();
                 $lockedEmployee = $this->overlap->lockEmployee($employee);
+
+                try {
+                    // Validasi lifecycle dan row lock approver harus bertahan sampai snapshot selesai
+                    // agar perubahan status serentak tidak menyisipkan approver nonaktif ke request baru.
+                    $steps = $this->approvalChains->resolveEffectiveSteps($lockedEmployee)
+                        // Pemohon tidak boleh menjadi approver pengajuannya sendiri; step konflik dihilangkan dari snapshot.
+                        ->reject(fn ($step) => $step->approver_employee_id === $lockedEmployee->id)
+                        ->values();
+                } catch (QueryException $exception) {
+                    // Kegagalan database adalah error infrastruktur dan tidak boleh dibocorkan sebagai pesan validasi.
+                    throw $exception;
+                } catch (\RuntimeException $exception) {
+                    throw ValidationException::withMessages([
+                        'jenis_cuti_id' => $exception->getMessage(),
+                    ]);
+                }
+
+                if ($steps->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        'jenis_cuti_id' => 'Pengajuan cuti tidak dapat diproses karena tidak ada approver lain yang valid.',
+                    ]);
+                }
+
                 $this->overlap->assertNoOverlap($lockedEmployee, $mulai, $selesai);
 
                 if ($request->hasFile('lampiran')) {
