@@ -62,13 +62,29 @@ class HandleKeycloakCallbackAction
             ]);
         }
 
+        // Email SSO yang diverifikasi IdP dipakai untuk dua hal: penandaan verifikasi
+        // email kanonis user dan pencocokan pegawai — keduanya hanya untuk klaim terverifikasi.
+        $verifiedClaim = $this->verifiedEmailClaim($keycloakUser);
+
         // Login berikutnya memakai subject Keycloak yang stabil agar perubahan email tidak memindahkan akun.
         $existingUser = User::where('keycloak_id', $keycloakId)->first();
 
         if ($existingUser) {
-            // Email internal user yang sudah terikat tidak pernah diverifikasi ulang oleh
-            // Keycloak pada jalur ini — status verifikasi existing dipertahankan apa adanya.
-            return $this->loginMappedUser($existingUser, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: false);
+            // Email kanonis akun terikat yang sama dengan klaim terverifikasi tetap boleh
+            // ditandai (mis. akun dipetakan manual admin lalu login SSO pertama); email
+            // internal yang berbeda tetap tidak pernah dianggap terverifikasi.
+            try {
+                return $this->loginMappedUser(
+                    $existingUser,
+                    $keycloakId,
+                    $username,
+                    $keycloakUser->getName(),
+                    $request,
+                    markEmailVerified: $verifiedClaim !== null && $this->emailMatchesVerifiedClaim($existingUser, $verifiedClaim),
+                );
+            } catch (SsoIdentityRejected $rejected) {
+                return view('auth.unregistered', ['message' => $rejected->userMessage]);
+            }
         }
 
         // Pegawai asli wajib cocok ke data employees; akun tanpa email hanya boleh lewat whitelist user lokal.
@@ -80,7 +96,7 @@ class HandleKeycloakCallbackAction
             ]);
         }
 
-        $matchedEmail = $this->verifiedEmailClaim($keycloakUser);
+        $matchedEmail = $verifiedClaim;
 
         if ($matchedEmail) {
             $employees = $this->matchedEmployees($employeeField, $matchedEmail);
@@ -126,6 +142,10 @@ class HandleKeycloakCallbackAction
 
             try {
                 return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: $this->emailMatchesVerifiedClaim($user, $matchedEmail));
+            } catch (SsoIdentityRejected $rejected) {
+                // Re-check terkunci pada boundary save mendeteksi subject sudah dimilik
+                // user lain → tolak terkontrol, bukan menimpa binding.
+                return view('auth.unregistered', ['message' => $rejected->userMessage]);
             } catch (UniqueConstraintViolationException) {
                 // Database adalah authority terakhir: benturan unik berarti callback
                 // paralel sudah membuat/mengikat user setelah resolusi kita. Re-resolve
@@ -137,7 +157,11 @@ class HandleKeycloakCallbackAction
                     return view('auth.unregistered', ['message' => $rejected->userMessage]);
                 }
 
-                return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: $this->emailMatchesVerifiedClaim($user, $matchedEmail));
+                try {
+                    return $this->loginMappedUser($user, $keycloakId, $username, $keycloakUser->getName(), $request, markEmailVerified: $this->emailMatchesVerifiedClaim($user, $matchedEmail));
+                } catch (SsoIdentityRejected $rejected) {
+                    return view('auth.unregistered', ['message' => $rejected->userMessage]);
+                }
             }
         }
 
@@ -298,7 +322,27 @@ class HandleKeycloakCallbackAction
             && is_string($user->keycloak_id)
             && $user->keycloak_id !== '';
 
-        DB::transaction(function () use ($user, $previousRole, $roleInitialized, $firstBinding, $request): void {
+        $subjectConflictAtSave = null;
+
+        DB::transaction(function () use (&$subjectConflictAtSave, $user, $keycloakId, $previousRole, $roleInitialized, $firstBinding, $request): void {
+            // Re-check terkunci tepat sebelum menulis: resolver melepas lock employee
+            // SEBELUM save, sehingga dua callback dengan subject berbeda untuk pegawai
+            // yang sama bisa sama-sama membaca binding kosong lalu saling menimpa
+            // (UPDATE baris yang sama tidak memicu unique constraint). Kunci baris user
+            // dan periksa state binding terkini; subject milik user lain = percobaan
+            // rebind identitas → tolak terkontrol, jangan pernah menimpa.
+            if ($user->exists) {
+                $fresh = User::whereKey($user->getKey())->lockForUpdate()->first();
+
+                if ($fresh && filled($fresh->keycloak_id) && $fresh->keycloak_id !== $keycloakId) {
+                    // Tidak ada yang ditulis → transaksi commit kosong; audit rejection
+                    // ditulis SETELAH commit agar evidence tidak ikut ter-rollback.
+                    $subjectConflictAtSave = $fresh;
+
+                    return;
+                }
+            }
+
             // Save (termasuk retry username) dibungkus savepoint via transaction nested:
             // di PostgreSQL statement yang gagal men-abort transaksi, jadi rollback ke
             // savepoint diperlukan sebelum save ulang. Audit tetap dieksekusi setelahnya.
@@ -331,6 +375,13 @@ class HandleKeycloakCallbackAction
                 $this->auditRoleInitialization($user, $previousRole, $request);
             }
         });
+
+        if ($subjectConflictAtSave !== null) {
+            // Audit ditulis SETELAH transaksi commit kosong agar evidence tidak ter-rollback.
+            $this->auditMappingRejected($subjectConflictAtSave, 'sso_subject_conflict', null, $subjectConflictAtSave->employee_id, $request);
+
+            throw new SsoIdentityRejected('sso_subject_conflict', self::REJECT_MESSAGES['sso_subject_conflict']);
+        }
 
         Auth::login($user);
         $request->session()->regenerate();

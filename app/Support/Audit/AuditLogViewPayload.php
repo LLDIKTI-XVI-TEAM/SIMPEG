@@ -79,7 +79,10 @@ class AuditLogViewPayload
 
     private static function categoryFor(string $module, string $event): string
     {
-        if (in_array($event, ['LOGIN', 'LOGOUT', 'SESSION_TIMEOUT'], true)) {
+        // SSO_BINDING (pengikatan pertama subject Keycloak) dan SSO_MAPPING_REJECTED
+        // (penolakan mapping identitas) adalah lifecycle autentikasi: tampilkan dalam
+        // kategori autentikasi, bukan aktivitas_sistem default.
+        if (in_array($event, ['LOGIN', 'LOGOUT', 'SESSION_TIMEOUT', 'SSO_BINDING', 'SSO_MAPPING_REJECTED'], true)) {
             return 'autentikasi';
         }
 

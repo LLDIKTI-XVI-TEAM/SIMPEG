@@ -1521,6 +1521,104 @@ class KeycloakCallbackMappingTest extends TestCase
     }
 
     /**
+     * P1 race pada boundary save: resolver melepas lock employee sebelum loginMappedUser
+     * menyimpan. Callback kedua dengan subject berbeda untuk pegawai yang sama dapat
+     * membaca binding kosong lalu MENIMPA subject pertama lewat UPDATE baris yang sama
+     * (tanpa unique violation). Re-check terkunci tepat sebelum save wajib menolak
+     * rebind secara terkontrol.
+     */
+    public function test_subject_rebound_by_concurrent_save_is_rejected_without_overwrite(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Kandidat Rebind',
+            'email' => 'kandidat-rebind@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'kandidat-rebind@example.com',
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+            'keycloak_id' => null,
+        ]);
+
+        $injected = false;
+        DB::listen(function (QueryExecuted $query) use (&$injected, $user): void {
+            // Suntik TEPAT SETELAH resolver membaca userByEmployee (setelah userBySubject
+            // lewat, sebelum fresh-lock save): simulasi callback/admin lain mengikat
+            // subject-nya di sela waktu antara resolusi dan penyimpanan.
+            if ($injected
+                || ! str_contains((string) $query->sql, 'from "users" where "employee_id" =')
+                || ! str_contains((string) $query->sql, 'for update')) {
+                return;
+            }
+
+            $injected = true;
+
+            // Callback paralel (subject berbeda) keburu menyimpan bindingnya lebih dulu.
+            DB::table('users')->where('id', $user->id)->update(['keycloak_id' => 'kc-pemenang-lain']);
+        });
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-kandidat-rebind',
+            'nickname' => 'kandidat-rebind',
+            'name' => 'Kandidat Rebind',
+            'email' => 'kandidat-rebind@example.com',
+            'raw' => ['email' => 'kandidat-rebind@example.com', 'email_verified' => true, 'preferred_username' => 'kandidat-rebind'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        // Controlled rejection, bukan penimpaan binding / HTTP 500.
+        $response->assertOk();
+        $response->assertSee('Akun SIMPEG sudah terhubung ke SSO lain.');
+        $this->assertGuest();
+
+        // Subject pemenang TIDAK tertimpa oleh kandidat.
+        $this->assertSame('kc-pemenang-lain', $user->refresh()->keycloak_id);
+
+        // Audit rejection aktor sistem tersedia tanpa subject mentah.
+        $audit = AuditLog::query()->where('event', 'SSO_MAPPING_REJECTED')->latest('created_at')->first();
+        $this->assertNotNull($audit);
+        $this->assertSame('sso_subject_conflict', $audit->new_values['reason'] ?? null);
+        $this->assertNull($audit->user_id);
+        $this->assertSame($user->id, $audit->auditable_id ?? null);
+        $this->assertStringNotContainsString('kc-kandidat-rebind', json_encode($audit->toArray()));
+    }
+
+    /**
+     * Akun yang SUDAH terikat keycloak_id tetap boleh mendapat penandaan verifikasi
+     * email bila email kanonisnya sama dengan klaim email Keycloak terverifikasi
+     * (mis. akun dipetakan manual oleh admin, lalu login SSO pertama).
+     */
+    public function test_bound_account_with_matching_verified_email_gets_email_verified_at(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Terikat Kanonis',
+            'email' => 'terikat-kanonis@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'terikat-kanonis@example.com',
+            'keycloak_id' => 'kc-terikat-kanonis',
+            'employee_id' => $employee->id,
+            'role' => 'pimpinan',
+            'email_verified_at' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-terikat-kanonis',
+            'nickname' => 'terikat-kanonis',
+            'name' => 'Terikat Kanonis',
+            'email' => 'terikat-kanonis@example.com',
+            'raw' => ['email' => 'terikat-kanonis@example.com', 'email_verified' => true, 'preferred_username' => 'terikat-kanonis'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertNotNull($user->refresh()->email_verified_at);
+    }
+
+    /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
     private function fakeKeycloakUser(array $attributes): void

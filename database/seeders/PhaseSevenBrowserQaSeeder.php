@@ -20,6 +20,7 @@ use App\Support\Cuti\CutiInstitution;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class PhaseSevenBrowserQaSeeder extends Seeder
 {
@@ -33,9 +34,19 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private const INACTIVE_APPROVER_EMAIL = 'qa-phase7-approver-nonaktif@example.test';
 
-    private const DEMO_APPROVER_USERNAME = 'demo-klabat-kabag';
+    /**
+     * Persona browser QA kini memakai AKUN UJI SSO TERPETAKAN (fixture
+     * SsoRoleMappedAccountSeeder) sehingga seluruh skenario dapat diuji lewat
+     * login Keycloak nyata — jalur dev-login sudah dihapus dan tidak ada lagi
+     * akun dengan password lokal yang bisa dipakai login.
+     *
+     * @see SsoRoleMappedAccountSeeder::ROLE_MAPPING
+     */
+    private const SSO_ADMIN_ROLE = 'admin_kepegawaian';
 
-    private const DEMO_PEGAWAI_USERNAME = 'demo-klabat-pegawai';
+    private const SSO_APPROVER_ROLE = 'kepala_bagian';
+
+    private const SSO_PEGAWAI_ROLE = 'pegawai';
 
     private const CHAIN_ID = '70000000-0000-4000-8000-000000000001';
 
@@ -82,7 +93,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         $applicationYear = CarbonImmutable::now(config('app.timezone'))->year;
 
         if ($applicationYear !== self::BALANCE_YEAR) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'PhaseSevenBrowserQaSeeder hanya mendukung tahun saldo 2026; tahun aplikasi saat ini '.$applicationYear.'.'
             );
         }
@@ -97,7 +108,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             $jenisCutiTahunan = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
             $jenisCutiSakit = RefJenisCuti::query()->where('code', 'sakit')->firstOrFail();
 
-            $admin = $this->upsertAdminSession($jenisPegawaiId, $statusAktifId);
+            $admin = $this->upsertAdminSession();
             $kepalaLembaga = $this->upsertEmployee(
                 self::KEPALA_LEMBAGA_EMAIL,
                 '198001012026000002',
@@ -166,10 +177,27 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         $this->command?->line('QA_KEPALA_LEMBAGA_ID='.$kepalaLembaga->id);
         $this->command?->line('QA_PENDING_CUTI_ID='.$pendingRequest->id);
-        $this->command?->line('QA_APPROVER_USERNAME='.self::DEMO_APPROVER_USERNAME);
+        $this->command?->line('QA_ADMIN_EMAIL='.$this->ssoEmailForRole(self::SSO_ADMIN_ROLE));
+        $this->command?->line('QA_APPROVER_EMAIL='.$this->ssoEmailForRole(self::SSO_APPROVER_ROLE));
+        $this->command?->line('QA_PEGAWAI_EMAIL='.$this->ssoEmailForRole(self::SSO_PEGAWAI_ROLE));
         $this->command?->line('QA_MANUAL_EMPLOYEE_ID='.$manualEmployee->id);
         $this->command?->line('QA_MANUAL_USAGE_ID='.$manualUsage->id);
         $this->command?->line('QA_INVALID_CHAIN_EMPLOYEE_ID='.$invalidEmployee->id);
+    }
+
+    /**
+     * Email akun uji SSO untuk role persona QA — satu-satunya sumber adalah fixture
+     * SsoRoleMappedAccountSeeder agar tidak ada duplikasi daftar akun uji di source.
+     */
+    private function ssoEmailForRole(string $role): string
+    {
+        $email = array_search($role, SsoRoleMappedAccountSeeder::ROLE_MAPPING, true);
+
+        if ($email === false) {
+            throw new RuntimeException("Fixture SSO untuk role '{$role}' tidak ditemukan di SsoRoleMappedAccountSeeder::ROLE_MAPPING.");
+        }
+
+        return $email;
     }
 
     /** Menjaga fixture saldo QA memenuhi masa kerja satu tahun sebelum tahun fakta pertama. */
@@ -184,39 +212,18 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         );
     }
 
-    private function upsertAdminSession(?string $jenisPegawaiId, ?string $statusAktifId): User
+    private function upsertAdminSession(): User
     {
-        $email = 'demo-klabat-kepeg@example.test';
+        // Sesi admin QA memakai akun uji SSO terpetakan (admin_kepegawaian) — akun
+        // sudah ditanam SsoRoleMappedAccountSeeder beserta pegawai aktifnya; seeder
+        // ini tidak membuat kredensial lokal baru dan tidak menimpa data existing.
         $user = User::query()
-            ->where('keycloak_username', 'demo-klabat-kepeg')
-            ->orWhere('email', $email)
-            ->first() ?? new User;
+            ->where('email', $this->ssoEmailForRole(self::SSO_ADMIN_ROLE))
+            ->first();
 
-        $employee = $user->employee_id !== null
-            ? Employee::query()->find($user->employee_id)
-            : Employee::query()->where('email', $email)->first();
-
-        if ($employee === null) {
-            $employee = $this->upsertEmployee(
-                $email,
-                '198001012026000004',
-                'Demo Klabat (Admin Kepegawaian)',
-                'admin_kepegawaian',
-                $jenisPegawaiId,
-                $statusAktifId,
-            );
+        if ($user === null || $user->employee_id === null) {
+            throw new RuntimeException('Akun SSO admin kepegawaian belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
         }
-
-        $user->fill([
-            'name' => 'Demo Klabat (Admin Kepegawaian)',
-            'email' => $email,
-            'keycloak_username' => 'demo-klabat-kepeg',
-            'role' => 'admin_kepegawaian',
-            'employee_id' => $employee->id,
-            'email_verified_at' => $user->email_verified_at ?? now(),
-            'password' => $user->password ?? 'demo-klabat-kepeg',
-        ]);
-        $user->save();
 
         return $user;
     }
@@ -259,7 +266,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
     private function resolveDemoApprover(?string $jenisPegawaiId, ?string $statusAktifId): Employee
     {
         $user = User::query()
-            ->where('keycloak_username', self::DEMO_APPROVER_USERNAME)
+            ->where('email', $this->ssoEmailForRole(self::SSO_APPROVER_ROLE))
             ->firstOrFail();
 
         $employee = $user->employee_id !== null
@@ -267,11 +274,11 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             : Employee::query()->where('email', $user->email)->first();
 
         if ($employee === null) {
-            throw new \RuntimeException('Employee untuk demo-klabat-kabag belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
+            throw new RuntimeException('Employee untuk akun SSO kepala bagian belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
         }
 
         $employee->fill([
-            'nama_lengkap' => 'Demo Klabat (Kepala Bagian)',
+            'nama_lengkap' => 'QA Fase 7 Kepala Bagian',
             'status_pegawai_id' => $statusAktifId,
             'status_aktif' => 'Aktif',
             'jenis_pegawai_id' => $jenisPegawaiId,
@@ -281,7 +288,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         $employee->save();
 
         $user->fill([
-            'name' => 'Demo Klabat (Kepala Bagian)',
+            'name' => 'QA Fase 7 Kepala Bagian',
             'role' => 'kepala_bagian',
             'employee_id' => $employee->id,
         ]);
@@ -291,7 +298,8 @@ class PhaseSevenBrowserQaSeeder extends Seeder
     }
 
     /**
-     * Memakai akun demo pegawai yang diizinkan dev-login agar form pengajuan diuji dengan sesi pegawai nyata.
+     * Memakai akun uji SSO terpetakan (pegawai) agar form pengajuan diuji dengan
+     * sesi pegawai nyata melalui login Keycloak — bukan akun demo ber-password lokal.
      */
     private function resolveDemoPegawai(
         ?string $jenisPegawaiId,
@@ -299,7 +307,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         Employee $approver,
     ): Employee {
         $user = User::query()
-            ->where('keycloak_username', self::DEMO_PEGAWAI_USERNAME)
+            ->where('email', $this->ssoEmailForRole(self::SSO_PEGAWAI_ROLE))
             ->firstOrFail();
 
         $employee = $user->employee_id !== null
@@ -307,7 +315,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             : Employee::query()->where('email', $user->email)->first();
 
         if ($employee === null) {
-            throw new \RuntimeException('Employee untuk demo-klabat-pegawai belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
+            throw new RuntimeException('Employee untuk akun SSO pegawai belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
         }
 
         $employee->fill([
@@ -560,14 +568,14 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             ->get();
 
         if ($existing->count() > 1) {
-            throw new \RuntimeException('Fakta cuti manual fixture QA terduplikasi.');
+            throw new RuntimeException('Fakta cuti manual fixture QA terduplikasi.');
         }
 
         if ($existing->isNotEmpty()) {
             $record = $existing->sole();
 
             if (! $this->matchesManualUsage($record, $leaveType, $activeApprover, $inactiveApprover)) {
-                throw new \RuntimeException('Fakta cuti manual fixture QA tidak sesuai kontrak snapshot.');
+                throw new RuntimeException('Fakta cuti manual fixture QA tidak sesuai kontrak snapshot.');
             }
 
             return $record;
@@ -688,7 +696,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         }
 
         if ($active->balance_year !== self::BALANCE_YEAR) {
-            throw new \RuntimeException('Catatan pemakaian aktif fixture QA memakai tahun saldo yang tidak didukung.');
+            throw new RuntimeException('Catatan pemakaian aktif fixture QA memakai tahun saldo yang tidak didukung.');
         }
 
         $service->replaceAnnualReconciliationSet(
@@ -759,7 +767,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         if ($existing !== null) {
             if ($existing->employee_id !== $employee->id || $fixtureName !== 'disetujui') {
-                throw new \RuntimeException('UUID pengajuan fixture QA sudah digunakan oleh data yang tidak didukung.');
+                throw new RuntimeException('UUID pengajuan fixture QA sudah digunakan oleh data yang tidak didukung.');
             }
 
             return $existing;

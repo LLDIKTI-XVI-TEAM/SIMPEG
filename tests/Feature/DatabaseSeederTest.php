@@ -242,10 +242,10 @@ class DatabaseSeederTest extends TestCase
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
         $employee = User::query()
-            ->where('keycloak_username', 'demo-klabat-pegawai')
+            ->where('email', $this->ssoEmailForRole('pegawai'))
             ->firstOrFail();
         $admin = User::query()
-            ->where('keycloak_username', 'demo-klabat-kepeg')
+            ->where('email', $this->ssoEmailForRole('admin_kepegawaian'))
             ->firstOrFail();
         $set = LeaveUsageReconciliationSet::query()
             ->where('employee_id', $employee->employee_id)
@@ -420,9 +420,9 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $employeeUser = User::query()->where('keycloak_username', 'demo-klabat-pegawai')->firstOrFail();
+        $employeeUser = User::query()->where('email', $this->ssoEmailForRole('pegawai'))->firstOrFail();
         $employee = $employeeUser->employee()->firstOrFail();
-        $admin = User::query()->where('keycloak_username', 'demo-klabat-kepeg')->firstOrFail();
+        $admin = User::query()->where('email', $this->ssoEmailForRole('admin_kepegawaian'))->firstOrFail();
         Appointment::query()->updateOrCreate(
             ['employee_id' => $employee->id],
             [
@@ -574,12 +574,12 @@ class DatabaseSeederTest extends TestCase
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
         $employee = User::query()
-            ->where('keycloak_username', 'demo-klabat-pegawai')
+            ->where('email', $this->ssoEmailForRole('pegawai'))
             ->firstOrFail()
             ->employee()
             ->firstOrFail();
         $approver = User::query()
-            ->where('keycloak_username', 'demo-klabat-kabag')
+            ->where('email', $this->ssoEmailForRole('kepala_bagian'))
             ->firstOrFail()
             ->employee()
             ->firstOrFail();
@@ -671,5 +671,16 @@ class DatabaseSeederTest extends TestCase
             'notifications' => DB::table('notifications')->count(),
             'jobs' => DB::table('jobs')->count(),
         ]);
+    }
+
+    /**
+     * Email akun uji SSO untuk role persona — sumber tunggal fixture seeder.
+     */
+    private function ssoEmailForRole(string $role): string
+    {
+        $email = array_search($role, SsoRoleMappedAccountSeeder::ROLE_MAPPING, true);
+        $this->assertIsString($email, "Fixture SSO untuk role '{$role}' tidak ditemukan.");
+
+        return $email;
     }
 }
