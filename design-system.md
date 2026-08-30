@@ -193,7 +193,6 @@ class="bg-primary"
 │  • Cuti                    │    max-w-7xl mx-auto             │
 │  • Dokumen                 │    px-4 py-6 lg:px-6             │
 │  • Audit Log               │                                  │
-│  • Pengaturan              │    {{ $slot }}                   │
 │  ─────────────────────     │                                  │
 │  [👤 User Info]            │  </main>                         │
 └──────────────────────────────────────────────────────────────┘
@@ -700,7 +699,6 @@ Hari Libur
 Cuti
 Dokumen
 Audit Log
-Pengaturan
 ```
 
 ### Implementasi Sidebar
@@ -729,7 +727,6 @@ Pengaturan
             ['label' => 'Cuti',         'route' => 'cuti.index'],
             ['label' => 'Dokumen',      'route' => 'dokumen.index'],
             ['label' => 'Audit Log',    'route' => 'audit.index'],
-            ['label' => 'Pengaturan',   'route' => 'settings.index'],
         ];
         @endphp
 
@@ -1026,7 +1023,6 @@ resources/
     ├── cuti/                    ← Modul Cuti
     ├── dokumen/                 ← Modul Dokumen
     ├── hari-libur/              ← Modul Hari Libur
-    └── pengaturan/              ← Modul Pengaturan
 ```
 
 **Context files (dibaca oleh impeccable skill):**

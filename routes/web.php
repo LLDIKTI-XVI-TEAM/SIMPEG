@@ -45,7 +45,6 @@ use App\Http\Controllers\Admin\PimpinanLeaveDocumentController;
 use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
-use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\SkRequirementController;
 use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
@@ -619,25 +618,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/dashboard/profil', [ProfileController::class, 'index'])->name('profil');
     Route::post('/dashboard/profil/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
-
-    Route::get('/dashboard/pengaturan', [SettingsController::class, 'index'])
-        ->middleware(['role:super_admin'])
-        ->name('pengaturan');
-    Route::post('/dashboard/pengaturan', [SettingsController::class, 'update'])
-        ->middleware(['role:super_admin'])
-        ->name('settings.update');
-
-    Route::get('/dashboard/pengaturan/legacy', function () {
-        return redirect()->route('pengaturan');
-    })->name('settings.index');
-
-    Route::get('/pengaturan', function () {
-        return redirect()->route('pengaturan');
-    });
-
-    Route::get('/dashboard/Pengaturan', function () {
-        return redirect()->route('pengaturan');
-    });
 
     // =========================================================================
     // SWITCH & REVERT ROLE
