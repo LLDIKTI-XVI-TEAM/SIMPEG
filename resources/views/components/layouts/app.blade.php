@@ -93,8 +93,6 @@
                     'ews.config',
                 ],
                 'kepala_bagian' => [
-                    'data-pegawai',
-                    'pegawai.import',
                     'hari-libur',
                     'dokumen',
                     'audit-log',
@@ -111,8 +109,6 @@
                 ],
 
                 'pegawai' => [
-                    'data-pegawai',
-                    'pegawai.import',
                     'dokumen',
                     'cuti.rekap',
                     'ews',
@@ -141,7 +137,11 @@
                 [
                     'group' => 'Kepegawaian',
                     'items' => array_filter([
-                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        // Data Pegawai permission-driven: tampil bagi role efektif yang
+                        // memegang employees.read (halaman admin menyesuaikan capability).
+                        auth()->user()?->hasPermission('employees.read')
+                            ? ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users']
+                            : null,
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],

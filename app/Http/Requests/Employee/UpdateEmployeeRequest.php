@@ -21,7 +21,7 @@ class UpdateEmployeeRequest extends FormRequest
         $user = $this->user();
 
         return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+            && $user->hasPermission('employees.update');
     }
 
     public function rules(): array

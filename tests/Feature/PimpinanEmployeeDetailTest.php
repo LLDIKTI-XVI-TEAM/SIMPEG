@@ -153,7 +153,12 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertSee('showDocumentStatusModal', false);
     }
 
-    public function test_daftar_pimpinan_tetap_read_only_saat_permission_mutasi_mengalami_drift(): void
+    /**
+     * Kontrak permission-driven: capability halaman mengikuti permission yang diberikan
+     * pada role pimpinan — bukan blanket read-only. Pimpinan yang diberi permission
+     * lifecycle pegawai melihat kontrol mutasi terkait di daftarnya.
+     */
+    public function test_daftar_pimpinan_menampilkan_kontrol_lifecycle_sesuai_permission_mutasi(): void
     {
         $role = Role::where('name', 'pimpinan')->firstOrFail();
         $permissionIds = Permission::query()
@@ -169,7 +174,20 @@ class PimpinanEmployeeDetailTest extends TestCase
         $this->actingAs(User::factory()->pimpinan()->create())
             ->get(route('pimpinan.pegawai.index'))
             ->assertOk()
-            ->assertDontSee('aria-label="Tampilkan Pegawai Non-Aktif"', false)
+            ->assertSee('deletePegawai(p.id, p.nama_lengkap)', false)
+            ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertSee('showDeleteModal', false)
+            ->assertSee('showRestoreModal', false);
+    }
+
+    /** Pimpinan tanpa permission lifecycle tetap melihat daftar tanpa kontrol mutasi. */
+    public function test_daftar_pimpinan_tanpa_permission_mutasi_tetap_read_only(): void
+    {
+        Employee::factory()->create();
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pimpinan.pegawai.index'))
+            ->assertOk()
             ->assertDontSee('deletePegawai(p.id, p.nama_lengkap)', false)
             ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
             ->assertDontSee('showDeleteModal', false)
@@ -1208,49 +1226,62 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_semua_route_mutasi_pegawai_memiliki_role_gate_admin_eksplisit(): void
+    /**
+     * Kontrak permission-driven: mutasi modul employees digerbang permission granular
+     * (evaluasi role efektif) — setiap route wajib membawa permission middleware-nya
+     * sehingga role tanpa permission tetap fail-closed. Sub-modul (keluarga, disiplin,
+     * riwayat) tetap digerbang ganda role + permission.
+     */
+    public function test_semua_route_mutasi_pegawai_membawa_permission_gate_eksplisit(): void
     {
-        // Mutasi pegawai umum: Super Admin + Admin Kepegawaian.
-        $mutationRoutes = [
-            'api.v1.pegawai.store',
-            'api.v1.pegawai.check-identity',
-            'api.v1.pegawai.import.store',
-            'api.v1.pegawai.destroy',
-            'api.v1.pegawai.keluarga.store',
-            'api.v1.pegawai.keluarga.update',
-            'api.v1.pegawai.keluarga.destroy',
-            'api.v1.pegawai.update',
-            'api.v1.pegawai.disiplin.store',
-            'api.v1.pegawai.berkas-lainnya.store',
-            'api.v1.pegawai.riwayat-kepangkatan.store',
-            'api.v1.pegawai.riwayat-jabatan.store',
-            'api.v1.pegawai.riwayat-kgb.store',
-            'api.v1.pegawai.riwayat-pendidikan.store',
-            'api.v1.pegawai.riwayat-pendidikan.update',
-            'api.v1.pegawai.riwayat-pendidikan.destroy',
-            'api.v1.pegawai.assign-atasan',
+        $expectedPermissions = [
+            'api.v1.pegawai.store' => 'employees.create',
+            'api.v1.pegawai.check-identity' => 'employees.create',
+            'api.v1.pegawai.import.store' => 'employees.import',
+            'api.v1.pegawai.destroy' => 'employees.deactivate',
+            'api.v1.pegawai.restore' => 'employees.restore',
+            'api.v1.pegawai.update' => 'employees.update',
+            'api.v1.pegawai.assign-atasan' => 'employees.update',
         ];
 
-        foreach ($mutationRoutes as $routeName) {
+        foreach ($expectedPermissions as $routeName => $permission) {
+            $route = app('router')->getRoutes()->getByName($routeName);
+
+            $this->assertNotNull($route, "Route {$routeName} harus tersedia.");
+            $this->assertContains(
+                'permission:'.$permission,
+                $route->gatherMiddleware(),
+                "Route {$routeName} harus fail-closed: hanya role dengan permission {$permission}.",
+            );
+        }
+
+        // Sub-modul non-employees tetap digerbang ganda role admin + permission.
+        $subModuleRoutes = [
+            'api.v1.pegawai.keluarga.store' => 'employee_families.create',
+            'api.v1.pegawai.keluarga.update' => 'employee_families.update',
+            'api.v1.pegawai.keluarga.destroy' => 'employee_families.delete',
+            'api.v1.pegawai.disiplin.store' => 'discipline_records.create',
+            'api.v1.pegawai.riwayat-kepangkatan.store' => 'employee_histories.create',
+            'api.v1.pegawai.riwayat-jabatan.store' => 'employee_histories.create',
+            'api.v1.pegawai.riwayat-kgb.store' => 'employee_histories.create',
+            'api.v1.pegawai.riwayat-pendidikan.store' => 'employee_histories.create',
+        ];
+
+        foreach ($subModuleRoutes as $routeName => $permission) {
             $route = app('router')->getRoutes()->getByName($routeName);
 
             $this->assertNotNull($route, "Route {$routeName} harus tersedia.");
             $this->assertContains(
                 'role:super_admin,admin_kepegawaian',
                 $route->gatherMiddleware(),
-                "Route {$routeName} harus tetap fail-closed untuk role Pimpinan.",
+                "Route {$routeName} harus tetap digerbang role admin.",
+            );
+            $this->assertContains(
+                'permission:'.$permission,
+                $route->gatherMiddleware(),
+                "Route {$routeName} harus membawa permission {$permission}.",
             );
         }
-
-        // Pemulihan pegawai adalah keputusan administrasi yang memerlukan permission employees.restore
-        // (US-2.10). Pimpinan tanpa permission tersebut tetap fail-closed.
-        $restoreRoute = app('router')->getRoutes()->getByName('api.v1.pegawai.restore');
-        $this->assertNotNull($restoreRoute, 'Route api.v1.pegawai.restore harus tersedia.');
-        $this->assertContains(
-            'permission:employees.restore',
-            $restoreRoute->gatherMiddleware(),
-            'Route api.v1.pegawai.restore harus fail-closed: hanya role dengan permission employees.restore.',
-        );
     }
 
     public function test_pimpinan_tetap_dilarang_menghapus_keluarga_dan_pendidikan_meski_permission_mutasi_diberikan(): void

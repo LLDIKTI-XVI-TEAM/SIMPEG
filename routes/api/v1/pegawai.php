@@ -16,24 +16,32 @@ $disableEmployeeApiAuth = app()->environment('local')
 
 $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []
-    : ['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan'];
+    : ['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'];
+// Otorisasi modul employees permission-driven: permission granular (evaluasi role efektif)
+// menjadi gerbang tunggal per route; role middleware hanya pagar kasar keanggotaan role.
+// READ endpoints memuat payload mentah sensitif (NIK keluarga, relasi mentah) yang
+// hanya untuk surface admin — tetap digerbang ganda role + permission; Pimpinan memakai
+// surface web ter-masked-nya sendiri (K-privasi).
 $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
     ? []
     : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
+// Mutasi modul employees permission-driven: permission granular (evaluasi role efektif)
+// menjadi gerbang tunggal; hierarki akses dikelola lewat RBAC matrix, bukan role gate.
 $adminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
-// Pemulihan pegawai adalah keputusan administrasi Super Admin (US-2.10 / runbook lifecycle).
-$superAdminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
+    : ['permission:'.$permission];
+// Mutasi sub-modul pegawai (keluarga, disiplin, riwayat, dokumen) tetap digerbang ganda
+// role + permission sampai kontrak permission-driven untuk modul tersebut ditetapkan.
+$adminSubModuleMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['role:super_admin', 'permission:'.$permission];
+    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
 Route::middleware($employeeGroupMiddleware)
     ->prefix('pegawai')
     ->name('pegawai.')
-    ->group(function () use ($adminEmployeeMutationMiddleware, $adminEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
+    ->group(function () use ($adminEmployeeMutationMiddleware, $adminSubModuleMutationMiddleware, $adminEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
         Route::get('/', [EmployeeController::class, 'index'])
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->name('index');
@@ -62,15 +70,15 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('keluarga.index');
         Route::post('/{employee}/keluarga', [EmployeeFamilyController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_families.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_families.create'))
             ->whereUuid('employee')
             ->name('keluarga.store');
         Route::put('/{employee}/keluarga/{family}', [EmployeeFamilyController::class, 'update'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_families.update'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_families.update'))
             ->whereUuid(['employee', 'family'])
             ->name('keluarga.update');
         Route::delete('/{employee}/keluarga/{family}', [EmployeeFamilyController::class, 'destroy'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_families.delete'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_families.delete'))
             ->whereUuid(['employee', 'family'])
             ->name('keluarga.destroy');
 
@@ -92,7 +100,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('disiplin.index');
         Route::post('/{employee}/disiplin', [DisciplineRecordController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('discipline_records.create'))
+            ->middleware($adminSubModuleMutationMiddleware('discipline_records.create'))
             ->whereUuid('employee')
             ->name('disiplin.store');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
@@ -122,7 +130,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-kepangkatan.index');
         Route::post('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-kepangkatan.store');
         Route::get('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'index'])
@@ -130,7 +138,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-jabatan.index');
         Route::post('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-jabatan.store');
         Route::get('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'index'])
@@ -138,7 +146,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-kgb.index');
         Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-kgb.store');
         Route::get('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'index'])
@@ -146,15 +154,15 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-pendidikan.index');
         Route::post('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-pendidikan.store');
         Route::put('/{employee}/riwayat-pendidikan/{education}', [EducationHistoryController::class, 'update'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid(['employee', 'education'])
             ->name('riwayat-pendidikan.update');
         Route::delete('/{employee}/riwayat-pendidikan/{education}', [EducationHistoryController::class, 'destroy'])
-            ->middleware($adminEmployeeMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid(['employee', 'education'])
             ->name('riwayat-pendidikan.destroy');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])

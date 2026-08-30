@@ -12,6 +12,10 @@
         $canRestoreEmployee = ! $isReadOnly
             && auth()->user()?->hasPermission('employees.restore');
         $canManageSkRequirements = $canManageSkRequirements ?? false;
+        // Capability aksi pegawai permission-driven: dihitung dari permission role efektif
+        // (controller bisa mengoverride), bukan blanket role super_admin/admin_kepegawaian.
+        $canCreateEmployee = $canCreateEmployee ?? (bool) auth()->user()?->hasPermission('employees.create');
+        $canImportEmployees = $canImportEmployees ?? (bool) auth()->user()?->hasPermission('employees.import');
         $skRequirementMatrix = $skRequirementMatrix ?? ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $skRequirementVersion = $skRequirementVersion ?? 'unversioned';
     @endphp
@@ -762,6 +766,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     <span>SK Wajib</span>
                 </x-ui.button>
                 @endif
+                @if (($canCreateEmployee ?? false) || ($canImportEmployees ?? false))
                 <div class="relative" x-data="{ open: false }">
                     <x-ui.button type="button" @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         ::aria-expanded="open.toString()" aria-controls="add-pegawai-menu">
@@ -773,6 +778,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </x-ui.button>
                     <div id="add-pegawai-menu" x-show="open" style="display: none;" x-transition
                         class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
+                        @if ($canCreateEmployee ?? false)
                         <a href="{{ route('pegawai.create') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
@@ -782,6 +788,8 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             </svg>
                             Tambah Manual
                         </a>
+                        @endif
+                        @if ($canImportEmployees ?? false)
                         <a href="{{ route('pegawai.import') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans mt-1">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
@@ -791,8 +799,10 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             </svg>
                             Import Pegawai
                         </a>
+                        @endif
                     </div>
                 </div>
+                @endif
                 @else
                 <a href="{{ route('pimpinan.laporan.nominatif') }}"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">

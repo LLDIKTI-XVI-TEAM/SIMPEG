@@ -123,7 +123,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian'])
         ->name('super-admin.status-pegawai.index');
     Route::post('/super-admin/status-pegawai', [PegawaiController::class, 'changeStatus'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('super-admin.status-pegawai.store');
 
     Route::get('/admin/search', [GlobalSearchController::class, 'search'])
@@ -132,45 +132,45 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/pegawai/import-data', function () {
         return view('admin.pegawai.import');
-    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+    })->middleware(['permission:employees.import'])
         ->name('pegawai.import');
 
     Route::get('/pegawai/import/template/{type}', [EmployeeImportController::class, 'template'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import-template');
 
     // Import API endpoints (dipanggil via fetch dari blade, butuh session auth)
     Route::post('/api/pegawai/import/upload', [EmployeeImportController::class, 'upload'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.upload');
 
     Route::get('/api/pegawai/import/{batchId}/preview', [EmployeeImportController::class, 'preview'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.preview');
 
     Route::post('/api/pegawai/import/{batchId}/validate', [EmployeeImportController::class, 'validate'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.validate');
 
     // Pemetaan kolom disimpan sebagai state batch agar dipakai ulang oleh preview/validasi/eksekusi.
     Route::post('/api/pegawai/import/{batchId}/mapping', [EmployeeImportController::class, 'saveMapping'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.mapping');
 
     Route::post('/api/pegawai/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.execute');
 
     Route::get('/api/pegawai/import/{batchId}/status', [EmployeeImportController::class, 'status'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.status');
 
     Route::get('/pegawai/import/{batchId}/laporan', [EmployeeImportController::class, 'report'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware(['permission:employees.import'])
         ->name('pegawai.import.report');
 
     Route::get('/ews', [EwsController::class, 'index'])
@@ -181,7 +181,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('ews.saya');
     Route::match(['post', 'patch'], '/ews/{alert}/followup', [EwsController::class, 'updateFollowup'])
         ->whereUuid('alert')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('ews.followup.update');
 
     Route::get('/laporan-export', function () {
@@ -392,65 +392,65 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan.pegawai.custom');
     Route::get('/pegawai', Index::class)
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('data-pegawai');
     Route::post('/pegawai/sk-requirements', [SkRequirementController::class, 'update'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:sk_requirements.manage'])
+        ->middleware(['permission:sk_requirements.manage'])
         ->name('sk-requirements.update');
     Route::get('/pegawai/create', Create::class)
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
+        ->middleware(['permission:employees.create'])
         ->name('pegawai.create');
     Route::post('/pegawai', [PegawaiController::class, 'store'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.create'])
+        ->middleware(['permission:employees.create'])
         ->name('pegawai.store');
     Route::post('/pegawai/status', [PegawaiController::class, 'changeStatus'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.status.update');
     Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('pegawai.show');
     Route::get('/pegawai/{id}/edit', Edit::class)
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.edit');
     Route::get('/pegawai/{employee}/attachment-riwayat/{type}/{history}/unduh', EmployeeHistoryAttachmentController::class)
         ->whereUuid('employee')
         ->whereUuid('history')
         ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'discipline', 'education', 'status', 'status-snapshot'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('pegawai.history-attachments.download');
     Route::get('/pegawai/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update', 'throttle:60,1'])
+        ->middleware(['permission:employees.update', 'throttle:60,1'])
         ->name('pegawai.supervisor-lookup');
     Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.update');
     Route::post('/pegawai/{id}/kinerja-baik', [PegawaiController::class, 'updatePerformanceFlag'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.kinerja.update');
     Route::post('/pegawai/{id}/satyalancana-eligibility', [PegawaiController::class, 'updateSatyalancanaEligibility'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.satyalancana.update');
     Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.deactivate'])
+        ->middleware(['permission:employees.deactivate'])
         ->name('pegawai.destroy');
     Route::post('/pegawai/{id}/restore', [PegawaiController::class, 'restore'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.restore'])
+        ->middleware(['permission:employees.restore'])
         ->name('pegawai.restore');
     Route::post('/pegawai/{id}/riwayat', [PegawaiController::class, 'storeRiwayat'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.riwayat.store');
     Route::post('/pegawai/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
+        ->middleware(['permission:employees.update'])
         ->name('pegawai.assign-atasan');
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
@@ -564,7 +564,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     });
 
     Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('dokumen');
     Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
@@ -574,11 +574,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('dokumen.update')
         ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('dokumen.show')
         ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('dokumen.download')
         ->whereUuid('id');
     Route::delete('/dashboard/dokumen/{id}', [DokumenController::class, 'destroy'])
