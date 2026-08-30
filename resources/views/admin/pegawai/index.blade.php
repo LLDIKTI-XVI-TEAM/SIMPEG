@@ -729,54 +729,49 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
     ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
-                <button type="button" @click="clearCache(); fetchPage(meta.current_page);"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
-                    title="Refresh Data">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                <x-ui.button type="button" variant="secondary" @click="clearCache(); fetchPage(meta.current_page);">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
                     Refresh
-                </button>
+                </x-ui.button>
                 @if(!$isReadOnly)
-                <button onclick="exportFilteredData()" id="export-btn"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
-                    <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor"
+                <x-ui.button type="button" variant="secondary" onclick="exportFilteredData()" id="export-btn">
+                    <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                     </svg>
                     Export Excel
-                </button>
-                <button onclick="exportFilteredDataPdf()" id="export-pdf-btn"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                </x-ui.button>
+                <x-ui.button type="button" variant="secondary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Export PDF
-                </button>
+                </x-ui.button>
                 @if ($canManageSkRequirements)
-                <button type="button" id="sk-requirement-btn" @click="openSkRequirementModal()"
-                    class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-primary/15 bg-surface px-3 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer"
-                    title="Atur SK Wajib per Jenis Pegawai" aria-label="Atur SK Wajib per Jenis Pegawai">
+                <x-ui.button type="button" variant="secondary" id="sk-requirement-btn" @click="openSkRequirementModal()"
+                    aria-label="Atur SK Wajib per Jenis Pegawai">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                     </svg>
                     <span>SK Wajib</span>
-                </button>
+                </x-ui.button>
                 @endif
                 <div class="relative" x-data="{ open: false }">
-                    <button @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                    <x-ui.button type="button" @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
+                        ::aria-expanded="open.toString()" aria-controls="add-pegawai-menu">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                             stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Pegawai
-                    </button>
-                    <div x-show="open" style="display: none;" x-transition
+                    </x-ui.button>
+                    <div id="add-pegawai-menu" x-show="open" style="display: none;" x-transition
                         class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
                         <a href="{{ route('pegawai.create') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
@@ -818,7 +813,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
             $tableColumns = [
                 ['key' => 'nama_lengkap', 'label' => 'Pegawai', 'sortable' => true],
                 ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true],
-                ['key' => 'golongan_terakhir', 'label' => 'Gol. / Jenis', 'sortable' => true],
+                ['key' => 'golongan_terakhir', 'label' => 'Golongan & Jenis', 'sortable' => true, 'width' => 'whitespace-nowrap'],
                 ['key' => 'tmt', 'label' => 'TMT'],
                 ['key' => 'status_nama', 'label' => 'Status'],
                 ['key' => 'is_lengkap', 'label' => 'Dokumen'],
@@ -933,10 +928,10 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
                         </td>
 
-                        {{-- Golongan / Jenis --}}
-                        <td class="px-4 py-3">
-                            <span class="text-sm font-medium text-ink"
-                                x-text="p.golongan_terakhir + ' / ' + p.jenis_pegawai"></span>
+                        {{-- Golongan & Jenis --}}
+                        <td class="px-4 py-3 whitespace-nowrap">
+                            <p class="text-sm font-medium text-ink" x-text="p.golongan_terakhir || '-'"></p>
+                            <p class="text-xs text-muted" x-text="p.jenis_pegawai || '-'"></p>
                         </td>
 
                         {{-- TMT --}}
@@ -1087,19 +1082,17 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         <div id="bulk-bar" class="fixed bottom-6 left-1/2 z-40 hidden -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-surface px-6 py-3.5 shadow-lg">
             <p class="text-sm font-semibold text-ink"><span id="selected-count">0</span> pegawai dipilih</p>
             <div class="h-4 w-px bg-border"></div>
-            <button onclick="exportSelectedData()"
-                class="inline-flex items-center gap-1.5 text-xs font-semibold text-warning hover:underline transition-colors cursor-pointer">
+            <x-ui.button type="button" variant="warning" size="sm" onclick="exportSelectedData()">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round"
                         d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                 </svg>
                 Export Pilihan
-            </button>
-            <button
-                onclick="document.querySelectorAll(\'.row-check\').forEach(c => c.checked = false); updateBulkBar();"
-                class="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:underline transition-colors cursor-pointer">
+            </x-ui.button>
+            <x-ui.button type="button" variant="ghost" size="sm"
+                onclick="document.querySelectorAll('.row-check').forEach(c => c.checked = false); updateBulkBar();">
                 Batal Pilih
-            </button>
+            </x-ui.button>
         </div>
         @endif
 
@@ -1300,16 +1293,14 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
 
             <x-slot:footer>
                 <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <button type="button"
+                    <x-ui.button type="button" variant="secondary" size="sm"
                         @click="closeSkRequirementModal()"
-                        :disabled="skMatrixBusy"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-muted hover:bg-soft disabled:opacity-60 font-sans">
+                        ::disabled="skMatrixBusy">
                         Batal
-                    </button>
-                    <button type="button" @click="saveSkRequirementMatrix()" :disabled="skMatrixBusy"
-                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 font-sans">
+                    </x-ui.button>
+                    <x-ui.button type="button" size="sm" @click="saveSkRequirementMatrix()" ::disabled="skMatrixBusy">
                         <span x-text="skMatrixBusy ? 'Menyimpan...' : 'Simpan Matriks'"></span>
-                    </button>
+                    </x-ui.button>
                 </div>
             </x-slot:footer>
         </x-ui.modal>
@@ -1378,13 +1369,11 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </p>
                 </div>
                 <div class="flex justify-end gap-3 pt-2 border-t border-border">
-                    <button type="button" @click="showDeleteModal = false" :disabled="isDeleting"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                    <x-ui.button type="button" variant="secondary" @click="showDeleteModal = false" ::disabled="isDeleting">
                         Batal
-                    </button>
-                    <button type="button" @click="confirmDeletePegawai()" :disabled="isDeleting"
-                        class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                        <svg x-show="isDeleting" class="mr-2 h-4 w-4 animate-spin text-white"
+                    </x-ui.button>
+                    <x-ui.button type="button" variant="danger-solid" @click="confirmDeletePegawai()" ::disabled="isDeleting">
+                        <svg x-show="isDeleting" class="h-4 w-4 animate-spin text-white"
                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                             </circle>
@@ -1392,13 +1381,13 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                             </path>
                         </svg>
-                        <svg x-show="!isDeleting" class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor"
+                        <svg x-show="!isDeleting" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                         </svg>
                         <span x-text="isDeleting ? 'Memproses...' : 'Ya, Nonaktifkan Pegawai'"></span>
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
         </x-ui.modal>
@@ -1448,13 +1437,11 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </p>
                 </div>
                 <div class="flex justify-end gap-3 border-t border-border pt-2">
-                    <button type="button" @click="showRestoreModal = false" :disabled="isRestoring"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans disabled:opacity-50">
+                    <x-ui.button type="button" variant="secondary" @click="showRestoreModal = false" ::disabled="isRestoring">
                         Batal
-                    </button>
-                    <button type="button" @click="confirmRestorePegawai()" :disabled="isRestoring"
-                        class="inline-flex items-center justify-center rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 cursor-pointer font-sans disabled:opacity-50">
-                        <svg x-show="isRestoring" class="mr-2 h-4 w-4 animate-spin text-white"
+                    </x-ui.button>
+                    <x-ui.button type="button" variant="success-solid" @click="confirmRestorePegawai()" ::disabled="isRestoring">
+                        <svg x-show="isRestoring" class="h-4 w-4 animate-spin text-white"
                             xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                             </circle>
@@ -1462,18 +1449,19 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                             </path>
                         </svg>
-                        <svg x-show="!isRestoring" class="mr-1.5 h-4 w-4 shrink-0" fill="none"
+                        <svg x-show="!isRestoring" class="h-4 w-4 shrink-0" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                         </svg>
                         <span x-text="isRestoring ? 'Memproses...' : 'Ya, Aktifkan Kembali'"></span>
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
         </x-ui.modal>
 
         {{-- ============================================================ --}}
+
         {{-- MODAL TAMBAH RIWAYAT (Pangkat / Jabatan / KGB) --}}
         {{-- ============================================================ --}}
         <x-ui.modal show="showRiwayatModal" closeAction="showRiwayatModal = false" maxWidth="lg"
@@ -1670,21 +1658,19 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
 
             {{-- Footer tombol --}}
             <div class="flex justify-end gap-3 pt-3 border-t border-border">
-                <button type="button" @click="showRiwayatModal = false"
-                    class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
+                <x-ui.button type="button" variant="secondary" @click="showRiwayatModal = false">
                     Batal
-                </button>
-                <button type="button" @click="submitRiwayat()" :disabled="isSubmitting"
-                    class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60 cursor-pointer font-sans">
+                </x-ui.button>
+                <x-ui.button type="button" @click="submitRiwayat()" ::disabled="isSubmitting">
                     <template x-if="isSubmitting">
-                        <svg class="w-4 h-4 mr-1.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
                             </circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
                         </svg>
                     </template>
                     <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Riwayat'"></span>
-                </button>
+                </x-ui.button>
             </div>
         </x-ui.modal>
         @endif

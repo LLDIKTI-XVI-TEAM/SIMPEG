@@ -22,7 +22,7 @@ class EwsController extends Controller
         $filterSearch = trim((string) ($validated['search'] ?? ''));
         $filterEvent = (string) ($validated['event'] ?? '');
         $filterStatus = (string) ($validated['status'] ?? '');
-        $perPage = (int) ($validated['per_page'] ?? 25);
+        $perPage = (int) ($validated['per_page'] ?? 10);
         $data = $action->paginate($filterEvent, $filterStatus, $filterSearch, $perPage);
 
         return view('admin.ews.aktif', [

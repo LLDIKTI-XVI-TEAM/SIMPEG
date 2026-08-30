@@ -1,7 +1,11 @@
-# SIMPEG Design System
+# SIMPEG Design System — Implementation Guide
 
-> **Source of Truth** untuk semua pengembangan UI di aplikasi SIMPEG.
-> Baca dokumen ini sebelum membuat atau memodifikasi komponen UI apapun.
+> Panduan implementasi UI SIMPEG yang diturunkan dari
+> [`DESIGN.md`](DESIGN.md). Dokumen tersebut adalah kontrak desain kanonis;
+> jika terdapat perbedaan, approval konsumen dan `DESIGN.md` yang berlaku.
+
+> Gunakan panduan ini saat membuat atau memodifikasi markup, tetapi jangan
+> menyalin kelas contoh apabila komponen `x-ui.*` yang sesuai sudah tersedia.
 
 ---
 
@@ -22,6 +26,10 @@ Design system dan panduan implementasi UI untuk aplikasi **SIMPEG** (Sistem Info
 
 ## 🎯 Prinsip Desain
 
+Keputusan desain normatif—termasuk identitas, token semantik, tipografi, motion,
+dan pengecualian yang disetujui—berada di [`DESIGN.md`](DESIGN.md). Bagian ini
+merangkum konsekuensinya saat mengimplementasikan antarmuka.
+
 **Physical scene:** Staf HR di kantor pemerintahan, bekerja di laptop saat jam kerja di ruangan yang terang. Antarmuka harus *legible*, *scannable*, dan fungsional — bukan dekoratif.
 
 **Color strategy:** Restrained — tinted neutrals dengan satu primary kuat (institutional blue) yang membawa otoritas. Secondary gold digunakan sparingly sebagai aksen.
@@ -36,59 +44,65 @@ Design system dan panduan implementasi UI untuk aplikasi **SIMPEG** (Sistem Info
 
 ---
 
-## 📂 Source of Truth
+## 📂 Referensi Kanonis
 
-Selalu periksa file berikut sebelum menambahkan styling baru:
+Gunakan referensi berikut secara berurutan:
 
-```
-resources/css/app.css
-```
+1. [`DESIGN.md`](DESIGN.md) untuk keputusan desain dan pengecualian yang
+   disetujui konsumen.
+2. `resources/css/app.css` untuk nilai token runtime yang dikompilasi.
+3. `resources/views/components/ui/` untuk API dan perilaku komponen yang
+   benar-benar dipakai aplikasi.
 
-- Gunakan **design token Tailwind** yang sudah ada
-- **Jangan hardcode warna** di dalam komponen Blade jika design token sudah tersedia
+Gunakan design token Tailwind yang sudah ada. Jangan hardcode warna di dalam
+komponen Blade jika token tersedia, kecuali pengecualian yang tercatat dalam
+`DESIGN.md`.
 
 ---
 
-## 🎨 Design Tokens
+## 🎨 Referensi Token
 
-Semua token didefinisikan sebagai CSS custom properties di `resources/css/app.css` via Tailwind CSS v4 `@theme {}`.
+Semua token didefinisikan sebagai CSS custom properties di
+`resources/css/app.css` via Tailwind CSS v4 `@theme {}`. Nilai dan peran
+semantiknya ditetapkan oleh [`DESIGN.md#2-color`](DESIGN.md#2-color); tabel di
+bawah adalah referensi kelas implementasi, bukan definisi kedua yang mandiri.
 
 ### Brand Colors
 
-| Token | CSS Variable | Kelas Tailwind | Hex | Peran |
-|-------|-------------|---------------|-----|-------|
-| Primary | `--color-primary` | `bg-primary` / `text-primary` / `border-primary` | `#122E92` | Brand, CTA, active state, sidebar aktif |
-| Secondary | `--color-secondary` | `bg-secondary` / `text-secondary` | `#D6AC48` | Aksen emas, badge sekunder, highlight |
+| Token | CSS Variable | Kelas Tailwind | Peran implementasi |
+|-------|-------------|---------------|---------------------|
+| Primary | `--color-primary` | `bg-primary` / `text-primary` / `border-primary` | Brand, CTA, active state, sidebar aktif |
+| Secondary | `--color-secondary` | `bg-secondary` / `text-secondary` | Aksen emas, badge sekunder, highlight |
 
 ### Surface Colors
 
-| Token | CSS Variable | Kelas Tailwind | Hex | Peran |
-|-------|-------------|---------------|-----|-------|
-| Page | `--color-page` | `bg-page` | `#F8FAFC` | Background body |
-| Surface | `--color-surface` | `bg-surface` | `#FFFFFF` | Card, panel, navbar, sidebar |
+| Token | CSS Variable | Kelas Tailwind | Peran implementasi |
+|-------|-------------|---------------|---------------------|
+| Page | `--color-page` | `bg-page` | Background body |
+| Surface | `--color-surface` | `bg-surface` | Card, panel, navbar, sidebar |
 
 ### Text Colors
 
-| Token | CSS Variable | Kelas Tailwind | Hex | Peran |
-|-------|-------------|---------------|-----|-------|
-| Ink | `--color-ink` | `text-ink` | `#111827` | Body text, heading |
-| Muted | `--color-muted` | `text-muted` | `#6B7280` | Label, metadata, placeholder |
+| Token | CSS Variable | Kelas Tailwind | Peran implementasi |
+|-------|-------------|---------------|---------------------|
+| Ink | `--color-ink` | `text-ink` | Body text, heading |
+| Muted | `--color-muted` | `text-muted` | Label, metadata, placeholder |
 
 ### Status Colors
 
-| Token | CSS Variable | Kelas Tailwind | Hex | Penggunaan |
-|-------|-------------|---------------|-----|-----------|
-| Success | `--color-success` | `bg-success` / `text-success` | `#16A34A` | Aktif, berhasil, status oke |
-| Warning | `--color-warning` | `bg-warning` / `text-warning` | `#F59E0B` | Peringatan, H-60, pending |
-| Danger | `--color-danger` | `bg-danger` / `text-danger` | `#DC2626` | Error, H-30, aksi destruktif |
-| Info | `--color-info` | `bg-info` / `text-info` | `#0284C7` | Informasi, H-90 |
+| Token | CSS Variable | Kelas Tailwind | Penggunaan |
+|-------|-------------|---------------|------------|
+| Success | `--color-success` | `bg-success` / `text-success` | Aktif, berhasil, status oke |
+| Warning | `--color-warning` | `bg-warning` / `text-warning` | Peringatan, H-60, pending |
+| Danger | `--color-danger` | `bg-danger` / `text-danger` | Error, H-30, aksi destruktif |
+| Info | `--color-info` | `bg-info` / `text-info` | Informasi, H-90 |
 
 ### Utility Colors
 
-| Token | CSS Variable | Kelas Tailwind | Hex | Peran |
-|-------|-------------|---------------|-----|-------|
-| Border | `--color-border` | `border-border` | `#E5E7EB` | Divider, border input, border card |
-| Soft | `--color-soft` | `bg-soft` | `#F3F4F6` | Header tabel, hover state, fill subtle |
+| Token | CSS Variable | Kelas Tailwind | Peran implementasi |
+|-------|-------------|---------------|---------------------|
+| Border | `--color-border` | `border-border` | Divider, border input, border card |
+| Soft | `--color-soft` | `bg-soft` | Header tabel, hover state, fill subtle |
 
 ---
 
@@ -146,15 +160,15 @@ class="bg-primary"
 
 | Elemen | Tag | Kelas Tailwind | Penggunaan |
 |--------|-----|---------------|-----------|
-| Page Title | `<h1>` | `text-4xl font-bold text-primary` | Satu per halaman |
-| Section Title | `<h2>` | `text-2xl font-semibold text-ink` | Judul seksi |
-| Subsection | `<h3>` | `text-xl font-semibold text-ink` | Sub-judul |
-| Body | `<p>` | `text-base text-ink` | Konten utama, min 16px |
-| Secondary | — | `text-sm text-muted` | Label, metadata, caption |
+| Page Title | `<h1>` | `text-2xl font-semibold text-ink` | Satu per halaman |
+| Section Title | `<h2>` | `text-lg font-semibold text-ink` | Judul seksi utama |
+| Subsection | `<h3>` | `text-sm font-bold text-ink` | Judul card atau subsection |
+| Body | `<p>` | `text-sm text-ink` | Konten utama dan tabel |
+| Secondary | — | `text-xs text-muted` | Label, metadata, caption |
 | Table Header | `<th>` | `text-xs font-semibold uppercase tracking-wide text-muted` | Header kolom tabel |
 | Badge / Tag | `<span>` | `text-xs font-semibold` | Dipasangkan dengan warna status |
 
-- **Line length:** Batasi 65–75ch pada blok konten panjang
+- **Line length:** Batasi 65–75ch pada blok konten panjang.
 - **Heading:** gunakan `text-wrap: balance` pada h1–h3 agar baris rata
 - **Prose:** gunakan `text-wrap: pretty` untuk kurangi orphan word
 - **Kontras minimum:** body text ≥ 4.5:1 terhadap background — teks muted jangan terlalu terang
@@ -313,6 +327,10 @@ body.bg-page
 
 ### Contoh Halaman Lengkap Menggunakan Layout
 
+> Contoh di bagian ini menjelaskan komposisi halaman. Pada source aplikasi,
+> gunakan komponen `x-ui.*` atau `x-form.*` yang tersedia; rangkaian kelas
+> Tailwind pada contoh lama tidak menjadi kontrak visual baru.
+
 #### Dashboard
 
 ```blade
@@ -371,21 +389,17 @@ body.bg-page
     </nav>
 
     {{-- Form Card --}}
-    <div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
+    <x-ui.card padding="lg">
         <h2 class="mb-6 text-xl font-semibold text-ink">Tambah Pegawai Baru</h2>
         <form method="POST" action="{{ route('pegawai.store') }}">
             @csrf
             {{-- ... field form ... --}}
             <div class="mt-6 flex items-center gap-3">
-                <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                    Simpan
-                </button>
-                <a href="{{ route('pegawai.index') }}" class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft">
-                    Batal
-                </a>
+                <x-ui.button type="submit" variant="primary">Simpan</x-ui.button>
+                <x-ui.button href="{{ route('pegawai.index') }}" variant="secondary">Batal</x-ui.button>
             </div>
         </form>
-    </div>
+    </x-ui.card>
 
 </x-layouts.app>
 ```
@@ -410,49 +424,54 @@ Base unit: `0.25rem` (Tailwind default).
 
 ## 🧩 Standar Komponen
 
+Selalu periksa source komponen sebelum mengubah kontraknya. Tabel ini mencatat
+entry point yang dipakai developer; gaya dan aksesibilitas komponen harus tetap
+mematuhi [`DESIGN.md`](DESIGN.md).
+
+| Komponen | Tanggung jawab | Aturan pemakaian |
+|----------|----------------|------------------|
+| `x-ui.button` | Action, link, dan state disabled | Gunakan varian/ukuran yang tersedia; jangan membuat button berkelas baru tanpa kebutuhan yang disetujui |
+| `x-ui.card` | Surface dashboard, form, tabel, panel | Gunakan sebagai wadah; jangan nested tanpa alasan struktural |
+| `x-ui.stat-card` | Ringkasan metrik dan link ke tindak lanjut | Gunakan label, nilai, icon, serta meta yang singkat dan bermakna |
+| `x-ui.table` | Tabel data responsif | Bungkus dengan `overflow-x-auto`, gunakan header semantik serta empty state |
+| `x-ui.badge` | Severity dan status | Selalu tampilkan teks status, bukan warna saja |
+| `x-ui.tabs` | Navigasi sub-halaman | Pertahankan relasi tab/panel dan navigasi keyboard |
+
 ### Buttons
 
-| Variant | Kelas Lengkap |
-|---------|--------------|
-| **Primary** | `inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90` |
-| **Secondary** | `inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft` |
-| **Danger** | `inline-flex items-center justify-center rounded-lg bg-danger px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90` |
-| **Ghost** | `inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-soft hover:text-ink` |
+Gunakan `x-ui.button` untuk action standar. Komponen saat ini menyediakan
+varian `primary`, `secondary`, `muted`, `danger`, `danger-solid`, `success`,
+`success-solid`, `warning`, `warning-solid`, `ghost`, dan `link`; ukuran `xs`,
+`sm`, `md`, `lg`, serta `icon`.
+Rujuk source komponen untuk API yang aktual saat menambah varian baru.
 
-```html
-{{-- Primary --}}
-<button class="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-    Simpan
-</button>
-
-{{-- Secondary --}}
-<button class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-5 py-3 text-sm font-semibold text-primary transition-colors hover:bg-soft">
-    Batal
-</button>
-
-{{-- Danger --}}
-<button class="inline-flex items-center justify-center rounded-lg bg-danger px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-    Hapus
-</button>
-
-{{-- Ghost --}}
-<button class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-soft hover:text-ink">
-    Batal
-</button>
+```blade
+<x-ui.button variant="primary" type="submit">Simpan</x-ui.button>
+<x-ui.button variant="secondary" href="{{ route('data-pegawai') }}">Batal</x-ui.button>
+<x-ui.button variant="danger-solid" type="submit">Hapus</x-ui.button>
 ```
+
+Komponen menangani state hover, focus, active, dan disabled. Hindari menyalin
+kelas button ke view baru kecuali ada kebutuhan yang sudah disetujui.
 
 ### Card Component
 
-```html
-<div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
-    <!-- konten card -->
-</div>
+Gunakan `x-ui.card` sebagai wadah standar dashboard, form, tabel, dan panel
+konten. Appearance internalnya—termasuk radius, shadow, padding, serta variant—
+dikontrol oleh komponen dan mencerminkan keputusan yang telah disetujui.
+
+```blade
+<x-ui.card padding="lg">
+    {{-- konten card --}}
+</x-ui.card>
 ```
 
 **Aturan card:**
-- Shadow: `shadow-sm` saja — tidak boleh `shadow-md` atau lebih besar
-- **Tidak boleh nested cards** (card di dalam card)
-- Gunakan untuk: dashboard stats, form containers, table containers, panel konten
+
+- Jangan menduplikasi rangkaian kelas card langsung di halaman baru.
+- **Tidak boleh nested cards** tanpa alasan struktural yang disetujui.
+- Jika appearance komponen berubah, perbarui kontrak di `DESIGN.md` dan contoh
+  ini bersama-sama.
 
 ### Badge Component
 
@@ -572,41 +591,35 @@ $kelas = $statusClasses[$pegawai->status] ?? 'bg-soft text-muted';
 
 ### Struktur Tabel Standar
 
-```html
-<div class="rounded-lg border border-border bg-surface shadow-sm overflow-hidden">
-    <table class="w-full">
-        <thead class="bg-soft">
-            <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">NIP</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Nama</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">Aksi</th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-border">
-            @forelse($pegawai as $p)
-                <tr class="hover:bg-soft/50 transition-colors">
-                    <td class="px-4 py-3 text-sm text-muted font-mono">{{ $p->nip }}</td>
-                    <td class="px-4 py-3 text-sm text-ink font-medium">{{ $p->nama }}</td>
-                    <td class="px-4 py-3">
-                        <span class="rounded-full bg-success/10 text-success px-3 py-1 text-xs font-semibold">
-                            {{ $p->status }}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <a href="#" class="text-sm text-primary font-semibold hover:underline">Detail</a>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="4" class="px-4 py-8 text-center text-sm text-muted">
-                        Tidak ada data pegawai.
-                    </td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
-</div>
+```blade
+<x-ui.card padding="none" class="overflow-hidden">
+    <div class="overflow-x-auto">
+        <x-ui.table caption="Daftar pegawai">
+            <x-ui.table-head>
+                <x-ui.table-row>
+                    <x-ui.table-th>NIP</x-ui.table-th>
+                    <x-ui.table-th>Nama</x-ui.table-th>
+                    <x-ui.table-th>Status</x-ui.table-th>
+                    <x-ui.table-th>Aksi</x-ui.table-th>
+                </x-ui.table-row>
+            </x-ui.table-head>
+            <x-ui.table-body>
+                @forelse($pegawai as $p)
+                    <x-ui.table-row>
+                        <x-ui.table-td class="font-mono text-muted">{{ $p->nip }}</x-ui.table-td>
+                        <x-ui.table-td class="font-medium">{{ $p->nama }}</x-ui.table-td>
+                        <x-ui.table-td><x-ui.badge variant="success">{{ $p->status }}</x-ui.badge></x-ui.table-td>
+                        <x-ui.table-td><x-ui.button variant="link" href="{{ route('pegawai.show', $p) }}">Detail</x-ui.button></x-ui.table-td>
+                    </x-ui.table-row>
+                @empty
+                    <x-ui.table-row>
+                        <x-ui.table-td colspan="4"><x-ui.empty-state icon="none" title="Tidak ada data pegawai." /></x-ui.table-td>
+                    </x-ui.table-row>
+                @endforelse
+            </x-ui.table-body>
+        </x-ui.table>
+    </div>
+</x-ui.card>
 ```
 
 **Aturan tabel:**
@@ -633,63 +646,13 @@ Layout: `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6`
 
 > ⚠️ Angka statistik untuk status bahaya **tidak** menggunakan `text-primary`. Warna angka mengikuti status — danger stat pakai `text-danger`.
 
-```html
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-
-    {{-- Total Pegawai --}}
-    <div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-muted font-medium">Total Pegawai</p>
-                <p class="mt-1 text-3xl font-bold text-primary">{{ $totalPegawai }}</p>
-            </div>
-            <div class="rounded-lg bg-primary/10 p-3">
-                {{-- Icon --}}
-            </div>
-        </div>
-        <p class="mt-4 text-xs text-muted">Seluruh pegawai aktif</p>
-    </div>
-
-    {{-- Total Cuti --}}
-    <div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-muted font-medium">Total Cuti</p>
-                <p class="mt-1 text-3xl font-bold text-warning">{{ $totalCuti }}</p>
-            </div>
-            <div class="rounded-lg bg-warning/10 p-3">
-                {{-- Icon --}}
-            </div>
-        </div>
-    </div>
-
-    {{-- Akan Pensiun --}}
-    <div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-muted font-medium">Akan Pensiun</p>
-                <p class="mt-1 text-3xl font-bold text-danger">{{ $akanPensiun }}</p>
-            </div>
-            <div class="rounded-lg bg-danger/10 p-3">
-                {{-- Icon --}}
-            </div>
-        </div>
-    </div>
-
-    {{-- Dokumen Kadaluarsa --}}
-    <div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-muted font-medium">Dokumen Kadaluarsa</p>
-                <p class="mt-1 text-3xl font-bold text-danger">{{ $dokumenKadaluarsa }}</p>
-            </div>
-            <div class="rounded-lg bg-danger/10 p-3">
-                {{-- Icon --}}
-            </div>
-        </div>
-    </div>
-
-</div>
+```blade
+<section class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan utama">
+    <x-ui.stat-card label="Total Pegawai" value="{{ $totalPegawai }}" variant="primary" size="lg" accent />
+    <x-ui.stat-card label="Total Cuti" value="{{ $totalCuti }}" variant="warning" size="lg" accent />
+    <x-ui.stat-card label="Akan Pensiun" value="{{ $akanPensiun }}" variant="danger" size="lg" accent />
+    <x-ui.stat-card label="Dokumen Kadaluarsa" value="{{ $dokumenKadaluarsa }}" variant="danger" size="lg" accent />
+</section>
 ```
 
 ---
@@ -888,12 +851,13 @@ Pengaturan
 
 ## 🎬 Motion & Animasi
 
-Ini adalah **productivity tool** — motion harus minimal dan bertujuan.
+Ini adalah **productivity tool** — motion harus minimal, bertujuan, dan mengikuti
+kontrak pada [`DESIGN.md#6-motion--interaction`](DESIGN.md#6-motion--interaction).
 
 | Aturan | Keterangan |
 |--------|-----------|
-| Transition | `transition-colors` pada elemen interaktif saja |
-| Duration | Default 150ms — tidak perlu override |
+| Transition baru | `transition-colors` sebagai default; `opacity` atau `transform` hanya untuk menyampaikan state |
+| Durasi baru | 150–200 ms; gunakan timing bawaan komponen jika komponen sudah tersedia |
 | Button hover | `hover:opacity-90` pada primary & danger button |
 | Entrance animation | **Tidak ada** — jangan gate content di balik animasi |
 | `prefers-reduced-motion` | Semua transisi harus di-disable |
@@ -924,11 +888,15 @@ Ini adalah **productivity tool** — motion harus minimal dan bertujuan.
 ### Aturan
 
 - ✅ **Mobile-first** approach
-- ✅ Tidak boleh ada horizontal overflow
+- ✅ Tidak boleh ada horizontal overflow pada halaman; tabel atau grafik lebar
+  hanya boleh scroll di wrapper lokal yang jelas
 - ✅ Tidak boleh ada teks yang terpotong
 - ✅ Tidak boleh ada komponen yang saling overlap
-- ✅ Sidebar hidden di mobile, visible mulai `lg:`
+- ✅ Sidebar off-canvas di mobile tidak boleh menerima fokus saat tertutup dan
+  fokus harus berpindah ke menu saat dibuka
 - ✅ Form label selalu di atas input (bukan inline) di mobile
+- ✅ Target action mandiri minimal 24 × 24 px; gunakan ukuran 44 × 44 px bila
+  ruang memungkinkan pada layar sentuh
 
 ### Pola Grid Responsif
 
@@ -985,46 +953,34 @@ $variantClasses = [
 
 ```
 resources/views/components/
-├── button.blade.php
-├── card.blade.php
-├── badge.blade.php
-├── alert.blade.php
+├── ui/
+│   ├── button.blade.php
+│   ├── card.blade.php
+│   ├── badge.blade.php
+│   ├── stat-card.blade.php
+│   ├── tabs.blade.php
+│   └── table*.blade.php
 ├── form/
 │   ├── input.blade.php
-│   ├── label.blade.php
 │   ├── select.blade.php
-│   └── error.blade.php
-└── table/
-    ├── wrapper.blade.php
-    └── header.blade.php
+│   └── textarea.blade.php
+├── layouts/
+│   └── app.blade.php
+└── pegawai/detail/
+    └── *.blade.php
 ```
 
-### Contoh Komponen Button (`components/button.blade.php`)
+### Contoh Pemakaian Button
 
 ```blade
-@props([
-    'variant' => 'primary',
-    'type'    => 'button',
-    'href'    => null,
-])
-
-@php
-$classes = match($variant) {
-    'primary'   => 'bg-primary text-white shadow-sm hover:opacity-90',
-    'secondary' => 'border border-primary/15 bg-surface text-primary hover:bg-soft',
-    'danger'    => 'bg-danger text-white shadow-sm hover:opacity-90',
-    'ghost'     => 'text-muted hover:bg-soft hover:text-ink',
-    default     => 'bg-primary text-white shadow-sm hover:opacity-90',
-};
-$base = 'inline-flex items-center justify-center rounded-lg px-5 py-3 text-sm font-semibold transition-colors';
-@endphp
-
-@if($href)
-    <a href="{{ $href }}" class="{{ $base }} {{ $classes }}" {{ $attributes }}>{{ $slot }}</a>
-@else
-    <button type="{{ $type }}" class="{{ $base }} {{ $classes }}" {{ $attributes }}>{{ $slot }}</button>
-@endif
+<x-ui.button variant="primary" type="submit">Simpan perubahan</x-ui.button>
+<x-ui.button variant="secondary" href="{{ route('dashboard') }}">Kembali</x-ui.button>
+<x-ui.button variant="danger-solid" type="submit">Hapus data</x-ui.button>
 ```
+
+Kelas internal `x-ui.button` tidak diduplikasi di dokumen ini. Ubah komponen
+langsung hanya ketika kontrak pada `DESIGN.md` dan approval konsumen memang ikut
+berubah.
 
 ---
 
@@ -1046,6 +1002,10 @@ Yang berikut ini **wajib dihindari** — ini adalah tanda desain yang buruk:
 | **Numbered section markers (01/02/03)** | Hanya gunakan jika urutan memang membawa informasi |
 | **Identical card grid** (icon+heading+text berulang) | Buat variasi visual berdasarkan konten actual |
 | **Teks yang overflow container** | Test setiap heading di semua breakpoint |
+
+Pengecualian yang telah disetujui—termasuk hero banner dashboard—tercatat di
+[`DESIGN.md#8-approved-exceptions`](DESIGN.md#8-approved-exceptions). Pengecualian
+tersebut tidak boleh diperluas ke surface lain tanpa approval desain baru.
 
 ---
 
@@ -1073,9 +1033,9 @@ resources/
 
 | File | Peran |
 |------|-------|
-| `PRODUCT.md` | Konteks strategis: register, users, brand personality |
-| `DESIGN.md` | Visual system reference (format Google Stitch) |
-| `design-system.md` | Panduan implementasi lengkap dengan kode contoh |
+| `PRODUCT.md` *(opsional)* | Konteks strategis: register, users, brand personality, bila proyek memilih untuk menambahkannya |
+| `DESIGN.md` | Kontrak desain kanonis: keputusan visual, accessibility, dan exception |
+| `design-system.md` | Panduan implementasi turunan: API komponen dan pola Blade/Tailwind |
 
 ---
 
@@ -1084,17 +1044,18 @@ resources/
 Sebelum submit kode UI, pastikan semua item berikut terpenuhi:
 
 - [ ] Menggunakan `font-sans` (Poppins)
-- [ ] Hanya menggunakan design token (bukan raw hex / kelas Tailwind default)
-- [ ] Tidak ada warna hardcoded (`bg-[#...]` atau `bg-blue-600`)
+- [ ] Mengikuti `DESIGN.md`; pengecualian yang disetujui konsumen tercatat di sana
+- [ ] Hanya menggunakan design token (bukan raw hex / kelas Tailwind default) di luar approved exception
+- [ ] Tidak ada warna hardcoded (`bg-[#...]` atau `bg-blue-600`) di luar approved exception
 - [ ] Mobile responsive di semua breakpoint (`sm`, `md`, `lg`, `xl`)
 - [ ] Tidak ada horizontal overflow
 - [ ] Spacing konsisten (`gap-4`, `gap-6`, `p-6`)
-- [ ] Button menggunakan 4 varian standar (primary / secondary / danger / ghost)
-- [ ] Card: `rounded-lg border border-border bg-surface p-6 shadow-sm`, tidak nested
+- [ ] Button menggunakan `x-ui.button` dengan varian yang tersedia
+- [ ] Card menggunakan `x-ui.card` dan tidak nested tanpa alasan struktural
 - [ ] Focus state pada semua input (`focus:ring-2 focus:ring-primary/20`)
 - [ ] Static mapping untuk kelas dinamis (bukan string interpolasi)
 - [ ] Teks heading: `text-wrap: balance`; kontras body text ≥ 4.5:1
-- [ ] Motion: `transition-colors` saja; `prefers-reduced-motion` didukung
+- [ ] Motion baru mengikuti `DESIGN.md`; `prefers-reduced-motion` didukung
 - [ ] Menggunakan Blade reusable components
 - [ ] Sesuai visual identity SIMPEG (biru `#122E92` + emas `#D6AC48`)
 - [ ] Kompatibel dengan Laravel 12 + Blade + Tailwind CSS v4

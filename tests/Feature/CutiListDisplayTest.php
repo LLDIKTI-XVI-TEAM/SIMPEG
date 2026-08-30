@@ -333,7 +333,7 @@ class CutiListDisplayTest extends TestCase
         $content = $response->getContent();
 
         $response->assertOk()
-            ->assertSee('Monitoring Cuti Pegawai')
+            ->assertSee('Monitoring Cuti')
             ->assertSee('name="search"', false)
             ->assertSee('name="unit"', false);
         $this->assertMatchesRegularExpression('/<th\b[^>]*>\s*Pegawai\s*<\/th>/s', $content);

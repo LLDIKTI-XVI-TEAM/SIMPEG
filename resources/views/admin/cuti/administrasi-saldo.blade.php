@@ -108,7 +108,7 @@
                 <h1 class="text-2xl font-semibold text-ink font-sans">Administrasi Pemakaian Cuti</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
-                    ['label' => 'Cuti', 'url' => route('cuti')],
+                    ['label' => 'Monitoring Cuti', 'url' => route('cuti')],
                     ['label' => 'Administrasi Pemakaian Cuti'],
                 ]" />
                 <p class="mt-2 max-w-2xl text-xs leading-relaxed text-muted">
@@ -542,10 +542,9 @@
                                     required
                                 />
 
-                                <button type="submit"
-                                    class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-auto">
+                                <x-ui.button type="submit" class="w-full sm:w-auto">
                                     Simpan Pemakaian Tahunan
-                                </button>
+                                </x-ui.button>
                             </form>
                         @else
                             <div class="mt-5 space-y-4" aria-label="Fakta pemakaian tahunan baca-saja">
@@ -700,10 +699,9 @@
                                     required
                                 />
 
-                                <button type="submit"
-                                    class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-auto">
+                                <x-ui.button type="submit" class="w-full sm:w-auto">
                                     Simpan Perbaikan
-                                </button>
+                                </x-ui.button>
                             </form>
                         @endif
                     </x-ui.card>
@@ -879,14 +877,14 @@
                                     class="min-h-11"
                                 />
 
-                                <button
+                                <x-ui.button
                                     type="submit"
-                                    x-bind:disabled="submitting"
-                                    class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                                    ::disabled="submitting"
+                                    class="w-full sm:w-auto"
                                 >
                                     <span x-show="!submitting">Simpan Cuti Eksternal</span>
                                     <span x-cloak x-show="submitting" role="status">Menyimpan…</span>
-                                </button>
+                                </x-ui.button>
                             </form>
                         @endif
                     </x-ui.card>

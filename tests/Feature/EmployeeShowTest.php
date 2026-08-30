@@ -135,6 +135,9 @@ class EmployeeShowTest extends TestCase
                 ->assertSee('role="tablist"', false)
                 ->assertSee('aria-label="Navigasi detail pegawai"', false)
                 ->assertSee('role="status"', false)
+                ->assertSee('id="dokumen-sk-heading"', false)
+                ->assertSee('id="arsip-sk-heading"', false)
+                ->assertSee('id="berkas-lainnya-heading"', false)
                 ->assertSee('focus-visible:ring-2', false);
         }
     }

@@ -1,4 +1,33 @@
-# SIMPEG Design System
+# SIMPEG Design Contract
+
+> Kontrak desain kanonis untuk SIMPEG. Dokumen ini memuat keputusan visual dan
+> perilaku UI yang harus dipatuhi. Panduan pemakaian Blade/Tailwind berada di
+> [`design-system.md`](design-system.md).
+
+## 0. Status, Authority & Maintenance
+
+### Hierarki keputusan
+
+1. Kebutuhan dan approval konsumen.
+2. Kontrak dalam dokumen ini.
+3. Definisi token runtime di `resources/css/app.css` dan kontrak komponen di
+   `resources/views/components/ui/`.
+4. Contoh pemakaian di `design-system.md`.
+
+Jika implementasi komponen yang telah disetujui konsumen berbeda dari dokumen,
+jangan mengubah komponen secara otomatis. Pastikan keputusan yang berlaku, lalu
+perbarui dokumen ini dan panduan implementasinya dalam perubahan yang sama.
+
+### Tanggung jawab dokumen
+
+- `DESIGN.md`: keputusan desain, semantic tokens, aturan aksesibilitas, dan
+  pengecualian yang disetujui.
+- `design-system.md`: API komponen, pola Blade/Tailwind, serta checklist
+  implementasi yang diturunkan dari dokumen ini.
+- `resources/css/app.css`: nilai token yang benar-benar dikompilasi aplikasi.
+
+Tidak ada dokumen lain yang boleh mendefinisikan ulang nilai token, skala
+tipografi, atau aturan motion tanpa merujuk ke kontrak ini.
 
 ## 1. Atmosphere & Identity
 
@@ -26,7 +55,7 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 
 ### Rules
 
-- Gunakan token Tailwind yang berasal dari `resources/css/app.css`; jangan menambah warna ad hoc di view.
+- Gunakan token Tailwind yang berasal dari `resources/css/app.css`; jangan menambah warna ad hoc di view, kecuali pada pengecualian yang disetujui di bawah.
 - Warna status selalu ditemani teks status atau severity.
 - Primary hanya untuk aksi yang benar-benar tersedia dan fokus keyboard.
 
@@ -49,7 +78,7 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 
 ### Rules
 
-- Jangan gunakan teks isi lebih kecil dari `text-xs` pada informasi yang harus dibaca.
+- Jangan gunakan teks isi lebih kecil dari `text-xs` pada informasi yang harus dibaca. Label navigasi, metadata, dan kontrol tetap harus memenuhi kontras minimum 4,5:1.
 - Metadata tidak menggantikan label form.
 
 ## 4. Spacing & Layout
@@ -62,10 +91,18 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 
 ## 5. Components
 
+- Gunakan komponen `x-ui.*`, `x-form.*`, dan komponen domain yang tersedia sebelum
+  membuat markup berkelas Tailwind baru.
+- API, varian, dan kelas internal komponen didokumentasikan di `design-system.md`.
+  Jangan menyalin rangkaian kelas dari contoh lama jika komponen sudah tersedia.
+- Keputusan visual komponen yang disetujui konsumen dicatat sebagai kontrak;
+  contoh implementasi harus mengikuti kontrak tersebut, bukan sebaliknya.
+
 ### `x-ui.button`
 
 - **Structure:** button atau anchor dengan variant dan size.
-- **Variants:** `primary`, `secondary`, `muted`, `danger`, `success`, `warning`, `ghost`, `link`.
+- **Variants:** `primary`, `secondary`, `muted`, `danger`, `danger-solid`,
+  `success`, `success-solid`, `warning`, `warning-solid`, `ghost`, `link`.
 - **States:** default, hover, focus ring, active scale, disabled.
 - **Accessibility:** disabled action selalu memiliki teks penjelasan dekat kontrol dan `aria-describedby`; tooltip tidak menjadi satu-satunya penjelasan.
 
@@ -89,7 +126,11 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 
 ## 6. Motion & Interaction
 
-- Gunakan transition yang sudah ada pada komponen (`transition-colors` atau `transition-all duration-200`).
+- Gunakan motion bawaan komponen bila tersedia. Untuk markup baru, gunakan
+  `transition-colors` sebagai default; `opacity` atau `transform` hanya boleh
+  dipakai untuk menyampaikan perubahan state.
+- Durasi interaksi baru berada pada rentang 150–200 ms. Hindari menambahkan
+  `transition-all` pada markup halaman baru.
 - Fokus keyboard selalu terlihat melalui `focus:ring`.
 - `prefers-reduced-motion` sudah dihormati oleh `resources/css/app.css`.
 - Jangan gunakan `alert()`, link `href="#"`, atau pagination/sort yang tidak menjalankan perilaku nyata.
@@ -99,3 +140,27 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 - Strategy: mixed, dengan card putih, border `border`, soft surface `soft`, dan shadow ringan yang sudah disediakan component.
 - Card/panel memakai `surface`, `border`, serta radius yang konsisten dari `x-ui` components.
 - Jangan membuat variasi card baru untuk satu halaman jika `x-ui.card` sudah mencukupi.
+
+## 8. Approved Exceptions
+
+### Hero dashboard
+
+Hero banner dashboard yang telah disetujui konsumen boleh memakai gradient,
+ilustrasi SVG, efek transparansi/blur, serta warna internal ilustrasi yang tidak
+tersedia sebagai token Tailwind. Pengecualian ini hanya berlaku untuk hero
+banner; aturan token-only tetap berlaku pada navigasi, card, tabel, form, badge,
+dan action di sekitarnya.
+
+Hero bukan pola generik yang boleh disalin ke halaman lain tanpa approval desain
+baru. Saat hero diubah, pertahankan keterbacaan teks, `prefers-reduced-motion`,
+dan responsivitasnya.
+
+## 9. Governance
+
+- Perubahan yang mengubah token, tipografi, motion, atau kontrak komponen harus
+  memperbarui `DESIGN.md` dan bagian terkait di `design-system.md` dalam PR yang
+  sama.
+- Contoh kode di `design-system.md` bersifat implementatif, bukan aturan visual
+  yang dapat menggantikan kontrak ini.
+- Audit UI menilai pengecualian yang tercatat di atas sebagai keputusan desain
+  yang disengaja, bukan sebagai pelanggaran token.

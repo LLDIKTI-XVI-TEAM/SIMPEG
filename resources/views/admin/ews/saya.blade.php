@@ -12,11 +12,10 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink">EWS Saya</h2>
-                <nav class="mb-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="font-medium text-ink">EWS Saya</span>
-                </nav>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'EWS Saya']
+                ]" />
             </div>
         </div>
 

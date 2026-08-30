@@ -657,9 +657,12 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->withoutMiddleware('role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai')
         ->name('revert-role');
 
-    Route::get('/notifications', [NotificationController::class, 'index'])
+    Route::get('/notifikasi', [NotificationController::class, 'index'])
         ->middleware('permission:notifications.read')
         ->name('notifications.index');
+
+    Route::redirect('/notifications', '/notifikasi')
+        ->middleware('permission:notifications.read');
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
         ->middleware(['role:super_admin,admin_kepegawaian'])

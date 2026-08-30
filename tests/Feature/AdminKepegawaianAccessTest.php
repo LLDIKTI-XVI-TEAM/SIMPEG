@@ -119,7 +119,7 @@ class AdminKepegawaianAccessTest extends TestCase
             '/laporan/export-pegawai',
             '/cuti/laporan',
             '/dashboard/audit',
-            '/notifications',
+            '/notifikasi',
         ] as $uri) {
             $response = $this->get($uri);
             if ($response->status() !== 200) {

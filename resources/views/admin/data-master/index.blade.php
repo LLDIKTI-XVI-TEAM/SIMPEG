@@ -49,24 +49,15 @@
     @endphp
 
 
-    <x-admin.page-header title="Data Master / Reference Tables" class="mb-6">
-        <x-slot:breadcrumb>
-                <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                <span>/</span>
-                <span class="font-medium text-ink">Data Master</span>
-                <span>•</span>
-                <span class="text-muted italic">Akses: Khusus Super Admin</span>
-        </x-slot:breadcrumb>
-        <x-slot:actions>
-            <x-ui.button href="{{ route('audit-log') }}" variant="muted">
-                <svg class="w-4 h-4 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
-                </svg>
-                Lihat Audit Log Master
-            </x-ui.button>
-        </x-slot:actions>
-    </x-admin.page-header>
+    <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+            <h2 class="text-2xl font-semibold text-ink font-sans">Data Master / Reference Tables</h2>
+            <x-ui.breadcrumb :items="[
+                ['label' => 'Dashboard', 'url' => route('dashboard')],
+                ['label' => 'Data Master']
+            ]" />
+        </div>
+    </div>
 
     <div x-data="{ 
         activeTab: '{{ old('tab', session('data_master_tab') ?: 'golongan') }}',
@@ -92,7 +83,7 @@
                     @foreach($tabs as $key => $label)
                     <x-ui.tab variant="sidebar-soft" active="activeTab === '{{ $key }}'" click="activeTab = '{{ $key }}'">
                         {{ $label }}
-                        <svg x-show="activeTab === '{{ $key }}'" class="w-4 h-4 ml-auto" fill="none" stroke="currentColor"
+                        <svg x-show="activeTab === '{{ $key }}'" class="w-4 h-4 ml-auto text-ink" fill="none" stroke="currentColor"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                         </svg>
@@ -156,21 +147,17 @@
             {{-- TAB: JENIS CUTI --}}
             <div x-show="activeTab === 'jenis_cuti'"
                 class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
+                <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Jenis Cuti</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi jenis-jenis
+                        <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Jenis Cuti</h2>
+                        <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi jenis-jenis
                             cuti dan aturannya.</p>
                     </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
+                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
                         Tambah
-                    </button>
+                    </x-ui.button>
                 </div>
-                <div class="rounded-lg overflow-hidden">
+                <div class="rounded-lg overflow-x-auto">
                     <x-ui.table>
                         <x-ui.table-head>
                             <x-ui.table-row>
@@ -180,14 +167,7 @@
                                     Nama Jenis Cuti</x-ui.table-th>
                                 <x-ui.table-th align="center">
                                     Khusus PNS</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
+                                <x-ui.table-th>Aksi</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
@@ -204,14 +184,14 @@
                                                 class="text-[11px] font-semibold text-muted">Tidak</span>
                                         @endif
                                     </x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
+                                    <x-ui.table-td padding="sm">
+                                        <div class="flex items-center justify-start gap-1.5">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit" aria-label="Edit jenis cuti">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
                                             </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus" aria-label="Hapus jenis cuti {{ $item['nama'] }}">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
@@ -228,21 +208,17 @@
             {{-- TAB: AGAMA --}}
             <div x-show="activeTab === 'agama'"
                 class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
+                <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Agama</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi agama resmi.
+                        <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Agama</h2>
+                        <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi agama resmi.
                         </p>
                     </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
+                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
                         Tambah
-                    </button>
+                    </x-ui.button>
                 </div>
-                <div class="rounded-lg overflow-hidden">
+                <div class="rounded-lg overflow-x-auto">
                     <x-ui.table>
                         <x-ui.table-head>
                             <x-ui.table-row>
@@ -250,14 +226,7 @@
                                     ID</x-ui.table-th>
                                 <x-ui.table-th>
                                     Nama Agama</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
+                                <x-ui.table-th>Aksi</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
@@ -265,14 +234,14 @@
                                 <x-ui.table-row :interactive="true">
                                     <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
                                     <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
+                                    <x-ui.table-td padding="sm">
+                                        <div class="flex items-center justify-start gap-1.5">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit" aria-label="Edit agama">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
                                             </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus" aria-label="Hapus agama {{ $item['nama'] }}">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
@@ -289,21 +258,17 @@
             {{-- TAB: JENIS KELAMIN --}}
             <div x-show="activeTab === 'jenis_kelamin'"
                 class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
+                <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Jenis Kelamin</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi jenis kelamin.
+                        <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Jenis Kelamin</h2>
+                        <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi jenis kelamin.
                         </p>
                     </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
+                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
                         Tambah
-                    </button>
+                    </x-ui.button>
                 </div>
-                <div class="rounded-lg overflow-hidden">
+                <div class="rounded-lg overflow-x-auto">
                     <x-ui.table>
                         <x-ui.table-head>
                             <x-ui.table-row>
@@ -313,14 +278,7 @@
                                     Kode</x-ui.table-th>
                                 <x-ui.table-th>
                                     Nama</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
+                                <x-ui.table-th>Aksi</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
@@ -329,14 +287,14 @@
                                     <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
                                     <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['kode'] }}</x-ui.table-td>
                                     <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
+                                    <x-ui.table-td padding="sm">
+                                        <div class="flex items-center justify-start gap-1.5">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit" aria-label="Edit jenis kelamin">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
                                             </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus" aria-label="Hapus jenis kelamin {{ $item['nama'] }}">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
@@ -353,21 +311,17 @@
             {{-- TAB: STATUS PERKAWINAN --}}
             <div x-show="activeTab === 'status_perkawinan'"
                 class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
-                <div class="pb-4 flex items-center justify-between">
+                <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h2 class="text-2xl font-bold text-primary font-sans leading-tight">Status Perkawinan</h2>
-                        <p class="text-[11px] text-muted mt-0.5 font-sans leading-normal">Data referensi status
+                        <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Status Perkawinan</h2>
+                        <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi status
                             perkawinan.</p>
                     </div>
-                    <button @click="openModal('tambah')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
+                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
                         Tambah
-                    </button>
+                    </x-ui.button>
                 </div>
-                <div class="rounded-lg overflow-hidden">
+                <div class="rounded-lg overflow-x-auto">
                     <x-ui.table>
                         <x-ui.table-head>
                             <x-ui.table-row>
@@ -375,14 +329,7 @@
                                     ID</x-ui.table-th>
                                 <x-ui.table-th>
                                     Status</x-ui.table-th>
-                                <x-ui.table-th align="right" class="select-none">
-                                    <div class="flex justify-end">
-                                        <svg class="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.936 6.936 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                        </svg>
-                                    </div>
-                                </x-ui.table-th>
+                                <x-ui.table-th>Aksi</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
@@ -390,14 +337,14 @@
                                 <x-ui.table-row :interactive="true">
                                     <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item['id'] }}</x-ui.table-td>
                                     <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item['nama'] }}</x-ui.table-td>
-                                    <x-ui.table-td align="right" padding="sm">
-                                        <div class="flex items-center justify-end gap-1.5">
-                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit">
+                                    <x-ui.table-td padding="sm">
+                                        <div class="flex items-center justify-start gap-1.5">
+                                            <x-ui.button type="button" @click="openModal('edit')" variant="secondary" size="icon" title="Edit" aria-label="Edit status perkawinan">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
                                             </x-ui.button>
-                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus">
+                                            <x-ui.button type="button" @click="openDeleteConfirm({ name: '{{ $item['nama'] }}' })" variant="danger" size="icon" title="Hapus" aria-label="Hapus status perkawinan {{ $item['nama'] }}">
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                                 </svg>
@@ -429,14 +376,14 @@
 
                 {{-- HEADER --}}
                 <div class="mb-6 flex items-center justify-between pb-4">
-                    <h3 class="text-xl font-bold text-primary font-sans"
+                    <h3 class="text-xl font-bold text-ink font-sans"
                         x-text="(modalMode === 'tambah' ? 'Tambah ' : 'Edit ') + tabs[activeTab]"></h3>
-                    <button @click="closeModal()" class="text-muted hover:text-danger transition-colors">
+                    <x-ui.button type="button" variant="ghost" size="icon" @click="closeModal()" title="Tutup dialog" aria-label="Tutup dialog">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                    </button>
+                    </x-ui.button>
                 </div>
 
                 {{-- BODY: Dynamic Forms based on activeTab --}}
@@ -505,14 +452,8 @@
 
                 {{-- FOOTER --}}
                 <div class="mt-8 flex justify-end gap-3 pt-5">
-                    <button @click="closeModal()"
-                        class="rounded-lg px-4 py-2 text-sm font-semibold text-muted hover:bg-soft transition-colors">
-                        Batal
-                    </button>
-                    <button @click="closeModal()"
-                        class="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-colors">
-                        Simpan
-                    </button>
+                    <x-ui.button type="button" variant="secondary" @click="closeModal()">Batal</x-ui.button>
+                    <x-ui.button type="button" @click="closeModal()">Simpan</x-ui.button>
                 </div>
 
             </div>

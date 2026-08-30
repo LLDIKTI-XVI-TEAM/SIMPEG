@@ -132,7 +132,7 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder([
                 'data-action-visual="temporary-secondary"',
-                'Ditangguhkan',
+                'Tangguhkan',
                 'Penangguhan karena tugas dinas menutup pengajuan lama dan melindungi hak sesuai ketentuan.',
                 'data-action-visual="terminal-warning"',
                 'Tangguhkan karena Tugas Dinas',

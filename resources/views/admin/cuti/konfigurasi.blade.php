@@ -67,23 +67,15 @@
             return this.errors[key]?.[0] ?? '';
         }
     }">
+        {{-- PAGE HEADER & BREADCRUMB --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <nav class="mb-2 flex items-center gap-1.5 text-xs text-muted" aria-label="Breadcrumb">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span aria-hidden="true">/</span>
-                    <span>Cuti</span>
-                    <span aria-hidden="true">/</span>
-                    <span class="font-medium text-ink">Konfigurasi Approval</span>
-                </nav>
-                <h2 class="text-2xl font-semibold text-ink">Konfigurasi Approval Cuti</h2>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Konfigurasi Approval Cuti</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Konfigurasi Approval Cuti']
+                ]" />
             </div>
-            <a href="{{ route('cuti') }}" class="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
-                Kembali ke Cuti
-                <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                </svg>
-            </a>
         </div>
 
         @if (session('success'))
@@ -137,10 +129,6 @@
                 <h3 id="employee-chain-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Chain Approval Pegawai</h3>
             </div>
 
-            <div class="flex items-center gap-2.5 px-5 pt-4">
-                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">1</span>
-                <p class="text-sm font-semibold text-ink">Pilih Pegawai</p>
-            </div>
             <x-cuti.employee-combobox
                 id="employee-search"
                 :action="route('cuti.config')"
@@ -156,7 +144,7 @@
                 placeholder="Nama atau NIP"
                 help="Ketik minimal 2 karakter."
                 submit-label="Cari Pegawai"
-                class="border-b border-border px-5 pb-4 pt-3"
+                class="border-b border-border px-5 py-4"
             />
 
             @if ($selectedEmployee)
@@ -167,7 +155,7 @@
                         <label for="approver-search" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kandidat Approver</label>
                         <div class="flex items-start gap-3">
                             <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" placeholder="Nama atau NIP" aria-describedby="approver-search-help" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                            <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Cari Kandidat</button>
+                            <x-ui.button type="submit" variant="secondary">Cari Kandidat</x-ui.button>
                         </div>
                         <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC Khusus.</p>
                     </form>
@@ -270,9 +258,7 @@
                         }"
                     >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="flex items-start gap-2.5">
-                                <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">2</span>
-                                <div>
+                            <div>
                                 <h4 class="text-sm font-semibold text-ink">Penetapan Kepala Bagian</h4>
                                 <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">
                                     @if ($selectedKepalaBagian)
@@ -281,7 +267,6 @@
                                         Belum ada Kepala Bagian aktif — tetapkan di bawah ini.
                                     @endif
                                 </p>
-                                </div>
                             </div>
                             @if ($selectedKepalaBagian)
                                 <button type="button" @click="kabagFormOpen = ! kabagFormOpen" :aria-expanded="kabagFormOpen.toString()" aria-controls="kabag-inline-form" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
@@ -389,8 +374,7 @@
                 <form method="POST" action="{{ route('cuti.config.employee-chain.store', $selectedEmployee) }}" class="divide-y divide-border">
                     @csrf
                     <div class="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div class="flex items-center gap-2.5">
-                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-white" aria-hidden="true">3</span>
+                        <div>
                             <p class="text-sm font-semibold text-ink">Susun Chain Approval</p>
                         </div>
                         @if ($selectedKepalaBagian)
@@ -404,7 +388,7 @@
                         @endif
                     </div>
                     <div class="sticky top-0 z-10 border-b border-border bg-surface/95 px-5 py-3 shadow-[0_4px_12px_rgb(15_23_42/0.08)] backdrop-blur-sm sm:hidden">
-                        <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Simpan Chain Pegawai</button>
+                        <x-ui.button type="submit" class="w-full">Simpan Chain Pegawai</x-ui.button>
                     </div>
                     <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
                         <div>
@@ -433,7 +417,7 @@
                                     <legend class="text-sm font-semibold text-ink">Verifikator</legend>
                                     <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Approver duplikat dilewati otomatis.</p>
                                 </div>
-                                <button type="button" @click="addVerifier()" :disabled="verifiers.length >= maxVerifierSteps" class="inline-flex items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50">Tambah Verifikator</button>
+                                <x-ui.button type="button" variant="secondary" size="sm" @click="addVerifier()" ::disabled="verifiers.length >= maxVerifierSteps">Tambah Verifikator</x-ui.button>
                             </div>
 
                             <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator.</p>
@@ -496,7 +480,7 @@
                             </div>
                              <div class="space-y-3">
                                  <x-form.textarea name="reason" id="employee-chain-reason" :required="true" rows="3" placeholder="Contoh: Penyesuaian verifikator setelah mutasi jabatan" />
-                                <button type="submit" class="hidden w-full items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:inline-flex">Simpan Chain Pegawai</button>
+                                <x-ui.button type="submit" class="hidden w-full sm:inline-flex">Simpan Chain Pegawai</x-ui.button>
                              </div>
                          </div>
                      @endif
@@ -508,7 +492,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                         </svg>
                         <p class="text-sm font-semibold text-ink">Pilih pegawai dari hasil pencarian</p>
-                        <p class="max-w-sm text-xs leading-relaxed text-muted">Langkah 2 dan 3 tampil setelah pegawai dipilih.</p>
+                        <p class="max-w-sm text-xs leading-relaxed text-muted">Penetapan Kepala Bagian dan susunan chain tampil setelah pegawai dipilih.</p>
                     </div>
                 </div>
             @else
@@ -698,7 +682,7 @@
                         <p x-show="pybmcSelectedId && !pybmcSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
                     </div>
                     <x-form.textarea name="pybmc_reason" id="pybmc-global-reason" label="Alasan PYBMC Global" :required="true" rows="3" placeholder="Contoh: Pergantian pejabat PYBMC" />
-                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Simpan PYBMC Global</button>
+                    <x-ui.button type="submit" class="w-full">Simpan PYBMC Global</x-ui.button>
                 </form>
             </div>
         </section>
@@ -725,7 +709,7 @@
                 <form method="POST" action="{{ route('cuti.config.backfill') }}" class="space-y-3">
                     @csrf
                     <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill" :required="true" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
-                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Jalankan Backfill Chain</button>
+                    <x-ui.button type="submit" class="w-full">Jalankan Backfill Chain</x-ui.button>
                 </form>
             </div>
         </section>
@@ -781,7 +765,7 @@
 
                         <x-form.textarea name="template_reason" id="template-reason" label="Alasan Penerapan" :required="true" rows="3" placeholder="Contoh: Menyeragamkan chain approval Bagian Keuangan" />
 
-                        <button type="submit" class="inline-flex w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Terapkan ke Unit Kerja</button>
+                        <x-ui.button type="submit" class="w-full">Terapkan ke Unit Kerja</x-ui.button>
                     </form>
                 @endif
             </div>

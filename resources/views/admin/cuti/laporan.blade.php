@@ -61,8 +61,8 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2 border-t border-border pt-4">
-                    <button type="submit" class="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">Terapkan Filter</button>
-                    <a data-filter-reset href="{{ route('cuti.laporan') }}" class="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-5 py-2 text-sm font-semibold text-ink hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30">Reset</a>
+                    <x-ui.button type="submit">Terapkan Filter</x-ui.button>
+                    <x-ui.button href="{{ route('cuti.laporan') }}" variant="secondary" data-filter-reset>Reset</x-ui.button>
                 </div>
             </form>
         </section>

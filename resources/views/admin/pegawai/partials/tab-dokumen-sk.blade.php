@@ -1,24 +1,4 @@
 <x-pegawai.detail.panel tab="docs" id-prefix="admin">
-    <x-pegawai.detail.section-header
-        title="Dokumen & SK"
-        description="Dokumen SK ditampilkan terpisah dari KTP/KK, ijazah, dan berkas tambahan lainnya."
-    >
-        @if($canManageDocuments)
-            <x-slot:actions>
-                <button
-                    type="button"
-                    @click="showUploadBerkas = true; uploadBerkasError = ''; uploadBerkasErrors = {}"
-                    class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2"
-                >
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                    Unggah Berkas Lainnya
-                </button>
-            </x-slot:actions>
-        @endif
-    </x-pegawai.detail.section-header>
-
     @if($canManageDocuments)
         <x-ui.modal
             show="showUploadBerkas"
@@ -331,18 +311,29 @@
         data-document-tersedia="{{ $documentStatus['tersedia_count'] }}"
         data-document-total-wajib="{{ $documentStatus['total_wajib'] }}"
     >
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <h4 id="dokumen-sk-heading" class="text-sm font-semibold text-ink">Dokumen SK</h4>
-                <p class="text-xs text-muted">Daftar dan status berikut mengikuti matriks SK wajib aktif untuk jenis pegawai ini.</p>
-            </div>
-            <span class="inline-flex w-fit shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $documentStatusBadgeClasses[$statusKey] ?? 'bg-soft text-muted' }}">
-                {{ $documentStatusLabels[$statusKey] ?? 'Status Tidak Dikenal' }}
-                @if($documentStatus['is_dinilai'])
-                    ({{ $documentStatus['tersedia_count'] }}/{{ $documentStatus['total_wajib'] }})
-                @endif
-            </span>
-        </div>
+        <x-pegawai.detail.section-header
+            title="Dokumen SK"
+            description="Daftar dan status berikut mengikuti matriks SK wajib aktif untuk jenis pegawai ini."
+            heading-id="dokumen-sk-heading"
+        >
+            <x-slot:actions>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex w-fit shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $documentStatusBadgeClasses[$statusKey] ?? 'bg-soft text-muted' }}">
+                        {{ $documentStatusLabels[$statusKey] ?? 'Status Tidak Dikenal' }}
+                        @if($documentStatus['is_dinilai'])
+                            ({{ $documentStatus['tersedia_count'] }}/{{ $documentStatus['total_wajib'] }})
+                        @endif
+                    </span>
+                    @if($canManageDocuments)
+                        <x-ui.button
+                            type="button"
+                            size="sm"
+                            @click="showUploadBerkas = true; uploadBerkasError = ''; uploadBerkasErrors = {}"
+                        >Unggah Berkas Lainnya</x-ui.button>
+                    @endif
+                </div>
+            </x-slot:actions>
+        </x-pegawai.detail.section-header>
 
         @if(! $documentStatus['is_dinilai'])
             <div class="rounded-lg border border-border bg-soft/40 p-4" role="status">
@@ -418,10 +409,11 @@
     </section>
 
     <section class="space-y-3" aria-labelledby="arsip-sk-heading">
-        <div>
-            <h4 id="arsip-sk-heading" class="text-sm font-semibold text-ink">Arsip SK</h4>
-            <p class="text-xs text-muted">Seluruh record arsip SK tetap tersedia untuk dilihat dan diunduh tanpa memengaruhi penilaian matriks aktif.</p>
-        </div>
+        <x-pegawai.detail.section-header
+            title="Arsip SK"
+            description="Seluruh record arsip SK tetap tersedia untuk dilihat dan diunduh tanpa memengaruhi penilaian matriks aktif."
+            heading-id="arsip-sk-heading"
+        />
 
         <x-pegawai.detail.table
             name="arsip-sk"
@@ -466,10 +458,11 @@
     </section>
 
     <section class="space-y-3" aria-labelledby="berkas-lainnya-heading">
-        <div>
-            <h4 id="berkas-lainnya-heading" class="text-sm font-semibold text-ink">Berkas Lainnya</h4>
-            <p class="text-xs text-muted">KTP/KK, ijazah, dan dokumen tambahan lain yang diunggah dari profil pegawai.</p>
-        </div>
+        <x-pegawai.detail.section-header
+            title="Berkas Lainnya"
+            description="KTP/KK, ijazah, dan dokumen tambahan lain yang diunggah dari profil pegawai."
+            heading-id="berkas-lainnya-heading"
+        />
 
         <x-pegawai.detail.table
             name="berkas-lainnya"

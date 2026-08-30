@@ -21,6 +21,21 @@ $permissionPaths = [
     'view_all_ews'            => 'EWS Aktif',
     'generate_reports'        => 'Laporan (Export)',
 ];
+
+$permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $moduleName) use ($permissionPaths) {
+    $search = $permissions->map(function ($permission) use ($permissionPaths) {
+        return implode(' ', [
+            $permission->name,
+            $permissionPaths[$permission->name] ?? $permission->name,
+            $permission->description ?? '',
+        ]);
+    })->implode(' ');
+
+    return [
+        'module' => $moduleName,
+        'search' => $search,
+    ];
+})->values()->all();
 @endphp
 
     <div x-data="{
@@ -30,12 +45,13 @@ $permissionPaths = [
         originalData: {},
         currentData: {},
         isDirty: false,
+        permissionGroups: {{ json_encode($permissionGroupsForFilter) }},
 
         init() {
             // Initialize permission mappings as string arrays for reliable checkbox binding
             const initial = {};
             @foreach($roles as $role)
-                initial[{{ $role->id }}] = {{ json_encode($role->permissions->pluck('id')->map(fn($id) => (string)$id)->toArray()) }};
+                initial[{{ json_encode($role->id) }}] = {{ json_encode($role->permissions->pluck('id')->map(fn($id) => (string) $id)->toArray()) }};
             @endforeach
             
             this.originalData = JSON.parse(JSON.stringify(initial));
@@ -58,6 +74,19 @@ $permissionPaths = [
         resetChanges() {
             this.currentData = JSON.parse(JSON.stringify(this.originalData));
             this.isDirty = false;
+        },
+
+        matchesPermission(value) {
+            const query = this.searchQuery.trim().toLocaleLowerCase();
+
+            return query === '' || String(value ?? '').toLocaleLowerCase().includes(query);
+        },
+
+        hasMatchingPermission() {
+            return this.permissionGroups.some(({ module, search }) =>
+                (this.moduleFilter === '' || this.moduleFilter === module)
+                && this.matchesPermission(search)
+            );
         }
     }" @confirm-rbac.window="$refs.rbacForm.submit()" class="space-y-6">
 
@@ -69,18 +98,6 @@ $permissionPaths = [
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Role & Permission']
                 ]" />
-                <div class="mt-1 flex items-center text-xs text-muted">
-                    <span>•</span>
-                    <span class="ml-1 text-muted italic">Akses: Khusus Super Admin</span>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <x-ui.button href="{{ route('audit-log') }}" variant="muted">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
-                    </svg>
-                    Lihat Audit Log Otorisasi
-                </x-ui.button>
             </div>
         </div>
 
@@ -89,32 +106,20 @@ $permissionPaths = [
             <x-ui.alert variant="success" class="font-semibold">{{ session('success') }}</x-ui.alert>
         @endif
 
-        {{-- SYNC & CONCEPT EXPLANATION CARD --}}
-        <div class="rounded-lg border-l-4 border-primary border-y border-r border-border bg-primary/5 p-4 shadow-sm">
-            <div class="flex items-start gap-3">
-                <div class="text-primary shrink-0 mt-0.5">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-primary font-sans">Otorisasi & Keamanan Internal</h3>
-                    <div class="text-xs text-ink/80 font-sans mt-1 leading-relaxed space-y-1">
-                        <p>Keycloak hanya berperan sebagai gerbang autentikasi login (SSO). Penentuan menu, hak akses halaman, dan aksi fitur diatur sepenuhnya di database internal SIMPEG melalui matriks RBAC di bawah ini.</p>
-                        <p class="font-semibold text-primary">Aturan Efektivitas Perubahan:</p>
-                        <ul class="list-disc pl-4 space-y-0.5">
-                            <li><strong>Perubahan Mapping Peran (Role Pegawai):</strong> Baru aktif setelah pegawai bersangkutan melakukan <strong>login berikutnya</strong>.</li>
-                            <li><strong>Perubahan Hak Akses Peran (Permission Matrix):</strong> Berlaku secara <strong>langsung (real-time)</strong> untuk semua pengguna aktif yang sedang memegang peran tersebut.</li>
-                        </ul>
-                    </div>
-                </div>
+        {{-- INFO ARCHITECTURE CARD --}}
+        <div class="rounded-lg border border-info/20 bg-info/5 p-4 text-xs text-info flex gap-3">
+            <svg class="w-5 h-5 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+            </svg>
+            <div>
+                <span class="font-bold">Informasi Otorisasi:</span> Sistem menggunakan Keycloak SSO murni untuk autentikasi identitas login. Seluruh hak akses, role, dan permission dibaca serta dikonfigurasi melalui database internal SIMPEG (RBAC). Perubahan peran (role) akan berlaku saat pegawai melakukan login berikutnya.
             </div>
         </div>
 
         {{-- SUMMARY ROLES CARDS --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             @foreach($roles as $role)
-                <x-ui.card padding="sm" class="flex flex-col justify-between hover:border-primary/25 transition-all duration-300">
+                <x-ui.card padding="sm" class="flex flex-col justify-between">
                     <div>
                         @php
                             $roleVariant = match ($role->name) {
@@ -128,14 +133,12 @@ $permissionPaths = [
                         <x-ui.badge :variant="$roleVariant" size="xs" uppercase>
                             {{ $role->name }}
                         </x-ui.badge>
-                        <x-ui.tooltip text="{{ $role->description }}">
-                            <p class="text-[10px] text-muted mt-2 font-sans line-clamp-2">
-                                {{ $role->description }}
-                            </p>
-                        </x-ui.tooltip>
+                        <p class="mt-2 text-xs font-sans text-muted line-clamp-2">
+                            {{ $role->description }}
+                        </p>
                     </div>
                     <div class="mt-4 border-t border-border/50 pt-2 flex items-baseline justify-between">
-                        <span class="text-[10px] text-muted font-sans font-medium">Izin Aktif:</span>
+                        <span class="text-xs text-muted font-sans font-medium">Izin Aktif:</span>
                         <span class="text-base font-bold text-ink">{{ $role->permissions->count() }}</span>
                     </div>
                 </x-ui.card>
@@ -159,7 +162,7 @@ $permissionPaths = [
                             @php
                                 $modules = array_keys($permissionsByModule->toArray());
                             @endphp
-                            <x-form.select x-model="moduleFilter">
+                            <x-form.select x-model="moduleFilter" class="h-10" aria-label="Filter modul">
                                 <option value="">Semua Modul</option>
                                 @foreach($modules as $m)
                                     <option value="{{ $m }}">{{ $m }}</option>
@@ -169,11 +172,13 @@ $permissionPaths = [
 
                         {{-- Search Input --}}
                         <div class="relative w-full sm:w-64">
+                            <label for="rbac-permission-search" class="sr-only">Cari izin atau deskripsi</label>
                             <input
-                                type="text"
+                                id="rbac-permission-search"
+                                type="search"
                                 x-model="searchQuery"
                                 placeholder="Cari izin / deskripsi..."
-                                class="w-full rounded-lg border border-border bg-surface pl-9 pr-4 py-1.5 text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans"
+                                class="h-10 w-full rounded-xl border border-border bg-surface py-2 pl-10 pr-4 text-sm text-ink shadow-sm placeholder:text-muted transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans"
                             >
                             <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -202,80 +207,85 @@ $permissionPaths = [
                             @php $globalIndex = 1; @endphp
                             @foreach($permissionsByModule as $moduleName => $perms)
                                 @php
-                                    $permsJson = json_encode($perms->map(function($p) use ($permissionPaths) {
-                                        return [
-                                            'name' => $p->name,
-                                            'display' => $permissionPaths[$p->name] ?? $p->name,
-                                            'description' => $p->description
-                                        ];
-                                    })->toArray());
+                                    $moduleNameJson = json_encode($moduleName);
+                                    $moduleSearch = $perms->map(function ($permission) use ($permissionPaths) {
+                                        return implode(' ', [
+                                            $permission->name,
+                                            $permissionPaths[$permission->name] ?? $permission->name,
+                                            $permission->description ?? '',
+                                        ]);
+                                    })->implode(' ');
+                                    $moduleSearchJson = json_encode($moduleSearch);
                                 @endphp
-                                <x-ui.table-body x-show="moduleFilter === '' || moduleFilter === '{{ $moduleName }}'" x-data="{ perms: {{ $permsJson }} }" class="border-b border-border">
-                                    {{-- Module Header Row --}}
-                                    <x-ui.table-row x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || perms.some(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.display.toLowerCase().includes(searchQuery.toLowerCase()) || (p.description || '').toLowerCase().includes(searchQuery.toLowerCase())))"
-                                        class="bg-soft/50 font-semibold">
-                                        <x-ui.table-td colspan="2" class="px-4 py-2 font-bold uppercase tracking-wider border-b border-border">
-                                            📁 &nbsp;{{ $moduleName }}
+                                {{-- Module Header Row --}}
+                                <x-ui.table-row x-show="(moduleFilter === '' || moduleFilter === {{ $moduleNameJson }}) && matchesPermission({{ $moduleSearchJson }})"
+                                    class="bg-soft/50 font-semibold">
+                                    <x-ui.table-td colspan="2" class="border-b border-border px-4 py-2 font-bold uppercase tracking-wider">
+                                        📁 &nbsp;{{ $moduleName }}
+                                    </x-ui.table-td>
+                                    @foreach($roles as $role)
+                                        <x-ui.table-td colspan="1" class="border-b border-border px-4 py-2"></x-ui.table-td>
+                                    @endforeach
+                                </x-ui.table-row>
+
+                                {{-- Permission Rows --}}
+                                @foreach($perms as $permission)
+                                    @php
+                                        $displayPath = $permissionPaths[$permission->name] ?? $permission->name;
+                                        $isSensitive = in_array($permission->name, ['manage_user_mapping', 'manage_rbac', 'view_audit_log', 'configure_ews']);
+                                    @endphp
+                                    <x-ui.table-row data-permission-search="{{ $permission->name }} {{ $displayPath }} {{ $permission->description }}" x-show="(moduleFilter === '' || moduleFilter === {{ $moduleNameJson }}) && matchesPermission($el.dataset.permissionSearch)"
+                                        class="hover:bg-soft/30 transition-colors">
+                                        <x-ui.table-td class="text-muted">{{ $globalIndex++ }}</x-ui.table-td>
+                                        <x-ui.table-td>
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="text-xs font-bold text-primary">{{ $displayPath }}</span>
+                                                @if($isSensitive)
+                                                    <span class="inline-flex items-center text-xs font-bold uppercase tracking-wider text-danger leading-none">⚠️ High Risk / Sensitif</span>
+                                                @endif
+                                            </div>
+                                            <div class="mt-0.5 text-xs leading-relaxed text-muted">
+                                                @if($permission->name === 'generate_reports')
+                                                    Mengunduh/export rekap data pegawai dan cuti dalam format PDF dan Excel.
+                                                @else
+                                                    {{ $permission->description }}
+                                                @endif
+                                            </div>
                                         </x-ui.table-td>
                                         @foreach($roles as $role)
-                                            <x-ui.table-td colspan="1" class="px-4 py-2 border-b border-border"></x-ui.table-td>
+                                            <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition">
+                                                @if($role->name === 'super_admin')
+                                                    {{-- Super Admin is always checked and disabled to prevent lockout --}}
+                                                    <div class="flex items-center justify-center">
+                                                        <x-form.checkbox
+                                                            checked
+                                                            disabled
+                                                            class="text-primary/45 bg-soft focus:ring-0"
+                                                        />
+                                                        {{-- Standard hidden inputs for checked values to send back --}}
+                                                        <input type="hidden" name="matrix[{{ $role->id }}][]" value="{{ $permission->id }}">
+                                                    </div>
+                                                @else
+                                                    <div class="flex items-center justify-center">
+                                                        <x-form.checkbox
+                                                            name="matrix[{{ $role->id }}][]"
+                                                            value="{{ $permission->id }}"
+                                                            x-model="currentData[{{ json_encode($role->id) }}]"
+                                                            @change="checkDirty()"
+                                                            class="transition"
+                                                        />
+                                                    </div>
+                                                @endif
+                                            </x-ui.table-td>
                                         @endforeach
                                     </x-ui.table-row>
-                                    
-                                    {{-- Permission Rows --}}
-                                    @foreach($perms as $permission)
-                                        @php
-                                            $displayPath = $permissionPaths[$permission->name] ?? $permission->name;
-                                            $isSensitive = in_array($permission->name, ['manage_user_mapping', 'manage_rbac', 'view_audit_log', 'configure_ews']);
-                                        @endphp
-                                        <x-ui.table-row x-show="(moduleFilter === '' || moduleFilter === '{{ $moduleName }}') && (searchQuery === '' || '{{ strtolower($permission->name) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($displayPath) }}'.includes(searchQuery.toLowerCase()) || '{{ strtolower($permission->description) }}'.includes(searchQuery.toLowerCase()))"
-                                            class="hover:bg-soft/30 transition-colors">
-                                            <x-ui.table-td class="text-muted">{{ $globalIndex++ }}</x-ui.table-td>
-                                            <x-ui.table-td>
-                                                <div class="flex items-center gap-1.5 flex-wrap">
-                                                    <span class="font-bold text-primary text-[11px]">{{ $displayPath }}</span>
-                                                    @if($isSensitive)
-                                                        <span class="inline-flex items-center text-[9px] font-bold uppercase tracking-wider text-danger leading-none">⚠️ High Risk / Sensitif</span>
-                                                    @endif
-                                                </div>
-                                                <div class="text-[10px] text-muted mt-0.5 leading-relaxed">
-                                                    @if($permission->name === 'generate_reports')
-                                                        Mengunduh/export rekap data pegawai dan cuti dalam format PDF dan Excel.
-                                                    @else
-                                                        {{ $permission->description }}
-                                                    @endif
-                                                </div>
-                                            </x-ui.table-td>
-                                            @foreach($roles as $role)
-                                                <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition">
-                                                    @if($role->name === 'super_admin')
-                                                        {{-- Super Admin is always checked and disabled to prevent lockout --}}
-                                                        <div class="flex items-center justify-center">
-                                                            <x-form.checkbox
-                                                                checked
-                                                                disabled
-                                                                class="text-primary/45 bg-soft focus:ring-0"
-                                                            />
-                                                            {{-- Standard hidden inputs for checked values to send back --}}
-                                                            <input type="hidden" name="matrix[{{ $role->id }}][]" value="{{ $permission->id }}">
-                                                        </div>
-                                                    @else
-                                                        <div class="flex items-center justify-center">
-                                                            <x-form.checkbox
-                                                                name="matrix[{{ $role->id }}][]"
-                                                                value="{{ $permission->id }}"
-                                                                x-model="currentData[{{ $role->id }}]"
-                                                                @change="checkDirty()"
-                                                                class="transition"
-                                                            />
-                                                        </div>
-                                                    @endif
-                                                </x-ui.table-td>
-                                            @endforeach
-                                        </x-ui.table-row>
-                                    @endforeach
-                                </x-ui.table-body>
+                                @endforeach
                             @endforeach
+                            <x-ui.table-row x-show="!hasMatchingPermission()" style="display: none;">
+                                <x-ui.table-td colspan="{{ 2 + $roles->count() }}" align="center" class="px-6 py-10 text-sm text-muted">
+                                    Tidak ada izin yang sesuai dengan filter.
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         </x-ui.table-body>
                     </x-ui.table>
                 </div>
@@ -301,24 +311,26 @@ $permissionPaths = [
                     </div>
                     <div>
                         <p class="text-sm font-semibold">Terdapat perubahan belum disimpan!</p>
-                        <p class="text-[11px] text-white/60 font-sans">Simpan perubahan matriks hak akses atau klik Batal untuk membatalkan perubahan.</p>
+                        <p class="text-xs text-white/60 font-sans">Simpan perubahan matriks hak akses atau klik Batal untuk membatalkan perubahan.</p>
                     </div>
                 </div>
                 <div class="flex items-center justify-end gap-3 shrink-0">
-                    <button
+                    <x-ui.button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         @click="resetChanges()"
-                        class="px-4 py-2 text-xs font-semibold text-white/80 hover:text-white transition cursor-pointer font-sans"
+                        class="text-white/80 hover:bg-white/10 hover:text-white"
                     >
                         Batal
-                    </button>
-                    <button
+                    </x-ui.button>
+                    <x-ui.button
                         type="button"
                         @click="$dispatch('open-confirm-rbac')"
-                        class="inline-flex items-center justify-center rounded-lg bg-secondary px-5 py-2.5 text-xs font-bold text-ink shadow-sm transition hover:opacity-90 cursor-pointer font-sans"
+                        size="sm"
                     >
                         Simpan Perubahan
-                    </button>
+                    </x-ui.button>
                 </div>
             </div>
 

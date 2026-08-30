@@ -277,7 +277,7 @@
                                 @error('lampiran')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                             </div>
                             <div class="md:col-span-2 flex justify-end">
-                                <button type="submit" class="{{ $buttonStyles['success'] }}">{{ $isRolloverReturn ? 'Perbaiki dan Ajukan Kembali' : 'Kirim Ulang Pengajuan' }}</button>
+                                <x-ui.button type="submit">{{ $isRolloverReturn ? 'Perbaiki dan Ajukan Kembali' : 'Kirim Ulang Pengajuan' }}</x-ui.button>
                             </div>
                         </form>
                     </div>
@@ -355,9 +355,9 @@
                 @if ($canAct)
                     {{-- Catatan keputusan wajib untuk tindakan selain setuju agar pemohon memahami dasar keputusan. --}}
                     @foreach ([
-                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Ditangguhkan', 'variant' => 'warning'],
-                        'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Minta Perubahan', 'variant' => 'danger'],
-                        'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger'],
+                        'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Ditangguhkan', 'variant' => 'warning-solid'],
+                        'requestChanges' => ['route' => 'cuti.request-changes', 'label' => 'Catatan Perubahan', 'title' => 'Minta Perubahan', 'variant' => 'warning-solid'],
+                        'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger-solid'],
                     ] as $formKey => $form)
                     <div x-show="decisionForm === '{{ $formKey }}'" x-cloak
                         role="dialog" aria-modal="true" aria-labelledby="decision-title-{{ $formKey }}"
@@ -377,8 +377,8 @@
                                 required
                             />
                             <div class="flex justify-end gap-2">
-                                <button type="button" class="{{ $buttonStyles['muted'] }}" @click="close()">Batal</button>
-                                <button type="submit" class="{{ $buttonStyles[$form['variant']] }}">{{ $form['title'] }}</button>
+                                <x-ui.button type="button" variant="secondary" @click="close()">Batal</x-ui.button>
+                                <x-ui.button type="submit" variant="{{ $form['variant'] }}">{{ $form['title'] }}</x-ui.button>
                             </div>
                         </form>
                     </div>
@@ -418,7 +418,7 @@
 
                     @if ($canAct)
                         <x-ui.button type="button" variant="secondary" data-action-visual="temporary-secondary" @click="open('postpone', $event)">
-                            Ditangguhkan
+                            Tangguhkan
                         </x-ui.button>
                         @if ($cuti->jenisCuti?->code === 'tahunan')
                             <div class="w-full sm:w-auto">
@@ -428,17 +428,11 @@
                                 </x-ui.button>
                             </div>
                         @endif
-                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('requestChanges', $event)">
-                            Perubahan
-                        </button>
-                        <button type="button" class="{{ $buttonStyles['danger'] }}" @click="open('decline', $event)">
-                            Tidak Setujui
-                        </button>
+                        <x-ui.button type="button" variant="warning-solid" @click="open('requestChanges', $event)">Minta Perubahan</x-ui.button>
+                        <x-ui.button type="button" variant="danger-solid" @click="open('decline', $event)">Tidak Setujui</x-ui.button>
                         <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
                             @csrf
-                            <button type="submit" class="{{ $buttonStyles['success'] }}">
-                                Setujui
-                            </button>
+                            <x-ui.button type="submit" variant="success-solid">Setujui</x-ui.button>
                         </form>
                     @endif
                 </div>

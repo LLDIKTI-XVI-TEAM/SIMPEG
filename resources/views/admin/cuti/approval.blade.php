@@ -78,28 +78,17 @@
                                         open(ev) { this.lastTrigger = ev?.currentTarget ?? null; this.confirming = true; },
                                         close() { this.confirming = false; this.$nextTick(() => this.lastTrigger?.focus()); } }" class="inline-flex items-center gap-2"
                                         x-effect="if (confirming) $nextTick(() => $refs.confirmApprove?.focus())">
-                                        <button type="button" x-show="!confirming" @click="open($event)"
-                                            class="inline-flex items-center justify-center rounded-lg bg-success px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
-                                            Setuju
-                                        </button>
+                                        <x-ui.button type="button" variant="success-solid" size="sm" x-show="!confirming" @click="open($event)">Setuju</x-ui.button>
                                         <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
                                             @csrf
                                             <span class="text-xs text-muted">Yakin?</span>
-                                            <button type="submit" x-ref="confirmApprove"
-                                                class="inline-flex items-center justify-center rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
-                                                Ya, setujui
-                                            </button>
-                                            <button type="button" @click="close()"
-                                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-ink cursor-pointer">
-                                                Batal
-                                            </button>
+                                            <x-ui.button type="submit" variant="success-solid" size="sm" x-ref="confirmApprove">Ya, setujui</x-ui.button>
+                                            <x-ui.button type="button" variant="secondary" size="sm" @click="close()">Batal</x-ui.button>
                                         </form>
                                     </div>
 
                                     {{-- Tunda: butuh alasan, arahkan ke detail tempat form penundaan tersedia --}}
-                                    <a href="{{ route('cuti.show', $r->id) }}" class="inline-flex items-center justify-center rounded-lg bg-warning px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 cursor-pointer">
-                                        Tunda
-                                    </a>
+                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="warning-solid" size="sm">Tunda</x-ui.button>
                                 </div>
                             </x-ui.table-td>
                         </x-ui.table-row>

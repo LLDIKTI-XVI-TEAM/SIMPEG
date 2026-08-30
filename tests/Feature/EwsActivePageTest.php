@@ -103,6 +103,120 @@ class EwsActivePageTest extends TestCase
         ]);
     }
 
+    public function test_ews_active_page_paginates_alerts_and_keeps_filters_in_page_links(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        foreach (range(1, 26) as $day) {
+            $this->alert(
+                now()->addDays($day)->toDateString(),
+                'KGB',
+                sprintf('Pegawai Pagination %02d', $day),
+            );
+        }
+
+        $response = $this->actingAs($user)->get(route('ews', [
+            'event' => 'KGB',
+            'search' => 'Pagination',
+        ]));
+
+        $alerts = $response->viewData('alerts');
+
+        $response->assertOk()
+            ->assertSee('Pegawai Pagination 01')
+            ->assertSee('Pegawai Pagination 10')
+            ->assertDontSee('Pegawai Pagination 11');
+        $this->assertSame(10, $alerts->perPage());
+        $this->assertSame(26, $alerts->total());
+        $this->assertStringContainsString('event=KGB', $alerts->url(2));
+        $this->assertStringContainsString('search=Pagination', $alerts->url(2));
+
+        $this->actingAs($user)
+            ->get(route('ews', ['event' => 'KGB', 'search' => 'Pagination', 'page' => 2]))
+            ->assertOk()
+            ->assertSee('Pegawai Pagination 11')
+            ->assertDontSee('Pegawai Pagination 01');
+    }
+
+    public function test_ews_active_page_searches_name_case_insensitively_and_partial_nip(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $nameMatch = $this->alert(now()->addDays(20)->toDateString(), 'KGB', 'Siti Rahmawati Pencarian');
+        $nameMatch->employee->update(['nip' => '199912341234123456']);
+        $other = $this->alert(now()->addDays(30)->toDateString(), 'KGB', 'Budi Santoso Pencarian');
+
+        $this->actingAs($user)
+            ->get(route('ews', ['search' => 'sItI rAhMa']))
+            ->assertOk()
+            ->assertSee($nameMatch->employee->nama_lengkap)
+            ->assertDontSee($other->employee->nama_lengkap);
+
+        $this->actingAs($user)
+            ->get(route('ews', ['search' => '12341234']))
+            ->assertOk()
+            ->assertSee($nameMatch->employee->nama_lengkap)
+            ->assertDontSee($other->employee->nama_lengkap);
+    }
+
+    public function test_ews_active_page_search_uses_explicit_submit_instead_of_navigating_while_typing(): void
+    {
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('ews'));
+
+        $response->assertOk()
+            ->assertSee('aria-label="Terapkan pencarian EWS"', false)
+            ->assertDontSee('requestSubmit()', false);
+    }
+
+    public function test_ews_active_page_treats_sql_wildcards_as_literal_search_characters(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $percentMatch = $this->alert(now()->addDays(20)->toDateString(), 'KGB', 'Pegawai 100% Literal');
+        $underscoreMatch = $this->alert(now()->addDays(21)->toDateString(), 'KGB', 'Pegawai_Kode Literal');
+        $other = $this->alert(now()->addDays(22)->toDateString(), 'KGB', 'Pegawai Biasa');
+
+        $this->actingAs($user)
+            ->get(route('ews', ['search' => '%']))
+            ->assertOk()
+            ->assertSee($percentMatch->employee->nama_lengkap)
+            ->assertDontSee($other->employee->nama_lengkap);
+
+        $this->actingAs($user)
+            ->get(route('ews', ['search' => '_']))
+            ->assertOk()
+            ->assertSee($underscoreMatch->employee->nama_lengkap)
+            ->assertDontSee($other->employee->nama_lengkap);
+    }
+
+    public function test_ews_active_page_pagination_uses_alert_id_as_stable_tie_breaker(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $alerts = collect();
+
+        foreach (range(1, 11) as $index) {
+            $alerts->push($this->alert(
+                now()->addDays(30)->toDateString(),
+                'KGB',
+                sprintf('Pegawai Target Seragam %02d', $index),
+            ));
+        }
+
+        $firstPage = $this->actingAs($user)->get(route('ews', ['per_page' => 10]));
+        $secondPage = $this->actingAs($user)->get(route('ews', ['per_page' => 10, 'page' => 2]));
+
+        $firstPage->assertOk();
+        $secondPage->assertOk();
+
+        $actualIds = collect($firstPage->viewData('alerts')->items())
+            ->pluck('alert_id')
+            ->merge(collect($secondPage->viewData('alerts')->items())->pluck('alert_id'))
+            ->values()
+            ->all();
+        $expectedIds = $alerts->sortBy('id')->pluck('id')->values()->all();
+
+        $this->assertSame($expectedIds, $actualIds);
+    }
+
     public function test_event_filter_only_shows_selected_event(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

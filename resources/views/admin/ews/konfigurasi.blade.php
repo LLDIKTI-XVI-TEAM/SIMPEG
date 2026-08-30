@@ -132,29 +132,12 @@
         {{-- ================================================================ --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Konfigurasi Early Warning System (EWS)</h2>
-                <nav class="mb-1 flex items-center gap-1.5 text-xs text-muted">
-                    <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
-                    <span>/</span>
-                    <span class="text-muted">EWS</span>
-                    <span>/</span>
-                    <span class="font-medium text-ink">Konfigurasi</span>
-                </nav>
+                <h2 class="text-2xl font-semibold text-ink">Konfigurasi EWS</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Konfigurasi EWS']
+                ]" />
             </div>
-            {{-- Shortcut link to EWS Aktif --}}
-            <a href="{{ route('ews') }}"
-                class="inline-flex items-center gap-2 rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft">
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                </svg>
-                Lihat EWS Aktif
-                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
-                </svg>
-            </a>
         </div>
 
         @if(session('success'))
@@ -640,14 +623,13 @@
                             x-model="reason"
                         />
 
-                        <button type="button" @click="openConfirm()"
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50 font-sans cursor-pointer"
-                            :disabled="reason.trim() === '' || thresholdWarnings.length > 0">
+                        <x-ui.button type="button" @click="openConfirm()" class="w-full"
+                            ::disabled="reason.trim() === '' || thresholdWarnings.length > 0">
                             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                             </svg>
                             Simpan Konfigurasi EWS
-                        </button>
+                        </x-ui.button>
                         <div class="space-y-1" aria-live="polite">
                             <p class="text-xs text-danger" x-show="reason.trim() === ''">
                                 Isi alasan perubahan sebelum menyimpan konfigurasi.
@@ -665,15 +647,12 @@
         {{-- E3: TIDY AUDIT LOG TABLE (Expandable Table style) --}}
         {{-- ================================================================ --}}
         <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-            <div class="px-5 py-4 border-b border-border bg-soft/30 flex items-center justify-between">
+            <div class="px-5 py-4 border-b border-border bg-soft/30">
                 <div>
                     <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Log Perubahan Konfigurasi</h3>
                     <p class="mt-0.5 text-xs text-muted">Riwayat lengkap perubahan parameter EWS. Klik baris untuk
                         detail IP, device, dan nilai lama/baru.</p>
                 </div>
-                <span
-                    class="text-[10px] font-semibold text-muted bg-soft px-2.5 py-1 rounded-full border border-border">{{ count($auditRows) }}
-                    entri</span>
             </div>
 
             <div class="overflow-x-auto">
@@ -776,19 +755,42 @@
                         @empty
                             <x-ui.table-row>
                                 <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-sm text-muted">
-                                    <div class="flex flex-col items-center gap-2">
-                                        <svg class="w-8 h-8 text-muted/40" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24" stroke-width="1">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                                        </svg>
-                                        Belum ada perubahan konfigurasi tercatat.
-                                    </div>
+                                    Belum ada perubahan konfigurasi tercatat.
                                 </x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse
                     </x-ui.table-body>
                 </x-ui.table>
+            </div>
+
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-soft/20 px-6 py-4 sm:flex-row">
+                <div class="flex flex-wrap items-center justify-center gap-4 text-sm text-muted sm:justify-start">
+                    <form method="GET" action="{{ route('ews.config') }}" class="flex items-center gap-2">
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="ews-config-log-per-page" class="sr-only">Jumlah log perubahan per halaman</label>
+                        <select
+                            id="ews-config-log-per-page"
+                            name="log_per_page"
+                            onchange="this.form.submit()"
+                            class="cursor-pointer appearance-none rounded-md border border-border bg-surface px-2.5 py-1 text-center font-sans text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                            @foreach([10, 25, 50] as $option)
+                                <option value="{{ $option }}" @selected($auditRows->perPage() === $option)>{{ $option }}</option>
+                            @endforeach
+                        </select>
+                        <span class="hidden sm:inline">data</span>
+                    </form>
+
+                    <div class="hidden border-l border-border pl-4 md:block">
+                        Menampilkan <span class="font-medium text-ink">{{ $auditRows->firstItem() ?? 0 }}</span>
+                        - <span class="font-medium text-ink">{{ $auditRows->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium text-ink">{{ $auditRows->total() }}</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    {{ $auditRows->links('vendor.pagination.simpeg') }}
+                </div>
             </div>
         </div>
 

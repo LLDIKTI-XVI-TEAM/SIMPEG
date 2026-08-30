@@ -83,7 +83,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-bold text-primary font-sans">Audit Log</h2>
+                <h2 class="text-2xl font-bold text-ink font-sans">Audit Log</h2>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Audit Log']
@@ -113,17 +113,14 @@
 
                 <x-slot:actions>
                     <a href="{{ route('audit-log') }}"
-                       class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer flex items-center gap-1">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                        </svg>
+                       class="text-xs text-primary font-semibold hover:underline font-sans cursor-pointer">
                         Reset Filter
                     </a>
                 </x-slot:actions>
 
                 {{-- Dropdown Event --}}
                 <div class="space-y-1.5">
-                    <label for="filter-event" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
+                    <label for="filter-event" class="text-xs font-bold text-muted font-sans uppercase tracking-wider">Jenis Event</label>
                     <div class="relative">
                         <x-form.select id="filter-event" name="event" onchange="this.form.submit()">
                             <option value="">Semua Event</option>
@@ -136,7 +133,7 @@
 
                 {{-- Dropdown Operator --}}
                 <div class="space-y-1.5">
-                    <label for="filter-operator" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
+                    <label for="filter-operator" class="text-xs font-bold text-muted font-sans uppercase tracking-wider">User / Operator</label>
                     <div class="relative">
                         <x-form.select id="filter-operator" name="operator" onchange="this.form.submit()">
                             <option value="">Semua User</option>
@@ -149,7 +146,7 @@
 
                 {{-- Dropdown Modul --}}
                 <div class="space-y-1.5">
-                    <label for="filter-modul" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
+                    <label for="filter-modul" class="text-xs font-bold text-muted font-sans uppercase tracking-wider">Modul / Tabel</label>
                     <div class="relative">
                         <x-form.select id="filter-modul" name="modul" onchange="this.form.submit()">
                             <option value="">Semua Modul</option>
@@ -162,13 +159,13 @@
 
                 {{-- Periode Mulai --}}
                 <div class="space-y-1.5">
-                    <label for="filter-from" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
+                    <label for="filter-from" class="text-xs font-bold text-muted font-sans uppercase tracking-wider">Periode Mulai</label>
                     <input id="filter-from" type="date" name="from" value="{{ $activeFilters['from'] }}" onchange="this.form.submit()" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
                 </div>
 
                 {{-- Periode Selesai --}}
                 <div class="space-y-1.5">
-                    <label for="filter-to" class="text-[11px] font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
+                    <label for="filter-to" class="text-xs font-bold text-muted font-sans uppercase tracking-wider">Periode Selesai</label>
                     <input id="filter-to" type="date" name="to" value="{{ $activeFilters['to'] }}" onchange="this.form.submit()" class="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer">
                 </div>
             </x-ui.filter-bar>
@@ -180,7 +177,7 @@
             {{-- Toolbar --}}
             <div class="px-6 py-4 border-b border-border flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
                 <div>
-                    <h3 class="text-sm font-semibold text-ink font-sans">Rekam Jejak Aktivitas (Audit Log)</h3>
+                    <h3 class="text-sm font-semibold text-ink font-sans">Rekam Jejak Aktivitas</h3>
                     <p class="text-xs text-muted">Catatan mutasi data dan otentikasi sistem kepegawaian secara kronologis.</p>
                 </div>
             </div>
@@ -191,7 +188,7 @@
                     <thead class="bg-soft border-b border-border">
                         <tr>
                             @foreach (['timestamp' => 'Waktu', 'operator' => 'User', 'event' => 'Jenis Event', 'modul' => 'Modul/Tabel'] as $kolom => $judul)
-                                <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none {{ $kolom === 'timestamp' ? 'w-48 min-w-48 whitespace-nowrap tabular-nums' : '' }}">
                                     <a href="{{ $tautanUrut($kolom) }}" class="flex items-center gap-1.5 hover:text-primary transition-colors">
                                         {{ $judul }}
                                         @if ($sortAktif === $kolom)
@@ -206,8 +203,8 @@
                                     </a>
                                 </th>
                             @endforeach
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
-                            <th class="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border">
@@ -228,7 +225,7 @@
                                 };
                             @endphp
                             <tr @click="selectedLogId = '{{ $log['id'] }}'; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
-                                <td class="px-4 py-3.5 text-xs text-ink">{{ $log['timestamp'] }}</td>
+                                <td class="w-48 min-w-48 whitespace-nowrap px-4 py-3.5 text-xs tabular-nums text-ink">{{ $log['timestamp'] }}</td>
                                 <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans">{{ $log['operator'] }}</td>
                                 <td class="px-4 py-3.5">
                                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans {{ $warnaTeks }}">
@@ -240,26 +237,31 @@
                                 <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(logs.find(l => l.id === '{{ $log['id'] }}'))"></td>
                                 <td class="px-4 py-3.5" @click.stop>
                                     <div class="flex items-center gap-1.5">
-                                        <button
-                                            type="button"
-                                            @click.stop="selectedLogId = '{{ $log['id'] }}'; showDrawer = true"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm cursor-pointer"
-                                            title="Detail Drawer"
-                                        >
-                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                            </svg>
-                                        </button>
-                                        <a
-                                            href="{{ route('audit-log.show', $log['id']) }}"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
-                                            title="Halaman Detail"
-                                        >
-                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                                            </svg>
-                                        </a>
+                                        <x-ui.tooltip text="Detail Drawer" position="top">
+                                            <x-ui.button
+                                                type="button"
+                                                variant="secondary"
+                                                size="icon"
+                                                @click.stop="selectedLogId = '{{ $log['id'] }}'; showDrawer = true"
+                                                aria-label="Buka ringkasan audit"
+                                            >
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                                </svg>
+                                            </x-ui.button>
+                                        </x-ui.tooltip>
+                                        <x-ui.tooltip text="Halaman Detail" position="top-end">
+                                            <a
+                                                href="{{ route('audit-log.show', $log['id']) }}"
+                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
+                                                aria-label="Buka halaman detail audit"
+                                            >
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                                </svg>
+                                            </a>
+                                        </x-ui.tooltip>
                                     </div>
                                 </td>
                             </tr>
@@ -275,32 +277,39 @@
             </div>
 
             {{-- TABLE FOOTER --}}
-            <div class="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface">
-                <div class="flex items-center gap-3">
-                    <p class="text-sm text-muted font-sans">
-                        Menampilkan {{ $auditLogs->total() === 0 ? 0 : $auditLogs->firstItem() }} -
-                        {{ $auditLogs->total() === 0 ? 0 : $auditLogs->lastItem() }} dari
-                        {{ $auditLogs->total() }} data
-                    </p>
-                    <form method="GET" action="{{ route('audit-log') }}" class="relative">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                <div class="flex items-center gap-3 text-sm text-muted">
+                    <form method="GET" action="{{ route('audit-log') }}" class="flex items-center gap-3">
                         @foreach ($activeFilters as $nama => $nilai)
+                            @continue($nama === 'per_page' || $nilai === '' || $nilai === null)
                             <input type="hidden" name="{{ $nama }}" value="{{ $nilai }}">
                         @endforeach
-                        <label for="per-page" class="sr-only">Jumlah baris per halaman</label>
-                        <select id="per-page" name="per_page" onchange="this.form.submit()" class="appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans">
+
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="audit-per-page" class="sr-only">Jumlah baris per halaman</label>
+                        <select
+                            id="audit-per-page"
+                            name="per_page"
+                            onchange="this.form.submit()"
+                            class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
+                        >
                             @foreach ([10, 25, 50] as $jumlah)
-                                <option value="{{ $jumlah }}"@selected((int) request('per_page', 25) === $jumlah)>{{ $jumlah }} / halaman</option>
+                                <option value="{{ $jumlah }}" @selected($auditLogs->perPage() === $jumlah)>{{ $jumlah }}</option>
                             @endforeach
                         </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-muted">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
+                        <span class="hidden sm:inline">data</span>
                     </form>
+
+                    {{-- Meta Info --}}
+                    <div class="hidden md:block ml-2 border-l border-border pl-4">
+                        Menampilkan <span class="font-medium text-ink">{{ $auditLogs->firstItem() ?? 0 }}</span>
+                        - <span class="font-medium text-ink">{{ $auditLogs->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium text-ink">{{ $auditLogs->total() }}</span>
+                    </div>
                 </div>
+
                 <div class="flex items-center gap-1.5">
-                    {{ $auditLogs->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                    {{ $auditLogs->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
 
@@ -318,11 +327,11 @@
                             <h3 class="text-sm font-bold text-ink font-sans">Detail Log Aktivitas</h3>
                             <p class="text-xs text-muted">Metadata operasional dan perubahan database.</p>
                         </div>
-                        <button @click="showDrawer = false" class="rounded-lg p-1.5 text-muted hover:bg-soft hover:text-ink transition-colors cursor-pointer focus:outline-none" aria-label="Close panel">
+                        <x-ui.button type="button" variant="ghost" size="icon" @click="showDrawer = false" aria-label="Tutup panel">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                             </svg>
-                        </button>
+                        </x-ui.button>
                     </div>
 
                     {{-- Drawer Body --}}
@@ -367,13 +376,13 @@
                             <div class="overflow-hidden rounded-lg border border-border bg-soft">
                                 <table class="w-full text-left border-collapse">
                                     <thead>
-                                        <tr class="bg-primary/10 text-[10px] uppercase font-semibold text-muted font-sans border-b border-border">
+                                        <tr class="bg-primary/10 text-xs uppercase font-semibold text-muted font-sans border-b border-border">
                                             <th class="px-3 py-2">Nama Field</th>
                                             <th class="px-3 py-2">Sebelum</th>
                                             <th class="px-3 py-2">Sesudah</th>
                                         </tr>
                                     </thead>
-                                    <tbody class="divide-y divide-border text-[11px] font-sans">
+                                    <tbody class="divide-y divide-border text-xs font-sans">
                                         <template x-for="item in getDiffFields(selectedLog)" :key="item.field">
                                             <tr>
                                                 <td class="px-3 py-2 font-semibold text-ink" x-text="item.field"></td>
@@ -409,9 +418,9 @@
                             <a :href="'/dashboard/audit/' + selectedLog.id" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft font-sans shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                                 Detail Penuh
                             </a>
-                            <button @click="showDrawer = false" class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft cursor-pointer focus:outline-none font-sans shadow-sm focus:ring-2 focus:ring-primary/30">
+                            <x-ui.button type="button" variant="secondary" size="sm" @click="showDrawer = false">
                                 Tutup
-                            </button>
+                            </x-ui.button>
                         </div>
                     </div>
 

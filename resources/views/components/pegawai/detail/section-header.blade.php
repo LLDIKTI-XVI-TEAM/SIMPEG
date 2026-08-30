@@ -1,6 +1,7 @@
 @props([
     'title',
     'description' => null,
+    'headingId' => null,
 ])
 
 <div
@@ -8,7 +9,7 @@
     class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
 >
     <div class="min-w-0">
-        <h3 class="text-sm font-bold text-ink font-sans">{{ $title }}</h3>
+        <h3 @if($headingId) id="{{ $headingId }}" @endif class="text-sm font-bold text-ink font-sans">{{ $title }}</h3>
 
         @if($description)
             <p class="mt-0.5 text-xs text-muted font-sans">{{ $description }}</p>

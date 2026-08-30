@@ -6,21 +6,12 @@
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <nav class="mb-1 flex items-center gap-1.5 text-xs text-muted" aria-label="Breadcrumb">
-                    <a href="{{ route('dashboard') }}" class="rounded-sm transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Dashboard</a>
-                    <span aria-hidden="true">/</span>
-                    <a href="{{ route('data-master') }}" class="rounded-sm transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Data Master</a>
-                    <span aria-hidden="true">/</span>
-                    <span aria-current="page" class="font-medium text-ink">Channel Notifikasi</span>
-                </nav>
-                <h1 class="text-2xl font-semibold text-ink">Konfigurasi Channel Notifikasi</h1>
-                <p class="mt-1 max-w-3xl text-sm leading-relaxed text-muted">
-                    Kelola master channel dan kebijakan delivery untuk setiap event. Status efektif membutuhkan master channel dan policy event sama-sama aktif.
-                </p>
+                <h2 class="text-2xl font-semibold text-ink">Konfigurasi Channel Notifikasi</h2>
+                <x-ui.breadcrumb :items="[
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Channel Notifikasi']
+                ]" />
             </div>
-            <span class="inline-flex w-fit items-center rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted">
-                Khusus Super Admin
-            </span>
         </div>
 
         @if(session('success'))
@@ -56,10 +47,10 @@
                         <label for="new-channel-name" class="mb-1 block text-xs font-semibold text-ink">Nama channel</label>
                         <input id="new-channel-name" name="name" value="{{ old('name') }}" maxlength="100" required autocomplete="off" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Nama channel">
                     </div>
-                    <button type="submit" :disabled="submitting" class="self-end rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                    <x-ui.button type="submit" class="self-end" ::disabled="submitting">
                         <span x-show="!submitting">Tambah</span>
                         <span x-show="submitting" style="display: none;">Menyimpan...</span>
-                    </button>
+                    </x-ui.button>
                 </form>
             </div>
         </section>
@@ -96,30 +87,30 @@
                             <label for="channel-name-{{ $channel['id'] }}" class="mb-1 block text-xs font-semibold text-ink">Nama tampilan</label>
                             <div class="flex gap-2">
                                 <input id="channel-name-{{ $channel['id'] }}" name="name" value="{{ $channel['name'] }}" maxlength="100" required class="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                                <button type="submit" :disabled="submitting" class="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60">Simpan</button>
+                                <x-ui.button type="submit" size="sm" ::disabled="submitting">Simpan</x-ui.button>
                             </div>
                         </form>
 
                         <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                             @if(!$channel['adapter_available'])
-                                <button type="button" disabled aria-describedby="unavailable-{{ $channel['id'] }}" class="cursor-not-allowed rounded-lg border border-border bg-soft px-3 py-2 text-xs font-semibold text-muted opacity-70">Belum tersedia</button>
+                                <x-ui.button type="button" variant="muted" size="sm" disabled aria-describedby="unavailable-{{ $channel['id'] }}">Belum tersedia</x-ui.button>
                                 <span id="unavailable-{{ $channel['id'] }}" class="text-xs text-muted">Adapter runtime belum tersedia.</span>
                             @elseif($channel['code'] === 'in_app' && $channel['is_enabled'])
-                                <button type="button" aria-haspopup="dialog" aria-controls="in-app-disable-dialog" onclick="document.getElementById('in-app-disable-dialog').showModal()" class="rounded-lg border border-danger/30 px-3 py-2 text-xs font-semibold text-danger hover:bg-danger/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger">Nonaktifkan</button>
+                                <x-ui.button type="button" variant="danger" size="sm" aria-haspopup="dialog" aria-controls="in-app-disable-dialog" onclick="document.getElementById('in-app-disable-dialog').showModal()">Nonaktifkan</x-ui.button>
                             @else
                                 <form action="{{ route('data-master.channel-notifikasi.status', $channel['id']) }}" method="POST" x-data="{ submitting: false }" @submit="submitting = true">
                                     @csrf
                                     <input type="hidden" name="is_enabled" value="{{ $channel['is_enabled'] ? '0' : '1' }}">
-                                    <button type="submit" :disabled="submitting" class="rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60 {{ $channel['is_enabled'] ? 'border-danger/30 text-danger hover:bg-danger/5' : 'border-success/30 text-success hover:bg-success/5' }}">
+                                    <x-ui.button type="submit" variant="{{ $channel['is_enabled'] ? 'danger' : 'success' }}" size="sm" ::disabled="submitting">
                                         {{ $channel['is_enabled'] ? 'Nonaktifkan' : 'Aktifkan' }}
-                                    </button>
+                                    </x-ui.button>
                                 </form>
                             @endif
 
                             @if(!$channel['is_core'])
                                 <form action="{{ route('data-master.channel-notifikasi.destroy', $channel['id']) }}" method="POST" class="ml-auto" x-data="{ submitting: false }" @submit="if (!confirm('Hapus channel yang belum dipakai ini?')) { $event.preventDefault(); return; } submitting = true">
                                     @csrf
-                                    <button type="submit" :disabled="submitting" class="rounded-lg px-3 py-2 text-xs font-semibold text-danger hover:bg-danger/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:cursor-wait disabled:opacity-60">Hapus</button>
+                                    <x-ui.button type="submit" variant="danger" size="sm" ::disabled="submitting">Hapus</x-ui.button>
                                 </form>
                             @endif
                         </div>
@@ -216,8 +207,8 @@
                 <h2 id="in-app-disable-title" class="text-lg font-semibold text-ink">Nonaktifkan kanal In-App?</h2>
                 <p id="in-app-disable-warning" class="mt-3 text-sm leading-relaxed text-muted">Menonaktifkan kanal In-App akan menghentikan pembuatan notifikasi di dalam aplikasi. Pada alur saat ini, sebagian pengiriman email bergantung pada notifikasi In-App sehingga email terkait juga dapat tidak terkirim. Konfigurasi per event tetap disimpan dan akan berlaku kembali ketika kanal diaktifkan. Lanjutkan?</p>
                 <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                    <button type="button" onclick="this.closest('dialog').close()" class="rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Batal</button>
-                    <button type="submit" :disabled="submitting" class="rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">Ya, nonaktifkan</button>
+                    <x-ui.button type="button" variant="secondary" class="focus-visible:ring-2" onclick="this.closest('dialog').close()">Batal</x-ui.button>
+                    <x-ui.button type="submit" variant="danger-solid" class="focus-visible:ring-2" ::disabled="submitting">Ya, nonaktifkan</x-ui.button>
                 </div>
             </form>
         </dialog>

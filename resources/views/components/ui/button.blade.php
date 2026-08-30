@@ -21,15 +21,17 @@
         'muted' => 'border border-border bg-surface text-ink shadow-sm hover:bg-soft focus:ring-primary/20',
         'danger' => 'border border-danger/20 bg-surface text-danger shadow-sm hover:bg-danger/5 focus:ring-danger/20',
         'danger-solid' => 'border border-danger bg-danger text-white shadow-sm hover:opacity-90 focus:ring-danger/30',
-        'success' => 'border border-success bg-success text-white shadow-sm hover:opacity-90 focus:ring-success/30',
-        'warning' => 'border border-warning bg-warning text-white shadow-sm hover:opacity-90 focus:ring-warning/30',
+        'success' => 'border border-success/30 bg-surface text-success shadow-sm hover:bg-success/10 focus:ring-success/30',
+        'success-solid' => 'border border-success bg-success text-white shadow-sm hover:opacity-90 focus:ring-success/30',
+        'warning' => 'border border-warning/30 bg-surface text-warning shadow-sm hover:bg-warning/10 focus:ring-warning/30',
+        'warning-solid' => 'border border-warning bg-warning text-white shadow-sm hover:opacity-90 focus:ring-warning/30',
         'ghost' => 'border border-transparent bg-transparent text-muted hover:bg-soft hover:text-ink focus:ring-primary/20',
         'link' => 'border border-transparent bg-transparent text-primary hover:underline focus:ring-primary/20',
     ];
 
     $sizes = [
-        'xs' => 'gap-1.5 rounded-lg px-3 py-2 text-xs',
-        'sm' => 'gap-1.5 rounded-xl px-3.5 py-1.5 text-xs',
+        'xs' => 'gap-2 rounded-lg px-3 py-2 text-xs',
+        'sm' => 'gap-2 rounded-xl px-3.5 py-1.5 text-xs',
         'md' => 'gap-2 rounded-xl px-4 py-2.5 text-sm',
         'lg' => 'gap-2 rounded-xl px-5 py-3 text-sm',
         'icon' => 'h-8 w-8 rounded-xl p-0',
@@ -38,7 +40,7 @@
     $isDisabled = filter_var($disabled, FILTER_VALIDATE_BOOL);
     $tag = $as ?: ($href ? 'a' : 'button');
     $classes = [
-        'inline-flex cursor-pointer items-center justify-center font-semibold font-sans transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
+        'inline-flex cursor-pointer items-center justify-center font-semibold font-sans transition-colors duration-200 active:scale-95 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100',
         $sizes[(string) $size] ?? $sizes['md'],
         $variants[(string) $variant] ?? $variants['primary'],
         'w-full' => filter_var($fullWidth, FILTER_VALIDATE_BOOL),
@@ -46,23 +48,29 @@
     ];
 
     $title = $attributes->get('title');
-    $tooltipPosition = $attributes->get('tooltip-position', 'top');
+    $dynamicTitle = $attributes->get('::title') ?? $attributes->get(':title');
+    $hasDynamicAriaLabel = $attributes->has('::aria-label') || $attributes->has(':aria-label');
+    $ariaLabel = $hasDynamicAriaLabel ? null : ($attributes->get('aria-label') ?? $title);
+    $tooltipPosition = $attributes->get('tooltip-position', $attributes->get('tooltipPosition', 'top'));
+    $buttonAttributes = $attributes->except(['title', '::title', ':title', 'tooltip-position', 'tooltipPosition', 'aria-label']);
 @endphp
 
-@if ($title)
-    <x-ui.tooltip text="{{ $title }}" position="{{ $tooltipPosition }}">
+@if ($title || $dynamicTitle)
+    <x-ui.tooltip :text="$title ?? ''" :dynamic-text="$dynamicTitle" position="{{ $tooltipPosition }}">
         @if ($tag === 'a')
             <a
                 @if ($href) href="{{ $href }}" @endif
                 @if ($isDisabled) aria-disabled="true" tabindex="-1" @endif
-                {{ $attributes->except('title')->class($classes) }}
+                @if ($ariaLabel) aria-label="{{ $ariaLabel }}" @endif
+                {{ $buttonAttributes->class($classes) }}
             >
                 {{ $slot }}
             </a>
         @elseif ($tag === 'label')
             <label
                 @if ($isDisabled) aria-disabled="true" @endif
-                {{ $attributes->except('title')->class($classes) }}
+                @if ($ariaLabel) aria-label="{{ $ariaLabel }}" @endif
+                {{ $buttonAttributes->class($classes) }}
             >
                 {{ $slot }}
             </label>
@@ -70,10 +78,9 @@
             <button
                 type="{{ $type }}"
                 @disabled($isDisabled)
-                {{ $attributes->except('title')->class($classes) }}
-            >
-                {{ $slot }}
-            </button>
+                @if ($ariaLabel) aria-label="{{ $ariaLabel }}" @endif
+                {{ $buttonAttributes->class($classes) }}
+            >{{ $slot }}</button>
         @endif
     </x-ui.tooltip>
 @else
@@ -81,24 +88,21 @@
         <a
             @if ($href) href="{{ $href }}" @endif
             @if ($isDisabled) aria-disabled="true" tabindex="-1" @endif
-            {{ $attributes->except('title')->class($classes) }}
-        >
-            {{ $slot }}
-        </a>
+            @if ($ariaLabel) aria-label="{{ $ariaLabel }}" @endif
+            {{ $buttonAttributes->class($classes) }}
+        >{{ $slot }}</a>
     @elseif ($tag === 'label')
         <label
             @if ($isDisabled) aria-disabled="true" @endif
-            {{ $attributes->class($classes) }}
-        >
-            {{ $slot }}
-        </label>
+            @if ($ariaLabel) aria-label="{{ $ariaLabel }}" @endif
+            {{ $buttonAttributes->class($classes) }}
+        >{{ $slot }}</label>
     @else
         <button
             type="{{ $type }}"
             @disabled($isDisabled)
-            {{ $attributes->except('title')->class($classes) }}
-        >
-            {{ $slot }}
-        </button>
+            @if ($ariaLabel) aria-label="{{ $ariaLabel }}" @endif
+            {{ $buttonAttributes->class($classes) }}
+        >{{ $slot }}</button>
     @endif
 @endif

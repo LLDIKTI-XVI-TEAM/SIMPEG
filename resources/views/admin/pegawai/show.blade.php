@@ -954,19 +954,20 @@
             :employees-url="route('data-pegawai')"
         >
                 @if($canUpdateEmployee)
-                <a href="{{ route('pegawai.edit', $p->id) }}" wire:navigate aria-label="Edit Pegawai" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 sm:px-4">
-                    <svg class="mr-1.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                <x-ui.button href="{{ route('pegawai.edit', $p->id) }}" wire:navigate aria-label="Edit Pegawai">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
-                    <span class="sm:hidden">Edit</span>
-                    <span class="hidden sm:inline">Edit Pegawai</span>
-                </a>
+                    Edit Pegawai
+                </x-ui.button>
                 @endif
                 @if($canDeactivateEmployee)
-                <button type="button" @click="showDeactivateModal = true"
-                    class="inline-flex items-center justify-center rounded-lg bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm">
+                <x-ui.button type="button" variant="danger-solid" @click="showDeactivateModal = true">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9 14.394 18m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
                     Nonaktifkan
-                </button>
+                </x-ui.button>
                 @endif
         </x-pegawai.detail.page-header>
 
@@ -1226,12 +1227,12 @@
                 >
                     @if($canCreateFamily)
                         <x-slot:actions>
-                            <button type="button" @click="openModal('keluarga', 'Tambah Anggota Keluarga')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <x-ui.button type="button" size="sm" @click="openModal('keluarga', 'Tambah Anggota Keluarga')">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Keluarga
-                    </button>
+                    </x-ui.button>
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
@@ -1287,12 +1288,12 @@
                 >
                     @if($canCreateEmployeeHistory)
                         <x-slot:actions>
-                        <button type="button" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button type="button" size="sm" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat Kepangkatan
-                        </button>
+                        </x-ui.button>
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
@@ -1325,12 +1326,12 @@
                 >
                     @if($canCreateEmployeeHistory)
                         <x-slot:actions>
-                        <button type="button" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button type="button" size="sm" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat Jabatan
-                        </button>
+                        </x-ui.button>
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
@@ -1364,12 +1365,12 @@
                 >
                     @if($canCreateEmployeeHistory)
                         <x-slot:actions>
-                        <button type="button" @click="openModal('kgb', 'Tambah Riwayat KGB')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
-                            <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                        <x-ui.button type="button" size="sm" @click="openModal('kgb', 'Tambah Riwayat KGB')">
+                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                             </svg>
                             Tambah Riwayat KGB
-                        </button>
+                        </x-ui.button>
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
@@ -1402,12 +1403,12 @@
                 >
                     @if($canCreateDiscipline)
                         <x-slot:actions>
-                            <button type="button" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <x-ui.button type="button" size="sm" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Hukuman
-                    </button>
+                    </x-ui.button>
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
@@ -1449,12 +1450,12 @@
                 >
                     @if($canCreateEmployeeHistory)
                         <x-slot:actions>
-                            <button type="button" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')" class="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 cursor-pointer font-sans">
-                        <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                            <x-ui.button type="button" size="sm" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                         </svg>
                         Tambah Pendidikan
-                    </button>
+                    </x-ui.button>
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
