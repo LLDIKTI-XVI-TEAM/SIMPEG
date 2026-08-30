@@ -211,13 +211,24 @@ class PhaseSevenBrowserQaSeeder extends Seeder
     {
         $email = strtolower($this->ssoEmailForRole($role));
 
-        $employee = Employee::query()
+        // Sama seperti resolver SSO utama: kandidat diambil hingga 2 dan dihitung —
+        // pencocokan ambigu (email_pribadi pegawai A = kolom legacy email pegawai B)
+        // tidak boleh dipilih arbitrer; persona QA wajib menunjuk tepat satu pegawai.
+        $candidates = Employee::query()
             ->where(function ($query) use ($email): void {
                 $query
                     ->whereRaw('lower(email) = ?', [$email])
                     ->orWhereRaw('lower(email_pribadi) = ?', [$email]);
             })
-            ->first();
+            ->limit(2)
+            ->get()
+            ->unique('id');
+
+        if ($candidates->count() > 1) {
+            throw new RuntimeException("Persona QA untuk role '{$role}' mencocokkan lebih dari satu pegawai — perbaiki data email kanonis sebelum menjalankan seeder.");
+        }
+
+        $employee = $candidates->first();
 
         $user = $employee !== null
             ? User::query()->where('employee_id', $employee->id)->first()
@@ -255,6 +266,15 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         if ($user->role !== self::SSO_ADMIN_ROLE) {
             throw new RuntimeException("Persona QA admin kepegawaian ber-role '{$user->role}', expected '".self::SSO_ADMIN_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
+        }
+
+        // Persona admin wajib memegang pegawai AKTIF: sesi admin QA yang gagal melewati
+        // EnsureActiveEmployeeAccount membuat skenario browser QA tidak dapat dijalankan.
+        $employee = Employee::query()->find($user->employee_id);
+
+        if ($employee === null || ! $employee->isActive()) {
+            $status = $employee?->status_aktif ?? 'tidak diketahui';
+            throw new RuntimeException("Persona QA admin kepegawaian memegang pegawai berstatus '{$status}', expected aktif. Perbaiki status melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
         }
 
         return $user;

@@ -13,10 +13,13 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
+use App\Models\User;
 use App\Services\EmployeeDocumentStatusService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
+use App\Support\Documents\DocumentAuthorization;
 use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -28,9 +31,37 @@ class Show extends Component
 {
     public $pegawaiId;
 
-    public function mount($id)
+    public function mount(Request $request, $id)
     {
+        // Lapisan privasi (K-privasi, terpisah dari RBAC aksi): halaman detail mentah
+        // memuat NIK anggota keluarga dan metadata dokumen. Route tetap permission-driven
+        // (employees.read membuka daftar & akses), tetapi payload mentah hanya untuk
+        // pengelola data kepegawaian (DocumentAuthorization); non-pengelola diarahkan ke
+        // surface masked masing-masing.
+        $user = $request->user();
+
+        if (! DocumentAuthorization::canViewArchive($user)) {
+            $maskedSurface = $this->maskedDetailSurface($user);
+
+            if ($maskedSurface !== null) {
+                $this->redirectRoute($maskedSurface, ['employee' => $id]);
+
+                return;
+            }
+
+            abort(403, 'Detail pegawai mentah hanya tersedia untuk pengelola data kepegawaian. Gunakan surface ringkasan role Anda.');
+        }
+
         $this->pegawaiId = $id;
+    }
+
+    /** Route surface detail ter-masked per role efektif, bila tersedia. */
+    private function maskedDetailSurface(?User $user): ?string
+    {
+        return match ($user?->getEffectiveRole()) {
+            'pimpinan' => 'pimpinan.pegawai.show',
+            default => null,
+        };
     }
 
     public function render(

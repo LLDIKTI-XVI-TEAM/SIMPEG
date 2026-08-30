@@ -1675,6 +1675,102 @@ class KeycloakCallbackMappingTest extends TestCase
     }
 
     /**
+     * P1 bootstrap race: keputusan akun pertama sistem wajib atomik lintas pegawai.
+     * Resolver mengambil advisory lock transaksional sebelum membaca exists() —
+     * regresi terjadi bila statement lock tidak lagi dieksekusi pada cabang user baru
+     * (dua callback paralel pegawai berbeda bisa sama-sama bootstrap super_admin).
+     */
+    public function test_bootstrap_takes_transactional_advisory_lock_on_first_account(): void
+    {
+        $statements = [];
+        DB::listen(function (\Illuminate\Database\Events\QueryExecuted $query) use (&$statements): void {
+            if (str_contains((string) $query->sql, 'pg_advisory_xact_lock')) {
+                $statements[] = $query->sql;
+            }
+        });
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Bootstrap Atomic',
+            'email' => 'bootstrap-atomic@example.com',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-bootstrap-atomic',
+            'nickname' => 'bootstrap-atomic',
+            'name' => 'Bootstrap Atomic',
+            'email' => 'bootstrap-atomic@example.com',
+            'raw' => ['email' => 'bootstrap-atomic@example.com', 'email_verified' => true, 'preferred_username' => 'bootstrap-atomic'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'bootstrap-atomic@example.com',
+            'role' => 'super_admin',
+        ]);
+        $this->assertNotEmpty($statements, 'Cabang bootstrap user baru wajib mengambil pg_advisory_xact_lock.');
+    }
+
+    /**
+     * P2 race username pada akun yang SUDAH terikat: akun mengubah keycloak_username
+     * ke klaim baru, tetapi user lain merebutnya sebelum save. Unique violation wajib
+     * di-retry dengan melepas perubahan username (bukan hanya klaim baru) — login tetap
+     * sukses, username lama dipertahankan, tanpa HTTP 500.
+     */
+    public function test_existing_account_losing_username_race_keeps_previous_username(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemilik Username Lama',
+            'email' => 'username-lama@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'username-lama@example.com',
+            'keycloak_id' => 'kc-username-lama',
+            'keycloak_username' => 'username-lama',
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        $injected = false;
+        DB::listen(function (\Illuminate\Database\Events\QueryExecuted $query) use (&$injected): void {
+            if ($injected || ! str_contains((string) $query->sql, 'keycloak_username')) {
+                return;
+            }
+
+            $injected = true;
+
+            // Callback paralel merebut username baru yang hendak diklaim akun terikat ini.
+            User::factory()->create([
+                'email' => 'perebut-username@example.com',
+                'keycloak_username' => 'username-lama-baru',
+                'role' => 'pegawai',
+            ]);
+        });
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-username-lama',
+            'nickname' => 'username-lama-baru',
+            'name' => 'Pemilik Username Lama',
+            'email' => 'username-lama@example.com',
+            'raw' => ['email' => 'username-lama@example.com', 'email_verified' => true, 'preferred_username' => 'username-lama-baru'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        // Login tetap sukses (identitas kanonis keycloak_id sama) — bukan HTTP 500.
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+
+        // Perubahan username dilepas: pemilik sah mempertahankan username lamanya.
+        $this->assertSame('username-lama', $user->refresh()->keycloak_username);
+        $this->assertDatabaseHas('users', [
+            'email' => 'perebut-username@example.com',
+            'keycloak_username' => 'username-lama-baru',
+        ]);
+    }
+
+    /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
     private function fakeKeycloakUser(array $attributes): void

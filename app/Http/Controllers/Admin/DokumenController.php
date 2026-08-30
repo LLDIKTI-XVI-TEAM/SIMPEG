@@ -7,21 +7,32 @@ use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Documents\ShowDocumentPageAction;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
+use App\Support\Documents\DocumentAuthorization;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
  * Arsip dokumen terpusat bersifat baca-saja: seluruh aksi unggah/edit/hapus
  * dilakukan dari tab Dokumen & SK pada halaman detail pegawai melalui API pegawai.
+ *
+ * Lapisan privasi (K-privasi, terpisah dari RBAC aksi): arsip memuat dokumen
+ * sensitif lintas pegawai (mis. ktp_kk) — baca/unduh hanya untuk pengelola data
+ * kepegawaian (DocumentAuthorization::canViewArchive), meski permission
+ * employees.read diberikan ke role lain lewat RBAC matrix.
  */
 class DokumenController extends Controller
 {
-    public function index(ListDocumentsPageAction $action)
+    public function index(Request $request, ListDocumentsPageAction $action)
     {
+        abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+
         return view('admin.dokumen.index', $action->execute());
     }
 
-    public function show(string $id, ShowDocumentPageAction $action)
+    public function show(Request $request, string $id, ShowDocumentPageAction $action)
     {
+        abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+
         return view('admin.dokumen.show', $action->execute($id));
     }
 
@@ -35,8 +46,10 @@ class DokumenController extends Controller
         abort(403, 'Arsip dokumen bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari halaman detail pegawai pada bagian Dokumen & SK.');
     }
 
-    public function download(string $id, PrepareDocumentDownloadAction $action)
+    public function download(Request $request, string $id, PrepareDocumentDownloadAction $action)
     {
+        abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+
         $download = $action->execute($id);
 
         return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [

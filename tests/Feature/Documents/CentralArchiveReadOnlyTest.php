@@ -93,6 +93,21 @@ class CentralArchiveReadOnlyTest extends TestCase
         $this->get(route('dokumen.download', $document->id))->assertOk();
     }
 
+    /**
+     * K-privasi (lapisan terpisah dari RBAC aksi): arsip memuat dokumen sensitif
+     * lintas pegawai (mis. ktp_kk) — permission employees.read saja tidak cukup;
+     * baca/unduh wajib lolos DocumentAuthorization::canViewArchive (pengelola).
+     */
+    public function test_pimpinan_dengan_employees_read_tetap_dilarang_mengakses_arsip(): void
+    {
+        $this->actingAsRole('pimpinan');
+        $document = $this->createBerkas();
+
+        $this->get(route('dokumen'))->assertForbidden();
+        $this->get(route('dokumen.show', $document->id))->assertForbidden();
+        $this->get(route('dokumen.download', $document->id))->assertForbidden();
+    }
+
     public function test_archive_search_matches_category_label_and_key(): void
     {
         $this->actingAsRole('admin_kepegawaian');

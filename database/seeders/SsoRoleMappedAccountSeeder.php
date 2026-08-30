@@ -166,6 +166,18 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 continue;
             }
 
+            // Sejajar invariant runtime resolveUserForEmployee (manual_binding_required):
+            // user tanpa pegawai yang ber-role selain pegawai tidak boleh di-bind otomatis
+            // lewat seeder — subject SSO pemilik email bisa terikat lalu login dengan
+            // privilege existing tanpa pemetaan admin. Mapping dilewati + peringatan.
+            if ($userByEmail && $userByEmail->employee_id === null && $userByEmail->role !== 'pegawai') {
+                $this->command?->warn(
+                    "SSO UAT account '{$email}' dilewati: user ber-privilege '{$userByEmail->role}' belum terhubung pegawai — petakan manual via jalur administratif SIMPEG."
+                );
+
+                continue;
+            }
+
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.
                 $employee = Employee::factory()->create([

@@ -12,6 +12,7 @@ use App\Models\LeaveUsageExternalApprovalStep;
 use App\Models\LeaveUsageReconciliationMembership;
 use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Queries\Cuti\CurrentApprovalChainPreviewQuery;
 use App\Services\Cuti\LeaveUsageReconciliationService;
@@ -22,6 +23,7 @@ use Database\Seeders\SsoRoleMappedAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Tests\TestCase;
 
 class DatabaseSeederTest extends TestCase
@@ -272,6 +274,78 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame('pegawai', $userByEmail->role);
         $this->assertNull($userByEmail->employee_id);
         $this->assertNull($userByEmployee->refresh()->keycloak_id);
+    }
+
+    /**
+     * Seeder tidak meng-bind otomatis user ber-privilege yang belum terhubung pegawai
+     * (invariant manual_binding_required runtime): mapping dilewati tanpa membuat
+     * placeholder employee dan tanpa mengubah user tersebut.
+     */
+    public function test_seeder_skips_privileged_user_without_employee_binding(): void
+    {
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
+
+        $privileged = User::factory()->create([
+            'email' => $email,
+            'role' => 'admin_kepegawaian',
+            'employee_id' => null,
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        // User sama sekali tidak berubah: tanpa employee_id, role dipertahankan.
+        $privileged->refresh();
+        $this->assertNull($privileged->employee_id);
+        $this->assertSame('admin_kepegawaian', $privileged->role);
+
+        // Tidak ada placeholder employee yang dibuat untuk email yang dilewati.
+        $this->assertSame(0, Employee::where('email', $email)->count());
+    }
+
+    /** Persona QA menolak pencocokan pegawai ambigu (harus tepat satu kandidat). */
+    public function test_phase_seven_persona_rejects_ambiguous_employee_match(): void
+    {
+        $pegawaiEmail = collect(SsoRoleMappedAccountSeeder::roleMapping())
+            ->search('pegawai');
+
+        Employee::factory()->create([
+            'email_pribadi' => $pegawaiEmail,
+        ]);
+        $legacy = Employee::factory()->create();
+        DB::table('employees')->where('id', $legacy->id)->update(['email' => $pegawaiEmail]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('lebih dari satu pegawai');
+
+        $this->seed(PhaseSevenBrowserQaSeeder::class);
+    }
+
+    /** Persona QA admin wajib memegang pegawai aktif (bukan hanya role + employee_id). */
+    public function test_phase_seven_persona_rejects_inactive_admin_employee(): void
+    {
+        $adminEmail = collect(SsoRoleMappedAccountSeeder::roleMapping())
+            ->search('admin_kepegawaian');
+
+        $nonaktif = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'email_pribadi' => $adminEmail,
+            'status_pegawai_id' => $nonaktif->id,
+            'status_aktif' => 'Non-Aktif',
+        ]);
+        User::factory()->create([
+            'email' => 'internal-admin-qa@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'admin_kepegawaian',
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('expected aktif');
+
+        $this->seed(PhaseSevenBrowserQaSeeder::class);
     }
 
     public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void

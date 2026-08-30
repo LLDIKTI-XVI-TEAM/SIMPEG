@@ -36,6 +36,13 @@ class HandleKeycloakCallbackAction
     ];
 
     /**
+     * Kunci advisory transaksional untuk keputusan bootstrap akun pertama sistem:
+     * menyerialisasi cabang user baru lintas pegawai agar dua callback paralel pada
+     * tabel users kosong tidak sama-sama memperoleh bootstrap super_admin.
+     */
+    private const BOOTSTRAP_LOCK_KEY = 727251621;
+
+    /**
      * Memproses callback Keycloak.
      *
      * Kontrak K-MTG-02 / Issue #6: Keycloak hanya membuktikan identitas; RBAC tetap
@@ -84,6 +91,13 @@ class HandleKeycloakCallbackAction
                 );
             } catch (SsoIdentityRejected $rejected) {
                 return view('auth.unregistered', ['message' => $rejected->userMessage]);
+            } catch (UniqueConstraintViolationException) {
+                // Retry username di dalam sudah menangani benturan klaim/ubah username;
+                // benturan residu berarti drift state langka pada akun terikat →
+                // gagal terkontrol, bukan HTTP 500.
+                return view('auth.unregistered', [
+                    'message' => 'Terjadi konflik data login. Silakan coba lagi atau hubungi administrator.',
+                ]);
             }
         }
 
@@ -239,6 +253,16 @@ class HandleKeycloakCallbackAction
                     'employee_id' => $employee->id,
                 ]);
             } else {
+                // Keputusan bootstrap harus atomik lintas pegawai: transaksi ini hanya
+                // mengunci baris employee sendiri, sehingga dua callback paralel untuk
+                // pegawai BERBEDA pada tabel users kosong dapat sama-sama melihat
+                // exists() == false dan sama-sama bootstrap super_admin. Advisory lock
+                // transaksional menyerialisasi keputusan bootstrap; callback kedua
+                // membaca ulang state setelah memperoleh lock dan memilih pegawai.
+                if (DB::getDriverName() === 'pgsql') {
+                    DB::statement('select pg_advisory_xact_lock(?)', [self::BOOTSTRAP_LOCK_KEY]);
+                }
+
                 $user = new User(['email' => $matchedEmail]);
                 $user->fill([
                     'name' => $name ?: $username ?: $employee->nama_lengkap,
@@ -369,11 +393,13 @@ class HandleKeycloakCallbackAction
                 });
             } catch (UniqueConstraintViolationException $e) {
                 // Authority terakhir adalah constraint DB: satu-satunya benturan yang
-                // mungkin di titik ini adalah keycloak_username yang baru diklaim bersamaan
-                // (identitas kanonis sudah divalidasi resolver + kunci transaksinya).
-                // Ulangi save tanpa username tersebut; identitas login tetap keycloak_id.
+                // mungkin di titik ini adalah keycloak_username yang baru diklaim/diubah
+                // bersamaan (identitas kanonis sudah divalidasi resolver + kunci
+                // transaksinya). Berlaku untuk klaim BARU maupun PERUBAHAN username pada
+                // user yang sudah terikat — keduanya direvert ke nilai terakhir yang
+                // diketahui lalu save diulang; identitas login tetap keycloak_id.
                 // Benturan lain diteruskan agar execute() re-resolve / fail-closed.
-                if (! $this->usernameWasJustClaimed($user)) {
+                if (! $user->isDirty('keycloak_username')) {
                     throw $e;
                 }
 
@@ -558,17 +584,6 @@ class HandleKeycloakCallbackAction
         }
 
         return $value;
-    }
-
-    /**
-     * True bila keycloak_username pada model ini adalah klaim BARU (sebelumnya null/kosong),
-     * sehingga unique violation saat save layak dicoba ulang tanpa username tersebut.
-     */
-    private function usernameWasJustClaimed(User $user): bool
-    {
-        return is_string($user->keycloak_username)
-            && $user->keycloak_username !== ''
-            && in_array($user->getRawOriginal('keycloak_username'), [null, ''], true);
     }
 
     /**
