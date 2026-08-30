@@ -172,7 +172,11 @@ class EmployeeStatusLifecycleAuthorizationTest extends TestCase
         ]);
     }
 
-    public function test_mutate_menolak_pimpinan_yang_diberi_permission_restore(): void
+    /**
+     * Kontrak permission-driven: role apa pun yang diberi employees.restore boleh
+     * mengaktifkan kembali pegawai — allowlist role sudah dihapus.
+     */
+    public function test_mutate_menerima_pimpinan_yang_diberi_permission_restore(): void
     {
         $employee = $this->inactiveEmployee();
         $target = RefStatusPegawai::query()->where('kode', 'AKTIF')->firstOrFail();
@@ -180,51 +184,44 @@ class EmployeeStatusLifecycleAuthorizationTest extends TestCase
         $this->grantRestorePermissionToRole('pimpinan');
         $this->assertTrue($actor->hasPermission('employees.restore'));
 
-        try {
-            app(EmployeeStatusLifecycleService::class)->mutate(
-                $employee,
-                $target,
-                '2026-08-28',
-                'Reaktivasi dari role yang tidak diizinkan.',
-                $this->requestFor($actor),
-                intent: EmployeeStatusLifecycleService::INTENT_RESTORE,
-            );
-            $this->fail('Reaktivasi wajib menolak role efektif di luar allowlist meski permission diberikan.');
-        } catch (ValidationException $exception) {
-            $this->assertSame(
-                'Mengaktifkan kembali pegawai hanya dapat dilakukan oleh Super Admin atau Admin Kepegawaian.',
-                $exception->errors()['status_pegawai_id'][0],
-            );
-        }
+        $context = EmployeeStatusActorContext::capture(
+            $this->requestFor($actor),
+            'employees.restore',
+            'restore',
+        );
 
-        $this->assertLifecycleUntouched($employee, [
-            'status_pegawai_id' => RefStatusPegawai::query()->where('kode', 'NONAKTIF')->value('id'),
-            'status_aktif' => 'Non-Aktif',
-            'status_keterangan' => 'Status awal nonaktif.',
-            'status_note' => 'Catatan awal nonaktif.',
-            'status_berkas_path' => 'employees/status/nonaktif.pdf',
-            'status_nomor_berkas' => 'SK-NONAKTIF-001',
+        $result = app(EmployeeStatusLifecycleService::class)->mutate(
+            $employee,
+            $target,
+            '2026-08-28',
+            'Reaktivasi oleh pimpinan ber-permission.',
+            $this->requestFor($actor),
+            intent: EmployeeStatusLifecycleService::INTENT_RESTORE,
+            actorContext: $context,
+        );
+
+        $this->assertTrue($result->changed);
+        $this->assertDatabaseHas('employee_status_histories', [
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $target->id,
+            'changed_by_user_id' => $actor->id,
         ]);
     }
 
-    public function test_provenance_restore_menolak_pimpinan_yang_diberi_permission_restore(): void
+    /** Provenance restore sah dibentuk dari role efektif apa pun yang ber-permission. */
+    public function test_provenance_restore_menerima_pimpinan_yang_diberi_permission_restore(): void
     {
         $actor = User::factory()->create(['role' => 'pimpinan']);
         $this->grantRestorePermissionToRole('pimpinan');
 
-        try {
-            EmployeeStatusActorContext::capture(
-                $this->requestFor($actor),
-                'employees.restore',
-                'restore',
-            );
-            $this->fail('Snapshot jadwal restore tidak boleh dibentuk dari role efektif di luar allowlist.');
-        } catch (ValidationException $exception) {
-            $this->assertSame(
-                'Role efektif aktor tidak diizinkan untuk mengaktifkan kembali pegawai.',
-                $exception->errors()['actor'][0],
-            );
-        }
+        $context = EmployeeStatusActorContext::capture(
+            $this->requestFor($actor),
+            'employees.restore',
+            'restore',
+        );
+
+        $this->assertSame('pimpinan', $context->effectiveRole);
+        $this->assertSame('employees.restore', $context->authorizationPermission);
     }
 
     public function test_mutate_accepts_frozen_context_for_temporary_effective_role(): void

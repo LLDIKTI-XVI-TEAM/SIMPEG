@@ -4,41 +4,32 @@ namespace App\Services\Employees;
 
 use App\Models\User;
 
-/** Menjaga invariant role efektif dan permission untuk otorisasi lifecycle pegawai. */
+/** Menjaga invariant otorisasi lifecycle pegawai (kontrak permission-driven). */
 final class EmployeeLifecycleAuthorization
 {
     public const RESTORE_PERMISSION = 'employees.restore';
 
-    /** @var list<string> */
-    private const RESTORE_ROLES = [
-        'super_admin',
-        'admin_kepegawaian',
-    ];
-
-    /** Reaktivasi wajib lolos role efektif dan permission secara bersamaan. */
+    /**
+     * Reaktivasi pegawai permission-driven: cukup permission employees.restore pada
+     * role efektif. Allowlist role Super Admin/Admin Kepegawaian dihapus — kewenangan
+     * reaktivasi kini sepenuhnya dikelola lewat RBAC matrix (kontrak permission-driven
+     * modul employees); role tanpa permission tetap fail-closed, dan simulasi role
+     * tidak dibypass karena hasPermission() berbasis role efektif.
+     */
     public function canRestore(?User $user): bool
     {
-        return $user instanceof User
-            && $this->effectiveRoleAllows($user->getEffectiveRole(), self::RESTORE_PERMISSION)
-            && $user->hasPermission(self::RESTORE_PERMISSION);
+        return $user instanceof User && $user->hasPermission(self::RESTORE_PERMISSION);
     }
 
     /**
-     * Permission lifecycle lain tetap permission-driven; reaktivasi memiliki allowlist
-     * role tambahan agar drift konfigurasi RBAC tidak memperluas kewenangan pemulihan.
+     * Invariant lifecycle per permission. Allowlist role untuk reaktivasi sudah
+     * dihapus: kesesuaian permission pada snapshot provenance divalidasi pemanggil
+     * (EmployeeStatusActorContext::assertAuthorizes), sehingga tidak ada role
+     * tambahan yang perlu diizinkan di sini — semua permission lolos dan bergantung
+     * pada pemeriksaan hasPermission() di jalur request.
      */
     public function effectiveRoleAllows(?string $effectiveRole, string $permission): bool
     {
-        if ($permission !== self::RESTORE_PERMISSION) {
-            return true;
-        }
-
-        if (in_array($effectiveRole, self::RESTORE_ROLES, true)) {
-            return true;
-        }
-
-        return $effectiveRole === 'local_api_bypass'
-            && app()->environment('local')
-            && config('services.simpeg.disable_employee_api_auth');
+        return true;
     }
 }

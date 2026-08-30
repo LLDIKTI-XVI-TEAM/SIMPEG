@@ -511,7 +511,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         }
         this.isRestoring = true;
         try {
-            // Endpoint restore memakai gate role super_admin + permission di backend,
+            // Endpoint restore permission-driven (employees.restore pada role efektif),
             // sehingga tombol ini hanya mempercepat akses dan bukan penentu otorisasi.
             const res = await fetch(`/api/v1/pegawai/${this.restorePegawaiId}/restore`, {
                 method: 'POST',
