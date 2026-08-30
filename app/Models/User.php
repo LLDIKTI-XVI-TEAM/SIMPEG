@@ -28,6 +28,33 @@ class User extends Authenticatable
     use HasFactory, HasUuid, Notifiable;
 
     /**
+     * Hierarki role SIMPEG: rank lebih kecil = role lebih rendah.
+     * Switch role hanya boleh dari role ber-rank lebih tinggi menuju role
+     * ber-rank lebih rendah; aturan ini dipakai canSwitchToRole() dan turunannya.
+     *
+     * @var array<string, int>
+     */
+    public const ROLE_RANKS = [
+        'super_admin' => 5,
+        'admin_kepegawaian' => 4,
+        'pimpinan' => 3,
+        'kepala_bagian' => 2,
+        'pegawai' => 1,
+    ];
+
+    /**
+     * Label tampilan role untuk menu simulasi (konsisten dengan halaman admin).
+     *
+     * @var array<string, string>
+     */
+    public const ROLE_LABELS = [
+        'admin_kepegawaian' => 'Admin Kepegawaian',
+        'pimpinan' => 'Pimpinan',
+        'kepala_bagian' => 'Kepala Bagian',
+        'pegawai' => 'Pegawai',
+    ];
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -119,12 +146,14 @@ class User extends Authenticatable
     }
 
     /**
-     * Menentukan apakah user dapat switch ke target_role yang dipilih.
+     * Menentukan apakah user dapat switch (simulasi) ke target_role yang dipilih.
      *
-     * Switch hanya diperbolehkan dari role asli super_admin menuju role tujuan yang diizinkan
-     * (Admin Kepegawaian, Pimpinan, Kepala Bagian, atau Pegawai). Target bukan allowlist atau
-     * switch ke role yang sama ditolak fail-closed. Allowlist eksplisit dipakai sebagai aturan
-     * domain (bukan perhitungan level numerik) agar batas target selalu jelas dan stabil.
+     * Kontrak permission-driven: role asli apa pun yang diberi permission
+     * users.switch_role boleh mensimulasikan role, tetapi target wajib LEBIH RENDAH
+     * dari role asli menurut ROLE_RANKS — aturan hierarki dipaksa di sini, di
+     * SwitchRoleRequest, dan di SwitchRoleAction. Target bukan allowlist, switch ke
+     * role yang sama, atau role asli tanpa target lebih rendah (pegawai) ditolak
+     * fail-closed.
      */
     public function canSwitchToRole(string $targetRole): bool
     {
@@ -133,17 +162,49 @@ class User extends Authenticatable
             return false;
         }
 
-        // Hanya role asli super_admin yang boleh melakukan simulasi; invite asal role lain
-        // (miskonfigurasi) tidak boleh dianggap sebagai origin yang sah.
-        if ($this->role !== 'super_admin') {
+        $originRank = self::ROLE_RANKS[$this->role] ?? null;
+        $targetRank = self::ROLE_RANKS[$targetRole] ?? null;
+
+        if ($originRank === null || $targetRank === null) {
             return false;
         }
 
-        return in_array($targetRole, [
-            'admin_kepegawaian',
-            'pimpinan',
-            'kepala_bagian',
-            'pegawai',
-        ], true);
+        return $targetRank < $originRank;
+    }
+
+    /**
+     * Opsi role tujuan simulasi untuk user ini: seluruh role ber-rank lebih rendah
+     * dari role asli, dengan label tampilannya. Dipakai menu "Simulasi Role" agar
+     * UI dan backend selalu sepakat soal target yang sah.
+     *
+     * @return array<string, string>
+     */
+    public function switchableRoleOptions(): array
+    {
+        $originRank = self::ROLE_RANKS[$this->role] ?? null;
+
+        if ($originRank === null) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach (self::ROLE_LABELS as $roleKey => $label) {
+            $targetRank = self::ROLE_RANKS[$roleKey] ?? null;
+
+            if ($targetRank !== null && $targetRank < $originRank) {
+                $options[$roleKey] = $label;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * True bila user ini memiliki minimal satu role tujuan simulasi yang sah.
+     */
+    public function canSwitchToAnyRole(): bool
+    {
+        return $this->switchableRoleOptions() !== [];
     }
 }

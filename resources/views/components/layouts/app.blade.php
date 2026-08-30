@@ -547,14 +547,15 @@
                                 </a>
                             @endif
 
-                            {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
-                                 switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
-                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
-                                {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
+                            {{-- Switch Role Menu (permission-driven): role asli apa pun yang role efektifnya
+                                 memiliki users.switch_role dan punya target lebih rendah dapat switch;
+                                 saat simulasi aktif, hanya aksi revert yang tampil --}}
+                            @if(auth()->check() && ((auth()->user()->hasPermission('users.switch_role') && auth()->user()->canSwitchToAnyRole()) || auth()->user()->temporary_role))
+                                {{-- Submenu switch hanya bagi akun asli yang TIDAK sedang dalam simulasi:
                                      selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
                                      role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
-                                     yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
-                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
+                                     yang menyesatkan. Target menu diturunkan dari hierarki ROLE_RANKS milik model. --}}
+                                @if(auth()->user()->hasPermission('users.switch_role') && auth()->user()->canSwitchToAnyRole() && ! auth()->user()->temporary_role)
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"
@@ -592,7 +593,7 @@
                                             class="mt-1 space-y-0.5 rounded-lg bg-soft/60 p-1 border border-border/50"
                                             style="display: none;"
                                         >
-                                            @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
+                                            @foreach(auth()->user()->switchableRoleOptions() as $roleKey => $roleLabel)
                                                 @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
                                                     <form method="POST" action="{{ route('switch-role') }}">
                                                         @csrf
