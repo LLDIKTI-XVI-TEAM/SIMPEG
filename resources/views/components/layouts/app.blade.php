@@ -78,11 +78,26 @@
                 default => 'dashboard',
             };
 
-            // Menu sidebar difilter per role melalui property 'roles' opsional.
-            // - Item TANPA 'roles' tampil untuk SEMUA role (universal).
-            // - Item DENGAN 'roles' hanya tampil untuk role yang terdaftar.
-            // Fitur eksklusif role (misal Daftar Bawahan untuk kepala_bagian) dikunci di sini.
-            // Fitur bersama (misal Data Pegawai) dikontrol via halaman RBAC (Role & Permission).
+            // Ambil daftar permission untuk role aktif dari RBAC (Role & Permission)
+            $rolePermissions = [];
+            if ($authUser) {
+                try {
+                    $rolePermissions = \Illuminate\Support\Facades\DB::table('roles')
+                        ->join('role_permissions', 'role_permissions.role_id', '=', 'roles.id')
+                        ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
+                        ->where('roles.name', $activeRole)
+                        ->pluck('permissions.name')
+                        ->flip()
+                        ->all();
+                } catch (\Throwable) {
+                    $rolePermissions = [];
+                }
+            }
+
+            // Menu sidebar difilter per role dan permission RBAC.
+            // - Fitur eksklusif role dikunci via 'roles' (contoh: Daftar Bawahan khusus kepala_bagian).
+            // - Fitur bersama dikontrol via 'permission' (dinamis dari halaman Role & Permission).
+            // - Menu yang tidak mendapatkan akses akan tampil dengan style disabled (abu-abu & non-aktif).
             $menuGroups = [
                 [
                     'group' => '',
@@ -94,13 +109,16 @@
                     'group' => 'Kepegawaian',
                     'items' => [
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
+                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
+                         'permission' => 'employees.read'],
                         ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users',
                          'roles' => ['kepala_bagian']],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
+                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
+                         'permission' => 'employees.read'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
+                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
+                         'permission' => 'employees.read'],
                         ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text',
                          'roles' => ['pimpinan']],
                         ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar',
@@ -116,13 +134,16 @@
                         ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge',
                          'roles' => ['kepala_bagian']],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
+                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
+                         'permission' => 'cuti.read_all'],
                         ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal',
                          'roles' => ['admin_kepegawaian']],
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
+                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
+                         'permission' => 'cuti.read_all'],
                         ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth',
-                         'roles' => ['super_admin']],
+                         'roles' => ['super_admin'],
+                         'permission' => 'cuti.configure'],
                     ]
                 ],
                 [
@@ -136,7 +157,8 @@
                          'roles' => ['kepala_bagian']],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth',
                          'roles' => ['super_admin']],
-                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell',
+                         'permission' => 'notifications.read'],
                         ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal',
                          'roles' => ['super_admin']],
                     ]
@@ -153,9 +175,11 @@
                         ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth',
                          'roles' => ['super_admin']],
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days',
-                         'roles' => ['super_admin']],
+                         'roles' => ['super_admin'],
+                         'permission' => 'hari_libur.read'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list',
-                         'roles' => ['super_admin', 'admin_kepegawaian']],
+                         'roles' => ['super_admin', 'admin_kepegawaian'],
+                         'permission' => 'audit_logs.read'],
                     ]
                 ]
             ];
@@ -173,8 +197,13 @@
                     $visibleItems = [];
                     foreach ($group['items'] as $menu) {
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                        $roleAllowed = !isset($menu['roles']) || in_array($activeRole, $menu['roles'], true);
-                        if ($routeExists && $roleAllowed) {
+                        if ($routeExists) {
+                            $roleAllowed = !isset($menu['roles']) || in_array($activeRole, $menu['roles'], true);
+                            $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
+                            if ($activeRole === 'super_admin' && !isset($menu['roles'])) {
+                                $permissionAllowed = true;
+                            }
+                            $menu['disabled'] = ! ($roleAllowed && $permissionAllowed);
                             $visibleItems[] = $menu;
                         }
                     }
@@ -190,10 +219,11 @@
                         @foreach($visibleItems as $menu)
                             @php
                                 $isActive = false;
+                                $isDisabled = $menu['disabled'] ?? false;
                             $currentRoute = request()->route() ? request()->route()->getName() : null;
-                            if ($currentRoute === $menu['route']) {
+                            if (!$isDisabled && $currentRoute === $menu['route']) {
                                 $isActive = true;
-                            } elseif ($currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
+                            } elseif (!$isDisabled && $currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
                                 $hasMoreSpecific = false;
                                 foreach ($allMenuRoutes as $otherRoute) {
                                     if ($otherRoute !== $menu['route'] &&
@@ -208,17 +238,30 @@
                                 }
                             }
 
-                            $href = route($menu['route']);
-                            $itemClass = $isActive
-                                ? 'bg-primary text-white font-semibold'
-                                : 'text-muted hover:bg-soft hover:text-ink font-medium';
-                            $iconClass = $isActive ? 'text-white' : 'text-muted';
+                            if ($isDisabled) {
+                                $itemClass = 'text-muted/40 cursor-not-allowed select-none bg-transparent hover:bg-transparent';
+                                $iconClass = 'text-muted/30';
+                            } elseif ($isActive) {
+                                $itemClass = 'bg-primary text-white font-semibold';
+                                $iconClass = 'text-white';
+                            } else {
+                                $itemClass = 'text-muted hover:bg-soft hover:text-ink font-medium';
+                                $iconClass = 'text-muted';
+                            }
                         @endphp
+                        @if($isDisabled)
+                        <div
+                            class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm {{ $itemClass }}"
+                            title="Tidak Mendapatkan Akses"
+                            aria-disabled="true"
+                        >
+                        @else
                         <a
-                            href="{{ $href }}"
+                            href="{{ route($menu['route']) }}"
                             wire:navigate
                             class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors {{ $itemClass }}"
                         >
+                        @endif
                             @if($menu['icon'] === 'squares-2x2')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
                             @elseif($menu['icon'] === 'users')
@@ -228,7 +271,7 @@
                             @elseif($menu['icon'] === 'arrow-up-tray')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
                             @elseif($menu['icon'] === 'calendar')
-                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H18v-.008Zm0 2.25h.008v.008H18V15Z" /></svg>
                             @elseif($menu['icon'] === 'check-badge')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296a3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043a3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
                             @elseif($menu['icon'] === 'document-text')
@@ -263,7 +306,15 @@
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" /></svg>
                             @endif
                             <span class="truncate">{{ $menu['label'] }}</span>
+                            @if($isDisabled)
+                                {{-- Ikon gembok kecil untuk menu tanpa akses --}}
+                                <svg class="w-3.5 h-3.5 shrink-0 ml-auto {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
+                            @endif
+                        @if($isDisabled)
+                        </div>
+                        @else
                         </a>
+                        @endif
                     @endforeach
                 </div>
                 @endif
