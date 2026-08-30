@@ -137,16 +137,19 @@ class DatabaseSeederTest extends TestCase
             'email' => 'internal-persona@lldikti.go.id',
             'employee_id' => $employee->id,
             'role' => 'pegawai',
+            'name' => 'Persona Internal Asli',
         ]);
 
         $this->seed(DatabaseSeeder::class);
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
-        // Persona QA diterapkan pada user yang sama (via employee_id), email internal tetap.
+        // Persona QA diterapkan pada user yang sama (via employee_id); email internal,
+        // nama, dan role existing TIDAK pernah ditimpa oleh seeder QA.
         $user->refresh();
         $this->assertSame($employee->id, $user->employee_id);
         $this->assertSame('internal-persona@lldikti.go.id', $user->email);
-        $this->assertSame('QA Fase 7 Pegawai', $user->name);
+        $this->assertSame('Persona Internal Asli', $user->name);
+        $this->assertSame('pegawai', $user->role);
     }
 
     public function test_seeder_preserves_existing_user_name_on_reseed(): void

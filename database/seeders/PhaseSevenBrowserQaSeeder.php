@@ -118,8 +118,8 @@ class PhaseSevenBrowserQaSeeder extends Seeder
                 $statusAktifId,
                 ['is_kepala_lembaga' => true]
             );
-            $approver = $this->resolveDemoApprover($jenisPegawaiId, $statusAktifId);
-            $normalEmployee = $this->resolveDemoPegawai($jenisPegawaiId, $statusAktifId, $approver);
+            $approver = $this->resolveDemoApprover();
+            $normalEmployee = $this->resolveDemoPegawai($approver);
             $manualEmployee = $this->upsertEmployee(
                 self::MANUAL_EMPLOYEE_EMAIL,
                 '198001012026000005',
@@ -245,12 +245,16 @@ class PhaseSevenBrowserQaSeeder extends Seeder
     private function upsertAdminSession(): User
     {
         // Sesi admin QA memakai akun uji SSO terpetakan (admin_kepegawaian) — akun
-        // sudah ditanam SsoRoleMappedAccountSeeder beserta pegawai aktifnya; seeder
-        // ini tidak membuat kredensial lokal baru dan tidak menimpa data existing.
+        // sudah ditanam SsoRoleMappedAccountSeeder beserta pegawai aktifnya. Seeder
+        // memvalidasi state yang disiapkan, bukan memperbaikinya secara diam-diam.
         $user = $this->ssoUserForRole(self::SSO_ADMIN_ROLE);
 
         if ($user->employee_id === null) {
-            throw new RuntimeException('Akun SSO admin kepegawaian belum terhubung ke pegawai. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
+            throw new RuntimeException('Persona QA admin kepegawaian belum terhubung ke pegawai. Petakan akun melalui jalur administratif SIMPEG (UpdateUserMappingAction) lalu jalankan ulang seeder.');
+        }
+
+        if ($user->role !== self::SSO_ADMIN_ROLE) {
+            throw new RuntimeException("Persona QA admin kepegawaian ber-role '{$user->role}', expected '".self::SSO_ADMIN_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
         }
 
         return $user;
@@ -291,7 +295,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         return $employee;
     }
 
-    private function resolveDemoApprover(?string $jenisPegawaiId, ?string $statusAktifId): Employee
+    private function resolveDemoApprover(): Employee
     {
         $user = $this->ssoUserForRole(self::SSO_APPROVER_ROLE);
 
@@ -300,25 +304,19 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             : null;
 
         if ($employee === null) {
-            throw new RuntimeException('Employee untuk akun SSO kepala bagian belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
+            throw new RuntimeException('Persona QA kepala bagian belum terhubung ke pegawai. Petakan akun melalui jalur administratif SIMPEG (UpdateUserMappingAction) lalu jalankan ulang seeder.');
         }
 
-        $employee->fill([
-            'nama_lengkap' => 'QA Fase 7 Kepala Bagian',
-            'status_pegawai_id' => $statusAktifId,
-            'status_aktif' => 'Aktif',
-            'jenis_pegawai_id' => $jenisPegawaiId,
-            'jabatan_terakhir' => 'Kepala Bagian',
-            'role' => 'kepala_bagian',
-        ]);
-        $employee->save();
+        // Persona SSO existing tidak boleh di-fix secara diam-diam: validasi state
+        // yang disiapkan (aktif + role sesuai) dan gagal dengan pesan actionable agar
+        // misconfiguration UAT tetap terlihat, bukan disembunyikan oleh seeder.
+        if (! $employee->isActive()) {
+            throw new RuntimeException("Persona QA kepala bagian ('{$employee->nama_lengkap}') berstatus '{$employee->status_aktif}', expected aktif. Perbaiki status melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
+        }
 
-        $user->fill([
-            'name' => 'QA Fase 7 Kepala Bagian',
-            'role' => 'kepala_bagian',
-            'employee_id' => $employee->id,
-        ]);
-        $user->save();
+        if ($user->role !== self::SSO_APPROVER_ROLE || $employee->role !== self::SSO_APPROVER_ROLE) {
+            throw new RuntimeException("Persona QA kepala bagian ber-role user '{$user->role}' / employee '{$employee->role}', expected '".self::SSO_APPROVER_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
+        }
 
         return $employee;
     }
@@ -328,8 +326,6 @@ class PhaseSevenBrowserQaSeeder extends Seeder
      * sesi pegawai nyata melalui login Keycloak — bukan akun demo ber-password lokal.
      */
     private function resolveDemoPegawai(
-        ?string $jenisPegawaiId,
-        ?string $statusAktifId,
         Employee $approver,
     ): Employee {
         $user = $this->ssoUserForRole(self::SSO_PEGAWAI_ROLE);
@@ -339,18 +335,23 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             : null;
 
         if ($employee === null) {
-            throw new RuntimeException('Employee untuk akun SSO pegawai belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
+            throw new RuntimeException('Persona QA pegawai belum terhubung ke pegawai. Petakan akun melalui jalur administratif SIMPEG (UpdateUserMappingAction) lalu jalankan ulang seeder.');
         }
 
+        // Persona SSO existing tidak boleh di-fix secara diam-diam: validasi state
+        // yang disiapkan (aktif + role sesuai) dan gagal dengan pesan actionable.
+        if (! $employee->isActive()) {
+            throw new RuntimeException("Persona QA pegawai ('{$employee->nama_lengkap}') berstatus '{$employee->status_aktif}', expected aktif. Perbaiki status melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
+        }
+
+        if ($user->role !== self::SSO_PEGAWAI_ROLE || $employee->role !== self::SSO_PEGAWAI_ROLE) {
+            throw new RuntimeException("Persona QA pegawai ber-role user '{$user->role}' / employee '{$employee->role}', expected '".self::SSO_PEGAWAI_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
+        }
+
+        // Wiring relasi QA (penugasan atasan) boleh disiapkan seeder — bukan status
+        // lifecycle ataupun role internal.
         $employee->fill([
-            'nama_lengkap' => 'QA Fase 7 Pegawai',
-            'status_pegawai_id' => $statusAktifId,
-            'status_aktif' => 'Aktif',
-            'jenis_pegawai_id' => $jenisPegawaiId,
-            'jabatan_terakhir' => 'Analis Kepegawaian',
             'kepala_bagian_id' => $approver->id,
-            'is_kepala_lembaga' => false,
-            'role' => 'pegawai',
         ]);
         $employee->save();
 
@@ -366,13 +367,6 @@ class PhaseSevenBrowserQaSeeder extends Seeder
                 'tanggal_berakhir' => null,
             ],
         );
-
-        $user->fill([
-            'name' => 'QA Fase 7 Pegawai',
-            'role' => 'pegawai',
-            'employee_id' => $employee->id,
-        ]);
-        $user->save();
 
         return $employee;
     }

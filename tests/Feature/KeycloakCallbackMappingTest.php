@@ -127,15 +127,15 @@ class KeycloakCallbackMappingTest extends TestCase
 
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Superadmin LLDIKTI16',
-            'email' => 'dayensite@gmail.com',
+            'email' => 'dayen.sso@example.test',
         ]);
 
         $this->fakeKeycloakUser([
             'id' => 'kc-dayensite',
             'nickname' => 'demo-klabat', // benturan: username sama dengan milik user demo
             'name' => 'Superadmin LLDIKTI16',
-            'email' => 'dayensite@gmail.com',
-            'raw' => ['email' => 'dayensite@gmail.com', 'email_verified' => true, 'preferred_username' => 'demo-klabat'],
+            'email' => 'dayen.sso@example.test',
+            'raw' => ['email' => 'dayen.sso@example.test', 'email_verified' => true, 'preferred_username' => 'demo-klabat'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -146,7 +146,7 @@ class KeycloakCallbackMappingTest extends TestCase
         // Login sukses: keycloak_id terisi, role internal default (bootstrap super_admin
         // sudah dikonsumsi akun demo, mapping tidak pernah meng-elevate), dan
         // keycloak_username yang bentrok TIDAK menimpa milik user demo.
-        $mappedUser = User::where('email', 'dayensite@gmail.com')->first();
+        $mappedUser = User::where('email', 'dayen.sso@example.test')->first();
         $this->assertSame('kc-dayensite', $mappedUser->keycloak_id);
         $this->assertSame('pegawai', $mappedUser->role);
         $this->assertNotSame('demo-klabat', $mappedUser->keycloak_username);
@@ -968,7 +968,7 @@ class KeycloakCallbackMappingTest extends TestCase
     {
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Dayen Kanonis',
-            'email_pribadi' => 'dayensite@gmail.com',
+            'email_pribadi' => 'dayen.sso@example.test',
         ]);
 
         $existingUser = User::factory()->create([
@@ -983,8 +983,8 @@ class KeycloakCallbackMappingTest extends TestCase
             'id' => 'kc-new-subject',
             'nickname' => 'dayen-sso',
             'name' => 'Dayen SSO',
-            'email' => 'dayensite@gmail.com',
-            'raw' => ['email' => 'dayensite@gmail.com', 'email_verified' => true, 'preferred_username' => 'dayen-sso'],
+            'email' => 'dayen.sso@example.test',
+            'raw' => ['email' => 'dayen.sso@example.test', 'email_verified' => true, 'preferred_username' => 'dayen-sso'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');
@@ -1020,7 +1020,7 @@ class KeycloakCallbackMappingTest extends TestCase
     {
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Korban Konflik',
-            'email_pribadi' => 'dayensite@gmail.com',
+            'email_pribadi' => 'dayen.sso@example.test',
         ]);
 
         $userByEmployee = User::factory()->create([
@@ -1029,7 +1029,7 @@ class KeycloakCallbackMappingTest extends TestCase
             'role' => 'pimpinan',
         ]);
         $userByEmail = User::factory()->create([
-            'email' => 'dayensite@gmail.com',
+            'email' => 'dayen.sso@example.test',
             'role' => 'pegawai',
         ]);
 
@@ -1039,8 +1039,8 @@ class KeycloakCallbackMappingTest extends TestCase
             'id' => 'kc-conflict-subject',
             'nickname' => 'conflict-sso',
             'name' => 'Konflik SSO',
-            'email' => 'dayensite@gmail.com',
-            'raw' => ['email' => 'dayensite@gmail.com', 'email_verified' => true, 'preferred_username' => 'conflict-sso'],
+            'email' => 'dayen.sso@example.test',
+            'raw' => ['email' => 'dayen.sso@example.test', 'email_verified' => true, 'preferred_username' => 'conflict-sso'],
         ]);
 
         $response = $this->get('/auth/keycloak/callback');

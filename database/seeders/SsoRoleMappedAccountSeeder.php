@@ -10,22 +10,28 @@ use Illuminate\Support\Str;
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Fixture akun uji UAT (HANYA local/testing): email Keycloak terverifikasi →
+     * Fixture akun uji automated (HANYA local/testing): email Keycloak terverifikasi →
      * role internal yang diharapkan untuk AKUN PLACEHOLDER baru.
      *
-     * Dataset ini sengaja hidup di seeder — bukan di config/ — agar production config
-     * tidak pernah membawa pemetaan email → elevated role (Issue #6: daftar akun uji
-     * adalah evidence UAT, bukan konfigurasi otorisasi). Auth callback TIDAK PERNAH
-     * membaca dataset ini; role internal ditentukan aplikasi SIMPEG.
+     * Identitas fixture sengaja sintetis (@example.test) — Issue #6 menyatakan daftar
+     * akun uji + expected role adalah evidence UAT, bukan konfigurasi otorisasi
+     * hardcoded; alamat email nyata tidak boleh menjadi sumber pemberian elevated role
+     * di source code. Akun UAT real (email LLDIKTI) disiapkan saat sesi UAT melalui
+     * jalur administratif internal SIMPEG (UpdateUserMappingAction) dan evidencenya
+     * dicatat pada Issue #6 — tidak di-commit di sini.
+     *
+     * Dataset ini hidup di seeder — bukan di config/ — agar production config tidak
+     * pernah membawa pemetaan email → role. Auth callback TIDAK PERNAH membaca dataset
+     * ini; role internal ditentukan aplikasi SIMPEG.
      *
      * @var array<string, string>
      */
     public const ROLE_MAPPING = [
-        'dayensite@gmail.com' => 'super_admin',
-        'sitedayen@gmail.com' => 'admin_kepegawaian',
-        'dionkobi08@gmail.com' => 'pimpinan',
-        'dayen6153@gmail.com' => 'kepala_bagian',
-        'dionleonn05@gmail.com' => 'pegawai',
+        'uat-admin@example.test' => 'super_admin',
+        'uat-kepeg@example.test' => 'admin_kepegawaian',
+        'uat-kabag@example.test' => 'kepala_bagian',
+        'uat-pimpinan@example.test' => 'pimpinan',
+        'uat-pegawai@example.test' => 'pegawai',
     ];
 
     /**
