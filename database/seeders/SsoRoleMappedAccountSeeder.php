@@ -5,42 +5,78 @@ namespace Database\Seeders;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Fixture akun uji automated (HANYA local/testing): email Keycloak terverifikasi →
-     * role internal yang diharapkan untuk AKUN PLACEHOLDER baru.
+     * Daftar akun UAT SSO (HANYA local/testing): email Keycloak terverifikasi,
+     * preferred_username, password lokal, dan role internal yang diharapkan.
      *
-     * Identitas fixture sengaja sintetis (@example.test) — Issue #6 menyatakan daftar
-     * akun uji + expected role adalah evidence UAT, bukan konfigurasi otorisasi
-     * hardcoded; alamat email nyata tidak boleh menjadi sumber pemberian elevated role
-     * di source code. Akun UAT real (email LLDIKTI) disiapkan saat sesi UAT melalui
-     * jalur administratif internal SIMPEG (UpdateUserMappingAction) dan evidencenya
-     * dicatat pada Issue #6 — tidak di-commit di sini.
+     * Akun-akun ini adalah evidence UAT Issue #6 — persona yang dipakai untuk
+     * browser smoke test dengan login Keycloak nyata. Auth callback TIDAK PERNAH
+     * membaca daftar ini sebagai otorisasi: role internal tetap ditentukan
+     * aplikasi SIMPEG (role kosong pada pegawai valid → pegawai, role existing
+     * tidak pernah dioverwrite).
      *
-     * Dataset ini hidup di seeder — bukan di config/ — agar production config tidak
-     * pernah membawa pemetaan email → role. Auth callback TIDAK PERNAH membaca dataset
-     * ini; role internal ditentukan aplikasi SIMPEG.
-     *
-     * @var array<string, string>
+     * @var list<array{email: string, username: string, password: string, role: string}>
      */
-    public const ROLE_MAPPING = [
-        'uat-admin@example.test' => 'super_admin',
-        'uat-kepeg@example.test' => 'admin_kepegawaian',
-        'uat-kabag@example.test' => 'kepala_bagian',
-        'uat-pimpinan@example.test' => 'pimpinan',
-        'uat-pegawai@example.test' => 'pegawai',
+    public const UAT_ACCOUNTS = [
+        [
+            'email' => 'dayensite@gmail.com',
+            'username' => 'demo-klabat',
+            'password' => 'demo-klabat',
+            'role' => 'super_admin',
+        ],
+        [
+            'email' => 'sitedayen@gmail.com',
+            'username' => 'demo-klabat-kepeg',
+            'password' => 'demo-klabat-kepeg',
+            'role' => 'admin_kepegawaian',
+        ],
+        [
+            'email' => 'dionkobi08@gmail.com',
+            'username' => 'demo-klabat-pimpinan',
+            'password' => 'demo-klabat-pimpinan',
+            'role' => 'pimpinan',
+        ],
+        [
+            'email' => 'dayen6153@gmail.com',
+            'username' => 'demo-klabat-kabag',
+            'password' => 'demo-klabat-kabag',
+            'role' => 'kepala_bagian',
+        ],
+        [
+            'email' => 'dionleonn05@gmail.com',
+            'username' => 'demo-klabat-pegawai',
+            'password' => 'demo-klabat-pegawai',
+            'role' => 'pegawai',
+        ],
     ];
 
     /**
-     * Menanam pegawai + user placeholder untuk setiap email pada fixture ROLE_MAPPING
-     * di atas, sehingga login SSO pertama akun tersebut langsung menemukan tepat satu
-     * pegawai.
+     * Pemetaan email → role yang diharapkan, diturunkan dari UAT_ACCOUNTS agar
+     * tidak ada duplikasi daftar akun uji di source.
+     *
+     * @return array<string, string>
+     */
+    public static function roleMapping(): array
+    {
+        $mapping = [];
+
+        foreach (self::UAT_ACCOUNTS as $account) {
+            $mapping[$account['email']] = $account['role'];
+        }
+
+        return $mapping;
+    }
+
+    /**
+     * Menanam pegawai + user untuk setiap akun UAT SSO di atas, sehingga login
+     * SSO pertama akun tersebut langsung menemukan tepat satu pegawai dan
+     * preferred_username-nya tersedia sebagai atribut login tambahan.
      *
      * Seeder ini BUKAN sumber otorisasi: auth callback tidak pernah membaca
-     * role_mapping; role internal ditentukan aplikasi SIMPEG.
+     * daftar ini; role internal ditentukan aplikasi SIMPEG.
      *
      * Seeder ini fail-closed: hanya berjalan di local/testing. Di produksi, pegawai
      * dengan email itu dibuat lewat alur admin/import yang normal.
@@ -54,6 +90,8 @@ class SsoRoleMappedAccountSeeder extends Seeder
      * - nama, email internal, dan role user existing TIDAK ditimpa;
      * - resolver user memakai kontrak kanonis Issue #6: employee_id dulu, baru
      *   email case-insensitive (termasuk email_pribadi pegawai).
+     * - password dan keycloak_username adalah milik fixture akun UAT: direset
+     *   idempoten oleh seeder ini setiap dijalankan (mengikuti pola akun demo).
      */
     public function run(): void
     {
@@ -61,9 +99,10 @@ class SsoRoleMappedAccountSeeder extends Seeder
             return;
         }
 
-        foreach (self::ROLE_MAPPING as $mappedEmail => $mappedRole) {
-            $email = trim((string) $mappedEmail);
-            $role = trim((string) $mappedRole);
+        foreach (self::UAT_ACCOUNTS as $uatAccount) {
+            $email = trim((string) $uatAccount['email']);
+            $username = trim((string) $uatAccount['username']);
+            $role = trim((string) $uatAccount['role']);
 
             if ($email === '' || $role === '') {
                 continue;
@@ -93,7 +132,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 // callback: jangan pilih arbitrer dan jangan mengikat user ber-role ke
                 // pegawai yang salah. Mapping dilewati + peringatan.
                 $this->command?->warn(
-                    "SSO mapped account '{$email}' dilewati: pencocokan pegawai ambigu (lebih dari satu pegawai cocok)."
+                    "SSO UAT account '{$email}' dilewati: pencocokan pegawai ambigu (lebih dari satu pegawai cocok)."
                 );
 
                 continue;
@@ -107,7 +146,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 // dengan email kanonis yang sama. Mapping dilewati; callback pun akan
                 // menolak mapping ke pegawai non-aktif.
                 $this->command?->warn(
-                    "SSO mapped account '{$email}' dilewati: pegawai existing berstatus non-aktif."
+                    "SSO UAT account '{$email}' dilewati: pegawai existing berstatus non-aktif."
                 );
 
                 continue;
@@ -121,7 +160,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
 
             if ($userByEmail && $userByEmail->employee_id !== null && (! $employee || $userByEmail->employee_id !== $employee->id)) {
                 $this->command?->warn(
-                    "SSO mapped account '{$email}' dilewati: email sudah dimiliki user yang terhubung ke pegawai lain."
+                    "SSO UAT account '{$email}' dilewati: email sudah dimiliki user yang terhubung ke pegawai lain."
                 );
 
                 continue;
@@ -148,7 +187,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
 
             if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
                 $this->command?->warn(
-                    "SSO mapped account '{$email}' dilewati: konflik identitas (email juga dimiliki user lain selain user pegawai)."
+                    "SSO UAT account '{$email}' dilewati: konflik identitas (email juga dimiliki user lain selain user pegawai)."
                 );
 
                 continue;
@@ -161,7 +200,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
             // mungkin berubah setelah akun dipetakan). Mapping dilewati + peringatan.
             if ($user->exists && $user->employee_id !== null && $user->employee_id !== $employee->id) {
                 $this->command?->warn(
-                    "SSO mapped account '{$email}' dilewati: user sudah terhubung ke pegawai lain."
+                    "SSO UAT account '{$email}' dilewati: user sudah terhubung ke pegawai lain."
                 );
 
                 continue;
@@ -187,15 +226,25 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 $user->email_verified_at = now();
             }
 
-            // Password acak hanya untuk placeholder user baru; user existing yang sudah
-            // menetapkan password via profil tidak boleh ditimpa tanpa audit.
-            if (! $user->exists) {
-                $user->password = Str::random(48);
+            // keycloak_username adalah atribut login tambahan (identitas kanonis tetap
+            // keycloak_id): diklaim hanya bila belum dipakai user lain — benturan tidak
+            // boleh menggagalkan seeding akun.
+            if ($username !== '' && $this->usernameIsAvailable($user, $username)) {
+                $user->keycloak_username = $username;
+            } elseif ($username !== '') {
+                $this->command?->warn(
+                    "SSO UAT account '{$email}': keycloak_username '{$username}' sudah dipakai user lain, diklaim dilewati."
+                );
             }
+
+            // Password adalah milik fixture akun UAT (dipakai tooling/QA lokal):
+            // direset idempoten setiap seeder dijalankan — mengikuti pola akun demo.
+            // Model memakai cast 'hashed' sehingga nilai plain langsung di-hash.
+            $user->password = $uatAccount['password'];
 
             $user->save();
 
-            $this->command?->info("SSO mapped account '{$email}' seeded with role: {$user->role}.");
+            $this->command?->info("SSO UAT account '{$email}' seeded with role: {$user->role}.");
         }
     }
 
@@ -204,5 +253,19 @@ class SsoRoleMappedAccountSeeder extends Seeder
         $localPart = strstr($email, '@', true) ?: $email;
 
         return ucwords(str_replace(['.', '_', '-'], ' ', $localPart));
+    }
+
+    /**
+     * True bila keycloak_username belum dipakai user lain (atau milik user ini sendiri).
+     */
+    private function usernameIsAvailable(User $user, string $username): bool
+    {
+        $query = User::query()->whereRaw('lower(keycloak_username) = ?', [strtolower($username)]);
+
+        if ($user->exists) {
+            $query->whereKeyNot($user->getKey());
+        }
+
+        return ! $query->exists();
     }
 }

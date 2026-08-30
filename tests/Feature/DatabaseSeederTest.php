@@ -32,25 +32,26 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        // Jumlah user bervariasi tergantung seeders yang aktif (demo + mapping).
+        // Jumlah user bervariasi tergantung seeders yang aktif (approval + mapping).
         // Cek keberadaan user penting, bukan hitungan eksak.
         $this->assertDatabaseHas('users', [
             'email' => 'merlina.rahman@example.com',
             'role' => 'admin_kepegawaian',
         ]);
 
-        foreach (SsoRoleMappedAccountSeeder::ROLE_MAPPING as $email => $role) {
+        foreach (SsoRoleMappedAccountSeeder::roleMapping() as $email => $role) {
             $this->assertDatabaseHas('users', [
                 'email' => $email,
                 'role' => $role,
             ]);
         }
 
-        // Jika demo_users masih ada (gabungan), pastikan juga ter-seed.
-        foreach ((array) config('services.keycloak.demo_users', []) as $demoUser) {
+        // Setiap akun UAT membawa preferred_username fixture-nya.
+        foreach (SsoRoleMappedAccountSeeder::UAT_ACCOUNTS as $uatAccount) {
             $this->assertDatabaseHas('users', [
-                'keycloak_username' => $demoUser['username'],
-                'role' => $demoUser['role'],
+                'email' => $uatAccount['email'],
+                'keycloak_username' => $uatAccount['username'],
+                'role' => $uatAccount['role'],
             ]);
         }
     }
@@ -59,7 +60,7 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        foreach (SsoRoleMappedAccountSeeder::ROLE_MAPPING as $email => $role) {
+        foreach (SsoRoleMappedAccountSeeder::roleMapping() as $email => $role) {
             $this->assertDatabaseHas('users', [
                 'email' => $email,
                 'role' => $role,
@@ -73,7 +74,7 @@ class DatabaseSeederTest extends TestCase
 
     public function test_seeder_does_not_reactivate_existing_employee(): void
     {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
 
         // Pegawai existing berstatus Pensiun — seeder ulang tidak boleh
         // menghidupkannya kembali hanya agar login SSO lulus.
@@ -92,7 +93,7 @@ class DatabaseSeederTest extends TestCase
 
     public function test_seeder_does_not_move_user_to_another_employee(): void
     {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
 
         $pegawaiAsal = Employee::factory()->create([
             'nama_lengkap' => 'Pegawai Asal',
@@ -154,7 +155,7 @@ class DatabaseSeederTest extends TestCase
 
     public function test_seeder_preserves_existing_user_name_on_reseed(): void
     {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
         $customName = 'Nama Kustom Yang Sudah Ada';
 
         // User existing dengan nama yang sudah ditetapkan (bukan derived dari email).
@@ -180,7 +181,7 @@ class DatabaseSeederTest extends TestCase
     /** Seeder memakai kontrak kanonis Issue #6: user milik pegawai di-resolve via employee_id, email internal tetap. */
     public function test_seeder_resolves_user_via_employee_id_with_different_internal_email(): void
     {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
 
         // Pegawai kanonis memegang email mapping pada email_pribadi; user internalnya
         // memakai email kantor yang berbeda.
@@ -214,7 +215,7 @@ class DatabaseSeederTest extends TestCase
      */
     public function test_seeder_skips_ambiguous_employee_match(): void
     {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
 
         $employeeA = Employee::factory()->create([
             'nama_lengkap' => 'Ambigu A',
@@ -241,7 +242,7 @@ class DatabaseSeederTest extends TestCase
      */
     public function test_seeder_skips_mapping_when_employee_user_conflicts_with_email_user(): void
     {
-        $email = collect(SsoRoleMappedAccountSeeder::ROLE_MAPPING)->keys()->first();
+        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
 
         $employee = Employee::factory()->create([
             'email_pribadi' => $email,
@@ -715,7 +716,7 @@ class DatabaseSeederTest extends TestCase
      */
     private function ssoEmailForRole(string $role): string
     {
-        $email = array_search($role, SsoRoleMappedAccountSeeder::ROLE_MAPPING, true);
+        $email = array_search($role, SsoRoleMappedAccountSeeder::roleMapping(), true);
         $this->assertIsString($email, "Fixture SSO untuk role '{$role}' tidak ditemukan.");
 
         return $email;

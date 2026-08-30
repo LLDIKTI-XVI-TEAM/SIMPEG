@@ -191,10 +191,10 @@ class PhaseSevenBrowserQaSeeder extends Seeder
      */
     private function ssoEmailForRole(string $role): string
     {
-        $email = array_search($role, SsoRoleMappedAccountSeeder::ROLE_MAPPING, true);
+        $email = array_search($role, SsoRoleMappedAccountSeeder::roleMapping(), true);
 
         if ($email === false) {
-            throw new RuntimeException("Fixture SSO untuk role '{$role}' tidak ditemukan di SsoRoleMappedAccountSeeder::ROLE_MAPPING.");
+            throw new RuntimeException("Fixture SSO untuk role '{$role}' tidak ditemukan di SsoRoleMappedAccountSeeder::roleMapping().");
         }
 
         return $email;

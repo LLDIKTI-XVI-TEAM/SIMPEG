@@ -744,21 +744,18 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
     }
 
-    public function test_database_seeder_creates_demo_role_users(): void
+    public function test_database_seeder_creates_uat_sso_accounts(): void
     {
-        // Setelah merge development, DatabaseSeeder memanggil DemoSsoUserSeeder + SsoRoleMappedAccountSeeder
-        // sehingga akun demo tetap tersedia untuk PhaseSevenBrowserQaSeeder, bersama mapping SSO.
+        // DatabaseSeeder menanam akun UAT SSO (email + preferred_username + role)
+        // yang dipakai persona browser QA dan evidence UAT Issue #6.
         $this->seed(DatabaseSeeder::class);
 
-        foreach (['demo-klabat', 'demo-klabat-kepeg', 'demo-klabat-kabag', 'demo-klabat-pimpinan', 'demo-klabat-pegawai'] as $username) {
-            $this->assertNotNull(User::where('keycloak_username', $username)->first(), "Demo user {$username} harus ada untuk fixture browser QA.");
-        }
+        foreach (SsoRoleMappedAccountSeeder::UAT_ACCOUNTS as $uatAccount) {
+            $user = User::where('email', $uatAccount['email'])->first();
 
-        foreach (SsoRoleMappedAccountSeeder::ROLE_MAPPING as $email => $role) {
-            $this->assertDatabaseHas('users', [
-                'email' => $email,
-                'role' => $role,
-            ]);
+            $this->assertNotNull($user, "Akun UAT {$uatAccount['email']} harus ada.");
+            $this->assertSame($uatAccount['username'], $user->keycloak_username, "Preferred username akun UAT {$uatAccount['email']} harus sesuai fixture.");
+            $this->assertSame($uatAccount['role'], $user->role, "Role akun UAT {$uatAccount['email']} harus sesuai fixture.");
         }
     }
 
