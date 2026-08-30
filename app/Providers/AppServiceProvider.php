@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\User;
-use App\Services\Notifications\WhatsApp\UnavailableWhatsAppTemplateAdapter;
+use App\Services\Notifications\WhatsApp\QontakWhatsAppTemplateAdapter;
+use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfig;
+use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfiguration;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
 use App\Services\Rbac\UiPermissionCapabilityService;
 use App\Services\TransactionSideEffectManager;
@@ -25,8 +27,17 @@ class AppServiceProvider extends ServiceProvider
         // Satu request harus berbagi daftar kompensasi yang sama antara middleware dan Action.
         $this->app->singleton(TransactionSideEffectManager::class);
 
-        // Adapter default sengaja fail-closed sampai kontrak provider WhatsApp terverifikasi.
-        $this->app->singleton(WhatsAppTemplateAdapter::class, UnavailableWhatsAppTemplateAdapter::class);
+        // Adapter Qontak tersedia sebagai capability, tetapi dispatcher tetap fail-closed
+        // sampai readiness, kill-switch channel, dan kebijakan event seluruhnya aktif.
+        $this->app->singleton(WhatsAppTemplateAdapter::class, QontakWhatsAppTemplateAdapter::class);
+
+        // Memo per proses hanya berlaku untuk artefak non-rahasia. Snapshot provider
+        // dibaca langsung agar rotasi/clear utuh terlihat oleh worker tanpa TTL.
+        $this->app->singleton(WhatsAppRuntimeConfig::class);
+        $this->app->bind(
+            WhatsAppRuntimeConfiguration::class,
+            fn (): WhatsAppRuntimeConfig => $this->app->make(WhatsAppRuntimeConfig::class),
+        );
 
         // Cache capability dibatasi pada lifecycle request agar perubahan RBAC pada request berikutnya langsung berlaku.
         $this->app->scoped(UiPermissionCapabilityService::class);

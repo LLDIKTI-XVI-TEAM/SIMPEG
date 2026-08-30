@@ -37,7 +37,7 @@ class NotificationEventChannelManagementTest extends TestCase
         $this->assertTrue($catalog->hasEvent('import_pegawai_gagal'));
         $this->assertTrue($catalog->hasAdapter('in_app'));
         $this->assertTrue($catalog->hasAdapter('email'));
-        $this->assertFalse($catalog->hasAdapter('whatsapp_business'));
+        $this->assertTrue($catalog->hasAdapter('whatsapp_business'));
         $this->assertTrue($catalog->supportsChannel('cuti.disetujui', 'email'));
         $this->assertTrue($catalog->supportsChannel('status_pegawai.diubah', 'in_app'));
         $this->assertTrue($catalog->supportsChannel('status_pegawai.diubah', 'email'));
@@ -57,7 +57,7 @@ class NotificationEventChannelManagementTest extends TestCase
         $this->assertTrue($catalog->supportsChannel('ews.satyalancana', 'whatsapp_business'));
         $this->assertFalse($catalog->supportsChannel('ews.scheduler_failed', 'whatsapp_business'));
         $this->assertFalse($catalog->supportsChannel('import_pegawai', 'whatsapp_business'));
-        $this->assertFalse($catalog->hasAdapter('whatsapp_business'));
+        $this->assertTrue($catalog->hasAdapter('whatsapp_business'));
     }
 
     public function test_super_admin_dapat_membuat_dan_memperbarui_policy_supported(): void

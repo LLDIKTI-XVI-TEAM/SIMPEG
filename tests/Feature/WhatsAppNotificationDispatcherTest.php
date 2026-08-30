@@ -15,16 +15,20 @@ use App\Models\WhatsAppNotificationDelivery;
 use App\Models\WhatsAppNotificationOutbox;
 use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationEventCatalog;
+use App\Services\Notifications\WhatsApp\UnavailableWhatsAppTemplateAdapter;
 use App\Services\Notifications\WhatsApp\WhatsAppNotificationDispatcher;
 use App\Services\Notifications\WhatsApp\WhatsAppReadiness;
 use App\Services\Notifications\WhatsApp\WhatsAppRecipientResolver;
+use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfig;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
+use App\Services\Notifications\WhatsApp\WhatsAppTemplateContract;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateMessage;
 use App\Services\NotificationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Tests\Support\FakeWhatsAppTemplateAdapter;
@@ -40,6 +44,10 @@ class WhatsAppNotificationDispatcherTest extends TestCase
     {
         parent::setUp();
         config([
+            'services.whatsapp.event_templates' => WhatsAppTemplateContract::eventTemplateArchetypes(),
+            'services.whatsapp.templates' => [],
+        ]);
+        config([
             'services.whatsapp.canonical_url' => 'https://simpeg.lldikti16.kemdikbud.go.id',
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan' => [
                 'id' => 'tmpl_cuti_perlu_tindakan_123',
@@ -50,7 +58,7 @@ class WhatsAppNotificationDispatcherTest extends TestCase
                     'tanggal_mulai' => '3',
                     'tanggal_selesai' => '4',
                     'jumlah_hari' => '5',
-                    'tautan_detail' => '6',
+                    'alasan' => '6',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -65,7 +73,6 @@ class WhatsAppNotificationDispatcherTest extends TestCase
                     'jenis_cuti' => '2',
                     'status' => '3',
                     'keterangan' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -80,7 +87,6 @@ class WhatsAppNotificationDispatcherTest extends TestCase
                     'jenis_peringatan' => '2',
                     'tanggal_target' => '3',
                     'sisa_waktu' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -88,6 +94,7 @@ class WhatsAppNotificationDispatcherTest extends TestCase
                 ],
             ],
         ]);
+        $this->persistRuntimeTemplateConfig();
         $this->fakeAdapter = new FakeWhatsAppTemplateAdapter;
         $this->app->instance(WhatsAppTemplateAdapter::class, $this->fakeAdapter);
     }
@@ -97,7 +104,9 @@ class WhatsAppNotificationDispatcherTest extends TestCase
         $employee = Employee::factory()->create(['no_hp' => '081234567890']);
 
         $this->assertFalse(app(WhatsAppReadiness::class)->isReady());
-        $this->assertNull(app(WhatsAppRecipientResolver::class)->resolve($employee));
+        // Resolver menormalisasi no_hp menjadi alamat 62..., tetapi kesiapan sumber
+        // nomor tetap menjadi gerbang readiness yang terpisah dan belum aktif di sini.
+        $this->assertSame('6281234567890', app(WhatsAppRecipientResolver::class)->resolve($employee));
 
         $dispatcher = app(WhatsAppNotificationDispatcher::class);
         $result = $dispatcher->dispatch($employee, 'cuti.disetujui', ['leave_request_id' => 'abc']);
@@ -107,9 +116,44 @@ class WhatsAppNotificationDispatcherTest extends TestCase
         $this->fakeAdapter->assertNotSent();
     }
 
+    public function test_adapter_runtime_unavailable_menghentikan_dispatch_sebelum_outbox_dibuat(): void
+    {
+        Queue::fake();
+        Http::fake();
+        $this->app->instance(WhatsAppTemplateAdapter::class, new UnavailableWhatsAppTemplateAdapter);
+
+        $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->firstOrFail();
+        $channel->forceFill(['is_enabled' => true])->save();
+        NotificationEventChannel::updateOrCreate(
+            ['event_key' => 'cuti.disetujui', 'notification_channel_id' => $channel->id],
+            ['is_enabled' => true],
+        );
+
+        // Gerbang konfigurasi sengaja dipaksa siap; adapter unavailable tetap harus
+        // menghentikan dispatcher sebelum mapper, delivery, dan outbox diproses.
+        $readiness = $this->createMock(WhatsAppReadiness::class);
+        $readiness->method('isReady')->willReturn(true);
+        $this->app->instance(WhatsAppReadiness::class, $readiness);
+
+        $recipientResolver = $this->createMock(WhatsAppRecipientResolver::class);
+        $recipientResolver->method('resolve')->willReturn('6281234567890');
+        $this->app->instance(WhatsAppRecipientResolver::class, $recipientResolver);
+
+        $employee = Employee::factory()->create();
+        $result = app(WhatsAppNotificationDispatcher::class)
+            ->dispatch($employee, 'cuti.disetujui', ['leave_request_id' => 'konteks-uji']);
+
+        $this->assertNull($result);
+        $this->assertDatabaseCount('whatsapp_notification_deliveries', 0);
+        $this->assertSame(0, WhatsAppNotificationOutbox::query()->count());
+        Queue::assertNothingPushed();
+        Http::assertNothingSent();
+    }
+
     public function test_template_id_belum_terkonfigurasi_fail_closed(): void
     {
         config(['services.whatsapp.templates.simpeg_cuti_status.id' => null]);
+        $this->persistRuntimeTemplateConfig();
 
         $employee = Employee::factory()->create();
         $dispatcher = app(WhatsAppNotificationDispatcher::class);
@@ -252,7 +296,6 @@ class WhatsAppNotificationDispatcherTest extends TestCase
                 '2' => 'Cuti Tahunan',
                 '3' => 'Disetujui',
                 '4' => 'Disetujui penuh.',
-                '5' => 'https://simpeg.lldikti16.kemdikbud.go.id/cuti/'.$leaveRequest->id,
             ],
             buttonVariables: [
                 'button_target_url' => 'https://simpeg.lldikti16.kemdikbud.go.id/cuti/'.$leaveRequest->id,
@@ -265,6 +308,7 @@ class WhatsAppNotificationDispatcherTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertSentCount(1);
@@ -556,7 +600,6 @@ class WhatsAppNotificationDispatcherTest extends TestCase
                     'jenis_peringatan' => '2',
                     'tanggal_target' => '3',
                     'sisa_waktu' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -773,5 +816,29 @@ class WhatsAppNotificationDispatcherTest extends TestCase
             'alasan' => 'Pengajuan ulang setelah rollover',
             'status' => 'menunggu_approval',
         ]);
+    }
+
+    /** Menyalin fixture kontrak dispatcher ke setting DB sumber runtime. */
+    private function persistRuntimeTemplateConfig(): void
+    {
+        $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->first()
+            ?? RefNotificationChannel::create([
+                'code' => 'whatsapp_business',
+                'name' => 'WhatsApp Business',
+                'is_enabled' => false,
+            ]);
+        $contract = json_encode([
+            'event_templates' => config('services.whatsapp.event_templates', []),
+            'templates' => config('services.whatsapp.templates', []),
+        ], JSON_THROW_ON_ERROR);
+
+        $channel->forceFill(['config' => [
+            'provider' => 'qontak',
+            'base_url' => 'https://service-chat.qontak.com/api/open/v1',
+            'canonical_url' => config('services.whatsapp.canonical_url'),
+            'template_configuration' => $contract,
+        ]])->save();
+
+        app(WhatsAppRuntimeConfig::class)->invalidate();
     }
 }

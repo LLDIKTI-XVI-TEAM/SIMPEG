@@ -35,7 +35,7 @@
             <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-end">
                 <div>
                     <h2 id="add-channel-title" class="text-base font-semibold text-ink">Tambah channel</h2>
-                    <p class="mt-1 text-xs leading-relaxed text-muted">Channel baru selalu dibuat nonaktif. Credential tetap dikelola melalui environment atau secret manager.</p>
+                    <p class="mt-1 text-xs leading-relaxed text-muted">Channel baru selalu dibuat nonaktif. Konfigurasi integrasi dikelola sesuai kebijakan masing-masing channel.</p>
                 </div>
                 <form action="{{ route('data-master.channel-notifikasi.store') }}" method="POST" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]" x-data="{ submitting: false }" @submit="submitting = true">
                     @csrf
@@ -90,6 +90,66 @@
                                 <x-ui.button type="submit" size="sm" ::disabled="submitting">Simpan</x-ui.button>
                             </div>
                         </form>
+
+                        @if($channel['code'] === 'whatsapp_business' && $channel['whatsapp_config'] !== null)
+                            <details class="mt-4 rounded-lg border border-border bg-soft/40" x-data="{ open: false }" @toggle="open = $event.newState === 'open'">
+                                <summary class="cursor-pointer select-none px-4 py-3 text-xs font-semibold text-ink">
+                                    Konfigurasi WhatsApp Business
+                                </summary>
+                                <form action="{{ route('data-master.channel-notifikasi.whatsapp-config', $channel['id']) }}" method="POST" class="space-y-3 border-t border-border px-4 py-4" x-data="{ submitting: false }" @submit="submitting = true">
+                                    @csrf
+                                    <p class="text-xs leading-relaxed text-muted">
+                                        Access token disimpan terenkripsi. Access token dan Channel Integration ID bersifat write-only sehingga nilai tersimpan tidak pernah ditampilkan kembali. Menyimpan konfigurasi tidak mengaktifkan pengiriman; readiness, status channel, dan kebijakan event tetap harus terpenuhi.
+                                    </p>
+                                    <div>
+                                        <div class="mb-1 flex items-center justify-between gap-3">
+                                            <label for="wa-access-token-{{ $channel['id'] }}" class="block text-xs font-semibold text-ink">Access token Qontak</label>
+                                            <span class="text-[11px] font-medium {{ $channel['whatsapp_config']['access_token_configured'] ? 'text-success' : 'text-muted' }}">
+                                                {{ $channel['whatsapp_config']['access_token_configured'] ? 'Token akses tersimpan' : 'Token akses belum tersimpan' }}
+                                            </span>
+                                        </div>
+                                        <input id="wa-access-token-{{ $channel['id'] }}" type="password" name="access_token" value="" maxlength="10000" autocomplete="new-password" placeholder="{{ $channel['whatsapp_config']['access_token_configured'] ? 'Kosongkan untuk mempertahankan token saat ini' : 'Masukkan access token Qontak' }}" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                        @if($channel['whatsapp_config']['access_token_configured'])
+                                            <label class="mt-2 flex items-start gap-2 text-xs text-muted">
+                                                <input type="checkbox" name="clear_access_token" value="1" class="mt-0.5 rounded border-border text-danger focus:ring-danger">
+                                                <span>Hapus access token tersimpan saat konfigurasi ini disimpan.</span>
+                                            </label>
+                                        @endif
+                                    </div>
+                                    <div>
+                                        <div class="mb-1 flex items-center justify-between gap-3">
+                                            <label for="wa-channel-integration-id-{{ $channel['id'] }}" class="block text-xs font-semibold text-ink">Channel Integration ID</label>
+                                            <span class="text-[11px] font-medium {{ $channel['whatsapp_config']['channel_integration_id_configured'] ? 'text-success' : 'text-muted' }}">
+                                                {{ $channel['whatsapp_config']['channel_integration_id_configured'] ? 'Channel ID tersimpan' : 'Channel ID belum tersimpan' }}
+                                            </span>
+                                        </div>
+                                        <input id="wa-channel-integration-id-{{ $channel['id'] }}" type="password" name="channel_integration_id" value="" maxlength="36" autocomplete="new-password" placeholder="{{ $channel['whatsapp_config']['channel_integration_id_configured'] ? 'Kosongkan untuk mempertahankan Channel ID saat ini' : 'Masukkan UUID Channel Integration ID' }}" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                        @if($channel['whatsapp_config']['channel_integration_id_configured'])
+                                            <label class="mt-2 flex items-start gap-2 text-xs text-muted">
+                                                <input type="checkbox" name="clear_channel_integration_id" value="1" class="mt-0.5 rounded border-border text-danger focus:ring-danger">
+                                                <span>Hapus Channel Integration ID tersimpan saat konfigurasi ini disimpan.</span>
+                                            </label>
+                                        @endif
+                                    </div>
+                                    <div>
+                                        <label for="wa-base-url-{{ $channel['id'] }}" class="mb-1 block text-xs font-semibold text-ink">Base URL API</label>
+                                        <input id="wa-base-url-{{ $channel['id'] }}" name="base_url" value="{{ old('base_url', $channel['whatsapp_config']['base_url']) }}" maxlength="255" autocomplete="off" placeholder="https://service-chat.qontak.com/api/open/v1" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                    </div>
+                                    <div>
+                                        <label for="wa-canonical-url-{{ $channel['id'] }}" class="mb-1 block text-xs font-semibold text-ink">Domain resmi (canonical URL)</label>
+                                        <input id="wa-canonical-url-{{ $channel['id'] }}" name="canonical_url" value="{{ old('canonical_url', $channel['whatsapp_config']['canonical_url']) }}" maxlength="255" autocomplete="off" placeholder="https://simpeg.lldiktiwil16.id" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                    </div>
+                                    <div>
+                                        <label for="wa-template-config-{{ $channel['id'] }}" class="mb-1 block text-xs font-semibold text-ink">Kontrak template resmi (JSON)</label>
+                                        <textarea id="wa-template-config-{{ $channel['id'] }}" name="template_configuration" rows="6" spellcheck="false" placeholder='{"event_templates":{...},"templates":{...}}' class="w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{{ old('template_configuration', $channel['whatsapp_config']['template_configuration']) }}</textarea>
+                                    </div>
+                                    <button type="submit" :disabled="submitting" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                                        <span x-show="!submitting">Simpan konfigurasi</span>
+                                        <span x-show="submitting" style="display: none;">Menyimpan...</span>
+                                    </button>
+                                </form>
+                            </details>
+                        @endif
 
                         <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                             @if(!$channel['adapter_available'])

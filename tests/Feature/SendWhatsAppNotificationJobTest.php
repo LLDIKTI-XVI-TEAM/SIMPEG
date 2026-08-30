@@ -18,10 +18,14 @@ use App\Services\Notifications\NotificationEventCatalog;
 use App\Services\Notifications\WhatsApp\WhatsAppDeliveryResult;
 use App\Services\Notifications\WhatsApp\WhatsAppReadiness;
 use App\Services\Notifications\WhatsApp\WhatsAppRecipientResolver;
+use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfig;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
+use App\Services\Notifications\WhatsApp\WhatsAppTemplateContract;
 use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\Support\FakeWhatsAppTemplateAdapter;
 use Tests\TestCase;
@@ -37,9 +41,22 @@ class SendWhatsAppNotificationJobTest extends TestCase
         parent::setUp();
         config([
             'services.whatsapp.canonical_url' => 'https://simpeg.example.test',
+            'services.whatsapp.event_templates' => WhatsAppTemplateContract::eventTemplateArchetypes(),
+            'services.whatsapp.templates' => [
+                'simpeg_cuti_perlu_tindakan' => ['id' => null, 'language' => null, 'variables_map' => [], 'button' => null],
+                'simpeg_cuti_status' => ['id' => null, 'language' => null, 'variables_map' => [], 'button' => null],
+                'simpeg_ews_pengingat' => ['id' => null, 'language' => null, 'variables_map' => [], 'button' => null],
+            ],
         ]);
         $this->fakeAdapter = new FakeWhatsAppTemplateAdapter;
         $this->app->instance(WhatsAppTemplateAdapter::class, $this->fakeAdapter);
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
     }
 
     private function enableWhatsAppForEvent(string $eventKey): void
@@ -54,7 +71,6 @@ class SendWhatsAppNotificationJobTest extends TestCase
                     'jenis_cuti' => '2',
                     'status' => '3',
                     'keterangan' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -70,7 +86,6 @@ class SendWhatsAppNotificationJobTest extends TestCase
                     'jenis_cuti' => '2',
                     'status' => '3',
                     'keterangan' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -85,7 +100,6 @@ class SendWhatsAppNotificationJobTest extends TestCase
                     'jenis_peringatan' => '2',
                     'tanggal_target' => '3',
                     'sisa_waktu' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -110,6 +124,26 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $mockResolver = $this->createMock(WhatsAppRecipientResolver::class);
         $mockResolver->method('resolve')->willReturn('+6281234567890');
         $this->app->instance(WhatsAppRecipientResolver::class, $mockResolver);
+
+        $this->persistRuntimeTemplateConfig($channel);
+    }
+
+    /** Menyalin fixture kontrak test ke setting DB yang menjadi sumber runtime. */
+    private function persistRuntimeTemplateConfig(RefNotificationChannel $channel): void
+    {
+        $contract = json_encode([
+            'event_templates' => config('services.whatsapp.event_templates', []),
+            'templates' => config('services.whatsapp.templates', []),
+        ], JSON_THROW_ON_ERROR);
+
+        $channel->forceFill(['config' => [
+            'provider' => 'qontak',
+            'base_url' => 'https://service-chat.qontak.com/api/open/v1',
+            'canonical_url' => config('services.whatsapp.canonical_url'),
+            'template_configuration' => $contract,
+        ]])->save();
+
+        app(WhatsAppRuntimeConfig::class)->invalidate();
     }
 
     /** @return array<int|string, string> */
@@ -120,7 +154,6 @@ class SendWhatsAppNotificationJobTest extends TestCase
             '2' => 'Cuti Tahunan',
             '3' => 'Disetujui',
             '4' => 'Disetujui sesuai usulan.',
-            '5' => 'https://simpeg.example.test/cuti/1',
         ];
     }
 
@@ -210,6 +243,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertSentCount(1);
@@ -219,6 +253,61 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $this->assertNull($delivery->lease_expires_at);
         $this->assertSame(1, $delivery->attempt_count);
         $this->assertNull($delivery->failure_code);
+    }
+
+    public function test_job_mengulang_readiness_setelah_runtime_worker_dimuat_ulang(): void
+    {
+        $this->enableWhatsAppForEvent('cuti.disetujui');
+        $employee = Employee::factory()->create();
+        $leaveRequest = $this->createLeaveRequest($employee);
+        $delivery = WhatsAppNotificationDelivery::create([
+            'idempotency_key' => 'idempotency-readiness-cache-stale',
+            'employee_id' => $employee->id,
+            'event_key' => 'cuti.disetujui',
+            'template_key' => 'simpeg_cuti_status',
+            'status' => 'queued',
+            'attempt_count' => 0,
+        ]);
+
+        $job = new SendWhatsAppNotificationJob(
+            idempotencyKey: $delivery->idempotency_key,
+            employeeId: $employee->id,
+            eventKey: 'cuti.disetujui',
+            templateKey: 'simpeg_cuti_status',
+            templateId: 'tmpl_cuti_status_123',
+            language: 'id',
+            variables: ['nama_pegawai' => 'Ahmad', 'status' => 'Disetujui'],
+            bodyVariables: $this->providerBodyVariables(),
+            buttonVariables: $this->providerButtonVariables(),
+            variablesMap: $this->providerVariablesMap('simpeg_cuti_status'),
+            leaveRequestId: $leaveRequest->id,
+        );
+
+        $runtime = app(WhatsAppRuntimeConfig::class);
+        $readiness = new class($runtime) extends WhatsAppReadiness
+        {
+            public int $checks = 0;
+
+            public function isReady(): bool
+            {
+                // Simulasi worker yang pertama kali membaca memo konfigurasi lama,
+                // lalu melihat konfigurasi baru setelah memo runtime dibersihkan job.
+                return ++$this->checks > 1;
+            }
+        };
+
+        $job->handle(
+            $readiness,
+            app(NotificationChannelResolver::class),
+            app(NotificationEventCatalog::class),
+            app(WhatsAppRecipientResolver::class),
+            $this->fakeAdapter,
+            $runtime,
+        );
+
+        $this->assertSame(2, $readiness->checks);
+        $this->fakeAdapter->assertSentCount(1);
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_DELIVERED, $delivery->refresh()->status);
     }
 
     public function test_job_dilewati_bila_nomor_penerima_tidak_terverifikasi_saat_runtime(): void
@@ -259,6 +348,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             $mockResolver,
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -297,6 +387,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -338,6 +429,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -382,6 +474,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 app(NotificationEventCatalog::class),
                 app(WhatsAppRecipientResolver::class),
                 $this->fakeAdapter,
+                app(WhatsAppRuntimeConfig::class),
             );
             $this->fail('Job harus melempar exception generik untuk memicu retry.');
         } catch (RuntimeException $exception) {
@@ -428,6 +521,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $delivery->refresh();
@@ -496,6 +590,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -544,13 +639,14 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         // Worker 2 tidak boleh mengirim ulang ke adapter
         $this->fakeAdapter->assertNotSent();
     }
 
-    public function test_retry_dapat_mengklaim_ulang_jika_lease_sudah_kedaluwarsa(): void
+    public function test_lease_sending_kedaluwarsa_ditutup_ambigu_tanpa_mengirim_ulang(): void
     {
         $this->enableWhatsAppForEvent('cuti.disetujui');
         $employee = Employee::factory()->create();
@@ -567,7 +663,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             'lease_expires_at' => now()->subMinutes(5),
         ]);
 
-        // Worker retry mencoba memproses kembali
+        // Worker retry tidak boleh menebak apakah POST worker sebelumnya sudah diterima provider.
         $job = new SendWhatsAppNotificationJob(
             idempotencyKey: 'idempotency-lease-expired',
             employeeId: $employee->id,
@@ -588,13 +684,15 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
-        // Pengiriman berhasil dieksekusi oleh worker retry
-        $this->fakeAdapter->assertSentCount(1);
+        $this->fakeAdapter->assertNotSent();
         $delivery->refresh();
-        $this->assertSame(WhatsAppNotificationDelivery::STATUS_DELIVERED, $delivery->status);
-        $this->assertSame(2, $delivery->attempt_count);
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_FAILED, $delivery->status);
+        $this->assertSame('provider_response_ambiguous', $delivery->failure_code);
+        $this->assertNull($delivery->lease_expires_at);
+        $this->assertSame(1, $delivery->attempt_count);
     }
 
     public function test_job_ditandai_skipped_jika_readiness_atau_kebijakan_nonaktif_saat_runtime(): void
@@ -630,6 +728,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -675,6 +774,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 app(NotificationEventCatalog::class),
                 app(WhatsAppRecipientResolver::class),
                 $this->fakeAdapter,
+                app(WhatsAppRuntimeConfig::class),
             );
             $this->fail('Harus melempar RuntimeException saat delivery gagal');
         } catch (RuntimeException $e) {
@@ -687,7 +787,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $this->assertSame('delivery_failed', $delivery->failure_code);
     }
 
-    public function test_error_provider_terdaftar_disimpan_dengan_kode_aman(): void
+    public function test_network_timeout_ambigu_dicatat_terminal_tanpa_pengiriman_ulang(): void
     {
         $this->enableWhatsAppForEvent('cuti.disetujui');
         $this->fakeAdapter->setNextResult(WhatsAppDeliveryResult::failed('network_timeout'));
@@ -717,22 +817,134 @@ class SendWhatsAppNotificationJobTest extends TestCase
             leaveRequestId: $leaveRequest->id,
         );
 
-        try {
-            $job->handle(
-                app(WhatsAppReadiness::class),
-                app(NotificationChannelResolver::class),
-                app(NotificationEventCatalog::class),
-                app(WhatsAppRecipientResolver::class),
-                $this->fakeAdapter,
-            );
-            $this->fail('Harus melempar RuntimeException saat delivery gagal');
-        } catch (RuntimeException $e) {
-            $this->assertSame('Pengiriman notifikasi WhatsApp gagal (network_timeout).', $e->getMessage());
-        }
+        $dependencies = [
+            app(WhatsAppReadiness::class),
+            app(NotificationChannelResolver::class),
+            app(NotificationEventCatalog::class),
+            app(WhatsAppRecipientResolver::class),
+            $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
+        ];
+
+        $job->handle(...$dependencies);
+        // Redelivery job yang sama tidak boleh mengulang POST yang hasilnya ambigu.
+        $job->handle(...$dependencies);
 
         $delivery->refresh();
         $this->assertSame(WhatsAppNotificationDelivery::STATUS_FAILED, $delivery->status);
         $this->assertSame('network_timeout', $delivery->failure_code);
+        $this->assertSame(1, $delivery->attempt_count);
+        $this->fakeAdapter->assertSentCount(1);
+    }
+
+    public function test_respons_5xx_ambigu_dicatat_terminal_tanpa_pengiriman_ulang(): void
+    {
+        $this->enableWhatsAppForEvent('cuti.disetujui');
+        $this->fakeAdapter->setNextResult(WhatsAppDeliveryResult::failed('provider_response_ambiguous'));
+
+        $employee = Employee::factory()->create();
+        $leaveRequest = $this->createLeaveRequest($employee);
+        $delivery = WhatsAppNotificationDelivery::create([
+            'idempotency_key' => 'idempotency-test-provider-response-ambiguous',
+            'employee_id' => $employee->id,
+            'event_key' => 'cuti.disetujui',
+            'template_key' => 'simpeg_cuti_status',
+            'status' => 'queued',
+            'attempt_count' => 0,
+        ]);
+
+        $job = new SendWhatsAppNotificationJob(
+            idempotencyKey: 'idempotency-test-provider-response-ambiguous',
+            employeeId: $employee->id,
+            eventKey: 'cuti.disetujui',
+            templateKey: 'simpeg_cuti_status',
+            templateId: 'tmpl_cuti_status_123',
+            language: 'id',
+            variables: ['nama_pegawai' => 'Ahmad'],
+            bodyVariables: $this->providerBodyVariables(),
+            buttonVariables: $this->providerButtonVariables(),
+            variablesMap: $this->providerVariablesMap('simpeg_cuti_status'),
+            leaveRequestId: $leaveRequest->id,
+        );
+
+        $dependencies = [
+            app(WhatsAppReadiness::class),
+            app(NotificationChannelResolver::class),
+            app(NotificationEventCatalog::class),
+            app(WhatsAppRecipientResolver::class),
+            $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
+        ];
+
+        $job->handle(...$dependencies);
+        // Redelivery job yang sama tidak boleh mengulang POST dengan hasil 5xx ambigu.
+        $job->handle(...$dependencies);
+
+        $delivery->refresh();
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_FAILED, $delivery->status);
+        $this->assertSame('provider_response_ambiguous', $delivery->failure_code);
+        $this->assertSame(1, $delivery->attempt_count);
+        $this->fakeAdapter->assertSentCount(1);
+    }
+
+    #[DataProvider('terminalProviderRejectionProvider')]
+    public function test_penolakan_provider_terminal_dicatat_tanpa_pengiriman_ulang(string $failureCode): void
+    {
+        $this->enableWhatsAppForEvent('cuti.disetujui');
+        $this->fakeAdapter->setNextResult(WhatsAppDeliveryResult::failed($failureCode));
+
+        $employee = Employee::factory()->create();
+        $leaveRequest = $this->createLeaveRequest($employee);
+        $idempotencyKey = "idempotency-test-terminal-{$failureCode}";
+        $delivery = WhatsAppNotificationDelivery::create([
+            'idempotency_key' => $idempotencyKey,
+            'employee_id' => $employee->id,
+            'event_key' => 'cuti.disetujui',
+            'template_key' => 'simpeg_cuti_status',
+            'status' => 'queued',
+            'attempt_count' => 0,
+        ]);
+
+        $job = new SendWhatsAppNotificationJob(
+            idempotencyKey: $idempotencyKey,
+            employeeId: $employee->id,
+            eventKey: 'cuti.disetujui',
+            templateKey: 'simpeg_cuti_status',
+            templateId: 'tmpl_cuti_status_123',
+            language: 'id',
+            variables: ['nama_pegawai' => 'Ahmad'],
+            bodyVariables: $this->providerBodyVariables(),
+            buttonVariables: $this->providerButtonVariables(),
+            variablesMap: $this->providerVariablesMap('simpeg_cuti_status'),
+            leaveRequestId: $leaveRequest->id,
+        );
+
+        $dependencies = [
+            app(WhatsAppReadiness::class),
+            app(NotificationChannelResolver::class),
+            app(NotificationEventCatalog::class),
+            app(WhatsAppRecipientResolver::class),
+            $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
+        ];
+
+        $job->handle(...$dependencies);
+        $job->handle(...$dependencies);
+
+        $delivery->refresh();
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_FAILED, $delivery->status);
+        $this->assertSame($failureCode, $delivery->failure_code);
+        $this->assertSame(1, $delivery->attempt_count);
+        $this->fakeAdapter->assertSentCount(1);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function terminalProviderRejectionProvider(): array
+    {
+        return [
+            'payload ditolak' => ['delivery_rejected'],
+            'credential atau konfigurasi ditolak' => ['provider_misconfigured'],
+        ];
     }
 
     public function test_kegagalan_provider_unavailable_memicu_exception_untuk_retry(): void
@@ -772,6 +984,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 app(NotificationEventCatalog::class),
                 app(WhatsAppRecipientResolver::class),
                 $this->fakeAdapter,
+                app(WhatsAppRuntimeConfig::class),
             );
             $this->fail('Provider unavailable harus melempar RuntimeException untuk memicu retry antrean.');
         } catch (RuntimeException $e) {
@@ -796,7 +1009,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                     'tanggal_mulai' => '3',
                     'tanggal_selesai' => '4',
                     'jumlah_hari' => '5',
-                    'tautan_detail' => '6',
+                    'alasan' => '6',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -808,6 +1021,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->first()
             ?? RefNotificationChannel::create(['code' => 'whatsapp_business', 'name' => 'WhatsApp Business', 'is_enabled' => true]);
         $channel->forceFill(['is_enabled' => true])->save();
+        $this->persistRuntimeTemplateConfig($channel);
 
         NotificationEventChannel::updateOrCreate(
             ['event_key' => 'cuti.pengajuan_baru', 'notification_channel_id' => $channel->id],
@@ -904,6 +1118,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         // Job harus diskip dan tidak mengirim instruksi tindakan usang ke approver 1
@@ -921,7 +1136,6 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 'cuti.pengajuan_baru' => 'provider_cuti_pengajuan_v1',
             ],
             'services.whatsapp.templates.provider_cuti_pengajuan_v1' => [
-                'archetype' => 'simpeg_cuti_perlu_tindakan',
                 'id' => 'tmpl_provider_cuti_pengajuan_123',
                 'language' => 'id',
                 'variables_map' => [
@@ -930,7 +1144,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                     'tanggal_mulai' => '3',
                     'tanggal_selesai' => '4',
                     'jumlah_hari' => '5',
-                    'tautan_detail' => '6',
+                    'alasan' => '6',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -942,6 +1156,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->first()
             ?? RefNotificationChannel::create(['code' => 'whatsapp_business', 'name' => 'WhatsApp Business', 'is_enabled' => true]);
         $channel->forceFill(['is_enabled' => true])->save();
+        $this->persistRuntimeTemplateConfig($channel);
 
         NotificationEventChannel::updateOrCreate(
             ['event_key' => 'cuti.pengajuan_baru', 'notification_channel_id' => $channel->id],
@@ -1037,6 +1252,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1080,6 +1296,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1094,7 +1311,6 @@ class SendWhatsAppNotificationJobTest extends TestCase
             '2' => 'Kenaikan Pangkat',
             '3' => '01 Oktober 2026',
             '4' => 'H-30 hari',
-            '5' => 'https://simpeg.example.test/ews-saya',
         ];
     }
 
@@ -1147,6 +1363,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1197,6 +1414,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1247,6 +1465,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1299,6 +1518,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1306,16 +1526,17 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $this->assertSame('ews_promotion_not_eligible', $delivery->failure_code);
     }
 
-    public function test_pekerjaan_ews_berhasil_dikirim_jika_status_masih_aktif_dan_belum_diakui(): void
+    public function test_pekerjaan_ews_menghitung_ulang_sisa_waktu_jika_status_masih_aktif(): void
     {
+        Carbon::setTestNow('2026-09-01 08:00:00');
         $this->enableWhatsAppForEvent('ews.kenaikan_pangkat');
         $employee = Employee::factory()->create(['no_hp' => '08123456789']);
 
         $alert = EwsAlert::create([
             'employee_id' => $employee->id,
             'type' => 'KENAIKAN_PANGKAT',
-            'target_date' => now()->addDays(30)->toDateString(),
-            'interval_days' => 30,
+            'target_date' => '2026-09-02',
+            'interval_days' => 1,
             'is_eligible' => true,
             'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
             'notification_acknowledged_at' => null,
@@ -1338,10 +1559,91 @@ class SendWhatsAppNotificationJobTest extends TestCase
             templateId: 'tmpl_ews_123',
             language: 'id',
             variables: ['nama_pegawai' => 'Ahmad'],
-            bodyVariables: $this->providerEwsBodyVariables(),
+            bodyVariables: array_replace($this->providerEwsBodyVariables(), ['4' => 'H-1 hari']),
             buttonVariables: $this->providerEwsButtonVariables(),
             ewsAlertId: $alert->id,
             variablesMap: $this->providerVariablesMap('simpeg_ews_pengingat'),
+        );
+
+        Carbon::setTestNow('2026-09-02 08:00:00');
+
+        $job->handle(
+            app(WhatsAppReadiness::class),
+            app(NotificationChannelResolver::class),
+            app(NotificationEventCatalog::class),
+            app(WhatsAppRecipientResolver::class),
+            $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
+        );
+
+        $this->fakeAdapter->assertSent(
+            static fn ($message): bool => $message->bodyVariables['4'] === 'Hari ini',
+        );
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_DELIVERED, $delivery->refresh()->status, 'Failure code: '.$delivery->refresh()->failure_code);
+    }
+
+    public function test_pekerjaan_ews_split_tanpa_sisa_waktu_tetap_dikirim(): void
+    {
+        $this->enableWhatsAppForEvent('ews.kenaikan_pangkat');
+        config([
+            'services.whatsapp.event_templates' => array_merge(
+                config('services.whatsapp.event_templates', []),
+                ['ews.kenaikan_pangkat' => 'ews_kenaikan_pangkat_ringkas_v1'],
+            ),
+            'services.whatsapp.templates.ews_kenaikan_pangkat_ringkas_v1' => [
+                'archetype' => WhatsAppTemplateContract::ARCHETYPE_EWS_PENGINGAT,
+                'id' => 'tmpl_ews_ringkas_123',
+                'language' => 'id',
+                'variables_map' => [
+                    'nama_pegawai' => '1',
+                    'jenis_peringatan' => '2',
+                    'tanggal_target' => '3',
+                ],
+                'button' => [
+                    'type' => 'url',
+                    'parameter' => 'button_target_url',
+                ],
+            ],
+        ]);
+        $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->firstOrFail();
+        $this->persistRuntimeTemplateConfig($channel);
+
+        $employee = Employee::factory()->create(['no_hp' => '08123456789']);
+        $alert = EwsAlert::create([
+            'employee_id' => $employee->id,
+            'type' => 'KENAIKAN_PANGKAT',
+            'target_date' => now()->addDays(30)->toDateString(),
+            'interval_days' => 30,
+            'is_eligible' => true,
+            'followup_status' => EwsAlert::FOLLOWUP_STATUS_ACTIVE,
+            'notification_acknowledged_at' => null,
+        ]);
+        $delivery = WhatsAppNotificationDelivery::create([
+            'idempotency_key' => 'idempotency-ews-split-tanpa-sisa-waktu',
+            'employee_id' => $employee->id,
+            'event_key' => 'ews.kenaikan_pangkat',
+            'template_key' => 'ews_kenaikan_pangkat_ringkas_v1',
+            'status' => 'queued',
+            'attempt_count' => 0,
+        ]);
+        $variablesMap = config('services.whatsapp.templates.ews_kenaikan_pangkat_ringkas_v1.variables_map');
+        $this->assertIsArray($variablesMap);
+        $job = new SendWhatsAppNotificationJob(
+            idempotencyKey: $delivery->idempotency_key,
+            employeeId: $employee->id,
+            eventKey: 'ews.kenaikan_pangkat',
+            templateKey: 'ews_kenaikan_pangkat_ringkas_v1',
+            templateId: 'tmpl_ews_ringkas_123',
+            language: 'id',
+            variables: ['nama_pegawai' => 'Ahmad'],
+            bodyVariables: [
+                '1' => 'Ahmad',
+                '2' => 'Kenaikan Pangkat',
+                '3' => '01 Oktober 2026',
+            ],
+            buttonVariables: $this->providerEwsButtonVariables(),
+            ewsAlertId: $alert->id,
+            variablesMap: $variablesMap,
         );
 
         $job->handle(
@@ -1350,10 +1652,17 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
-        $this->fakeAdapter->assertSentCount(1);
-        $this->assertSame(WhatsAppNotificationDelivery::STATUS_DELIVERED, $delivery->refresh()->status, 'Failure code: '.$delivery->refresh()->failure_code);
+        $this->fakeAdapter->assertSent(
+            static fn ($message): bool => $message->bodyVariables === [
+                '1' => 'Ahmad',
+                '2' => 'Kenaikan Pangkat',
+                '3' => '01 Oktober 2026',
+            ],
+        );
+        $this->assertSame(WhatsAppNotificationDelivery::STATUS_DELIVERED, $delivery->refresh()->status);
     }
 
     public function test_pekerjaan_ews_satyalancana_dilewati_jika_kelayakan_terbaru_dicabut(): void
@@ -1401,6 +1710,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1459,6 +1769,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1514,6 +1825,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertSentCount(1);
@@ -1564,6 +1876,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertSentCount(1);
@@ -1614,6 +1927,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1653,6 +1967,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1687,6 +2002,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1726,6 +2042,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1768,6 +2085,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -1782,10 +2100,11 @@ class SendWhatsAppNotificationJobTest extends TestCase
             'language' => 'id',
             'variables_map' => [
                 'nama_pegawai' => '1', 'jenis_cuti' => '2', 'tanggal_mulai' => '3',
-                'tanggal_selesai' => '4', 'jumlah_hari' => '5', 'tautan_detail' => '6',
+                'tanggal_selesai' => '4', 'jumlah_hari' => '5', 'alasan' => '6',
             ],
             'button' => ['type' => 'url', 'parameter' => 'button_target_url'],
         ]]);
+        $this->persistRuntimeTemplateConfig(RefNotificationChannel::query()->where('code', 'whatsapp_business')->firstOrFail());
 
         $applicant = Employee::factory()->create();
         $approverA = Employee::factory()->create();
@@ -1859,6 +2178,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 app(NotificationEventCatalog::class),
                 app(WhatsAppRecipientResolver::class),
                 $this->fakeAdapter,
+                app(WhatsAppRuntimeConfig::class),
             );
         }
 
@@ -1876,10 +2196,11 @@ class SendWhatsAppNotificationJobTest extends TestCase
             'language' => 'id',
             'variables_map' => [
                 'nama_pegawai' => '1', 'jenis_cuti' => '2', 'tanggal_mulai' => '3',
-                'tanggal_selesai' => '4', 'jumlah_hari' => '5', 'tautan_detail' => '6',
+                'tanggal_selesai' => '4', 'jumlah_hari' => '5', 'alasan' => '6',
             ],
             'button' => ['type' => 'url', 'parameter' => 'button_target_url'],
         ]]);
+        $this->persistRuntimeTemplateConfig(RefNotificationChannel::query()->where('code', 'whatsapp_business')->firstOrFail());
 
         $applicant = Employee::factory()->create();
         $approver = Employee::factory()->create();
@@ -1937,6 +2258,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();
@@ -2003,6 +2325,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 app(NotificationEventCatalog::class),
                 app(WhatsAppRecipientResolver::class),
                 $this->fakeAdapter,
+                app(WhatsAppRuntimeConfig::class),
             );
 
             $this->assertSame(WhatsAppNotificationDelivery::STATUS_SKIPPED, $delivery->refresh()->status);
@@ -2046,6 +2369,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
             app(NotificationEventCatalog::class),
             app(WhatsAppRecipientResolver::class),
             $this->fakeAdapter,
+            app(WhatsAppRuntimeConfig::class),
         );
 
         $this->fakeAdapter->assertNotSent();

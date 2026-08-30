@@ -7,8 +7,11 @@ use App\Models\EwsAlert;
 use App\Models\LeaveApproval;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\RefNotificationChannel;
 use App\Models\RefStatusPegawai;
 use App\Services\Notifications\WhatsApp\WhatsAppPrivacyGuard;
+use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfig;
+use App\Services\Notifications\WhatsApp\WhatsAppTemplateContract;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplatePayloadMapper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,21 +22,28 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
 
     private WhatsAppTemplatePayloadMapper $mapper;
 
+    private WhatsAppRuntimeConfig $runtime;
+
     protected function setUp(): void
     {
         parent::setUp();
+        config([
+            'services.whatsapp.event_templates' => WhatsAppTemplateContract::eventTemplateArchetypes(),
+            'services.whatsapp.templates' => [],
+        ]);
         config([
             'services.whatsapp.canonical_url' => 'https://simpeg.lldikti16.kemdikbud.go.id',
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan' => [
                 'id' => 'tmpl_cuti_perlu_tindakan_123',
                 'language' => 'id',
+                // Tautan detail disalurkan lewat tombol URL, bukan parameter body.
                 'variables_map' => [
                     'nama_pegawai' => '1',
                     'jenis_cuti' => '2',
                     'tanggal_mulai' => '3',
                     'tanggal_selesai' => '4',
                     'jumlah_hari' => '5',
-                    'tautan_detail' => '6',
+                    'alasan' => '6',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -48,7 +58,6 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                     'jenis_cuti' => '2',
                     'status' => '3',
                     'keterangan' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -63,7 +72,6 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                     'jenis_peringatan' => '2',
                     'tanggal_target' => '3',
                     'sisa_waktu' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -71,7 +79,33 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                 ],
             ],
         ]);
-        $this->mapper = new WhatsAppTemplatePayloadMapper(new WhatsAppPrivacyGuard);
+        $this->runtime = new WhatsAppRuntimeConfig;
+        $this->persistRuntimeTemplateConfig();
+        $this->mapper = new WhatsAppTemplatePayloadMapper(new WhatsAppPrivacyGuard, $this->runtime);
+    }
+
+    /** Menyalin fixture kontrak mapper ke setting DB sumber runtime. */
+    private function persistRuntimeTemplateConfig(): void
+    {
+        $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->first()
+            ?? RefNotificationChannel::create([
+                'code' => 'whatsapp_business',
+                'name' => 'WhatsApp Business',
+                'is_enabled' => false,
+            ]);
+        $contract = json_encode([
+            'event_templates' => config('services.whatsapp.event_templates', []),
+            'templates' => config('services.whatsapp.templates', []),
+        ], JSON_THROW_ON_ERROR);
+
+        $channel->forceFill(['config' => [
+            'provider' => 'qontak',
+            'base_url' => 'https://service-chat.qontak.com/api/open/v1',
+            'canonical_url' => config('services.whatsapp.canonical_url'),
+            'template_configuration' => $contract,
+        ]])->save();
+
+        $this->runtime->invalidate();
     }
 
     private function formatDate(\DateTimeInterface $date): string
@@ -131,6 +165,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
         $this->assertSame('01 September 2026', $payload->variables['tanggal_mulai'] ?? null);
         $this->assertSame('03 September 2026', $payload->variables['tanggal_selesai'] ?? null);
         $this->assertSame('3 hari kerja', $payload->variables['jumlah_hari'] ?? null);
+        $this->assertSame('Keperluan keluarga', $payload->variables['alasan'] ?? null);
         $this->assertSame('https://simpeg.lldikti16.kemdikbud.go.id/dashboard/cuti/'.$leaveRequest->id, $payload->variables['tautan_detail'] ?? null);
         $this->assertSame('https://simpeg.lldikti16.kemdikbud.go.id/dashboard/cuti/'.$leaveRequest->id, $payload->buttonVariables['button_target_url'] ?? null);
     }
@@ -167,6 +202,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
         $leaveRequest = $this->createLeaveRequest($employee);
 
         config(['services.whatsapp.event_templates' => []]);
+        $this->persistRuntimeTemplateConfig();
 
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, [
             'leave_request_id' => $leaveRequest->id,
@@ -182,13 +218,14 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                 'tanggal_mulai' => '3',
                 'tanggal_selesai' => '4',
                 'jumlah_hari' => '5',
-                'tautan_detail' => '6',
+                'alasan' => '6',
             ],
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan.button' => [
                 'type' => 'url',
                 'parameter' => 'button_target_url',
             ],
         ]);
+        $this->persistRuntimeTemplateConfig();
 
         $employee = Employee::factory()->create(['nama_lengkap' => 'Ahmad Fauzi']);
         $leaveRequest = $this->createLeaveRequest($employee);
@@ -230,6 +267,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
     {
         // Template ID kosong -> fail closed
         config(['services.whatsapp.templates.simpeg_cuti_perlu_tindakan.id' => null]);
+        $this->persistRuntimeTemplateConfig();
         $employee = Employee::factory()->create();
         $leaveRequest = $this->createLeaveRequest($employee);
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, ['leave_request_id' => $leaveRequest->id]));
@@ -239,6 +277,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan.id' => 'tmpl_123',
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan.language' => null,
         ]);
+        $this->persistRuntimeTemplateConfig();
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, ['leave_request_id' => $leaveRequest->id]));
     }
 
@@ -251,6 +290,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan.variables_map' => [],
             'services.whatsapp.templates.simpeg_cuti_perlu_tindakan.button' => null,
         ]);
+        $this->persistRuntimeTemplateConfig();
 
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, [
             'leave_request_id' => $leaveRequest->id,
@@ -264,14 +304,22 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
 
         // Canonical URL belum ditetapkan -> fail closed
         config(['services.whatsapp.canonical_url' => null]);
+        $this->persistRuntimeTemplateConfig();
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, ['leave_request_id' => $leaveRequest->id]));
 
         // Canonical URL skema http -> fail closed
         config(['services.whatsapp.canonical_url' => 'http://simpeg.lldikti16.kemdikbud.go.id']);
+        $this->persistRuntimeTemplateConfig();
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, ['leave_request_id' => $leaveRequest->id]));
 
         // Canonical URL localhost -> fail closed
         config(['services.whatsapp.canonical_url' => 'https://localhost']);
+        $this->persistRuntimeTemplateConfig();
+        $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, ['leave_request_id' => $leaveRequest->id]));
+
+        // Canonical URL IPv6 loopback -> fail closed
+        config(['services.whatsapp.canonical_url' => 'https://[::1]']);
+        $this->persistRuntimeTemplateConfig();
         $this->assertNull($this->mapper->map('cuti.pengajuan_baru', $employee, ['leave_request_id' => $leaveRequest->id]));
     }
 
@@ -620,7 +668,6 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                     'jenis_cuti' => '2',
                     'status' => '3',
                     'keterangan' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -636,7 +683,6 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                     'jenis_cuti' => '2',
                     'status' => '3',
                     'keterangan' => '4',
-                    'tautan_detail' => '5',
                 ],
                 'button' => [
                     'type' => 'url',
@@ -644,6 +690,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                 ],
             ],
         ]);
+        $this->persistRuntimeTemplateConfig();
 
         $employee = Employee::factory()->create(['nama_lengkap' => 'Budi Santoso']);
         $leaveRequest = $this->createLeaveRequest($employee);
@@ -685,6 +732,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
                 'button' => ['type' => 'url', 'parameter' => 'cta_url'],
             ],
         ]);
+        $this->persistRuntimeTemplateConfig();
 
         $employee = Employee::factory()->create(['nama_lengkap' => 'Nadia Pegawai']);
         $leaveRequest = $this->createLeaveRequest($employee, ['status' => 'disetujui']);

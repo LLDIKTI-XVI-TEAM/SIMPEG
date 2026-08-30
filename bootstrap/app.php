@@ -33,5 +33,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Defense-in-depth: credential write-only tidak boleh masuk old input walaupun
+        // validasi kelak gagal di luar FormRequest khusus konfigurasi WhatsApp.
+        $exceptions->dontFlash([
+            'access_token',
+            'refresh_token',
+            'channel_integration_id',
+        ]);
     })->create();

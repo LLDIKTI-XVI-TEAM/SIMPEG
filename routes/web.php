@@ -227,6 +227,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
         Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
             ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
+        Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
+            ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
 
         Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
         Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])

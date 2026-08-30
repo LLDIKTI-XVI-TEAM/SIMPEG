@@ -11,6 +11,12 @@ final class WhatsAppTemplateContract
     public const ARCHETYPE_EWS_PENGINGAT = 'simpeg_ews_pengingat';
 
     /**
+     * Variabel kanonik yang disalurkan ke tombol URL template, bukan ke parameter body.
+     * Kontrak resmi provider menempatkan tautan detail pada tombol URL dengan satu parameter.
+     */
+    public const BUTTON_ONLY_VARIABLE = 'tautan_detail';
+
+    /**
      * Pemetaan internal event ke archetype hanya mendefinisikan bentuk data SIMPEG.
      * ID, bahasa, urutan variabel, dan tombol tetap wajib datang dari kontrak provider runtime.
      *
@@ -48,6 +54,8 @@ final class WhatsAppTemplateContract
             'tanggal_mulai',
             'tanggal_selesai',
             'jumlah_hari',
+            // Kontrak resmi provider menambahkan alasan pengajuan pada posisi terakhir body.
+            'alasan',
             'tautan_detail',
         ],
         self::ARCHETYPE_CUTI_STATUS => [
@@ -67,9 +75,11 @@ final class WhatsAppTemplateContract
     ];
 
     /**
+     * @param  array<string, mixed>|null  $templateConfig  kontrak template runtime (opsional); bila
+     *                                                     tidak diberikan, dibaca dari konfigurasi efektif
      * @return list<string>|null
      */
-    public static function requiredVariables(string $templateKey, ?string $archetype = null): ?array
+    public static function requiredVariables(string $templateKey, ?string $archetype = null, ?array $templateConfig = null): ?array
     {
         if (isset(self::REQUIRED_VARIABLES[$templateKey])) {
             return self::REQUIRED_VARIABLES[$templateKey];
@@ -79,7 +89,7 @@ final class WhatsAppTemplateContract
             return self::REQUIRED_VARIABLES[$archetype];
         }
 
-        $templateConfig = config("services.whatsapp.templates.{$templateKey}");
+        $templateConfig ??= app(WhatsAppRuntimeConfig::class)->template($templateKey);
         if (is_array($templateConfig)) {
             $configuredArchetype = $templateConfig['archetype'] ?? null;
             if (is_string($configuredArchetype) && isset(self::REQUIRED_VARIABLES[$configuredArchetype])) {
@@ -99,12 +109,17 @@ final class WhatsAppTemplateContract
 
     /**
      * Provider harus memberikan kontrak runtime lengkap. Tidak ada fallback ke nama variabel proposal.
+     *
+     * @param  array<string, mixed>|null  $templateConfig  kontrak template runtime (opsional); bila
+     *                                                     tidak diberikan, dibaca dari konfigurasi efektif
      */
     public static function isConfigured(string $templateKey, mixed $templateConfig, ?string $archetype = null): bool
     {
         $resolvedArchetype = $archetype ?? (is_array($templateConfig) ? ($templateConfig['archetype'] ?? null) : null);
         $allowedVariables = self::requiredVariables(
             is_string($resolvedArchetype) ? $resolvedArchetype : $templateKey,
+            $archetype,
+            is_array($templateConfig) ? $templateConfig : null,
         );
         if ($allowedVariables === null || ! is_array($templateConfig)) {
             return false;
@@ -112,8 +127,10 @@ final class WhatsAppTemplateContract
 
         $templateId = $templateConfig['id'] ?? null;
         $language = $templateConfig['language'] ?? null;
-        if (! is_string($templateId) || trim($templateId) === ''
-            || ! is_string($language) || trim($language) === '') {
+        if (! is_string($templateId) || trim($templateId) === '' || $templateId !== trim($templateId)
+            || preg_match('/^\s|\s$/u', $templateId) !== 0
+            || ! is_string($language) || trim($language) === '' || $language !== trim($language)
+            || preg_match('/^\s|\s$/u', $language) !== 0) {
             return false;
         }
 
@@ -122,16 +139,24 @@ final class WhatsAppTemplateContract
             return false;
         }
 
+        // Tautan detail selalu disalurkan lewat tombol URL. Kontrak apa pun (termasuk
+        // template split per-event) yang masih menaruhnya di body ditolak agar mapper
+        // dan validasi payload worker tidak pernah berbeda pendapat soal isi body.
+        if (array_key_exists(self::BUTTON_ONLY_VARIABLE, $variablesMap)) {
+            return false;
+        }
+
         $configuredVariables = array_keys($variablesMap);
         if (array_diff($configuredVariables, $allowedVariables) !== []) {
             return false;
         }
 
-        // Archetype bawaan mempertahankan kontrak penuh dokumen submission.
+        // Archetype bawaan mempertahankan kontrak penuh dokumen submission, dengan
+        // pengecualian tautan_detail yang wajib berada pada tombol URL provider.
         // Template split provider boleh hanya meminta subset allowlist archetype.
         if ($templateKey === $resolvedArchetype || isset(self::REQUIRED_VARIABLES[$templateKey])) {
+            $expectedVariables = array_values(array_diff($allowedVariables, [self::BUTTON_ONLY_VARIABLE]));
             sort($configuredVariables);
-            $expectedVariables = $allowedVariables;
             sort($expectedVariables);
             if ($configuredVariables !== $expectedVariables) {
                 return false;
@@ -140,11 +165,13 @@ final class WhatsAppTemplateContract
 
         $providerKeys = [];
         foreach ($variablesMap as $providerKey) {
-            if (! is_string($providerKey) || trim($providerKey) === '') {
+            if (! is_string($providerKey)
+                || trim($providerKey) === ''
+                || $providerKey !== trim($providerKey)) {
                 return false;
             }
 
-            $providerKeys[] = trim($providerKey);
+            $providerKeys[] = $providerKey;
         }
 
         if (count($providerKeys) !== count(array_unique($providerKeys))) {
@@ -152,11 +179,13 @@ final class WhatsAppTemplateContract
         }
 
         $button = $templateConfig['button'] ?? null;
+        $buttonParameter = is_array($button) ? ($button['parameter'] ?? null) : null;
 
         return is_array($button)
             && ($button['type'] ?? null) === 'url'
-            && is_string($button['parameter'] ?? null)
-            && trim($button['parameter']) !== '';
+            && is_string($buttonParameter)
+            && trim($buttonParameter) !== ''
+            && $buttonParameter === trim($buttonParameter);
     }
 
     /**
@@ -164,6 +193,11 @@ final class WhatsAppTemplateContract
      *
      * @param  array<int|string, string>  $bodyVariables
      * @param  array<int|string, string>  $buttonVariables
+     * @param  array<string, mixed>|null  $templateConfig  kontrak template runtime (opsional); bila
+     *                                                     tidak diberikan, dibaca dari konfigurasi efektif
+     * @param  string|null  $canonicalUrl  domain resmi runtime (opsional); bila tidak diberikan,
+     *                                     dibaca dari konfigurasi efektif
+     * @param  string|null  $archetype  bentuk data domain untuk template split per-event
      */
     public static function matchesQueuedPayload(
         string $templateKey,
@@ -172,15 +206,18 @@ final class WhatsAppTemplateContract
         array $bodyVariables,
         array $buttonVariables,
         ?array $queuedVariablesMap = null,
+        ?array $templateConfig = null,
+        ?string $canonicalUrl = null,
+        ?string $archetype = null,
     ): bool {
-        $templateConfig = config("services.whatsapp.templates.{$templateKey}");
-        if (! self::isConfigured($templateKey, $templateConfig)) {
+        $templateConfig ??= app(WhatsAppRuntimeConfig::class)->template($templateKey);
+        if (! self::isConfigured($templateKey, $templateConfig, $archetype)) {
             return false;
         }
 
         /** @var array{id: string, language: string, variables_map: array<string, string>, button: array{type: string, parameter: string}} $templateConfig */
-        if (! hash_equals(trim($templateConfig['id']), trim($templateId))
-            || ! hash_equals(trim($templateConfig['language']), trim($language))) {
+        if (! hash_equals($templateConfig['id'], $templateId)
+            || ! hash_equals($templateConfig['language'], $language)) {
             return false;
         }
 
@@ -215,7 +252,7 @@ final class WhatsAppTemplateContract
             return false;
         }
 
-        $canonicalUrl = config('services.whatsapp.canonical_url');
+        $canonicalUrl ??= app(WhatsAppRuntimeConfig::class)->canonicalUrl();
         if (! is_string($canonicalUrl) || trim($canonicalUrl) === '') {
             return false;
         }

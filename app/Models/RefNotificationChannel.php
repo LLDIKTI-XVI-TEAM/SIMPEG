@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Services\Notifications\WhatsApp\WhatsAppConfigSensitiveData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -31,6 +32,23 @@ class RefNotificationChannel extends Model
             'is_enabled' => 'boolean',
             'config' => 'array',
         ];
+    }
+
+    /**
+     * Mencegah credential WhatsApp legacy maupun ciphertext aktif ikut keluar saat
+     * model dikonversi menjadi array atau JSON.
+     *
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        $serialized = parent::toArray();
+
+        if (isset($serialized['config']) && is_array($serialized['config'])) {
+            $serialized['config'] = WhatsAppConfigSensitiveData::scrubConfiguration($serialized['config']);
+        }
+
+        return $serialized;
     }
 
     public function scopeEnabled(Builder $query): Builder

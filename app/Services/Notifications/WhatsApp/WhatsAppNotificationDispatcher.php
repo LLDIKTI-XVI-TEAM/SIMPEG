@@ -22,10 +22,11 @@ class WhatsAppNotificationDispatcher
         private readonly WhatsAppRecipientResolver $recipientResolver,
         private readonly WhatsAppTemplatePayloadMapper $mapper,
         private readonly WhatsAppNotificationJobPublisher $publisher,
+        private readonly WhatsAppRuntimeConfig $runtime,
     ) {}
 
     /**
-     * Mengevaluasi 5 gerbang fail-closed sebelum mencatat delivery audit dan mengantrekan job.
+     * Mengevaluasi gerbang fail-closed sebelum mencatat delivery audit dan mengantrekan job.
      *
      * @param  array<string, mixed>|null  $data
      */
@@ -38,23 +39,29 @@ class WhatsAppNotificationDispatcher
             return null;
         }
 
-        // Gerbang 2: Kesiapan konfigurasi provider resmi (in-memory fail-closed)
+        // Gerbang 2: Adapter runtime harus benar-benar tersedia. Konfigurasi lengkap
+        // tidak boleh membuat outbox ketika aplikasi masih di mode candidate/nonaktif.
+        if (! $this->catalog->hasAdapter('whatsapp_business')) {
+            return null;
+        }
+
+        // Gerbang 3: Kesiapan konfigurasi provider resmi (in-memory fail-closed)
         if (! $this->readiness->isReady()) {
             return null;
         }
 
-        // Gerbang 3: Kebijakan aktif channel per event di database
+        // Gerbang 4: Kebijakan aktif channel per event di database
         if (! $this->channels->isEnabledForEvent($eventKey, 'whatsapp_business')) {
             return null;
         }
 
-        // Gerbang 4: Resolusi alamat nomor WhatsApp kanonis terverifikasi
+        // Gerbang 5: Resolusi alamat nomor WhatsApp kanonis terverifikasi
         $recipientAddress = $this->recipientResolver->resolve($employee);
         if ($recipientAddress === null || trim($recipientAddress) === '') {
             return null;
         }
 
-        // Gerbang 5: Pemetaan template dan validasi privacy guard
+        // Gerbang 6: Pemetaan template dan validasi privacy guard
         $mapped = $this->mapper->map($eventKey, $employee, $data);
         if ($mapped === null) {
             return null;
@@ -234,7 +241,8 @@ class WhatsAppNotificationDispatcher
         WhatsAppMappedTemplate $mapped,
         array $data,
     ): string {
-        $variablesMap = config("services.whatsapp.templates.{$mapped->templateKey}.variables_map");
+        $templateConfig = $this->runtime->template($mapped->templateKey);
+        $variablesMap = is_array($templateConfig) ? ($templateConfig['variables_map'] ?? null) : null;
         $payload = [
             'idempotency_key' => $idempotencyKey,
             'employee_id' => $employee->id,
