@@ -107,6 +107,20 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 continue;
             }
 
+            // Validasi user pemilik email SEBELUM membuat placeholder: bila email
+            // mapping sudah dimiliki user yang terhubung ke pegawai lain, mapping pasti
+            // ditolak callback (konflik identitas). Membuat placeholder lebih dulu akan
+            // meninggalkan employee palsu tanpa user pada setiap kasus konflik ini.
+            $userByEmail = User::whereRaw('lower(email) = ?', [strtolower($email)])->first();
+
+            if ($userByEmail && $userByEmail->employee_id !== null && (! $employee || $userByEmail->employee_id !== $employee->id)) {
+                $this->command?->warn(
+                    "SSO mapped account '{$email}' dilewati: email sudah dimiliki user yang terhubung ke pegawai lain."
+                );
+
+                continue;
+            }
+
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.
                 $employee = Employee::factory()->create([
@@ -125,7 +139,6 @@ class SsoRoleMappedAccountSeeder extends Seeder
             // konflik identitas terdeteksi — operator ?? di sini akan menyembunyikan
             // konflik yang nanti ditolak callback sebagai identity_conflict.
             $userByEmployee = User::where('employee_id', $employee->id)->first();
-            $userByEmail = User::whereRaw('lower(email) = ?', [strtolower($email)])->first();
 
             if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
                 $this->command?->warn(

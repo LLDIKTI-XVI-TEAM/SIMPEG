@@ -324,7 +324,7 @@ class HandleKeycloakCallbackAction
 
         $subjectConflictAtSave = null;
 
-        DB::transaction(function () use (&$subjectConflictAtSave, $user, $keycloakId, $previousRole, $roleInitialized, $firstBinding, $request): void {
+        DB::transaction(function () use (&$subjectConflictAtSave, &$previousRole, &$roleInitialized, &$firstBinding, $user, $keycloakId, $request): void {
             // Re-check terkunci tepat sebelum menulis: resolver melepas lock employee
             // SEBELUM save, sehingga dua callback dengan subject berbeda untuk pegawai
             // yang sama bisa sama-sama membaca binding kosong lalu saling menimpa
@@ -340,6 +340,23 @@ class HandleKeycloakCallbackAction
                     $subjectConflictAtSave = $fresh;
 
                     return;
+                }
+
+                if ($fresh) {
+                    // Hitung ulang status binding/role dari state terkini DI DALAM lock:
+                    // callback paralel dengan subject yang sama bisa saja sudah menyimpan
+                    // binding/inisialisasi role setelah snapshot pre-lock diambil — tanpa
+                    // recompute ini satu pengikatan pertama menghasilkan audit duplikat.
+                    $rawCurrentSubject = $fresh->getRawOriginal('keycloak_id');
+                    $firstBinding = in_array($rawCurrentSubject, [null, ''], true)
+                        && is_string($user->keycloak_id)
+                        && $user->keycloak_id !== '';
+
+                    $rawCurrentRole = $fresh->getRawOriginal('role');
+                    $previousRole = is_string($rawCurrentRole) ? $rawCurrentRole : null;
+                    $roleInitialized = in_array($previousRole, [null, ''], true)
+                        && $user->role !== null
+                        && $user->role !== '';
                 }
             }
 

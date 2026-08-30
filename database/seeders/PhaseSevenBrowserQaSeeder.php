@@ -200,6 +200,36 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         return $email;
     }
 
+    /**
+     * User akun uji SSO untuk role persona QA, di-resolve dengan kontrak kanonis
+     * Issue #6: pegawai dicari via email kanonis (case-insensitive, kolom legacy +
+     * email_pribadi), lalu user diambil via employee_id. Lookup email eksak pada user
+     * tidak cukup karena SsoRoleMappedAccountSeeder mendukung user existing dengan
+     * email internal berbeda dari email mapping.
+     */
+    private function ssoUserForRole(string $role): User
+    {
+        $email = strtolower($this->ssoEmailForRole($role));
+
+        $employee = Employee::query()
+            ->where(function ($query) use ($email): void {
+                $query
+                    ->whereRaw('lower(email) = ?', [$email])
+                    ->orWhereRaw('lower(email_pribadi) = ?', [$email]);
+            })
+            ->first();
+
+        $user = $employee !== null
+            ? User::query()->where('employee_id', $employee->id)->first()
+            : User::query()->whereRaw('lower(email) = ?', [$email])->first();
+
+        if ($user === null) {
+            throw new RuntimeException("Akun SSO untuk role '{$role}' belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.");
+        }
+
+        return $user;
+    }
+
     /** Menjaga fixture saldo QA memenuhi masa kerja satu tahun sebelum tahun fakta pertama. */
     private function ensureEligibleAppointment(Employee $employee): void
     {
@@ -217,12 +247,10 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         // Sesi admin QA memakai akun uji SSO terpetakan (admin_kepegawaian) — akun
         // sudah ditanam SsoRoleMappedAccountSeeder beserta pegawai aktifnya; seeder
         // ini tidak membuat kredensial lokal baru dan tidak menimpa data existing.
-        $user = User::query()
-            ->where('email', $this->ssoEmailForRole(self::SSO_ADMIN_ROLE))
-            ->first();
+        $user = $this->ssoUserForRole(self::SSO_ADMIN_ROLE);
 
-        if ($user === null || $user->employee_id === null) {
-            throw new RuntimeException('Akun SSO admin kepegawaian belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
+        if ($user->employee_id === null) {
+            throw new RuntimeException('Akun SSO admin kepegawaian belum terhubung ke pegawai. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
         }
 
         return $user;
@@ -265,13 +293,11 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private function resolveDemoApprover(?string $jenisPegawaiId, ?string $statusAktifId): Employee
     {
-        $user = User::query()
-            ->where('email', $this->ssoEmailForRole(self::SSO_APPROVER_ROLE))
-            ->firstOrFail();
+        $user = $this->ssoUserForRole(self::SSO_APPROVER_ROLE);
 
         $employee = $user->employee_id !== null
             ? Employee::query()->find($user->employee_id)
-            : Employee::query()->where('email', $user->email)->first();
+            : null;
 
         if ($employee === null) {
             throw new RuntimeException('Employee untuk akun SSO kepala bagian belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');
@@ -306,13 +332,11 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         ?string $statusAktifId,
         Employee $approver,
     ): Employee {
-        $user = User::query()
-            ->where('email', $this->ssoEmailForRole(self::SSO_PEGAWAI_ROLE))
-            ->firstOrFail();
+        $user = $this->ssoUserForRole(self::SSO_PEGAWAI_ROLE);
 
         $employee = $user->employee_id !== null
             ? Employee::query()->find($user->employee_id)
-            : Employee::query()->where('email', $user->email)->first();
+            : null;
 
         if ($employee === null) {
             throw new RuntimeException('Employee untuk akun SSO pegawai belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.');

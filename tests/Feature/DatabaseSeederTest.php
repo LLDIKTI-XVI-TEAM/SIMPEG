@@ -113,6 +113,40 @@ class DatabaseSeederTest extends TestCase
             'employee_id' => $pegawaiAsal->id,
             'role' => 'pegawai',
         ]);
+
+        // Mapping ditolak SEBELUM pembuatan placeholder: tidak ada employee palsu
+        // tanpa user yang tertinggal untuk email yang konflik.
+        $this->assertSame(0, Employee::where('email', $email)->count());
+    }
+
+    /**
+     * Persona browser QA di-resolve via employee_id kanonis: user existing yang
+     * dipakai ulang SsoRoleMappedAccountSeeder boleh memegang email internal berbeda
+     * dari email mapping — lookup email eksak pada user akan gagal menemukannya.
+     */
+    public function test_phase_seven_browser_persona_resolves_via_employee_id_with_internal_email(): void
+    {
+        $email = $this->ssoEmailForRole('pegawai');
+
+        // Employee kanonis memegang email mapping pada email_pribadi; user internalnya
+        // memakai email kantor berbeda (kasus reuse yang didukung seeder SSO).
+        $employee = Employee::factory()->create([
+            'email_pribadi' => $email,
+        ]);
+        $user = User::factory()->create([
+            'email' => 'internal-persona@lldikti.go.id',
+            'employee_id' => $employee->id,
+            'role' => 'pegawai',
+        ]);
+
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(PhaseSevenBrowserQaSeeder::class);
+
+        // Persona QA diterapkan pada user yang sama (via employee_id), email internal tetap.
+        $user->refresh();
+        $this->assertSame($employee->id, $user->employee_id);
+        $this->assertSame('internal-persona@lldikti.go.id', $user->email);
+        $this->assertSame('QA Fase 7 Pegawai', $user->name);
     }
 
     public function test_seeder_preserves_existing_user_name_on_reseed(): void

@@ -1619,6 +1619,65 @@ class KeycloakCallbackMappingTest extends TestCase
     }
 
     /**
+     * Dua callback paralel dengan subject yang sama untuk user yang keycloak_id-nya
+     * masih kosong: callback pemenang menyimpan lebih dulu, callback kedua memperoleh
+     * lock dan melihat subject yang sama (bukan konflik). Status binding/role wajib
+     * dihitung ulang dari state terkini DI DALAM lock agar satu pengikatan pertama
+     * tidak menghasilkan audit SSO_BINDING / inisialisasi role duplikat.
+     */
+    public function test_parallel_same_subject_callbacks_write_single_binding_audit(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Subject Kembar',
+            'email' => 'subject-kembar@example.com',
+        ]);
+
+        $user = User::factory()->create([
+            'email' => 'subject-kembar@example.com',
+            'employee_id' => $employee->id,
+            'role' => null,
+            'keycloak_id' => null,
+        ]);
+
+        $injected = false;
+        DB::listen(function (QueryExecuted $query) use (&$injected, $user): void {
+            // Suntik TEPAT SETELAH resolver membaca userByEmployee: simulasi callback
+            // "pemenang" paralel yang sudah menyimpan subject + inisialisasi role yang sama.
+            if ($injected
+                || ! str_contains((string) $query->sql, 'from "users" where "employee_id" =')
+                || ! str_contains((string) $query->sql, 'for update')) {
+                return;
+            }
+
+            $injected = true;
+
+            DB::table('users')->where('id', $user->id)->update([
+                'keycloak_id' => 'kc-kembar',
+                'role' => 'pegawai',
+            ]);
+        });
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-kembar',
+            'nickname' => 'subject-kembar',
+            'name' => 'Subject Kembar',
+            'email' => 'subject-kembar@example.com',
+            'raw' => ['email' => 'subject-kembar@example.com', 'email_verified' => true, 'preferred_username' => 'subject-kembar'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        // Login tetap sukses (subject sama = bukan konflik).
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
+
+        // Tidak ada audit duplikat: pengikatan pertama + inisialisasi role sudah
+        // dilakukan callback pemenang, callback kedua tidak menulis ulang evidencenya.
+        $this->assertSame(0, AuditLog::query()->where('event', 'SSO_BINDING')->count());
+        $this->assertSame(0, AuditLog::query()->where('event', 'UPDATE')->where('auditable_type', 'User')->count());
+    }
+
+    /**
      * Stub Socialite supaya test fokus ke keputusan mapping SIMPEG, bukan jaringan Keycloak.
      */
     private function fakeKeycloakUser(array $attributes): void
