@@ -41,6 +41,10 @@ return new class extends Migration
             $table->index('approver_employee_id', 'leave_usage_external_approval_employee_index');
         });
 
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::unprepared(<<<'SQL'
 ALTER TABLE leave_usage_external_approval_steps
     ADD CONSTRAINT leave_usage_external_approval_order_check
@@ -242,6 +246,16 @@ SQL);
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            Schema::dropIfExists('leave_usage_external_approval_steps');
+
+            Schema::table('leave_usage_records', function (Blueprint $table): void {
+                $table->dropColumn('approval_document_number');
+            });
+
+            return;
+        }
+
         DB::unprepared(<<<'SQL'
 DROP TRIGGER IF EXISTS leave_usage_record_approval_document_number_immutable ON leave_usage_records;
 DROP FUNCTION IF EXISTS reject_leave_usage_approval_document_number_mutation();

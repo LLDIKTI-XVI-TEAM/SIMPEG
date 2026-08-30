@@ -9,6 +9,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Cutover DB-only memastikan upgrade tidak meninggalkan request final tanpa fakta pemakaian.
         app(BackfillLegacyApprovedLeaveUsage::class)->execute();
     }

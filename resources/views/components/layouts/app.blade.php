@@ -70,190 +70,75 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            $canAdministerLeaveBalance = $activeRole === 'admin_kepegawaian'
-                && (($layoutCapabilities['cuti.balance.reconcile'] ?? false)
-                    || ($layoutCapabilities['cuti.manual.manage'] ?? false));
 
-            // Menu terlarang/dikunci untuk masing-masing role
-            $lockedMenus = [
-                'super_admin' => [],
-                'admin_kepegawaian' => [
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'data-master',
-                    'hari-libur',
-                    'ews.config',
-                ],
-                'pimpinan' => [
-                    'audit-log',
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'ews.config',
-                ],
-                'kepala_bagian' => [
-                    'hari-libur',
-                    'dokumen',
-                    'audit-log',
-                    'pengaturan',
-                    'user-management',
-                    'rbac',
-                    'data-master',
-                    'laporan',
-                    'laporan.pegawai',
-                    'cuti.laporan',
-                    'cuti.rekap',
-                    'ews',
-                    'ews.config',
-                ],
+            // Dashboard mengikuti role efektif (tiap role punya beranda sendiri).
+            $dashboardRoute = match ($activeRole) {
+                'pimpinan' => 'pimpinan.dashboard',
+                'kepala_bagian' => 'kepala-bagian.dashboard',
+                default => 'dashboard',
+            };
 
-                'pegawai' => [
-                    'dokumen',
-                    'cuti.rekap',
-                    'ews',
-                    'ews.config',
-                    'laporan',
-                    'laporan.pegawai',
-            'cuti.laporan',
-                    'user-management',
-                    'rbac',
-                    'data-master',
-                    'hari-libur',
-                    'pengaturan',
-                    'audit-log',
-                ],
-            ];
-
-            $myLockedMenus = $lockedMenus[$activeRole] ?? [];
-
+            // Kontrak menu universal: SELURUH item tampil untuk semua role. Otorisasi
+            // ditegakkan di halaman masing-masing (permission-driven; hierarki via
+            // DocumentAuthorization untuk permukaan privasi) — role tanpa akses menerima
+            // halaman "Tidak Mendapatkan Akses" (errors/403), bukan menu yang disembunyikan.
             $menuGroups = [
                 [
                     'group' => '',
                     'items' => [
-                        ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'squares-2x2'],
+                        ['label' => 'Dashboard', 'route' => $dashboardRoute, 'icon' => 'squares-2x2'],
                     ]
                 ],
                 [
                     'group' => 'Kepegawaian',
-                    'items' => array_filter([
-                        // Data Pegawai permission-driven: tampil bagi role efektif yang
-                        // memegang employees.read (halaman admin menyesuaikan capability).
-                        auth()->user()?->hasPermission('employees.read')
-                            ? ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users']
-                            : null,
-                        $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
+                    'items' => [
+                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                    ])
+                        ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
+                        ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
+                    ]
                 ],
                 [
                     'group' => 'Cuti',
-                    'items' => array_filter([
-                        $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
-                        ['label' => in_array($activeRole, ['pegawai'], true) ? 'Pengajuan Cuti' : 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                    'items' => [
+                        ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                        ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
+                        ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        $canAdministerLeaveBalance
-                            ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
-                            : null,
+                        ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal'],
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
-                        $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
-                    ])
+                        ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'],
+                    ]
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
-                    'items' => array_filter([
-                        $activeRole === 'kepala_bagian' ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
-                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
-                        $activeRole === 'pegawai' ? ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle'] : null,
+                    'items' => [
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
+                        ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle'],
+                        ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
-                        $activeRole === 'super_admin' ? ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal'] : null,
-                    ])
+                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                        ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal'],
+                    ]
                 ],
                 [
                     'group' => 'Administrasi Sistem',
-                    'items' => [
-                        ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
-                        ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
-                        ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
-                        ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
-                        ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth'],
-                        ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
-                    ]
+                    'items' => array_merge(
+                        $activeRole === 'super_admin' ? [
+                            ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
+                            ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
+                            ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
+                            ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth'],
+                        ] : [],
+                        [
+                            ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
+                            ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
+                        ]
+                    )
                 ]
             ];
-
-            if ($activeRole === 'pimpinan') {
-                $menuGroups = [
-                    [
-                        'group' => '',
-                        'items' => [
-                            ['label' => 'Dashboard', 'route' => 'pimpinan.dashboard', 'icon' => 'squares-2x2'],
-                        ]
-                    ],
-                    [
-                        'group' => 'Kepegawaian',
-                        'items' => [
-                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users'],
-                        ]
-                    ],
-                    [
-                        'group' => 'Cuti',
-                        'items' => [
-                            ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
-                            ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ]
-                    ],
-                    [
-                        'group' => 'EWS & Notifikasi',
-                        'items' => [
-                            ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
-                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
-                        ]
-                    ],
-                    [
-                        'group' => 'Laporan',
-                        'items' => [
-                            ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
-                            ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
-                            ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
-                            ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
-                        ]
-                    ]
-                ];
-            }
-
-            if ($activeRole === 'kepala_bagian') {
-                $menuGroups = [
-                    [
-                        'group' => '',
-                        'items' => [
-                            ['label' => 'Dashboard', 'route' => 'kepala-bagian.dashboard', 'icon' => 'squares-2x2'],
-                        ],
-                    ],
-                    [
-                        'group' => 'Kepegawaian',
-                        'items' => [
-                            ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'],
-                        ],
-                    ],
-                    [
-                        'group' => 'Cuti',
-                        'items' => [
-                            ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
-                            ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ],
-                    ],
-                    [
-                        'group' => 'EWS & Notifikasi',
-                        'items' => [
-                            ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
-                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
-                        ],
-                    ],
-                ];
-            }
 
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {
@@ -268,8 +153,7 @@
                     $visibleItems = [];
                     foreach ($group['items'] as $menu) {
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                        $isLocked    = in_array($menu['route'], $myLockedMenus);
-                        if ($routeExists && !$isLocked) {
+                        if ($routeExists) {
                             $visibleItems[] = $menu;
                         }
                     }

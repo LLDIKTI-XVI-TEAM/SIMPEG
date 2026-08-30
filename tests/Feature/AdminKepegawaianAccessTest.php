@@ -18,28 +18,17 @@ class AdminKepegawaianAccessTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_sidebar_admin_kepegawaian_hanya_menampilkan_menu_yang_diizinkan(): void
+    public function test_sidebar_admin_kepegawaian_menampilkan_menu_universal_tanpa_menu_super_admin(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
 
         $response = $this->actingAs($admin)
-            ->withSession(['active_role' => 'super_admin'])
+            ->withSession(['active_role' => 'admin_kepegawaian'])
             ->get('/dashboard');
 
         $response->assertOk();
 
-        foreach ([
-            'user-management',
-            'rbac',
-            'data-master',
-            'hari-libur',
-            'ews.config',
-            'cuti.config',
-            'pengaturan',
-        ] as $forbiddenRoute) {
-            $response->assertDontSee('href="'.route($forbiddenRoute).'"', false);
-        }
-
+        // Menu universal: item berikut tampil untuk semua role.
         foreach ([
             'data-pegawai',
             'dokumen',
@@ -48,8 +37,19 @@ class AdminKepegawaianAccessTest extends TestCase
             'laporan.pegawai',
             'cuti.laporan',
             'audit-log',
-        ] as $allowedRoute) {
-            $response->assertSee('href="'.route($allowedRoute).'"', false);
+            'hari-libur',
+        ] as $route) {
+            $response->assertSee('href="'.route($route).'"', false);
+        }
+
+        // Menu khusus super_admin: tidak tampil untuk admin_kepegawaian.
+        foreach ([
+            'user-management',
+            'rbac',
+            'data-master',
+            'pengaturan',
+        ] as $route) {
+            $response->assertDontSee('href="'.route($route).'"', false);
         }
     }
 

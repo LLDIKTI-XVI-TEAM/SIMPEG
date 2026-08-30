@@ -91,7 +91,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('Bawahan Tugas Belajar Dashboard');
     }
 
-    public function test_navigation_menampilkan_cuti_bawahan_dan_pengajuan_cuti_sendiri(): void
+    public function test_navigation_menampilkan_cuti_bawahan_dan_monitoring_cuti(): void
     {
         [$user] = $this->kepalaBagian();
 
@@ -100,7 +100,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertOk()
             ->assertSee('Cuti Bawahan')
             ->assertSee('href="'.route('kepala-bagian.cuti.index').'"', false)
-            ->assertSee('Pengajuan Cuti')
+            ->assertSee('Monitoring Cuti')
             ->assertSee('href="'.route('cuti').'"', false);
     }
 

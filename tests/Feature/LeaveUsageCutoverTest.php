@@ -943,7 +943,7 @@ class LeaveUsageCutoverTest extends TestCase
             ->assertDontSee('Koreksi Administratif');
     }
 
-    public function test_sidebar_administrasi_pemakaian_hanya_terlihat_untuk_exact_admin_dengan_salah_satu_permission_workspace(): void
+    public function test_sidebar_administrasi_pemakaian_selalu_terlihat_karena_akses_ditegakkan_di_halaman(): void
     {
         $reconcilePermission = Permission::query()->where('name', 'cuti.balance.reconcile')->sole();
         $manualPermission = Permission::query()->where('name', 'cuti.manual.manage')->sole();
@@ -955,18 +955,20 @@ class LeaveUsageCutoverTest extends TestCase
             $manualPermission->id,
         ]);
 
+        // Menu universal: semua role melihat item menu meskipun tanpa permission.
+        // Otorisasi ditegakkan di halaman (403 → "Tidak Mendapatkan Akses").
         $this->actingAs(User::factory()->superAdmin()->create())
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Administrasi Pemakaian Cuti')
-            ->assertDontSee('href="'.$administrationUrl.'"', false);
+            ->assertSee('Administrasi Pemakaian Cuti')
+            ->assertSee('href="'.$administrationUrl.'"', false);
 
         $adminRole->permissions()->detach([$reconcilePermission->id, $manualPermission->id]);
         $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Administrasi Pemakaian Cuti')
-            ->assertDontSee('href="'.$administrationUrl.'"', false);
+            ->assertSee('Administrasi Pemakaian Cuti')
+            ->assertSee('href="'.$administrationUrl.'"', false);
 
         $adminRole->permissions()->attach($manualPermission);
         $this->actingAs(User::factory()->adminKepegawaian()->create())
