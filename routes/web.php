@@ -389,6 +389,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['permission:employees.read'])
         ->name('laporan.pegawai.pdf');
 
+    Route::get('/laporan/export-pegawai/pdf-nominatif', [LaporanController::class, 'exportPegawaiNominatifPdf'])
+        ->middleware(['permission:employees.read'])
+        ->name('laporan.pegawai.pdf-nominatif');
+
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['permission:employees.read'])
         ->name('laporan.pegawai.custom');
