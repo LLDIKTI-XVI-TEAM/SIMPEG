@@ -18,23 +18,19 @@ $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []
     : ['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'];
 // Otorisasi modul employees permission-driven: permission granular (evaluasi role efektif)
-// menjadi gerbang tunggal per route; role middleware hanya pagar kasar keanggotaan role.
-// READ endpoints memuat payload mentah sensitif (NIK keluarga, relasi mentah) yang
-// hanya untuk surface admin — tetap digerbang ganda role + permission; Pimpinan memakai
-// surface web ter-masked-nya sendiri (K-privasi).
+// menjadi gerbang tunggal per route; hierarki akses dikelola dinamis lewat RBAC matrix.
 $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
     ? []
-    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
+    : ['permission:'.$permission];
 // Mutasi modul employees permission-driven: permission granular (evaluasi role efektif)
 // menjadi gerbang tunggal; hierarki akses dikelola lewat RBAC matrix, bukan role gate.
 $adminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
     : ['permission:'.$permission];
-// Mutasi sub-modul pegawai (keluarga, disiplin, riwayat, dokumen) tetap digerbang ganda
-// role + permission sampai kontrak permission-driven untuk modul tersebut ditetapkan.
+// Mutasi sub-modul pegawai (keluarga, disiplin, riwayat, dokumen) dikelola lewat RBAC matrix.
 $adminSubModuleMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission];
+    : ['permission:'.$permission];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
@@ -104,7 +100,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('disiplin.store');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware())
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read,dokumen_sk.read'])
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
         Route::post('/{employee}/berkas-lainnya', [EmployeeDocumentController::class, 'storeBerkasLainnya'])
@@ -122,7 +118,7 @@ Route::middleware($employeeGroupMiddleware)
             ->scopeBindings()
             ->name('berkas-lainnya.destroy');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
-            ->middleware($adminEmployeeReadMiddleware())
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read,dokumen_sk.read'])
             ->whereUuid('employee')
             ->name('status-dokumen');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
