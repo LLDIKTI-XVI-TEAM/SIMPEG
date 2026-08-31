@@ -2,6 +2,7 @@
 
 namespace App\Support\Histories;
 
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
@@ -18,6 +19,19 @@ class EmployeeHistoryPayload
     public function primeAttachmentReferences(iterable $paths): void
     {
         $this->attachments->primeDocumentReferences($paths);
+    }
+
+    /**
+     * Mempertahankan kontrak data SK Pengangkatan Pertama dengan tanggal kalender yang deterministik.
+     *
+     * @return array<string, mixed>
+     */
+    public function appointment(Appointment $appointment, ?Employee $employee = null): array
+    {
+        return $this->withDownloadUrl($this->withDateOnlyFields($appointment->toArray(), [
+            'tanggal_sk' => $appointment->tanggal_sk,
+            'tmt_pengangkatan' => $appointment->tmt_pengangkatan,
+        ]), $employee, 'appointment', $appointment);
     }
 
     /**

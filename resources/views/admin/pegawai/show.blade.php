@@ -131,7 +131,107 @@
         deletingBerkas: null,
         berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
 
-        // Upload / Ganti Berkas SK Riwayat (Kepangkatan, Jabatan, KGB)
+        // Data & SK Pengangkatan Pertama
+        appointmentData: @js($p->appointment ? [
+            'id' => $p->appointment->id,
+            'jenis_pengangkatan' => $p->appointment->jenis_pengangkatan,
+            'no_sk' => $p->appointment->no_sk,
+            'tanggal_sk' => $p->appointment->tanggal_sk?->format('Y-m-d'),
+            'tmt_pengangkatan' => $p->appointment->tmt_pengangkatan?->format('Y-m-d'),
+            'file_sk' => $p->appointment->file_sk,
+            'download_url' => $p->appointment->admin_attachment_download_url,
+        ] : null),
+        showAppointmentModal: false,
+        isEditingAppointment: false,
+        isSavingAppointment: false,
+        appointmentError: '',
+        appointmentForm: {
+            jenis_pengangkatan: 'CPNS',
+            no_sk: '',
+            tanggal_sk: '',
+            tmt_pengangkatan: '',
+            file_sk: null,
+        },
+
+        openAppointmentModal() {
+            this.appointmentError = '';
+            if (this.appointmentData) {
+                this.isEditingAppointment = true;
+                this.appointmentForm = {
+                    jenis_pengangkatan: this.appointmentData.jenis_pengangkatan || 'CPNS',
+                    no_sk: this.appointmentData.no_sk || '',
+                    tanggal_sk: this.appointmentData.tanggal_sk || '',
+                    tmt_pengangkatan: this.appointmentData.tmt_pengangkatan || '',
+                    file_sk: null,
+                };
+            } else {
+                this.isEditingAppointment = false;
+                this.appointmentForm = {
+                    jenis_pengangkatan: 'CPNS',
+                    no_sk: '',
+                    tanggal_sk: '',
+                    tmt_pengangkatan: '',
+                    file_sk: null,
+                };
+            }
+            this.showAppointmentModal = true;
+            this.$nextTick(() => {
+                const el = document.getElementById('appointment_file_sk_input');
+                if (el) el.value = '';
+            });
+        },
+
+        async submitAppointment() {
+            if (!this.appointmentForm.jenis_pengangkatan || !this.appointmentForm.no_sk || !this.appointmentForm.tanggal_sk || !this.appointmentForm.tmt_pengangkatan) {
+                this.appointmentError = 'Mohon lengkapi semua kolom bertanda bintang (*).';
+                return;
+            }
+
+            this.isSavingAppointment = true;
+            this.appointmentError = '';
+
+            const fd = new FormData();
+            fd.append('jenis_pengangkatan', this.appointmentForm.jenis_pengangkatan);
+            fd.append('no_sk', this.appointmentForm.no_sk);
+            fd.append('tanggal_sk', this.appointmentForm.tanggal_sk);
+            fd.append('tmt_pengangkatan', this.appointmentForm.tmt_pengangkatan);
+            if (this.appointmentForm.file_sk) {
+                fd.append('file_sk', this.appointmentForm.file_sk);
+            }
+
+            try {
+                const response = await fetch(`/api/v1/pegawai/{{ $p->id }}/pengangkatan`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: fd,
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    this.appointmentData = result.appointment;
+                    this.clearDocumentArchiveCache();
+                    this.showAppointmentModal = false;
+                    this.toast = { show: true, message: result.message || 'Data SK Pengangkatan berhasil disimpan!', type: 'success' };
+                    setTimeout(() => this.toast.show = false, 3000);
+                } else {
+                    const err = await response.json();
+                    if (err.errors) {
+                        this.appointmentError = Object.values(err.errors).flat().join(' ');
+                    } else {
+                        this.appointmentError = err.message || 'Gagal menyimpan data pengangkatan.';
+                    }
+                }
+            } catch (e) {
+                this.appointmentError = 'Terjadi kesalahan jaringan saat menyimpan data.';
+            } finally {
+                this.isSavingAppointment = false;
+            }
+        },
+
+        // Upload / Ganti Berkas SK Riwayat (Kepangkatan, Jabatan, KGB, Pengangkatan)
         showUploadSkModal: false,
         uploadSkType: 'pangkat',
         uploadSkRecord: null,
@@ -157,7 +257,7 @@
                 return;
             }
 
-            if (!this.uploadSkRecord || !this.uploadSkRecord.id) {
+            if (!this.uploadSkRecord || (!this.uploadSkRecord.id && this.uploadSkType !== 'pengangkatan')) {
                 this.uploadSkError = 'Data riwayat tidak valid.';
                 return;
             }
@@ -165,11 +265,16 @@
             this.isUploadingSk = true;
             this.uploadSkError = '';
 
-            let routeType = 'riwayat-kepangkatan';
-            if (this.uploadSkType === 'jabatan') routeType = 'riwayat-jabatan';
-            else if (this.uploadSkType === 'kgb') routeType = 'riwayat-kgb';
-
-            const endpoint = `/api/v1/pegawai/{{ $p->id }}/${routeType}/${this.uploadSkRecord.id}/upload-sk`;
+            let endpoint = '';
+            if (this.uploadSkType === 'jabatan') {
+                endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan/${this.uploadSkRecord.id}/upload-sk`;
+            } else if (this.uploadSkType === 'kgb') {
+                endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb/${this.uploadSkRecord.id}/upload-sk`;
+            } else if (this.uploadSkType === 'pengangkatan') {
+                endpoint = `/api/v1/pegawai/{{ $p->id }}/pengangkatan/upload-sk`;
+            } else {
+                endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kepangkatan/${this.uploadSkRecord.id}/upload-sk`;
+            }
 
             const fd = new FormData();
             fd.append('file_sk', this.uploadSkFile);
@@ -186,25 +291,29 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    const updated = result.history;
 
-                    if (this.uploadSkType === 'pangkat') {
-                        const idx = this.pangkatList.findIndex(item => item.id === this.uploadSkRecord.id);
-                        if (idx !== -1) {
-                            this.pangkatList[idx].download_url = updated.download_url;
-                            this.pangkatList[idx].file_sk = updated.file_sk;
-                        }
-                    } else if (this.uploadSkType === 'jabatan') {
-                        const idx = this.jabatanList.findIndex(item => item.id === this.uploadSkRecord.id);
-                        if (idx !== -1) {
-                            this.jabatanList[idx].download_url = updated.download_url;
-                            this.jabatanList[idx].file_sk = updated.file_sk;
-                        }
-                    } else if (this.uploadSkType === 'kgb') {
-                        const idx = this.kgbList.findIndex(item => item.id === this.uploadSkRecord.id);
-                        if (idx !== -1) {
-                            this.kgbList[idx].download_url = updated.download_url;
-                            this.kgbList[idx].file_sk = updated.file_sk;
+                    if (this.uploadSkType === 'pengangkatan') {
+                        this.appointmentData = result.appointment;
+                    } else {
+                        const updated = result.history;
+                        if (this.uploadSkType === 'pangkat') {
+                            const idx = this.pangkatList.findIndex(item => item.id === this.uploadSkRecord.id);
+                            if (idx !== -1) {
+                                this.pangkatList[idx].download_url = updated.download_url;
+                                this.pangkatList[idx].file_sk = updated.file_sk;
+                            }
+                        } else if (this.uploadSkType === 'jabatan') {
+                            const idx = this.jabatanList.findIndex(item => item.id === this.uploadSkRecord.id);
+                            if (idx !== -1) {
+                                this.jabatanList[idx].download_url = updated.download_url;
+                                this.jabatanList[idx].file_sk = updated.file_sk;
+                            }
+                        } else if (this.uploadSkType === 'kgb') {
+                            const idx = this.kgbList.findIndex(item => item.id === this.uploadSkRecord.id);
+                            if (idx !== -1) {
+                                this.kgbList[idx].download_url = updated.download_url;
+                                this.kgbList[idx].file_sk = updated.file_sk;
+                            }
                         }
                     }
 
@@ -1715,11 +1824,76 @@
                 <x-pegawai.detail.section-header
                     title="Data & SK Pengangkatan Pertama"
                     description="Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK."
-                />
-                @include('pegawai.partials.detail.appointment-readonly', [
-                    'appointment' => $p->appointment,
-                    'attachmentDownloadUrl' => $p->appointment?->admin_attachment_download_url,
-                ])
+                >
+                    @if($canUpdateEmployeeHistory)
+                        <x-slot:actions>
+                            <template x-if="!appointmentData">
+                                <x-ui.button type="button" size="sm" @click="openAppointmentModal()">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                    </svg>
+                                    Tambah Data Pengangkatan
+                                </x-ui.button>
+                            </template>
+                            <template x-if="appointmentData">
+                                <x-ui.button type="button" variant="outline" size="sm" @click="openAppointmentModal()">
+                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                    </svg>
+                                    Edit Data Pengangkatan
+                                </x-ui.button>
+                            </template>
+                        </x-slot:actions>
+                    @endif
+                </x-pegawai.detail.section-header>
+
+                <x-pegawai.detail.table
+                    name="pengangkatan"
+                    :headings="['Jenis Pengangkatan', 'Nomor SK Pengangkatan', 'Tanggal SK', 'TMT Pengangkatan', 'Berkas']"
+                >
+                    <template x-if="appointmentData">
+                        <tr class="transition-colors hover:bg-soft/30 text-ink">
+                            <td class="px-4 py-3 font-bold" x-text="appointmentData.jenis_pengangkatan || '-'"></td>
+                            <td class="px-4 py-3" x-text="appointmentData.no_sk || '-'"></td>
+                            <td class="px-4 py-3" x-text="formatDate(appointmentData.tanggal_sk)"></td>
+                            <td class="px-4 py-3" x-text="formatDate(appointmentData.tmt_pengangkatan)"></td>
+                            <td class="px-4 py-3">
+                                <template x-if="appointmentData.download_url">
+                                    <div class="flex items-center gap-2">
+                                        <a :href="appointmentData.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                        @if($canUpdateEmployeeHistory)
+                                            <button type="button" @click="openUploadSkModal('pengangkatan', appointmentData)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+                                                <span>Ganti</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                </template>
+                                <template x-if="!appointmentData.download_url">
+                                    <div>
+                                        @if($canUpdateEmployeeHistory)
+                                            <button type="button" @click="openUploadSkModal('pengangkatan', appointmentData)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                                                </svg>
+                                                <span>Upload Berkas</span>
+                                            </button>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </div>
+                                </template>
+                            </td>
+                        </tr>
+                    </template>
+                    <template x-if="!appointmentData">
+                        <tr>
+                            <td colspan="5" class="px-4 py-6 text-center font-semibold text-muted">
+                                Belum ada data pengangkatan.
+                            </td>
+                        </tr>
+                    </template>
+                </x-pegawai.detail.table>
             </x-pegawai.detail.panel>
 
             @include('admin.pegawai.partials.tab-dokumen-sk')
@@ -2358,6 +2532,12 @@
                         <div class="text-muted text-xs mt-0.5" x-text="'Nomor Surat: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt)"></div>
                     </div>
                 </template>
+                <template x-if="uploadSkType === 'pengangkatan'">
+                    <div>
+                        <div class="font-bold text-ink text-sm" x-text="'SK Pengangkatan ' + (uploadSkRecord?.jenis_pengangkatan || '-')"></div>
+                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor SK: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt_pengangkatan)"></div>
+                    </div>
+                </template>
             </div>
 
             {{-- Pesan Error --}}
@@ -2406,6 +2586,100 @@
                 </button>
             </div>
         </div>
+    </x-ui.modal>
+
+    {{-- ============================================================ --}}
+    {{-- MODAL TAMBAH / EDIT DATA PENGANGKATAN PERTAMA                --}}
+    {{-- ============================================================ --}}
+    <x-ui.modal
+        show="showAppointmentModal"
+        title="Data & SK Pengangkatan Pertama"
+        closeAction="if(!isSavingAppointment) showAppointmentModal = false"
+        maxWidth="lg"
+    >
+        <form @submit.prevent="submitAppointment()" class="space-y-4 text-xs font-sans">
+            {{-- Error Message --}}
+            <div x-show="appointmentError" class="rounded-lg bg-danger/10 border border-danger/20 p-2.5 text-danger font-medium text-xs" x-text="appointmentError"></div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {{-- Jenis Pengangkatan --}}
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
+                    <select x-model="appointmentForm.jenis_pengangkatan" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                        <option value="CPNS">CPNS</option>
+                        <option value="PNS">PNS</option>
+                        <option value="PPPK">PPPK</option>
+                        <option value="Pegawai Tetap Non-PNS">Pegawai Tetap Non-PNS</option>
+                        <option value="Kontrak / Lainnya">Kontrak / Lainnya</option>
+                    </select>
+                </div>
+
+                {{-- Nomor SK --}}
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK <span class="text-danger">*</span></label>
+                    <input type="text" x-model="appointmentForm.no_sk" required placeholder="Contoh: 800/123/KP/2020" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {{-- Tanggal SK --}}
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
+                    <input type="date" x-model="appointmentForm.tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+
+                {{-- TMT Pengangkatan --}}
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
+                    <input type="date" x-model="appointmentForm.tmt_pengangkatan" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                </div>
+            </div>
+
+            {{-- Unggah Berkas SK --}}
+            <div class="space-y-1.5 pt-1">
+                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                    Berkas SK Pengangkatan
+                    <span x-show="!isEditingAppointment" class="text-muted font-normal">(Opsional)</span>
+                </label>
+                <div class="flex items-center gap-2">
+                    <label for="appointment_file_sk_input" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                        Pilih File
+                    </label>
+                    <input type="file"
+                           id="appointment_file_sk_input"
+                           class="hidden"
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           @change="appointmentForm.file_sk = $event.target.files[0] || null">
+                    <span class="min-w-0 flex-1 truncate text-xs font-sans"
+                          :class="appointmentForm.file_sk ? 'text-ink font-semibold' : 'text-muted'"
+                          x-text="appointmentForm.file_sk ? appointmentForm.file_sk.name : (appointmentData?.download_url ? 'Berkas SK sudah ada (Pilih file baru jika ingin mengganti)' : 'Belum ada file dipilih')"></span>
+                    <button x-show="appointmentForm.file_sk"
+                            type="button"
+                            @click="appointmentForm.file_sk = null; document.getElementById('appointment_file_sk_input').value = ''"
+                            class="shrink-0 text-xs text-danger hover:underline font-sans cursor-pointer">Hapus</button>
+                </div>
+                <p class="text-[10px] text-muted italic font-sans">Format yang didukung: PDF, JPG, JPEG, PNG (Maks. 10 MB).</p>
+            </div>
+
+            {{-- Footer Buttons --}}
+            <div class="flex items-center justify-end gap-2 border-t border-border pt-4 mt-4">
+                <button type="button"
+                        @click="showAppointmentModal = false"
+                        :disabled="isSavingAppointment"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
+                    Batal
+                </button>
+                <button type="submit"
+                        :disabled="isSavingAppointment"
+                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[120px] disabled:opacity-50">
+                    <span x-show="!isSavingAppointment" x-text="isEditingAppointment ? 'Simpan Perubahan' : 'Simpan Data'"></span>
+                    <span x-show="isSavingAppointment" class="inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>Menyimpan...</span>
+                    </span>
+                </button>
+            </div>
+        </form>
     </x-ui.modal>
 </div>{{-- /x-data utama --}}
 

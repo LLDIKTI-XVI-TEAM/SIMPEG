@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AppointmentController;
 use App\Http\Controllers\Api\V1\DisciplineRecordController;
 use App\Http\Controllers\Api\V1\EducationHistoryController;
 use App\Http\Controllers\Api\V1\EmployeeController;
@@ -173,6 +174,18 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid(['employee', 'education'])
             ->name('riwayat-pendidikan.destroy');
+        Route::get('/{employee}/pengangkatan', [AppointmentController::class, 'show'])
+            ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
+            ->whereUuid('employee')
+            ->name('pengangkatan.show');
+        Route::post('/{employee}/pengangkatan', [AppointmentController::class, 'save'])
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create,employee_histories.update,employees.update'))
+            ->whereUuid('employee')
+            ->name('pengangkatan.save');
+        Route::post('/{employee}/pengangkatan/upload-sk', [AppointmentController::class, 'uploadSk'])
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create,employee_histories.update,employees.update'))
+            ->whereUuid('employee')
+            ->name('pengangkatan.upload-sk');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])
             ->middleware($adminEmployeeMutationMiddleware('employees.update'))
             ->whereUuid('employee')
