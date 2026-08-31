@@ -30,8 +30,18 @@
 
     <div class="space-y-6" x-data="{
         followup: { open: false, action: '', status: '', label: '', employee: '', type: '', note: '' },
-        openFollowup(action, status, label, employee, type) {
-            this.followup = { open: true, action, status, label, employee, type, note: '' };
+        openFollowupFromButton(event) {
+            const button = event.currentTarget;
+
+            this.followup = {
+                open: true,
+                action: button.dataset.followupAction,
+                status: button.dataset.followupStatus,
+                label: button.dataset.followupLabel,
+                employee: button.dataset.followupEmployee,
+                type: button.dataset.followupType,
+                note: '',
+            };
         },
         closeFollowup() {
             this.followup.open = false;
@@ -296,10 +306,16 @@
                                                 <div class="flex items-center gap-1.5">
                                                     <x-ui.tooltip text="Tandai Ditangani" position="top">
                                                         <x-ui.button
+                                                            type="button"
                                                             variant="success"
                                                             size="icon"
-                                                            @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('ditangani'), @js('Ditangani'), @js($alert['nama']), @js($alert['type']))"
+                                                            @click="openFollowupFromButton($event)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
+                                                            data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
+                                                            data-followup-status="ditangani"
+                                                            data-followup-label="Ditangani"
+                                                            data-followup-employee="{{ $alert['nama'] }}"
+                                                            data-followup-type="{{ $alert['type'] }}"
                                                             aria-label="Tandai Ditangani untuk {{ $alert['nama'] }}"
                                                         >
                                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -310,10 +326,16 @@
 
                                                     <x-ui.tooltip text="Tandai Tidak Perlu" position="top">
                                                         <x-ui.button
+                                                            type="button"
                                                             variant="danger"
                                                             size="icon"
-                                                            @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('tidak_perlu'), @js('Tidak Perlu'), @js($alert['nama']), @js($alert['type']))"
+                                                            @click="openFollowupFromButton($event)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
+                                                            data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
+                                                            data-followup-status="tidak_perlu"
+                                                            data-followup-label="Tidak Perlu"
+                                                            data-followup-employee="{{ $alert['nama'] }}"
+                                                            data-followup-type="{{ $alert['type'] }}"
                                                             aria-label="Tandai Tidak Perlu untuk {{ $alert['nama'] }}"
                                                         >
                                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">

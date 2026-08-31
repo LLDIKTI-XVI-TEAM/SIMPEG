@@ -318,7 +318,11 @@ class EwsActivePageTest extends TestCase
             ->get(route('ews'))
             ->assertOk()
             ->assertSee($alert->id, false)
-            ->assertSee('Catatan Tindak Lanjut EWS');
+            ->assertSee('Catatan Tindak Lanjut EWS')
+            ->assertSee('openFollowupFromButton($event)', false)
+            ->assertSee('data-followup-action="'.route('ews.followup.update', $alert).'"', false)
+            ->assertSee('data-followup-status="ditangani"', false)
+            ->assertSee('data-followup-status="tidak_perlu"', false);
     }
 
     public function test_non_eligible_promotion_alert_still_appears_for_admin(): void
