@@ -28,7 +28,7 @@ class RbacSeeder extends Seeder
             'employees.deactivate' => ['module' => 'employees', 'description' => 'Menonaktifkan data pegawai'],
             'employees.restore' => ['module' => 'employees', 'description' => 'Mengaktifkan kembali data pegawai nonaktif'],
             'employees.read_self' => ['module' => 'employees', 'description' => 'Melihat detail data pegawai milik sendiri'],
-            'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai (pangkat, jabatan, KGB, pendidikan, pengangkatan)'],
+            'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai (pangkat, jabatan, KGB, pendidikan, pengangkatan, status kepegawaian)'],
             'employee_histories.create' => ['module' => 'employee_histories', 'description' => 'Membuat entri riwayat pegawai'],
             'employee_histories.update' => ['module' => 'employee_histories', 'description' => 'Memperbarui riwayat pegawai'],
             'employee_histories.delete' => ['module' => 'employee_histories', 'description' => 'Menghapus riwayat pegawai'],
