@@ -219,29 +219,24 @@
                     foreach ($group['items'] as $menu) {
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
                         if ($routeExists) {
-                            // Cek apakah role aktif diizinkan berdasarkan daftar roles eksklusif
-                            $roleAllowed = !isset($menu['roles']) || in_array($activeRole, $menu['roles'], true);
-
-                            // Cek permission RBAC hanya jika:
-                            // 1. Menu tidak punya batasan 'roles' (menu bersama/shared), ATAU
-                            // 2. Menu punya 'roles' tapi role aktif TIDAK ada di dalamnya (sudah tidak allowed)
-                            // Jika role aktif sudah ada di 'roles', tidak perlu cek permission tambahan
-                            if (!$roleAllowed) {
-                                // Role tidak diizinkan, langsung disabled
-                                $permissionAllowed = false;
-                            } elseif (isset($menu['roles']) && $roleAllowed) {
-                                // Role eksklusif dan sudah diizinkan -> tidak perlu cek permission
-                                $permissionAllowed = true;
+                            // 1. Menu Eksklusif Role (memiliki 'roles'):
+                            // Jika role user tidak ada di dalam daftar 'roles', sembunyikan sepenuhnya (tidak tampil di sidebar)
+                            if (isset($menu['roles'])) {
+                                if (!in_array($activeRole, $menu['roles'], true)) {
+                                    continue;
+                                }
+                                $menu['disabled'] = false;
                             } else {
-                                // Menu bersama (tanpa 'roles') -> cek permission RBAC
-                                $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
-                                // Super admin selalu dapat akses menu bersama
+                                // 2. Menu RBAC / Bersama (tidak memiliki 'roles'):
+                                // Cek permission dari matriks RBAC database. Jika belum diberi izin, tampilkan sebagai disabled.
                                 if ($activeRole === 'super_admin') {
                                     $permissionAllowed = true;
+                                } else {
+                                    $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
                                 }
+                                $menu['disabled'] = !$permissionAllowed;
                             }
 
-                            $menu['disabled'] = ! ($roleAllowed && $permissionAllowed);
                             $visibleItems[] = $menu;
                         }
                     }
