@@ -20,6 +20,8 @@
 
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
+        $canUpdateEmployeeHistory = auth()->check()
+            && (auth()->user()->hasPermission('employee_histories.update') || auth()->user()->hasPermission('employee_histories.create') || auth()->user()->getEffectiveRole() === 'super_admin');
 
         $detailTabs = [
             'profile' => 'Profil',
@@ -89,9 +91,9 @@
             'pendidikan_terakhir' => $p->pendidikan_terakhir,
             'program_studi' => $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir,
         ]),
-        pangkatList: {{ $p->rankHistories->map(fn($r) => ['golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'download_url' => $r->admin_attachment_download_url])->toJson() }},
-        jabatanList: {{ $p->positionHistories->map(fn($j) => ['jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'download_url' => $j->admin_attachment_download_url])->toJson() }},
-        kgbList: {{ $p->salaryHistories->map(fn($s) => ['gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'download_url' => $s->admin_attachment_download_url])->toJson() }},
+        pangkatList: {{ $p->rankHistories->map(fn($r) => ['id' => $r->id, 'golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'file_sk' => $r->file_sk, 'download_url' => $r->admin_attachment_download_url])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['id' => $j->id, 'jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'file_sk' => $j->file_sk, 'download_url' => $j->admin_attachment_download_url])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['id' => $s->id, 'gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'file_sk' => $s->file_sk, 'download_url' => $s->admin_attachment_download_url])->toJson() }},
         disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->admin_attachment_download_url])->toJson() }},
         pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'program_studi_id' => $e->program_studi_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->programStudi?->nama ?? $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->admin_attachment_download_url])->toJson() }},
         pendidikanLoading: false,
@@ -128,6 +130,102 @@
         deleteBerkasError: '',
         deletingBerkas: null,
         berkasList: {{ \Illuminate\Support\Js::from($otherDocumentRows) }},
+
+        // Upload / Ganti Berkas SK Riwayat (Kepangkatan, Jabatan, KGB)
+        showUploadSkModal: false,
+        uploadSkType: 'pangkat',
+        uploadSkRecord: null,
+        uploadSkFile: null,
+        uploadSkError: '',
+        isUploadingSk: false,
+
+        openUploadSkModal(type, record) {
+            this.uploadSkType = type;
+            this.uploadSkRecord = record;
+            this.uploadSkFile = null;
+            this.uploadSkError = '';
+            this.showUploadSkModal = true;
+            this.$nextTick(() => {
+                const el = document.getElementById('upload_file_sk_input');
+                if (el) el.value = '';
+            });
+        },
+
+        async submitUploadSk() {
+            if (!this.uploadSkFile) {
+                this.uploadSkError = 'Silakan pilih berkas SK terlebih dahulu.';
+                return;
+            }
+
+            if (!this.uploadSkRecord || !this.uploadSkRecord.id) {
+                this.uploadSkError = 'Data riwayat tidak valid.';
+                return;
+            }
+
+            this.isUploadingSk = true;
+            this.uploadSkError = '';
+
+            let routeType = 'riwayat-kepangkatan';
+            if (this.uploadSkType === 'jabatan') routeType = 'riwayat-jabatan';
+            else if (this.uploadSkType === 'kgb') routeType = 'riwayat-kgb';
+
+            const endpoint = `/api/v1/pegawai/{{ $p->id }}/${routeType}/${this.uploadSkRecord.id}/upload-sk`;
+
+            const fd = new FormData();
+            fd.append('file_sk', this.uploadSkFile);
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    },
+                    body: fd,
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const updated = result.history;
+
+                    if (this.uploadSkType === 'pangkat') {
+                        const idx = this.pangkatList.findIndex(item => item.id === this.uploadSkRecord.id);
+                        if (idx !== -1) {
+                            this.pangkatList[idx].download_url = updated.download_url;
+                            this.pangkatList[idx].file_sk = updated.file_sk;
+                        }
+                    } else if (this.uploadSkType === 'jabatan') {
+                        const idx = this.jabatanList.findIndex(item => item.id === this.uploadSkRecord.id);
+                        if (idx !== -1) {
+                            this.jabatanList[idx].download_url = updated.download_url;
+                            this.jabatanList[idx].file_sk = updated.file_sk;
+                        }
+                    } else if (this.uploadSkType === 'kgb') {
+                        const idx = this.kgbList.findIndex(item => item.id === this.uploadSkRecord.id);
+                        if (idx !== -1) {
+                            this.kgbList[idx].download_url = updated.download_url;
+                            this.kgbList[idx].file_sk = updated.file_sk;
+                        }
+                    }
+
+                    this.clearDocumentArchiveCache();
+                    this.showUploadSkModal = false;
+                    this.toast = { show: true, message: result.message || 'Berkas SK berhasil diperbarui!', type: 'success' };
+                    setTimeout(() => this.toast.show = false, 3000);
+                } else {
+                    const err = await response.json();
+                    if (err.errors && err.errors.file_sk) {
+                        this.uploadSkError = err.errors.file_sk.join(' ');
+                    } else {
+                        this.uploadSkError = err.message || 'Gagal mengunggah berkas SK. Silakan coba lagi.';
+                    }
+                }
+            } catch (e) {
+                this.uploadSkError = 'Terjadi kesalahan jaringan saat mengunggah berkas.';
+            } finally {
+                this.isUploadingSk = false;
+            }
+        },
 
         clearDocumentArchiveCache() {
             try {
@@ -850,18 +948,21 @@
                         this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
                         this.disiplinFileMode = 'arsip';
                     } else if (this.modalType === 'kgb') {
+                        const h = result.history;
                         this.kgbList.unshift({
+                            id: h.id,
                             gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
                             no_sk: this.newKgb.no_sk,
                             tgl_sk: this.newKgb.tanggal_sk,
                             tmt: this.newKgb.tmt_kgb,
-                            download_url: result.history.download_url,
+                            download_url: h.download_url,
                         });
                         this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
                         document.getElementById('file_sk_kgb').value = '';
                     } else if (this.modalType === 'jabatan') {
                         const h = result.history;
                         this.jabatanList.unshift({
+                            id: h.id,
                             jabatan: h.jabatan?.nama ?? h.nama_jabatan ?? '-',
                             unit: h.unit_kerja?.nama ?? '-',
                             kelas_jabatan: h.kelas_jabatan,
@@ -875,6 +976,7 @@
                     } else if (this.modalType === 'pangkat') {
                         const h = result.history;
                         this.pangkatList.unshift({
+                            id: h.id,
                             golongan: h.golongan?.nama ?? '-',
                             no_sk: h.no_sk,
                             tgl_sk: h.tanggal_sk,
@@ -1301,13 +1403,39 @@
                     name="kepangkatan"
                     :headings="['Golongan', 'Nomor SK Pangkat', 'Tanggal SK', 'TMT Pangkat', 'Berkas']"
                 >
-                            <template x-for="p in pangkatList" :key="p.no_sk">
+                            <template x-for="p in pangkatList" :key="p.id || p.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="p.golongan"></td>
                                     <td class="px-4 py-3" x-text="p.no_sk"></td>
                                     <td class="px-4 py-3" x-text="formatDate(p.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(p.tmt)"></td>
-                                    <td class="px-4 py-3"><a x-show="p.download_url" :href="p.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a><span x-show="!p.download_url" class="text-muted">-</span></td>
+                                    <td class="px-4 py-3">
+                                        <template x-if="p.download_url">
+                                            <div class="flex items-center gap-2">
+                                                <a :href="p.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                                @if($canUpdateEmployeeHistory)
+                                                    <button type="button" @click="openUploadSkModal('pangkat', p)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+                                                        <span>Ganti</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </template>
+                                        <template x-if="!p.download_url">
+                                            <div>
+                                                @if($canUpdateEmployeeHistory)
+                                                    <button type="button" @click="openUploadSkModal('pangkat', p)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                                                        </svg>
+                                                        <span>Upload Berkas</span>
+                                                    </button>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </div>
+                                        </template>
+                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="pangkatList.length === 0">
@@ -1339,14 +1467,40 @@
                     name="jabatan"
                     :headings="['Nama Jabatan', 'Unit Kerja', 'Nomor SK Jabatan', 'Tanggal SK', 'TMT Jabatan', 'Berkas']"
                 >
-                            <template x-for="j in jabatanList" :key="j.no_sk">
+                            <template x-for="j in jabatanList" :key="j.id || j.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="j.jabatan"></td>
                                     <td class="px-4 py-3" x-text="j.unit"></td>
                                     <td class="px-4 py-3" x-text="j.no_sk"></td>
                                     <td class="px-4 py-3" x-text="formatDate(j.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(j.tmt)"></td>
-                                    <td class="px-4 py-3"><a x-show="j.download_url" :href="j.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a><span x-show="!j.download_url" class="text-muted">-</span></td>
+                                    <td class="px-4 py-3">
+                                        <template x-if="j.download_url">
+                                            <div class="flex items-center gap-2">
+                                                <a :href="j.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                                @if($canUpdateEmployeeHistory)
+                                                    <button type="button" @click="openUploadSkModal('jabatan', j)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+                                                        <span>Ganti</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </template>
+                                        <template x-if="!j.download_url">
+                                            <div>
+                                                @if($canUpdateEmployeeHistory)
+                                                    <button type="button" @click="openUploadSkModal('jabatan', j)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                                                        </svg>
+                                                        <span>Upload Berkas</span>
+                                                    </button>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </div>
+                                        </template>
+                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="jabatanList.length === 0">
@@ -1378,13 +1532,39 @@
                     name="kgb"
                     :headings="['Gaji Pokok Baru', 'Nomor Surat KGB', 'Tanggal Surat', 'TMT KGB', 'Berkas']"
                 >
-                            <template x-for="k in kgbList" :key="k.no_sk">
+                            <template x-for="k in kgbList" :key="k.id || k.no_sk">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
                                     <td class="px-4 py-3 font-bold" x-text="k.gaji"></td>
                                     <td class="px-4 py-3" x-text="k.no_sk"></td>
                                     <td class="px-4 py-3" x-text="formatDate(k.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(k.tmt)"></td>
-                                    <td class="px-4 py-3"><a x-show="k.download_url" :href="k.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a><span x-show="!k.download_url" class="text-muted">-</span></td>
+                                    <td class="px-4 py-3">
+                                        <template x-if="k.download_url">
+                                            <div class="flex items-center gap-2">
+                                                <a :href="k.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                                @if($canUpdateEmployeeHistory)
+                                                    <button type="button" @click="openUploadSkModal('kgb', k)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
+                                                        <span>Ganti</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </template>
+                                        <template x-if="!k.download_url">
+                                            <div>
+                                                @if($canUpdateEmployeeHistory)
+                                                    <button type="button" @click="openUploadSkModal('kgb', k)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                                                        </svg>
+                                                        <span>Upload Berkas</span>
+                                                    </button>
+                                                @else
+                                                    <span class="text-muted">-</span>
+                                                @endif
+                                            </div>
+                                        </template>
+                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="kgbList.length === 0">
@@ -2147,6 +2327,86 @@
         </form>
     </x-ui.modal>
     @endif
+
+    {{-- ============================================================ --}}
+    {{-- MODAL UPLOAD / GANTI BERKAS SK (PANGKAT, JABATAN, KGB)        --}}
+    {{-- ============================================================ --}}
+    <x-ui.modal
+        show="showUploadSkModal"
+        title="Upload / Ganti Berkas SK"
+        closeAction="if(!isUploadingSk) showUploadSkModal = false"
+        maxWidth="md"
+    >
+        <div class="space-y-4 text-xs font-sans">
+            {{-- Info Riwayat Yang Dipilih --}}
+            <div class="rounded-xl border border-border bg-soft/40 p-3.5 space-y-1.5">
+                <template x-if="uploadSkType === 'pangkat'">
+                    <div>
+                        <div class="font-bold text-ink text-sm" x-text="'Golongan ' + (uploadSkRecord?.golongan || '-')"></div>
+                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor SK: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt)"></div>
+                    </div>
+                </template>
+                <template x-if="uploadSkType === 'jabatan'">
+                    <div>
+                        <div class="font-bold text-ink text-sm" x-text="(uploadSkRecord?.jabatan || '-')"></div>
+                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor SK: ' + (uploadSkRecord?.no_sk || '-') + ' • Unit: ' + (uploadSkRecord?.unit || '-')"></div>
+                    </div>
+                </template>
+                <template x-if="uploadSkType === 'kgb'">
+                    <div>
+                        <div class="font-bold text-ink text-sm" x-text="'Gaji Pokok: ' + (uploadSkRecord?.gaji || '-')"></div>
+                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor Surat: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt)"></div>
+                    </div>
+                </template>
+            </div>
+
+            {{-- Pesan Error --}}
+            <div x-show="uploadSkError" class="rounded-lg bg-danger/10 border border-danger/20 p-2.5 text-danger font-medium text-xs" x-text="uploadSkError"></div>
+
+            {{-- Input File --}}
+            <div class="space-y-1.5">
+                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pilih Berkas SK <span class="text-danger">*</span></label>
+                <div class="flex items-center gap-2">
+                    <label for="upload_file_sk_input" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
+                        Pilih File
+                    </label>
+                    <input type="file"
+                           id="upload_file_sk_input"
+                           class="hidden"
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           @change="uploadSkFile = $event.target.files[0] || null">
+                    <span class="min-w-0 flex-1 truncate text-xs font-sans"
+                          :class="uploadSkFile ? 'text-ink font-semibold' : 'text-muted'"
+                          x-text="uploadSkFile ? uploadSkFile.name : 'Belum ada file dipilih'"></span>
+                    <button x-show="uploadSkFile"
+                            type="button"
+                            @click="uploadSkFile = null; document.getElementById('upload_file_sk_input').value = ''"
+                            class="shrink-0 text-xs text-danger hover:underline font-sans cursor-pointer">Hapus</button>
+                </div>
+                <p class="text-[10px] text-muted italic font-sans">Format yang didukung: PDF, JPG, JPEG, PNG (Maks. 10 MB).</p>
+            </div>
+
+            {{-- Footer Buttons --}}
+            <div class="flex items-center justify-end gap-2 border-t border-border pt-4 mt-2">
+                <button type="button"
+                        @click="showUploadSkModal = false"
+                        :disabled="isUploadingSk"
+                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
+                    Batal
+                </button>
+                <button type="button"
+                        @click="submitUploadSk"
+                        :disabled="isUploadingSk || !uploadSkFile"
+                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer disabled:opacity-50">
+                    <span x-show="!isUploadingSk" x-text="uploadSkRecord?.download_url ? 'Simpan Perubahan' : 'Upload Berkas'"></span>
+                    <span x-show="isUploadingSk" class="inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>Mengunggah...</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
 </div>{{-- /x-data utama --}}
 
 </div>

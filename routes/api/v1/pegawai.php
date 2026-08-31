@@ -129,6 +129,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-kepangkatan.store');
+        Route::post('/{employee}/riwayat-kepangkatan/{rank}/upload-sk', [RankHistoryController::class, 'uploadSk'])
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update,employee_histories.create'))
+            ->whereUuid(['employee', 'rank'])
+            ->name('riwayat-kepangkatan.upload-sk');
         Route::get('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'index'])
             ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
@@ -137,6 +141,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-jabatan.store');
+        Route::post('/{employee}/riwayat-jabatan/{position}/upload-sk', [PositionHistoryController::class, 'uploadSk'])
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update,employee_histories.create'))
+            ->whereUuid(['employee', 'position'])
+            ->name('riwayat-jabatan.upload-sk');
         Route::get('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'index'])
             ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
@@ -145,6 +153,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
             ->whereUuid('employee')
             ->name('riwayat-kgb.store');
+        Route::post('/{employee}/riwayat-kgb/{kgb}/upload-sk', [KgbHistoryController::class, 'uploadSk'])
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update,employee_histories.create'))
+            ->whereUuid(['employee', 'kgb'])
+            ->name('riwayat-kgb.upload-sk');
         Route::get('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'index'])
             ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
