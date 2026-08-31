@@ -23,17 +23,26 @@ class ManualExternalApproverLookupTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_lookup_hanya_menerima_exact_admin_dengan_permission_manual_sebelum_query_pegawai(): void
+    public function test_lookup_hanya_menerima_role_yang_diizinkan_dengan_permission_manual(): void
     {
         $manualPermission = Permission::query()->where('name', 'cuti.manual.manage')->sole();
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['kepala_bagian', 'pegawai'] as $role) {
             Role::query()->where('name', $role)->sole()->permissions()->syncWithoutDetaching([$manualPermission->id]);
 
             $this->actingAs(User::factory()->create(['role' => $role]))
                 ->getJson(self::LOOKUP_PATH.'?q=Pegawai')
                 ->assertForbidden();
         }
+
+        Role::query()->where('name', 'pimpinan')->sole()->permissions()->syncWithoutDetaching([$manualPermission->id]);
+        $this->actingAs(User::factory()->create(['role' => 'pimpinan']))
+            ->getJson(self::LOOKUP_PATH.'?q=Pegawai')
+            ->assertOk();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->getJson(self::LOOKUP_PATH.'?q=Pegawai')
+            ->assertOk();
 
         $adminRole = Role::query()->where('name', 'admin_kepegawaian')->sole();
         $adminRole->permissions()->detach($manualPermission->id);

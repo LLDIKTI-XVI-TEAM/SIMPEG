@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -14,7 +15,11 @@ class CalculateWorkdaysRequest extends FormRequest
     public function authorize(): bool
     {
         // Hanya pengguna dengan hak mengajukan cuti yang boleh memakai kalkulasi hari kerja.
-        return (bool) $this->user()?->hasPermission('cuti.create');
+        $actor = $this->user();
+
+        return $actor !== null
+            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.create', (string) $actor->getEffectiveRole())
+            && $actor->hasPermission('cuti.create');
     }
 
     /**

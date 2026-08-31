@@ -297,9 +297,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['permission:cuti.read_all'])
         ->name('cuti.rekap');
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
-        ->middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile,cuti.manual.manage'])
+        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile'])
+    Route::middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.reconcile'])
         ->prefix('cuti/rekonsiliasi-tahunan')
         ->name('cuti.reconciliation.')
         ->group(function (): void {
@@ -314,7 +314,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('document')
                 ->name('document.download');
         });
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.manual.manage'])
+    Route::middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:cuti.manual.manage'])
         ->prefix('cuti/pemakaian-manual')
         ->name('cuti.manual.')
         ->group(function (): void {
@@ -471,6 +471,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('pegawai.assign-atasan');
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
+        ->middleware('permission:cuti.balance.read')
         ->name('cuti.saldo');
 
     Route::get('/pegawai/legacy', function () {
@@ -502,15 +503,17 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return redirect()->route('hari-libur');
     })->name('hari-libur.index');
 
-    Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
+    Route::get('/dashboard/cuti', [CutiController::class, 'index'])
+        ->middleware('permission:cuti.read_own,cuti.read_all')
+        ->name('cuti');
     Route::get('/dashboard/cuti/create', [CutiController::class, 'create'])
-        ->middleware('permission:cuti.create')
+        ->middleware(['role:super_admin,admin_kepegawaian,kepala_bagian,pegawai', 'permission:cuti.create'])
         ->name('cuti.create');
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
-        ->middleware('permission:cuti.create')
+        ->middleware(['role:super_admin,admin_kepegawaian,kepala_bagian,pegawai', 'permission:cuti.create'])
         ->name('cuti.store');
     Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
-        ->middleware('permission:cuti.create')
+        ->middleware(['role:super_admin,admin_kepegawaian,kepala_bagian,pegawai', 'permission:cuti.create'])
         ->name('cuti.resubmit')
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
@@ -519,8 +522,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard/cuti/{leaveRequest}/lampiran', [CutiController::class, 'downloadAttachment'])
         ->name('cuti.attachment.download')
         ->whereUuid('leaveRequest');
-    // Antrean dan tindakan approval cuti digerbang ganda: role allowlist sebagai pagar kasar
-    // dan permission level-aksi; kelayakan approver per-tahap (person-based) ditegakkan di service.
+    // Antrean dan tindakan approval mempertahankan allowlist role sebagai pagar kasar.
+    // Kelayakan approver per-tahap (person-based) tetap ditegakkan di service, tanpa permission RBAC stage.
     Route::get('/cuti/approval', [CutiController::class, 'approval'])
         ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.approval');
@@ -548,7 +551,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('cuti.show')
         ->whereUuid('id');
 
-    // Konfigurasi rantai approval cuti dikontrol via permission cuti.configure dan cuti.configure_chain
+    // Seluruh operasi konfigurasi rantai memakai satu permission: cuti.configure.
     Route::get('/cuti/konfigurasi-approval', [CutiConfigController::class, 'index'])
         ->middleware(['permission:cuti.configure'])
         ->name('cuti.config');
@@ -556,16 +559,16 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.update');
     Route::post('/cuti/konfigurasi-approval/backfill', [CutiConfigController::class, 'backfill'])
-        ->middleware(['permission:cuti.configure_chain'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.backfill');
     Route::post('/cuti/konfigurasi-approval/pybmc-global', [CutiConfigController::class, 'updateGlobalPybmc'])
-        ->middleware(['permission:cuti.configure_chain'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.pybmc-global');
     Route::post('/cuti/konfigurasi-approval/unit', [CutiConfigController::class, 'applyTemplateToUnit'])
-        ->middleware(['permission:cuti.configure_chain'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.unit-template.apply');
     Route::post('/cuti/konfigurasi-approval/pegawai/{employee}', [CutiConfigController::class, 'storeEmployeeChain'])
-        ->middleware(['permission:cuti.configure_chain'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.employee-chain.store')
         ->whereUuid('employee');
 

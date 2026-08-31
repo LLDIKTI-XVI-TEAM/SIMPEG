@@ -5,6 +5,7 @@ namespace App\Actions\Rbac;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Services\AuditService;
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,12 @@ class SaveRolePermissionMatrixAction
                 $sebelum = $role->permissions->pluck('id')->sort()->values()->all();
                 $sesudah = collect($matrix[$role->id] ?? [])
                     ->unique()
+                    ->filter(function (string $permissionId) use ($namaPermission, $role): bool {
+                        $permissionName = $namaPermission->get($permissionId);
+
+                        return is_string($permissionName)
+                            && CutiPermissionMatrixPolicy::isAssignableToRole($permissionName, $role->name);
+                    })
                     ->sort()
                     ->values()
                     ->all();

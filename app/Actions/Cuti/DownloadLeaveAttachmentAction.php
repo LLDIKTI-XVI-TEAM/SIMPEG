@@ -28,7 +28,13 @@ final class DownloadLeaveAttachmentAction
     /** Satu aturan baca dipakai detail dan unduhan: owner, read-all, atau approver snapshot. */
     public function canReadAsGeneralActor(LeaveRequest $leave, User $actor): bool
     {
-        if ($actor->hasPermission('cuti.read_all') || $actor->employee_id === $leave->employee_id) {
+        if ($actor->hasPermission('cuti.read_all')) {
+            return true;
+        }
+
+        if ($actor->hasPermission('cuti.read_own')
+            && $actor->employee_id !== null
+            && $actor->employee_id === $leave->employee_id) {
             return true;
         }
 

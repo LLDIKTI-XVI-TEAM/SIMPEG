@@ -109,14 +109,14 @@ class LeaveUsageCutoverTest extends TestCase
         $this->assertDatabaseMissing('permissions', ['name' => 'cuti.balance.adjust']);
     }
 
-    public function test_halaman_administrasi_saldo_menerima_exact_admin_dengan_salah_satu_permission_workspace(): void
+    public function test_halaman_administrasi_saldo_menerima_role_berhak_dengan_salah_satu_permission_workspace(): void
     {
         $this->get('/cuti/administrasi-saldo')->assertRedirect(route('login'));
 
         $reconcilePermission = Permission::query()->where('name', 'cuti.balance.reconcile')->sole();
         $manualPermission = Permission::query()->where('name', 'cuti.manual.manage')->sole();
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['kepala_bagian', 'pegawai'] as $role) {
             Role::query()->where('name', $role)->sole()->permissions()->syncWithoutDetaching([
                 $reconcilePermission->id,
                 $manualPermission->id,
@@ -125,6 +125,21 @@ class LeaveUsageCutoverTest extends TestCase
                 ->get('/cuti/administrasi-saldo')
                 ->assertForbidden();
         }
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get('/cuti/administrasi-saldo')
+            ->assertOk()
+            ->assertViewIs('admin.cuti.administrasi-saldo');
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get('/cuti/administrasi-saldo')
+            ->assertForbidden();
+
+        Role::query()->where('name', 'pimpinan')->sole()->permissions()->syncWithoutDetaching([$manualPermission->id]);
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get('/cuti/administrasi-saldo')
+            ->assertOk()
+            ->assertViewIs('admin.cuti.administrasi-saldo');
 
         $adminRole = Role::query()->where('name', 'admin_kepegawaian')->sole();
         $adminRole->permissions()->detach([$reconcilePermission->id, $manualPermission->id]);
@@ -184,7 +199,7 @@ class LeaveUsageCutoverTest extends TestCase
 
         $permission = Permission::query()->where('name', 'cuti.balance.reconcile')->sole();
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             Role::query()->where('name', $role)->sole()->permissions()->syncWithoutDetaching([$permission->id]);
             $actor = User::factory()->create(['role' => $role]);
 
@@ -229,12 +244,12 @@ class LeaveUsageCutoverTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_action_rekonsiliasi_langsung_memakai_exact_role_permission_sebelum_lookup_dan_storage(): void
+    public function test_action_rekonsiliasi_langsung_memakai_role_permission_sebelum_lookup_dan_storage(): void
     {
         $unknown = (string) Str::uuid();
         $permission = Permission::query()->where('name', 'cuti.balance.reconcile')->sole();
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             Role::query()->where('name', $role)->sole()->permissions()->syncWithoutDetaching([$permission->id]);
             $this->assertReconciliationActionsReject(User::factory()->create(['role' => $role]), $unknown, $role);
         }
@@ -943,7 +958,7 @@ class LeaveUsageCutoverTest extends TestCase
             ->assertDontSee('Koreksi Administratif');
     }
 
-    public function test_sidebar_administrasi_pemakaian_selalu_terlihat_karena_akses_ditegakkan_di_halaman(): void
+    public function test_sidebar_administrasi_pemakaian_hanya_terlihat_saat_permission_tersedia(): void
     {
         $reconcilePermission = Permission::query()->where('name', 'cuti.balance.reconcile')->sole();
         $manualPermission = Permission::query()->where('name', 'cuti.manual.manage')->sole();
@@ -955,7 +970,7 @@ class LeaveUsageCutoverTest extends TestCase
             $manualPermission->id,
         ]);
 
-        // Menu universal: semua role melihat item menu meskipun tanpa permission.
+        // Menu hanya ditampilkan saat role efektif memiliki salah satu permission workspace.
         // Otorisasi ditegakkan di halaman (403 → "Tidak Mendapatkan Akses").
         $this->actingAs(User::factory()->superAdmin()->create())
             ->get(route('dashboard'))
@@ -967,8 +982,8 @@ class LeaveUsageCutoverTest extends TestCase
         $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Administrasi Pemakaian Cuti')
-            ->assertSee('href="'.$administrationUrl.'"', false);
+            ->assertDontSee('Administrasi Pemakaian Cuti')
+            ->assertDontSee('href="'.$administrationUrl.'"', false);
 
         $adminRole->permissions()->attach($manualPermission);
         $this->actingAs(User::factory()->adminKepegawaian()->create())
@@ -986,7 +1001,7 @@ class LeaveUsageCutoverTest extends TestCase
             ->assertSee('href="'.$administrationUrl.'"', false);
     }
 
-    public function test_tautan_administrasi_saldo_di_rekap_hanya_terlihat_untuk_exact_admin_dengan_salah_satu_permission_workspace(): void
+    public function test_tautan_administrasi_saldo_di_rekap_mengikuti_permission_dan_role_yang_berhak(): void
     {
         $employee = Employee::factory()->create();
         LeaveBalance::query()->create([
@@ -1013,7 +1028,7 @@ class LeaveUsageCutoverTest extends TestCase
         $this->actingAs(User::factory()->superAdmin()->create())
             ->get(route('cuti.rekap'))
             ->assertOk()
-            ->assertDontSee($administrationUrl);
+            ->assertSee($administrationUrl);
 
         $pimpinanRole->permissions()->syncWithoutDetaching([
             $reconcilePermission->id,
@@ -1022,7 +1037,7 @@ class LeaveUsageCutoverTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'pimpinan']))
             ->get(route('cuti.rekap'))
             ->assertOk()
-            ->assertDontSee($administrationUrl);
+            ->assertSee($administrationUrl);
 
         $adminRole->permissions()->detach([$reconcilePermission->id, $manualPermission->id]);
         $this->actingAs(User::factory()->adminKepegawaian()->create())

@@ -2,17 +2,22 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Memvalidasi backfill chain approval cuti dari konfigurasi legacy.
- * Operasi ini mass-update konfigurasi pegawai, jadi harus punya alasan audit dan permission khusus chain.
+ * Operasi ini mass-update konfigurasi pegawai, jadi harus punya alasan audit dan permission cuti.configure.
  */
 class BackfillApprovalChainsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('cuti.configure_chain');
+        $actor = $this->user();
+
+        return $actor !== null
+            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.configure', (string) $actor->getEffectiveRole())
+            && $actor->hasPermission('cuti.configure');
     }
 
     /** @return array<string, list<string>> */

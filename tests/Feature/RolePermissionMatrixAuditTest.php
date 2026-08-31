@@ -143,6 +143,30 @@ class RolePermissionMatrixAuditTest extends TestCase
         ]);
     }
 
+    public function test_matriks_memaksa_batas_penugasan_permission_cuti(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $pimpinan = Role::query()->where('name', 'pimpinan')->firstOrFail();
+        $pegawai = Role::query()->where('name', 'pegawai')->firstOrFail();
+        $create = Permission::query()->where('name', 'cuti.create')->sole();
+        $manual = Permission::query()->where('name', 'cuti.manual.manage')->sole();
+        $proof = Permission::query()->where('name', 'cuti.proof.generate')->sole();
+        $readAll = Permission::query()->where('name', 'cuti.read_all')->sole();
+
+        $response = $this->actingAs($superAdmin)->post(route('rbac.update'), [
+            'matrix' => [
+                $pimpinan->id => array_merge($pimpinan->permissions->pluck('id')->all(), [$create->id, $manual->id]),
+                $pegawai->id => array_merge($pegawai->permissions->pluck('id')->all(), [$proof->id, $readAll->id]),
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertFalse($pimpinan->fresh()->permissions->contains('id', $create->id));
+        $this->assertTrue($pimpinan->fresh()->permissions->contains('id', $manual->id));
+        $this->assertTrue($pegawai->fresh()->permissions->contains('id', $proof->id));
+        $this->assertFalse($pegawai->fresh()->permissions->contains('id', $readAll->id));
+    }
+
     public function test_peran_tanpa_kewenangan_tidak_dapat_mengubah_hak_akses(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

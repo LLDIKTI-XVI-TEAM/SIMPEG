@@ -2,15 +2,20 @@
 
 namespace App\Http\Requests\Cuti;
 
+use App\Models\User;
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class ManualExternalApproverLookupRequest extends FormRequest
 {
-    /** Lookup penyetuju tetap dibatasi ke Admin Kepegawaian yang berhak mengelola fakta manual. */
+    /** Lookup penyetuju mengikuti penerima permission pemakaian manual yang sah. */
     public function authorize(): bool
     {
-        return $this->user()?->getEffectiveRole() === 'admin_kepegawaian'
-            && $this->user()?->hasPermission('cuti.manual.manage');
+        $actor = $this->user();
+
+        return $actor instanceof User
+            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.manual.manage', (string) $actor->getEffectiveRole())
+            && $actor->hasPermission('cuti.manual.manage');
     }
 
     /** @return array<string, list<string>> */

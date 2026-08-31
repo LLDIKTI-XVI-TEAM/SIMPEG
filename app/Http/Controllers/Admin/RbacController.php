@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Rbac\SaveRolePermissionMatrixRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -48,15 +49,11 @@ class RbacController extends Controller
             'cuti.read_own' => ['module' => 'cuti', 'description' => 'Melihat pengajuan cuti milik sendiri'],
             'cuti.read_all' => ['module' => 'cuti', 'description' => 'Melihat seluruh pengajuan cuti (monitor)'],
             'cuti.approve' => ['module' => 'cuti', 'description' => 'Mengambil keputusan approval cuti sesuai assignment aktif'],
-            'cuti.approve_stage1' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 1 (Atasan Langsung)'],
-            'cuti.approve_stage2' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 2 (Kabag Umum)'],
-            'cuti.approve_stage3' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 3 (Pimpinan/PYBMC)'],
             'cuti.configure' => ['module' => 'cuti', 'description' => 'Mengonfigurasi approval chain cuti'],
-            'cuti.configure_chain' => ['module' => 'cuti', 'description' => 'Mengonfigurasi rantai approval cuti per pegawai'],
             'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
             'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
-            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
+            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat ulang bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
             'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
             'ews.read' => ['module' => 'ews', 'description' => 'Melihat daftar EWS aktif seluruh pegawai'],
@@ -76,10 +73,20 @@ class RbacController extends Controller
         $roles = Role::with('permissions')->get();
         $permissions = Permission::all();
         $permissionsByModule = $permissions->groupBy('module');
+        $lockedPermissionIdsByRole = $roles->mapWithKeys(function (Role $role) use ($permissions): array {
+            $lockedPermissionIds = $permissions
+                ->filter(fn (Permission $permission): bool => ! CutiPermissionMatrixPolicy::isAssignableToRole($permission->name, $role->name))
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            return [$role->id => $lockedPermissionIds];
+        })->all();
 
         return view('admin.rbac.index', [
             'roles' => $roles,
             'permissionsByModule' => $permissionsByModule,
+            'lockedPermissionIdsByRole' => $lockedPermissionIdsByRole,
             'title' => 'Role & Permission / RBAC',
         ]);
     }

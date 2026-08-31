@@ -678,11 +678,11 @@ class SwitchRoleTest extends TestCase
     {
         $user = $this->createUserWithRole('super_admin');
 
-        // Super Admin biasa: tombol Ajukan Cuti Baru tidak tampil.
+        // Super Admin biasa memiliki hak pengajuan cuti.
         $this->actingAs($user)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertDontSee('Ajukan Cuti Baru');
+            ->assertSee('Ajukan Cuti Baru');
 
         // Simulasi pegawai: role efektif pegawai memenuhi syarat cuti.create,
         // tombol harus tampil meskipun role asli tetap super_admin.

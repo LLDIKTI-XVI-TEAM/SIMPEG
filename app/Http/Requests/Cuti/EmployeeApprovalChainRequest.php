@@ -4,6 +4,7 @@ namespace App\Http\Requests\Cuti;
 
 use App\Models\Employee;
 use App\Models\LeavePybmcGlobalConfig;
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,11 @@ class EmployeeApprovalChainRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('cuti.configure_chain');
+        $actor = $this->user();
+
+        return $actor !== null
+            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.configure', (string) $actor->getEffectiveRole())
+            && $actor->hasPermission('cuti.configure');
     }
 
     /**

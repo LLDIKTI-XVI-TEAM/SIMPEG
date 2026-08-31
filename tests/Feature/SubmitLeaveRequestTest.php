@@ -186,7 +186,6 @@ class SubmitLeaveRequestTest extends TestCase
     {
         return [
             'admin kepegawaian' => ['admin_kepegawaian'],
-            'pimpinan' => ['pimpinan'],
             'kepala bagian' => ['kepala_bagian'],
             'pegawai' => ['pegawai'],
         ];
@@ -222,14 +221,28 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
-    public function test_super_admin_tidak_bisa_membuka_form_atau_mengajukan_cuti(): void
+    public function test_super_admin_bisa_membuka_form_dan_mengajukan_cuti(): void
     {
-        $employee = Employee::factory()->create();
-        $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
+        $aktor = $this->makePemohon(role: 'super_admin');
         $jenis = $this->jenisCuti('Cuti Super Admin');
+        $this->reconcileAnnualProjection($aktor, 2026);
 
-        $this->actingAs($user)->get(route('cuti.create'))->assertForbidden();
-        $this->actingAs($user)->post(route(self::ROUTE), $this->payload($jenis))->assertForbidden();
+        $this->actingAs($aktor['user'])->get(route('cuti.create'))->assertOk();
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))
+            ->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+        ]);
+    }
+
+    public function test_pimpinan_tidak_dapat_membuka_form_atau_mengajukan_cuti(): void
+    {
+        $aktor = $this->makePemohon(role: 'pimpinan');
+        $jenis = $this->jenisCuti('Cuti Pimpinan');
+
+        $this->actingAs($aktor['user'])->get(route('cuti.create'))->assertForbidden();
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))->assertForbidden();
         $this->assertDatabaseCount('leave_requests', 0);
     }
 

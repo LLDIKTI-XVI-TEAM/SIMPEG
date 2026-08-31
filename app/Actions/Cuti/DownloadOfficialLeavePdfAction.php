@@ -35,7 +35,9 @@ class DownloadOfficialLeavePdfAction
             return false;
         }
 
-        if ($user->employee_id === $leaveRequest->employee_id) {
+        if ($user->hasPermission('cuti.read_own')
+            && $user->employee_id !== null
+            && $user->employee_id === $leaveRequest->employee_id) {
             return true;
         }
 

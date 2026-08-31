@@ -138,8 +138,14 @@
                 [
                     'group' => 'Cuti',
                     'items' => [
-                        // Semua role dapat akses Monitoring Cuti
-                        ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                        // Semua role defaultnya dapat membaca pengajuan sendiri.
+                        ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar',
+                         'permission' => 'cuti.read_own'],
+                        // Semua role dapat menjadi approver bila ditunjuk di approval chain aktif.
+                        ['label' => 'Antrean Persetujuan', 'route' => 'cuti.approval', 'icon' => 'check-badge'],
+                        // Semua role defaultnya dapat melihat saldo cuti sendiri.
+                        ['label' => 'Saldo Cuti Saya', 'route' => 'cuti.saldo', 'icon' => 'document-text',
+                         'permission' => 'cuti.balance.read'],
                         // Eksklusif pimpinan: tidak bisa diubah dari RBAC
                         ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge',
                          'roles' => ['pimpinan']],
@@ -149,9 +155,9 @@
                         // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text',
                          'permission' => 'cuti.read_all'],
-                        // Eksklusif admin_kepegawaian: tidak bisa diubah dari RBAC
+                        // Cukup memiliki salah satu permission mutasi saldo/manual.
                         ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal',
-                         'roles' => ['admin_kepegawaian']],
+                         'permissions_any' => ['cuti.balance.reconcile', 'cuti.manual.manage']],
                         // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down',
                          'permission' => 'cuti.read_all'],
@@ -231,6 +237,14 @@
                                 // Cek permission dari matriks RBAC database. Jika belum diberi izin, tampilkan sebagai disabled.
                                 if ($activeRole === 'super_admin') {
                                     $permissionAllowed = true;
+                                } elseif (isset($menu['permissions_any'])) {
+                                    $permissionAllowed = false;
+                                    foreach ($menu['permissions_any'] as $permission) {
+                                        if (isset($rolePermissions[$permission])) {
+                                            $permissionAllowed = true;
+                                            break;
+                                        }
+                                    }
                                 } else {
                                     $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
                                 }

@@ -12,9 +12,9 @@ class RbacSeeder extends Seeder
     {
         // Daftar role aplikasi sesuai permission matrix SIMPEG.
         $roles = [
-            'super_admin' => 'Super Admin — akses administrasi penuh selain pengajuan cuti pribadi',
+            'super_admin' => 'Super Admin — akses administrasi penuh dan fitur cuti pegawai',
             'admin_kepegawaian' => 'Admin Kepegawaian — kelola data pegawai, pantau cuti, dan ajukan cuti sendiri',
-            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, dan pengajuan cuti sendiri',
+            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, tanpa pengajuan cuti pribadi',
             'kepala_bagian' => 'Kepala Bagian — approval cuti bawahan dan pengajuan cuti sendiri',
             'pegawai' => 'Pegawai — read-only data sendiri, ajukan cuti, lihat notifikasi',
         ];
@@ -49,20 +49,17 @@ class RbacSeeder extends Seeder
             'notifications.read' => ['module' => 'notifications', 'description' => 'Melihat notifikasi milik sendiri'],
             'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],
             'users.switch_role' => ['module' => 'users', 'description' => 'Melakukan simulasi beralih ke role yang lebih rendah untuk demo/testing/support'],
-            // Permission cuti menjadi gerbang kasar route/menu; otorisasi inti per pengajuan tetap berbasis approver terkonfigurasi.
+            // Permission cuti menjadi gerbang halaman/fitur; otorisasi keputusan tetap berbasis
+            // approver yang tercatat pada approval chain aktif, bukan permission per stage.
             'cuti.create' => ['module' => 'cuti', 'description' => 'Mengajukan permohonan cuti'],
             'cuti.read_own' => ['module' => 'cuti', 'description' => 'Melihat pengajuan cuti milik sendiri'],
             'cuti.read_all' => ['module' => 'cuti', 'description' => 'Melihat seluruh pengajuan cuti (monitor)'],
             'cuti.approve' => ['module' => 'cuti', 'description' => 'Mengambil keputusan approval cuti sesuai assignment aktif'],
-            'cuti.approve_stage1' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 1 (Atasan Langsung)'],
-            'cuti.approve_stage2' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 2 (Kabag Umum)'],
-            'cuti.approve_stage3' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 3 (Pimpinan/PYBMC)'],
             'cuti.configure' => ['module' => 'cuti', 'description' => 'Mengonfigurasi approval chain cuti'],
-            'cuti.configure_chain' => ['module' => 'cuti', 'description' => 'Mengonfigurasi rantai approval cuti per pegawai'],
             'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
             'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
-            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
+            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat ulang bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
             'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
             'ews.read' => ['module' => 'ews', 'description' => 'Melihat daftar EWS aktif seluruh pegawai'],
@@ -81,16 +78,10 @@ class RbacSeeder extends Seeder
         }
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
-        // hari_libur tetap khusus super_admin; pimpinan/atasan/pegawai belum punya akses route admin.
-        // Catatan cuti: cuti.approve_stage2 (Kabag Umum) belum dipetakan ke role dasar karena approver stage 2
-        // bersifat person-based via approval_configs; pemetaan role penampungnya menunggu konfirmasi dan ditegakkan
-        // di approval engine. cuti.configure dibatasi khusus super_admin.
+        // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
+        // pada chain aktif. Pimpinan sengaja tidak menerima hak pengajuan cuti.
         $this->syncRolePermissions([
-            'super_admin' => array_values(array_diff(array_keys($permissions), [
-                'cuti.create',
-                'cuti.balance.reconcile',
-                'cuti.manual.manage',
-            ])),
+            'super_admin' => array_keys($permissions),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
@@ -119,12 +110,16 @@ class RbacSeeder extends Seeder
                 // Admin kepegawaian dapat melihat dokumen & SK pegawai dan memantau EWS aktif
                 'dokumen_sk.read',
                 'ews.read',
-                // Admin kepegawaian dapat mengajukan cuti sendiri dan memonitor seluruh pengajuan tanpa menyetujui.
+                // Admin kepegawaian dapat mengajukan, memantau, mengelola konfigurasi, dan administrasi cuti.
                 'cuti.create',
+                'cuti.read_own',
                 'cuti.read_all',
+                'cuti.approve',
+                'cuti.configure',
                 'cuti.balance.read',
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
+                'cuti.proof.generate',
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [
@@ -137,26 +132,33 @@ class RbacSeeder extends Seeder
                 'ews.read',
                 'notifications.read',
                 'notifications.update',
-                // Role pimpinan dapat mengajukan cuti sendiri bila bukan pegawai bertanda Kepala Lembaga.
-                'cuti.create',
+                // Pimpinan dapat memantau dan mengatur chain, tetapi tidak mengajukan cuti sendiri.
+                'cuti.read_own',
                 'cuti.approve',
-                'cuti.approve_stage3',
                 'cuti.read_all',
+                'cuti.configure',
+                'cuti.balance.read',
             ],
             'kepala_bagian' => [
                 'notifications.read',
                 'notifications.update',
-                // Kepala bagian dapat mengajukan cuti sendiri sekaligus memegang approval stage 1 bawahan.
+                // Kepala Bagian dapat mengajukan cuti, memantau, dan mengatur chain.
                 'cuti.create',
+                'cuti.read_own',
                 'cuti.approve',
-                'cuti.approve_stage1',
+                'cuti.read_all',
+                'cuti.configure',
+                'cuti.balance.read',
             ],
             'pegawai' => [
                 'employees.read_self',
                 'notifications.read',
                 'notifications.update',
-                // Pegawai dapat membuat pengajuan cuti miliknya sendiri.
+                // Pegawai dapat membuat serta membaca pengajuan/saldo miliknya sendiri.
                 'cuti.create',
+                'cuti.read_own',
+                'cuti.approve',
+                'cuti.balance.read',
                 // Profil mandiri hanya memberi akses baca; mutasi tetap melalui admin kepegawaian.
                 'employee_families.read',
                 'employee_histories.read',

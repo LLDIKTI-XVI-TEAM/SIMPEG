@@ -64,12 +64,15 @@ class BuildCutiDetailAction
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
         $canReadAll = $user->hasPermission('cuti.read_all');
+        $canReadOwn = $user->hasPermission('cuti.read_own')
+            && $user->employee_id !== null
+            && $cuti->employee_id === $user->employee_id;
 
         // Snapshot approver lama tetap boleh membaca pengajuan untuk kebutuhan audit,
         // tetapi tidak memperoleh izin bertindak setelah tahapnya selesai.
         abort_if(
             ! $canReadAll
-            && $cuti->employee_id !== $user->employee_id
+            && ! $canReadOwn
             && ! $isAnySnapshotApprover
             && ! $canDownloadFormulir,
             403,

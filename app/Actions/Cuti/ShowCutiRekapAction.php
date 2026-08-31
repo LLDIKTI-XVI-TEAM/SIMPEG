@@ -6,13 +6,12 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\User;
 use App\Queries\Cuti\CutiRekapQuery;
-use App\Services\Rbac\UiPermissionCapabilityService;
+use App\Support\Rbac\CutiPermissionMatrixPolicy;
 
 class ShowCutiRekapAction
 {
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
-        private readonly UiPermissionCapabilityService $capabilities,
     ) {}
 
     /**
@@ -45,9 +44,12 @@ class ShowCutiRekapAction
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
         $unitOptions = $this->rekapQuery->unitOptions($unit);
         $jenisOptions = $this->rekapQuery->leaveTypeOptions($jenisId);
-        $canAdministerBalance = $actor?->getEffectiveRole() === 'admin_kepegawaian'
-            && ($this->capabilities->allows($actor, 'cuti.balance.reconcile')
-                || $this->capabilities->allows($actor, 'cuti.manual.manage'));
+        $canAdministerBalance = $actor !== null && (
+            (CutiPermissionMatrixPolicy::isAssignableToRole('cuti.balance.reconcile', (string) $actor->getEffectiveRole())
+                && $actor->hasPermission('cuti.balance.reconcile'))
+            || (CutiPermissionMatrixPolicy::isAssignableToRole('cuti.manual.manage', (string) $actor->getEffectiveRole())
+                && $actor->hasPermission('cuti.manual.manage'))
+        );
 
         return compact(
             'summary', 'leaveBalances', 'usageRows',

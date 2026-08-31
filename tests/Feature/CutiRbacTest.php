@@ -33,11 +33,7 @@ class CutiRbacTest extends TestCase
         'cuti.read_own',
         'cuti.read_all',
         'cuti.approve',
-        'cuti.approve_stage1',
-        'cuti.approve_stage2',
-        'cuti.approve_stage3',
         'cuti.configure',
-        'cuti.configure_chain',
         'cuti.balance.read',
         'cuti.balance.reconcile',
         'cuti.manual.manage',
@@ -59,6 +55,13 @@ class CutiRbacTest extends TestCase
                 'name' => $permission,
                 'module' => 'cuti',
             ]);
+        }
+    }
+
+    public function test_permission_stage_dan_configure_chain_tidak_terdaftar_di_rbac(): void
+    {
+        foreach (['cuti.approve_stage1', 'cuti.approve_stage2', 'cuti.approve_stage3', 'cuti.configure_chain'] as $permission) {
+            $this->assertDatabaseMissing('permissions', ['name' => $permission]);
         }
     }
 
@@ -85,40 +88,57 @@ class CutiRbacTest extends TestCase
         ]);
     }
 
-    public function test_super_admin_tidak_mewarisi_permission_mutasi_khusus_admin_kepegawaian(): void
+    public function test_super_admin_memiliki_semua_permission_cuti(): void
     {
         $user = User::factory()->superAdmin()->create();
-        $excluded = ['cuti.create', 'cuti.balance.reconcile', 'cuti.manual.manage'];
 
         foreach (self::CUTI_PERMISSIONS as $permission) {
-            $this->assertSame(
-                ! in_array($permission, $excluded, true),
-                $user->hasPermission($permission),
-                "mapping cuti super_admin tidak sesuai untuk {$permission}",
-            );
+            $this->assertTrue($user->hasPermission($permission), "Super Admin harus memiliki {$permission}");
         }
     }
 
-    public function test_permission_rekonsiliasi_dan_manual_hanya_dipetakan_ke_admin_kepegawaian(): void
+    public function test_permission_manual_didefaultkan_ke_super_admin_dan_admin_kepegawaian(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $superAdmin = User::factory()->superAdmin()->create();
+        $pimpinan = User::factory()->pimpinan()->create();
         $adminRole = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
         $superAdminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $pimpinanRole = Role::query()->where('name', 'pimpinan')->firstOrFail();
+        $permission = Permission::query()->where('name', 'cuti.manual.manage')->firstOrFail();
 
-        foreach (['cuti.balance.reconcile', 'cuti.manual.manage'] as $permissionName) {
-            $permission = Permission::query()->where('name', $permissionName)->firstOrFail();
+        $this->assertTrue($admin->hasPermission('cuti.manual.manage'));
+        $this->assertTrue($superAdmin->hasPermission('cuti.manual.manage'));
+        $this->assertFalse($pimpinan->hasPermission('cuti.manual.manage'));
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $adminRole->id, 'permission_id' => $permission->id]);
+        $this->assertDatabaseHas('role_permissions', ['role_id' => $superAdminRole->id, 'permission_id' => $permission->id]);
+        $this->assertDatabaseMissing('role_permissions', ['role_id' => $pimpinanRole->id, 'permission_id' => $permission->id]);
+    }
 
-            $this->assertTrue($admin->hasPermission($permissionName));
-            $this->assertFalse($superAdmin->hasPermission($permissionName));
-            $this->assertDatabaseHas('role_permissions', [
-                'role_id' => $adminRole->id,
-                'permission_id' => $permission->id,
-            ]);
-            $this->assertDatabaseMissing('role_permissions', [
-                'role_id' => $superAdminRole->id,
-                'permission_id' => $permission->id,
-            ]);
+    public function test_bukti_cuti_default_super_admin_dan_admin_namun_dapat_diberikan_ke_role_lain(): void
+    {
+        $proof = Permission::query()->where('name', 'cuti.proof.generate')->firstOrFail();
+        $admin = User::factory()->adminKepegawaian()->create();
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $this->assertTrue($admin->hasPermission('cuti.proof.generate'));
+        $this->assertTrue($superAdmin->hasPermission('cuti.proof.generate'));
+
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $roleName) {
+            $role = Role::query()->where('name', $roleName)->firstOrFail();
+            $user = User::factory()->state(['role' => $roleName])->create();
+            $this->assertFalse($user->hasPermission('cuti.proof.generate'));
+
+            $role->permissions()->syncWithoutDetaching([$proof->id]);
+            $this->assertTrue($user->fresh()->hasPermission('cuti.proof.generate'));
+        }
+    }
+
+    public function test_semua_role_default_dapat_melihat_saldo_cuti_sendiri(): void
+    {
+        foreach (['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+            $user = User::factory()->state(['role' => $role])->create();
+            $this->assertTrue($user->hasPermission('cuti.balance.read'), "role {$role} harus memiliki cuti.balance.read");
         }
     }
 
@@ -126,7 +146,6 @@ class CutiRbacTest extends TestCase
     {
         return [
             'admin kepegawaian' => ['admin_kepegawaian'],
-            'pimpinan' => ['pimpinan'],
             'kepala bagian' => ['kepala_bagian'],
             'pegawai' => ['pegawai'],
         ];
@@ -140,19 +159,14 @@ class CutiRbacTest extends TestCase
         $this->assertTrue($user->hasPermission('cuti.create'), "role {$role} harus memiliki cuti.create");
     }
 
-    public function test_pegawai_bisa_ajukan_cuti_tetapi_tidak_bisa_approve_atau_konfigurasi(): void
+    public function test_pegawai_mendapat_akses_pengajuan_pembacaan_sendiri_dan_saldo(): void
     {
         $user = User::factory()->pegawai()->create();
 
-        // Pegawai sebagai pemohon cuti hanya boleh membuat pengajuan.
         $this->assertTrue($user->hasPermission('cuti.create'));
-
-        // Pegawai tidak boleh menyetujui pengajuan pada stage manapun.
-        $this->assertFalse($user->hasPermission('cuti.approve_stage1'));
-        $this->assertFalse($user->hasPermission('cuti.approve_stage2'));
-        $this->assertFalse($user->hasPermission('cuti.approve_stage3'));
-
-        // Pegawai tidak boleh melihat seluruh pengajuan maupun mengonfigurasi approval chain.
+        $this->assertTrue($user->hasPermission('cuti.read_own'));
+        $this->assertTrue($user->hasPermission('cuti.balance.read'));
+        $this->assertTrue($user->hasPermission('cuti.approve'));
         $this->assertFalse($user->hasPermission('cuti.read_all'));
         $this->assertFalse($user->hasPermission('cuti.configure'));
     }
@@ -257,56 +271,44 @@ class CutiRbacTest extends TestCase
         $response->assertSee('Setujui');
     }
 
-    public function test_kepala_bagian_hanya_bisa_approve_stage1(): void
+    public function test_kepala_bagian_mendapat_default_pengajuan_monitoring_konfigurasi_dan_saldo(): void
     {
         $user = User::factory()->kepalaBagian()->create();
 
-        // Kepala bagian memegang gerbang stage 1 (mengetahui pengajuan bawahan).
-        $this->assertTrue($user->hasPermission('cuti.approve_stage1'));
-
-        // Atasan langsung bukan approver stage 2/3 dan tidak mengonfigurasi approval chain.
-        $this->assertFalse($user->hasPermission('cuti.approve_stage2'));
-        $this->assertFalse($user->hasPermission('cuti.approve_stage3'));
-        $this->assertFalse($user->hasPermission('cuti.configure'));
+        foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read'] as $permission) {
+            $this->assertTrue($user->hasPermission($permission), "Kepala Bagian harus memiliki {$permission}");
+        }
     }
 
-    public function test_pimpinan_bisa_approve_stage3_dan_lihat_semua_cuti(): void
+    public function test_pimpinan_tidak_dapat_mengajukan_tetapi_bisa_monitor_konfigurasi_dan_melihat_saldo(): void
     {
         $user = User::factory()->pimpinan()->create();
 
-        // Pimpinan (Kepala Lembaga/PYBMC) adalah approver final dan dapat memonitor seluruh pengajuan.
-        $this->assertTrue($user->hasPermission('cuti.approve_stage3'));
-        $this->assertTrue($user->hasPermission('cuti.read_all'));
-
-        // Pimpinan bukan approver stage 1 dan tidak mengonfigurasi approval chain (khusus super admin).
-        $this->assertFalse($user->hasPermission('cuti.approve_stage1'));
-        $this->assertFalse($user->hasPermission('cuti.configure'));
+        $this->assertFalse($user->hasPermission('cuti.create'));
+        foreach (['cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read'] as $permission) {
+            $this->assertTrue($user->hasPermission($permission), "Pimpinan harus memiliki {$permission}");
+        }
     }
 
-    public function test_admin_kepegawaian_hanya_monitor_tidak_bisa_approve(): void
+    public function test_admin_kepegawaian_memiliki_default_bukti_dan_administrasi_cuti(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
-        // Admin kepegawaian memonitor seluruh pengajuan (read-only), bukan pelaku approval.
-        $this->assertTrue($user->hasPermission('cuti.read_all'));
-
-        $this->assertFalse($user->hasPermission('cuti.approve_stage1'));
-        $this->assertFalse($user->hasPermission('cuti.approve_stage2'));
-        $this->assertFalse($user->hasPermission('cuti.approve_stage3'));
+        foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read', 'cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.proof.generate'] as $permission) {
+            $this->assertTrue($user->hasPermission($permission), "Admin Kepegawaian harus memiliki {$permission}");
+        }
     }
 
-    public function test_konfigurasi_approval_hanya_untuk_super_admin(): void
+    public function test_konfigurasi_approval_tersedia_untuk_semua_role_kecuali_pegawai(): void
     {
-        // Konfigurasi approval chain dibatasi khusus super admin.
-        $superAdmin = User::factory()->superAdmin()->create();
-        $this->assertTrue($superAdmin->hasPermission('cuti.configure'));
-
-        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian'] as $role) {
             $user = User::factory()->state(['role' => $role])->create();
-            $this->assertFalse(
+            $this->assertTrue(
                 $user->hasPermission('cuti.configure'),
-                "role {$role} tidak boleh memiliki cuti.configure",
+                "role {$role} harus memiliki cuti.configure",
             );
         }
+
+        $this->assertFalse(User::factory()->pegawai()->create()->hasPermission('cuti.configure'));
     }
 }
