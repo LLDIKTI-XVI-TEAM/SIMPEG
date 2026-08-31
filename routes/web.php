@@ -728,13 +728,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
             Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
 
-            Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
-            Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])->name('laporan.kepangkatan.excel');
-            Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])->name('laporan.kepangkatan.pdf');
-
-            Route::get('/laporan/nominatif', [PimpinanReportController::class, 'fixedEmployeeReport'])->name('laporan.nominatif');
-            Route::get('/laporan/nominatif/excel', [PimpinanReportController::class, 'exportFixedEmployeeReportExcel'])->name('laporan.nominatif.excel');
-            Route::get('/laporan/nominatif/pdf', [PimpinanReportController::class, 'exportFixedEmployeeReportPdf'])->name('laporan.nominatif.pdf');
+            Route::get('/laporan/kepangkatan', fn () => redirect()->route('laporan.kepangkatan'))->name('laporan.kepangkatan.redirect');
+            Route::get('/laporan/nominatif', fn () => redirect()->route('laporan.pegawai'))->name('laporan.nominatif');
             Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
         });
 

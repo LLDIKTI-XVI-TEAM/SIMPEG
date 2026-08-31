@@ -21,6 +21,11 @@ class EnsurePermission
             abort(403, 'Anda tidak memiliki hak akses untuk fitur ini.');
         }
 
+        // Super Admin memiliki akses penuh ke seluruh permission sistem
+        if ($user->getEffectiveRole() === 'super_admin') {
+            return $next($request);
+        }
+
         // Cukup satu permission cocok agar route mendukung beberapa role/permission alternatif.
         foreach ($permissions as $permission) {
             if ($user->hasPermission($permission)) {

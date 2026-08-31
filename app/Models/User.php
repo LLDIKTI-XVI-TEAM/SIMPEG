@@ -139,6 +139,10 @@ class User extends Authenticatable
             return false;
         }
 
+        if ($effectiveRole === 'super_admin') {
+            return true;
+        }
+
         return Role::query()
             ->where('name', $effectiveRole)
             ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
