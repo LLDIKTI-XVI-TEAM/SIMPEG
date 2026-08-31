@@ -32,6 +32,7 @@ class RbacSeeder extends Seeder
             'employee_histories.create' => ['module' => 'employee_histories', 'description' => 'Membuat entri riwayat pegawai'],
             'employee_histories.update' => ['module' => 'employee_histories', 'description' => 'Memperbarui riwayat pegawai'],
             'employee_histories.delete' => ['module' => 'employee_histories', 'description' => 'Menghapus riwayat pegawai'],
+            'employee_histories.export' => ['module' => 'employee_histories', 'description' => 'Melihat dan mengunduh Laporan Riwayat Kepangkatan pegawai'],
             'discipline_records.read' => ['module' => 'discipline_records', 'description' => 'Melihat riwayat hukuman disiplin'],
             'discipline_records.create' => ['module' => 'discipline_records', 'description' => 'Membuat riwayat hukuman disiplin'],
             'employee_families.read' => ['module' => 'employee_families', 'description' => 'Melihat data keluarga pegawai'],
@@ -104,6 +105,7 @@ class RbacSeeder extends Seeder
                 'employee_histories.create',
                 'employee_histories.update',
                 'employee_histories.delete',
+                'employee_histories.export',
                 'discipline_records.read',
                 'discipline_records.create',
                 'employee_families.read',
@@ -127,7 +129,8 @@ class RbacSeeder extends Seeder
             ],
             'pimpinan' => [
                 'employees.read',
-                // Pimpinan dapat melihat dokumen & SK dan memantau EWS aktif
+                // Pimpinan dapat melihat riwayat kepangkatan, dokumen & SK, dan memantau EWS aktif
+                'employee_histories.export',
                 'dokumen_sk.read',
                 'ews.read',
                 'notifications.read',

@@ -35,6 +35,9 @@ class EmployeeExportDataService
 
         $bup = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
 
+        $user = auth()->user();
+        $isKabag = $user && method_exists($user, 'getEffectiveRole') && $user->getEffectiveRole() === 'kepala_bagian';
+
         $employees = Employee::query()
             ->select([
                 'id',
@@ -58,6 +61,19 @@ class EmployeeExportDataService
                     ->where('is_latest', true)
                     ->orderByDesc('tmt_jabatan'),
             ])
+            ->when($isKabag, function (Builder $query) use ($user): void {
+                $reportIds = app(\App\Services\Employees\KepalaBagianScopeService::class)->directReportIds($user);
+                $kabagUnitId = $user->employee?->positionHistories()->where('is_latest', true)->value('unit_kerja_id');
+
+                $query->where(function (Builder $q) use ($reportIds, $kabagUnitId) {
+                    $q->whereIn('id', $reportIds);
+                    if ($kabagUnitId) {
+                        $q->orWhereHas('positionHistories', function (Builder $pos) use ($kabagUnitId) {
+                            $pos->where('is_latest', true)->where('unit_kerja_id', $kabagUnitId);
+                        });
+                    }
+                });
+            })
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query->whereRaw('LOWER(nama_lengkap) LIKE ?', ["%{$search}%"])
@@ -188,8 +204,26 @@ class EmployeeExportDataService
      */
     public function filterOptions(): array
     {
+        $user = auth()->user();
+        $isKabag = $user && method_exists($user, 'getEffectiveRole') && $user->getEffectiveRole() === 'kepala_bagian';
+
+        $unitsQuery = RefUnitKerja::query()->orderBy('nama');
+        if ($isKabag) {
+            $reportIds = app(\App\Services\Employees\KepalaBagianScopeService::class)->directReportIds($user);
+            $unitIds = \App\Models\PositionHistory::query()
+                ->where('is_latest', true)
+                ->whereIn('employee_id', $reportIds)
+                ->whereNotNull('unit_kerja_id')
+                ->pluck('unit_kerja_id');
+            $kabagUnitId = $user->employee?->positionHistories()->where('is_latest', true)->value('unit_kerja_id');
+            if ($kabagUnitId) {
+                $unitIds->push($kabagUnitId);
+            }
+            $unitsQuery->whereIn('id', $unitIds->unique()->all());
+        }
+
         return [
-            'units' => RefUnitKerja::query()->orderBy('nama')->pluck('nama')->all(),
+            'units' => $unitsQuery->pluck('nama')->all(),
             'golongan' => RefGolongan::query()->orderBy('urutan')->pluck('kode')->all(),
             'jenis' => RefJenisPegawai::query()->orderBy('nama')->pluck('nama')->all(),
             'status' => RefStatusPegawai::query()->orderBy('nama')->pluck('nama')->all(),

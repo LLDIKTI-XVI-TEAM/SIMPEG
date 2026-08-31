@@ -26,16 +26,9 @@ class ExportPegawaiRequest extends FormRequest
         'tanggal_pensiun' => 'Tgl. Pensiun',
     ];
 
-    /** @var list<string> */
-    protected const REPORTING_ROLES = [
-        'super_admin',
-        'admin_kepegawaian',
-        'pimpinan',
-    ];
-
     public function authorize(): bool
     {
-        return in_array($this->user()?->role, self::REPORTING_ROLES, true);
+        return (bool) $this->user()?->hasPermission('employees.read');
     }
 
     /** @return array<string, list<string|Rule>> */

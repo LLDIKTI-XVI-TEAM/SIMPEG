@@ -24,6 +24,7 @@ $permissionPaths = [
     'dokumen_sk.read'         => 'Dokumen & SK (Lihat)',
     'ews.read'                => 'EWS Aktif (Lihat)',
     'ews.configure'           => 'Konfigurasi EWS',
+    'employee_histories.export' => 'Laporan Riwayat Kepangkatan',
 ];
 
 $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $moduleName) use ($permissionPaths) {

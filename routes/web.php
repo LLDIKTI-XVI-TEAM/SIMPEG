@@ -392,6 +392,18 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
         ->middleware(['permission:employees.read'])
         ->name('laporan.pegawai.custom');
+
+    Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])
+        ->middleware(['permission:employee_histories.export'])
+        ->name('laporan.kepangkatan');
+
+    Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])
+        ->middleware(['permission:employee_histories.export'])
+        ->name('laporan.kepangkatan.excel');
+
+    Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])
+        ->middleware(['permission:employee_histories.export'])
+        ->name('laporan.kepangkatan.pdf');
     Route::get('/pegawai', Index::class)
         ->middleware(['permission:employees.read'])
         ->name('data-pegawai');

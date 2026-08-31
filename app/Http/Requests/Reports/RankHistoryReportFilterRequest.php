@@ -8,7 +8,7 @@ class RankHistoryReportFilterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->getEffectiveRole() === 'pimpinan';
+        return (bool) $this->user()?->hasPermission('employee_histories.export');
     }
 
     public function rules(): array

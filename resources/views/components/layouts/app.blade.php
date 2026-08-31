@@ -130,12 +130,9 @@
                         // RBAC: dikontrol dari Role & Permission admin (employees.read)
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
                          'permission' => 'employees.read'],
-                        // Eksklusif pimpinan: tidak bisa diubah dari RBAC
-                        ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text',
-                         'roles' => ['pimpinan']],
-                        // Eksklusif pimpinan: tidak bisa diubah dari RBAC
-                        ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar',
-                         'roles' => ['pimpinan']],
+                        // RBAC: dikontrol dari Role & Permission admin (employee_histories.export)
+                        ['label' => 'Riwayat Kepangkatan', 'route' => 'laporan.kepangkatan', 'icon' => 'document-chart-bar',
+                         'permission' => 'employee_histories.export'],
                     ]
                 ],
                 [
