@@ -7,10 +7,10 @@ use Illuminate\Validation\Rule;
 
 class StoreJabatanRequest extends FormRequest
 {
-    /** Pengelolaan referensi jabatan dibatasi Super Admin, sejalan dengan gate data master. */
+    /** Pengelolaan referensi jabatan mengikuti permission Data Master. */
     public function authorize(): bool
     {
-        return $this->user()?->role === 'super_admin';
+        return (bool) $this->user()?->hasPermission('reference_tables.manage');
     }
 
     /**

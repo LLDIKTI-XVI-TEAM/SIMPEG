@@ -198,9 +198,9 @@
                         // Eksklusif super_admin
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key',
                          'roles' => ['super_admin']],
-                        // Eksklusif super_admin
+                        // Dikontrol dari Role & Permission (reference_tables.manage)
                         ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells',
-                         'roles' => ['super_admin']],
+                         'permission' => 'reference_tables.manage'],
                         // RBAC: dikontrol dari Role & Permission admin (hari_libur.read)
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days',
                          'permission' => 'hari_libur.read'],

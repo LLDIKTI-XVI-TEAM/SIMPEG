@@ -674,17 +674,19 @@
 
             </div>
 
-            {{-- SUPER ADMIN SHORTCUTS CARD (BOTTOM) --}}
-            @if(auth()->user()->getEffectiveRole() === 'super_admin')
+            {{-- Shortcut Data Master mengikuti permission; shortcut sistem lain tetap Super Admin. --}}
+            @php($canManageReferenceTables = auth()->user()->hasPermission('reference_tables.manage'))
+            @if($canManageReferenceTables || auth()->user()->getEffectiveRole() === 'super_admin')
             <div class="rounded-lg border border-border bg-surface p-6 shadow-sm mt-6">
             <div class="mb-6">
                 <h3 class="text-sm font-bold text-ink font-sans">
                     Aksi & Administrasi Sistem
                 </h3>
-                <p class="text-xs text-muted font-sans mt-0.5">Kelola pengguna, data master, dan audit sistem SIMPEG secara terpusat.</p>
+                <p class="text-xs text-muted font-sans mt-0.5">Kelola data master{{ auth()->user()->getEffectiveRole() === 'super_admin' ? ', pengguna, dan audit sistem' : '' }} SIMPEG secara terpusat.</p>
             </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    @if($canManageReferenceTables)
                     <a href="{{ route('data-master') }}" class="flex h-full items-start gap-4 p-5 rounded-xl border border-border bg-surface hover:border-primary hover:shadow-lg transition-all duration-300 group">
                         <div class="h-12 w-12 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -696,7 +698,9 @@
                             <p class="text-[11px] text-muted mt-1 leading-relaxed">Manajemen tabel master (Unit Kerja, Agama, Eselon, Golongan, dll).</p>
                         </div>
                     </a>
+                    @endif
 
+                    @if(auth()->user()->getEffectiveRole() === 'super_admin')
                     <a href="{{ route('user-management') }}" class="flex h-full items-start gap-4 p-5 rounded-xl border border-border bg-surface hover:border-primary hover:shadow-lg transition-all duration-300 group">
                         <div class="h-12 w-12 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -721,6 +725,7 @@
                             <p class="text-[11px] text-muted mt-1 leading-relaxed">Pusat pelacakan riwayat segala perubahan data yang terjadi pada sistem.</p>
                         </div>
                     </a>
+                    @endif
 
                 </div>
             </div>

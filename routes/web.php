@@ -206,28 +206,35 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('rbac.update');
 
     Route::get('/data-master', [DataMasterController::class, 'index'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:reference_tables.manage')
         ->name('data-master');
 
     // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
     // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
-    Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
-        Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
-            ->name('channel-notifikasi.index');
-        Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
-            ->name('channel-notifikasi.store');
-        Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
-        Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
-        Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
-        Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
-        Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
+    Route::prefix('data-master')->name('data-master.')->group(function (): void {
+        // Channel notifikasi adalah konfigurasi infrastruktur, bukan referensi
+        // kepegawaian; aksesnya tetap eksklusif untuk Super Admin.
+        Route::middleware('role:super_admin')->group(function (): void {
+            Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
+                ->name('channel-notifikasi.index');
+            Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
+                ->name('channel-notifikasi.store');
+            Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
+            Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
+            Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
+            Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
+            Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
+        });
 
-        Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
+        // Seluruh tabel referensi Data Master memakai satu permission yang
+        // dapat diberikan melalui matriks RBAC untuk setiap role.
+        Route::middleware('permission:reference_tables.manage')->group(function (): void {
+            Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
         Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
             ->whereUuid('eselon')->name('eselon.update');
         Route::post('/eselon/{eselon}/toggle-aktif', [DataMasterEselonController::class, 'toggle'])
@@ -243,14 +250,13 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         Route::post('/jenjang-pendidikan/{jenjang}/destroy', [DataMasterJenjangPendidikanController::class, 'destroy'])
             ->whereUuid('jenjang')->name('jenjang-pendidikan.destroy');
 
-        Route::post('/program-studi', [DataMasterProgramStudiController::class, 'store'])
-            ->middleware('permission:reference_tables.manage')->name('program-studi.store');
+        Route::post('/program-studi', [DataMasterProgramStudiController::class, 'store'])->name('program-studi.store');
         Route::post('/program-studi/{programStudi}/update', [DataMasterProgramStudiController::class, 'update'])
-            ->whereUuid('programStudi')->middleware('permission:reference_tables.manage')->name('program-studi.update');
+            ->whereUuid('programStudi')->name('program-studi.update');
         Route::post('/program-studi/{programStudi}/toggle-aktif', [DataMasterProgramStudiController::class, 'toggle'])
-            ->whereUuid('programStudi')->middleware('permission:reference_tables.manage')->name('program-studi.toggle');
+            ->whereUuid('programStudi')->name('program-studi.toggle');
         Route::post('/program-studi/{programStudi}/destroy', [DataMasterProgramStudiController::class, 'destroy'])
-            ->whereUuid('programStudi')->middleware('permission:reference_tables.manage')->name('program-studi.destroy');
+            ->whereUuid('programStudi')->name('program-studi.destroy');
 
         Route::post('/golongan', [DataMasterGolonganController::class, 'store'])->name('golongan.store');
         Route::post('/golongan/{golongan}/update', [DataMasterGolonganController::class, 'update'])
@@ -291,6 +297,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->whereUuid('statusPegawai')->name('status-pegawai.toggle');
         Route::post('/status-pegawai/{statusPegawai}/destroy', [DataMasterStatusPegawaiController::class, 'destroy'])
             ->whereUuid('statusPegawai')->name('status-pegawai.destroy');
+        });
     });
 
     Route::get('/cuti/rekap', [CutiController::class, 'rekap'])

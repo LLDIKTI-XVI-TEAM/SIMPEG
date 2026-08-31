@@ -3,6 +3,7 @@
 @php
 $permissionPaths = [
     'manage_reference_tables' => 'Data Master',
+    'reference_tables.manage' => 'Data Master',
     'configure_ews'           => 'Konfigurasi EWS',
     'manage_holidays'         => 'Hari Libur',
     'manage_user_mapping'     => 'User Management',
