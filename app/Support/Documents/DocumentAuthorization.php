@@ -21,17 +21,20 @@ class DocumentAuthorization
 
     public static function canViewArchive(?User $user): bool
     {
-        // Arsip dokumen berisi data pegawai lintas unit: selain role pengelola,
-        // akses baca tetap mensyaratkan izin employees.read agar pencabutan izin
-        // baca pegawai tidak meninggalkan celah akses ke arsip terpusat.
-        return self::hasManagerRole($user)
-            && $user->hasPermission('employees.read');
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermission('dokumen_sk.read') || $user->hasPermission('employees.read');
     }
 
     public static function canManage(?User $user): bool
     {
-        return self::hasManagerRole($user)
-            && $user->hasPermission('employees.update');
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermission('employees.update');
     }
 
     private static function hasManagerRole(?User $user): bool
