@@ -2546,24 +2546,31 @@
             {{-- Input File --}}
             <div class="space-y-1.5">
                 <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pilih Berkas SK <span class="text-danger">*</span></label>
-                <div class="flex items-center gap-2">
-                    <label for="upload_file_sk_input" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
-                        Pilih File
-                    </label>
-                    <input type="file"
-                           id="upload_file_sk_input"
-                           class="hidden"
+                <div class="border-2 border-dashed border-border rounded-lg p-5 bg-soft/50 text-center relative hover:border-primary transition">
+                    <input type="file" id="upload_file_sk_input"
                            accept=".pdf,.jpg,.jpeg,.png"
-                           @change="uploadSkFile = $event.target.files[0] || null">
-                    <span class="min-w-0 flex-1 truncate text-xs font-sans"
-                          :class="uploadSkFile ? 'text-ink font-semibold' : 'text-muted'"
-                          x-text="uploadSkFile ? uploadSkFile.name : 'Belum ada file dipilih'"></span>
-                    <button x-show="uploadSkFile"
-                            type="button"
-                            @click="uploadSkFile = null; document.getElementById('upload_file_sk_input').value = ''"
-                            class="shrink-0 text-xs text-danger hover:underline font-sans cursor-pointer">Hapus</button>
+                           @change="uploadSkFile = $event.target.files[0] || null"
+                           class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                    <svg class="mx-auto h-9 w-9 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                    </svg>
+                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK (PDF/JPG/PNG, maks 10MB)</p>
+                    <template x-if="uploadSkFile">
+                        <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
+                            <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                            <span class="font-medium" x-text="uploadSkFile.name"></span>
+                            <span class="text-muted" x-text="'(' + (uploadSkFile.size ? (uploadSkFile.size / 1024 / 1024).toFixed(2) + ' MB' : '') + ')'"></span>
+                            <button type="button" @click.stop="uploadSkFile = null; document.getElementById('upload_file_sk_input').value = ''" class="ml-1 text-danger hover:underline cursor-pointer">Hapus</button>
+                        </div>
+                    </template>
+                    <template x-if="!uploadSkFile && uploadSkRecord?.download_url">
+                        <div class="mt-2 text-xs text-muted">
+                            Berkas saat ini: <a :href="uploadSkRecord.download_url" target="_blank" class="text-primary hover:underline font-semibold">Unduh SK</a>
+                        </div>
+                    </template>
                 </div>
-                <p class="text-[10px] text-muted italic font-sans">Format yang didukung: PDF, JPG, JPEG, PNG (Maks. 10 MB).</p>
             </div>
 
             {{-- Footer Buttons --}}
@@ -2605,58 +2612,72 @@
                 {{-- Jenis Pengangkatan --}}
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
-                    <select x-model="appointmentForm.jenis_pengangkatan" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        <option value="CPNS">CPNS</option>
-                        <option value="PNS">PNS</option>
-                        <option value="PPPK">PPPK</option>
-                    </select>
-                </div>
-
-                {{-- Nomor SK --}}
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK <span class="text-danger">*</span></label>
-                    <input type="text" x-model="appointmentForm.no_sk" required placeholder="Contoh: 800/123/KP/2020" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {{-- Tanggal SK --}}
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK <span class="text-danger">*</span></label>
-                    <input type="date" x-model="appointmentForm.tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    <div class="relative">
+                        <select x-model="appointmentForm.jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 pr-10 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                            <option value="CPNS">CPNS</option>
+                            <option value="PNS">PNS</option>
+                            <option value="PPPK">PPPK</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- TMT Pengangkatan --}}
                 <div class="space-y-1">
                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
-                    <input type="date" x-model="appointmentForm.tmt_pengangkatan" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                    <input type="date" x-model="appointmentForm.tmt_pengangkatan" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
                 </div>
-            </div>
 
-            {{-- Unggah Berkas SK --}}
-            <div class="space-y-1.5 pt-1">
-                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                    Berkas SK Pengangkatan
-                    <span x-show="!isEditingAppointment" class="text-muted font-normal">(Opsional)</span>
-                </label>
-                <div class="flex items-center gap-2">
-                    <label for="appointment_file_sk_input" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
-                        Pilih File
-                    </label>
-                    <input type="file"
-                           id="appointment_file_sk_input"
-                           class="hidden"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           @change="appointmentForm.file_sk = $event.target.files[0] || null">
-                    <span class="min-w-0 flex-1 truncate text-xs font-sans"
-                          :class="appointmentForm.file_sk ? 'text-ink font-semibold' : 'text-muted'"
-                          x-text="appointmentForm.file_sk ? appointmentForm.file_sk.name : (appointmentData?.download_url ? 'Berkas SK sudah ada (Pilih file baru jika ingin mengganti)' : 'Belum ada file dipilih')"></span>
-                    <button x-show="appointmentForm.file_sk"
-                            type="button"
-                            @click="appointmentForm.file_sk = null; document.getElementById('appointment_file_sk_input').value = ''"
-                            class="shrink-0 text-xs text-danger hover:underline font-sans cursor-pointer">Hapus</button>
+                {{-- Nomor SK Pengangkatan --}}
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
+                    <input type="text" x-model="appointmentForm.no_sk" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                 </div>
-                <p class="text-[10px] text-muted italic font-sans">Format yang didukung: PDF, JPG, JPEG, PNG (Maks. 10 MB).</p>
+
+                {{-- Tanggal SK Terbit --}}
+                <div class="space-y-1">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
+                    <input type="date" x-model="appointmentForm.tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                </div>
+
+                {{-- File SK Pengangkatan --}}
+                <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
+                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                        File SK Pengangkatan
+                        <span x-show="!isEditingAppointment" class="text-muted font-normal">(Opsional)</span>
+                    </label>
+                    <div class="mt-1">
+                        <div class="border-2 border-dashed border-border rounded-lg p-5 bg-soft/50 text-center relative hover:border-primary transition">
+                            <input type="file" id="appointment_file_sk_input" name="file_sk_pengangkatan"
+                                   accept=".pdf,.jpg,.jpeg,.png"
+                                   @change="appointmentForm.file_sk = $event.target.files[0] || null"
+                                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                            <svg class="mx-auto h-9 w-9 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                            </svg>
+                            <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Pengangkatan (PDF/JPG/PNG, maks 10MB)</p>
+                            <template x-if="appointmentForm.file_sk">
+                                <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
+                                    <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                    </svg>
+                                    <span class="font-medium" x-text="appointmentForm.file_sk.name"></span>
+                                    <span class="text-muted" x-text="'(' + (appointmentForm.file_sk.size ? (appointmentForm.file_sk.size / 1024 / 1024).toFixed(2) + ' MB' : '') + ')'"></span>
+                                    <button type="button" @click.stop="appointmentForm.file_sk = null; document.getElementById('appointment_file_sk_input').value = ''" class="ml-1 text-danger hover:underline cursor-pointer">Hapus</button>
+                                </div>
+                            </template>
+                            <template x-if="!appointmentForm.file_sk && appointmentData?.download_url">
+                                <div class="mt-2 text-xs text-muted">
+                                    Berkas saat ini: <a :href="appointmentData.download_url" target="_blank" class="text-primary hover:underline font-semibold" x-text="appointmentData.file_sk ? appointmentData.file_sk.split('/').pop() : 'Unduh SK'"></a>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {{-- Footer Buttons --}}
