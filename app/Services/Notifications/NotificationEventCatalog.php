@@ -2,6 +2,9 @@
 
 namespace App\Services\Notifications;
 
+use App\Services\Notifications\WhatsApp\UnavailableWhatsAppTemplateAdapter;
+use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
+
 final class NotificationEventCatalog
 {
     /** @var array<string, array{label: string, group: string, allowed_channels: list<string>}> */
@@ -139,6 +142,8 @@ final class NotificationEventCatalog
     /** @var list<string> */
     private const RUNTIME_ADAPTERS = ['in_app', 'email'];
 
+    public function __construct(private readonly WhatsAppTemplateAdapter $whatsAppAdapter) {}
+
     /**
      * Satu katalog domain mencegah identitas event berbeda antara konfigurasi dan delivery runtime.
      *
@@ -162,6 +167,13 @@ final class NotificationEventCatalog
 
     public function hasAdapter(string $channelCode): bool
     {
-        return in_array($channelCode, self::RUNTIME_ADAPTERS, true);
+        if (in_array($channelCode, self::RUNTIME_ADAPTERS, true)) {
+            return true;
+        }
+
+        // Capability WhatsApp tersedia hanya ketika container memakai adapter konkret;
+        // readiness dan kebijakan runtime tetap menjadi gerbang pengiriman terpisah.
+        return $channelCode === 'whatsapp_business'
+            && ! ($this->whatsAppAdapter instanceof UnavailableWhatsAppTemplateAdapter);
     }
 }

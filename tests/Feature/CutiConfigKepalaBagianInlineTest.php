@@ -48,9 +48,9 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
             ->assertSee('Penetapan Kepala Bagian')
             ->assertSee(route('pegawai.assign-atasan', $pegawai->id), false)
             ->assertSee('name="redirect_to" value="cuti-config"', false)
-            // Form chain tetap tidak menawarkan step 0 sebelum kabag ditetapkan.
-            ->assertDontSee('name="steps[0][approver_employee_id]"', false)
-            ->assertSee('Pegawai belum memiliki Kepala Bagian aktif. Tetapkan struktur pegawai sebelum menyimpan chain.');
+            // Form chain belum menawarkan tahap Kepala Bagian sampai penugasan efektif tersedia.
+            ->assertDontSee(':name="`steps[${verifiers.length}][approver_employee_id]`"', false)
+            ->assertSee('Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.');
     }
 
     public function test_penetapan_dari_halaman_konfigurasi_kembali_ke_halaman_konfigurasi(): void
@@ -76,11 +76,11 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
             'kepala_bagian_id' => $kabag->id,
         ]);
 
-        // Setelah kembali, chain langsung dapat disimpan: hidden step 0 terisi kabag baru.
+        // Setelah kembali, tahap Kepala Bagian mengikuti seluruh verifikator dan terisi dari penugasan efektif baru.
         $this->actingAs($actor)
             ->get(route('cuti.config', ['employee_id' => $pegawai->id]))
             ->assertOk()
-            ->assertSee('name="steps[0][approver_employee_id]" value="'.$kabag->id.'"', false);
+            ->assertSee(':name="`steps[${verifiers.length}][approver_employee_id]`" value="'.$kabag->id.'"', false);
     }
 
     public function test_penetapan_tanpa_redirect_to_tetap_kembali_ke_detail_pegawai(): void

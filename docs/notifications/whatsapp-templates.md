@@ -1,11 +1,64 @@
 # Rancangan Template WhatsApp Business SIMPEG — LLDIKTI Wilayah XVI
 
+> **Status:** Dokumen pengajuan (*submission proposal*). Qontak, endpoint resmi, kontrak template, dan Channel Integration ID telah diberikan LLDIKTI. Adapter runtime tersedia, tetapi pengiriman tetap fail-closed sampai sandbox, sumber nomor penerima, readiness, channel, dan kebijakan event terverifikasi serta diaktifkan.
 > **Dokumen Kontrak Pengajuan (*Submission Proposal*)**  
 > **Status:** Disiapkan oleh tim pengembang SIMPEG untuk diserahkan kepada LLDIKTI Wilayah XVI guna proses pengajuan template resmi ke Meta / WhatsApp Business Solution Provider resmi yang ditetapkan oleh LLDIKTI Wilayah XVI (dengan Qontak sebagai baseline kandidat acuan).  
 > **Acuan Dokumen Kanonis:**  
 > - [PRD-SIMPEG-Fase1-Core.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/1e53db76189b57551cf87de2a5e35834206f1d2e/DOCUMENT/PRD-DLL/PRD-SIMPEG-Fase1-Core.md) (§10 *Early Warning System* dan §11 *Notifikasi*)
 > - [User-Stories-SIMPEG-Fase1.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/1e53db76189b57551cf87de2a5e35834206f1d2e/DOCUMENT/PRD-DLL/User-Stories-SIMPEG-Fase1.md) (US-6.5 AC-1 s.d. AC-5 dan Addendum AC-MTG-4 s.d. AC-MTG-10)
 > - [Keputusan-Evaluasi-Meeting-LLDIKTI-15-Agustus-2026.md](https://github.com/diyoncrzz18/lldikti-doc-2/blob/1e53db76189b57551cf87de2a5e35834206f1d2e/DOCUMENT/Keputusan-Evaluasi-Meeting-LLDIKTI-15-Agustus-2026.md) (K-MTG-05, K-MTG-05A, dan K-MTG-07 OQ-MTG-06)
+
+---
+
+## 📌 0. Catatan Konfigurasi Qontak
+
+Bagian ini merekam arahan teknis langsung LLDIKTI untuk Qontak. Adapter konkret tersedia setelah identitas channel diberikan, tetapi dependency readiness dan kill-switch operasional tetap wajib dipenuhi sebelum delivery dibuat.
+
+### Provider dan Endpoint
+
+- Provider adalah Qontak dan endpoint hanya boleh `https://service-chat.qontak.com/api/open/v1`; host, path, skema, port, query, atau fragment lain ditolak sebelum request HTTP dibuat.
+- Mekanisme token awal, masa berlaku, dan refresh belum ditetapkan sebagai kontrak runtime SIMPEG.
+
+### Penyimpanan Konfigurasi
+
+- `ref_notification_channels.config` menyimpan endpoint allowlist, canonical URL, kontrak template, dan access token sebagai ciphertext khusus. Plaintext token tidak boleh berada di database, HTML, audit, log, source, test, atau dokumentasi.
+- Access token dikelola write-only pada halaman setting: input kosong mempertahankan ciphertext, token baru merotasinya, dan checkbox eksplisit menghapusnya. Audit hanya mencatat status `added`, `rotated`, `cleared`, atau `unchanged`.
+- Refresh token tetap kosong dan tidak disimpan. `channel_integration_id` resmi dikelola write-only melalui halaman setting; input kosong mempertahankan ID, nilai baru merotasinya, dan checkbox eksplisit menghapusnya. Nilai tidak dirender kembali atau dicatat ke audit. Tidak ada artefak Qontak yang fallback ke environment.
+
+### Contoh Template Baseline (bukan Kontrak Runtime)
+
+| Kode Template | ID Baseline | Variabel Body | Tombol URL |
+|---|---|---|---|
+| `simpeg16_cuti_perlu_tindakan` | `bf2a5c38-8cf6-4d12-bec4-d852ff4ea51f` | `{{1}}` nama pemohon, `{{2}}` jenis cuti, `{{3}}` tanggal mulai, `{{4}}` tanggal selesai, `{{5}}` jumlah hari, `{{6}}` **alasan** (baru, tidak ada di proposal) | `https://simpeg.lldiktiwil16.id/{{1}}` |
+| `simpeg16_cuti_status` | `505d3ed8-d10c-466f-82d8-94f8365e95d8` | `{{nama_pegawai}}`, `{{jenis_cuti}}`, `{{status}}`, `{{keterangan}}` | `https://simpeg.lldiktiwil16.id/{{1}}` |
+| `simpeg16_ews_pengingat` | `f96a20e2-16c6-458c-8810-919614921cfc` | `{{nama_pegawai}}`, `{{jenis_peringatan}}`, `{{tanggal_target}}`, `{{sisa_waktu}}` | `https://simpeg.lldiktiwil16.id/{{1}}` |
+| `simpeg16_notifikasi_sistem` | `628280fd-bc09-4b60-8ef9-b6a6f8ec6e4a` | `{{judul}}`, `{{ringkasan}}` | `https://simpeg.lldiktiwil16.id/{{1}}` |
+
+### Catatan Parameter Baseline
+
+- Urutan/kunci parameter, bahasa, tombol URL, dan domain canonical wajib mengikuti hasil provider yang direkam secara kanonis. Nilai pada baseline ini tidak dapat dipakai sebagai asumsi produksi.
+
+### Format Parameter API Baseline
+
+Mengikuti implementasi referensi LLDIKTI (aplikasi lain yang sudah terintegrasi Qontak):
+
+- Body parameter: `{"key": <posisi integer>, "value": <nama/kunci variabel>, "value_text": <isi pesan>}` — `key` selalu posisi body (1..n), `value` membawa nama variabel untuk template bernama atau kunci posisi untuk template numerik, `value_text` membawa nilai yang dikirim.
+- Tombol URL: `{"index": "0", "type": "url", "value": <path setelah canonical URL, diawali "/"}` — `value` menggantikan `{{1}}` pada URL tombol template.
+- Payload luar: `to_number` (format 62xxx), `to_name`, `message_template_id`, `channel_integration_id`, `language: {code: "id"}`.
+
+### Perbedaan Kandidat dari Proposal (Bagian 3)
+
+1. Nama template berprefix `simpeg16_`.
+2. `simpeg16_cuti_perlu_tindakan` menambahkan variabel `alasan` pada posisi body ke-6; nilai diambil dari kolom `alasan` `leave_requests` setelah sanitasi privacy guard.
+3. Domain placeholder `https://<domain-simpeg-resmi>` tergantikan domain produksi resmi.
+
+### Artefak yang Masih Wajib Diterima dan Diverifikasi
+
+1. Nomor uji/sandbox untuk verifikasi pengiriman pertama.
+2. Konfirmasi sumber nomor penerima kanonis (`employees.no_hp` normalisasi 62xxx; kebijakan default saat ini: lewati delivery bila tidak valid).
+3. Kode bahasa template terdaftar (asumsi sementara `id`).
+4. Konfirmasi token permanen atau alur refresh yang aman terhadap worker paralel dan respons 401.
+5. Persetujuan alur aktivasi produksi setelah sandbox smoke berhasil.
 
 ---
 
@@ -232,8 +285,8 @@ Tabel berikut menghubungkan katalog event internal sistem (`App\Services\Notific
 
 1. **Kontrak Runtime Eksternal**:
    - Nama teknis template ID resmi, nama variabel runtime, kode bahasa (misal `id` / `id_ID`), dan konfigurasi tombol tautan URL (*call-to-action button*) akan mengikuti respon resmi dari Meta / WhatsApp Provider yang dikembalikan oleh LLDIKTI Wilayah XVI.
-   - Setelah artefak resmi diterima, kontrak tersebut dipasang melalui secret `SIMPEG_WHATSAPP_TEMPLATE_CONFIGURATION` berbentuk JSON dengan dua bagian: `event_templates` (event internal ke template provider) dan `templates` (setiap template memuat `id`, `language`, `variables_map`, `button`, serta `archetype` bila template dipecah per-event). Konfigurasi JSON tidak valid atau kontrak yang tidak lengkap membuat readiness tetap `false`; tidak ada fallback ke nama variabel proposal.
+   - Setelah artefak resmi diterima, kontrak tersebut dicatat pada konfigurasi channel `whatsapp_business` berbentuk JSON dengan dua bagian: `event_templates` (event internal ke template provider) dan `templates` (setiap template memuat `id`, `language`, `variables_map`, `button`, serta `archetype` bila template dipecah per-event). Konfigurasi JSON tidak valid atau kontrak yang tidak lengkap membuat readiness tetap `false`; tidak ada fallback ke nama variabel proposal. Access token berada pada setting yang sama sebagai ciphertext write-only, sedangkan Channel Integration ID resmi dikelola write-only tanpa fallback environment.
 2. **Klausul Pemecahan Template (*Split per-Event*)**:
    - Jika pihak Meta / Provider menolak generalisasi model template (misalnya meminta template terpisah untuk masing-masing jenis cuti atau masing-masing event EWS), tim pengembang akan memecah template tersebut per-event dengan daftar variabel yang telah disetujui, **tanpa mengubah arsitektur domain event internal SIMPEG** (K-MTG-05A.3).
 3. **Kesiapan Integrasi (*Fail-Closed Guard & Full Readiness Dependencies*)**:
-   - Sesuai ketetapan K-MTG-05.3, US-6.5 AC-4, serta dependensi kesiapan K-MTG-07 (OQ-MTG-06) dan Issue #13, sebelum seluruh dependensi implementasi eksternal—meliputi: penetapan provider final, kontrak API resmi, pemetaan exact variable runtime, kode bahasa terdaftar, konfigurasi tombol URL (*call-to-action button*), kredensial resmi (*API key / secret token*), template ID resmi yang disetujui Meta, nomor uji terdaftar, akses sandbox, sumber nomor penerima kanonis terverifikasi, asosiasi immutable untuk event keputusan yang memuat catatan, serta verifikasi status kesiapan (*readiness flag*)—diterima dan divalidasi secara formal dari LLDIKTI Wilayah XVI, adapter WhatsApp di sisi aplikasi tetap dalam kondisi **nonaktif / fail-closed** dan dispatcher dilarang memanggil layanan eksternal tersebut.
+   - Sesuai ketetapan K-MTG-05.3, US-6.5 AC-4, serta dependensi kesiapan K-MTG-07 (OQ-MTG-06) dan Issue #13, sebelum seluruh dependensi implementasi eksternal—meliputi: kode bahasa terdaftar, kredensial resmi yang masih valid, nomor uji terdaftar, akses sandbox, sumber nomor penerima kanonis terverifikasi, asosiasi immutable untuk event keputusan yang memuat catatan, serta verifikasi status kesiapan (*readiness flag*)—diterima dan divalidasi secara formal dari LLDIKTI Wilayah XVI, pengiriman WhatsApp tetap **nonaktif / fail-closed** dan dispatcher dilarang membuat delivery/outbox maupun memanggil layanan eksternal tersebut.

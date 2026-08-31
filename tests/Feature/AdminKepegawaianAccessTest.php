@@ -28,7 +28,7 @@ class AdminKepegawaianAccessTest extends TestCase
 
         $response->assertOk();
 
-        // Menu universal: item berikut tampil untuk semua role.
+        // Menu yang diizinkan untuk admin_kepegawaian memiliki tautan href aktif.
         foreach ([
             'data-pegawai',
             'dokumen',
@@ -37,19 +37,20 @@ class AdminKepegawaianAccessTest extends TestCase
             'laporan.pegawai',
             'cuti.laporan',
             'audit-log',
-            'hari-libur',
         ] as $route) {
             $response->assertSee('href="'.route($route).'"', false);
         }
 
-        // Menu khusus super_admin: tidak tampil untuk admin_kepegawaian.
+        // Menu tanpa izin akses tampil disabled tanpa atribut href aktif.
         foreach ([
             'user-management',
             'rbac',
             'data-master',
-            'pengaturan',
-        ] as $route) {
-            $response->assertDontSee('href="'.route($route).'"', false);
+            'hari-libur',
+            'ews.config',
+            'cuti.config',
+        ] as $forbiddenRoute) {
+            $response->assertDontSee('href="'.route($forbiddenRoute).'"', false);
         }
     }
 
@@ -64,21 +65,33 @@ class AdminKepegawaianAccessTest extends TestCase
             '/data-master',
             '/hari-libur',
             '/konfigurasi',
-            '/dashboard/pengaturan',
         ] as $uri) {
             $this->get($uri)->assertForbidden();
         }
     }
 
-    public function test_super_admin_dapat_membuka_halaman_pengaturan_sistem(): void
+    public function test_super_admin_mempertahankan_surface_konfigurasi_kanonis_tanpa_menu_placeholder(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
 
-        $this->actingAs($superAdmin)
+        $dashboard = $this->actingAs($superAdmin)
             ->withSession(['active_role' => 'super_admin'])
-            ->get('/dashboard/pengaturan')
-            ->assertOk()
-            ->assertSee('Pengaturan Sistem');
+            ->get(route('dashboard'));
+
+        $dashboard->assertOk();
+        $dashboard->assertDontSee('Pengaturan Sistem');
+
+        foreach ([
+            'user-management',
+            'rbac',
+            'data-master',
+            'hari-libur',
+            'ews.config',
+            'cuti.config',
+            'data-master.channel-notifikasi.index',
+        ] as $routeName) {
+            $this->get(route($routeName))->assertOk();
+        }
     }
 
     public function test_super_admin_melihat_konfigurasi_approval_cuti_di_sidebar_dan_bukan_pengaturan(): void
@@ -93,15 +106,6 @@ class AdminKepegawaianAccessTest extends TestCase
         $dashboardResponse->assertSee('href="'.route('cuti.config').'"', false);
         $dashboardResponse->assertSee('Konfigurasi Approval Cuti');
 
-        $settingsResponse = $this->get(route('pengaturan'));
-
-        $settingsResponse->assertOk();
-        $settingsContent = strstr($settingsResponse->getContent(), '<main');
-
-        $this->assertIsString($settingsContent);
-        $this->assertStringNotContainsString('href="'.route('cuti.config').'"', $settingsContent);
-        $this->assertStringNotContainsString('Konfigurasi Approval Cuti', $settingsContent);
-        $this->assertStringNotContainsString('Alur Approval Cuti', $settingsContent);
     }
 
     public function test_admin_kepegawaian_dapat_membuka_halaman_operasional_sesuai_dokumen(): void

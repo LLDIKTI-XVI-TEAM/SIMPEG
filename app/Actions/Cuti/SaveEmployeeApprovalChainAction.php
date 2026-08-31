@@ -9,8 +9,11 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use App\Services\Cuti\ApprovalChainInvariantService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 /**
  * Menyimpan konfigurasi rantai approval cuti per pegawai sebagai chain aktif baru.
@@ -40,7 +43,22 @@ class SaveEmployeeApprovalChainAction
 
             // Kandidat wajib sah dan seluruh approver dikunci sebelum chain aktif lama disentuh,
             // supaya kegagalan konfigurasi tidak meninggalkan pergantian kewenangan secara parsial.
-            $this->invariants->validate($steps);
+            try {
+                $this->invariants->validateForEmployee($employee, $steps);
+            } catch (QueryException $exception) {
+                // Detail SQL dan binding merupakan error infrastruktur, bukan pesan validasi pengguna.
+                throw $exception;
+            } catch (RuntimeException $exception) {
+                // Caller domain tetap menerima RuntimeException, sedangkan boundary HTTP memperoleh
+                // error validasi yang dapat ditampilkan tanpa mengubah kontrak exception lainnya.
+                if ($request === null) {
+                    throw $exception;
+                }
+
+                throw ValidationException::withMessages([
+                    'steps' => $exception->getMessage(),
+                ]);
+            }
 
             $oldChain = LeaveApprovalChain::query()
                 ->where('employee_id', $employee->id)

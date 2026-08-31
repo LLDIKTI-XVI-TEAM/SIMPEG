@@ -35,6 +35,7 @@ class CutiConfigController extends Controller
             $request->validated('search'),
             $request->validated('employee_id'),
             $request->validated('approver_search'),
+            $request->old('steps'),
         ));
     }
 

@@ -1,14 +1,8 @@
 <?php
 
-use App\Services\Notifications\WhatsApp\WhatsAppTemplateConfiguration;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateContract;
 
 $whatsAppDefaultEventTemplates = WhatsAppTemplateContract::eventTemplateArchetypes();
-$whatsAppTemplateConfiguration = env('SIMPEG_WHATSAPP_TEMPLATE_CONFIGURATION');
-$whatsAppRuntimeTemplates = WhatsAppTemplateConfiguration::decode(
-    $whatsAppTemplateConfiguration,
-    array_keys($whatsAppDefaultEventTemplates),
-);
 $whatsAppDefaultTemplates = [
     'simpeg_cuti_perlu_tindakan' => [
         'id' => null,
@@ -83,23 +77,22 @@ return [
         'disable_employee_api_auth' => filter_var(env('SIMPEG_DISABLE_EMPLOYEE_API_AUTH', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
-    // Seluruh nilai default sengaja nonaktif. Nilai konkret baru boleh dipasang setelah
-    // provider WhatsApp dan artefak sandbox resmi diverifikasi oleh LLDIKTI.
+    // Artefak Qontak hanya berasal dari setting aplikasi (ref_notification_channels.config).
+    // Environment dibatasi pada kill-switch deployment; ia tidak menjadi fallback credential,
+    // endpoint, Channel Integration ID, canonical URL, atau kontrak template.
     'whatsapp' => [
         'enabled' => filter_var(env('SIMPEG_WHATSAPP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
         'sandbox_verified' => filter_var(env('SIMPEG_WHATSAPP_SANDBOX_VERIFIED', false), FILTER_VALIDATE_BOOLEAN),
         'recipient_source_verified' => filter_var(env('SIMPEG_WHATSAPP_RECIPIENT_SOURCE_VERIFIED', false), FILTER_VALIDATE_BOOLEAN),
-        'provider' => env('SIMPEG_WHATSAPP_PROVIDER'),
-        'base_url' => env('SIMPEG_WHATSAPP_BASE_URL'),
-        'credential_reference' => env('SIMPEG_WHATSAPP_CREDENTIAL_REFERENCE'),
-        'channel_id' => env('SIMPEG_WHATSAPP_CHANNEL_ID'),
-        // JSON kontrak resmi provider: event_templates dan templates (id, language,
-        // variables_map, button). Bila kosong/tidak valid, readiness tetap false.
-        'template_configuration' => $whatsAppTemplateConfiguration,
-        'runtime_configuration_valid' => $whatsAppRuntimeTemplates['valid'],
-        'canonical_url' => env('SIMPEG_WHATSAPP_CANONICAL_URL'),
-        'event_templates' => array_replace($whatsAppDefaultEventTemplates, $whatsAppRuntimeTemplates['event_templates']),
-        'templates' => array_replace($whatsAppDefaultTemplates, $whatsAppRuntimeTemplates['templates']),
+        'provider' => null,
+        'base_url' => null,
+        'channel_integration_id' => null,
+        'access_token' => null,
+        'template_configuration' => null,
+        'runtime_configuration_valid' => false,
+        'canonical_url' => null,
+        'event_templates' => $whatsAppDefaultEventTemplates,
+        'templates' => $whatsAppDefaultTemplates,
     ],
 
 ];

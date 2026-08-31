@@ -71,6 +71,7 @@
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
 
+<<<<<<< HEAD
             // Dashboard mengikuti role efektif (tiap role punya beranda sendiri).
             $dashboardRoute = match ($activeRole) {
                 'pimpinan' => 'pimpinan.dashboard',
@@ -93,6 +94,60 @@
                     $rolePermissions = [];
                 }
             }
+=======
+            // Menu terlarang/dikunci untuk masing-masing role
+            $lockedMenus = [
+                'super_admin' => [],
+                'admin_kepegawaian' => [
+                    'user-management',
+                    'rbac',
+                    'data-master',
+                    'hari-libur',
+                    'ews.config',
+                ],
+                'pimpinan' => [
+                    'audit-log',
+                    'user-management',
+                    'rbac',
+                    'ews.config',
+                ],
+                'kepala_bagian' => [
+                    'data-pegawai',
+                    'pegawai.import',
+                    'hari-libur',
+                    'dokumen',
+                    'audit-log',
+                    'user-management',
+                    'rbac',
+                    'data-master',
+                    'laporan',
+                    'laporan.pegawai',
+                    'cuti.laporan',
+                    'cuti.rekap',
+                    'ews',
+                    'ews.config',
+                ],
+
+                'pegawai' => [
+                    'data-pegawai',
+                    'pegawai.import',
+                    'dokumen',
+                    'cuti.rekap',
+                    'ews',
+                    'ews.config',
+                    'laporan',
+                    'laporan.pegawai',
+            'cuti.laporan',
+                    'user-management',
+                    'rbac',
+                    'data-master',
+                    'hari-libur',
+                    'audit-log',
+                ],
+            ];
+
+            $myLockedMenus = $lockedMenus[$activeRole] ?? [];
+>>>>>>> secondOrigin/development
 
             // Menu sidebar difilter per role dan permission RBAC.
             // - Fitur eksklusif role dikunci via 'roles' (contoh: Daftar Bawahan khusus kepala_bagian).
@@ -165,10 +220,6 @@
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
-                    'items' => [
-                        // Eksklusif super_admin, admin_kepegawaian, pimpinan
-                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
                         // Eksklusif pegawai
                         ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle',
                          'roles' => ['pegawai']],
@@ -200,9 +251,6 @@
                          'roles' => ['super_admin']],
                         // Eksklusif super_admin
                         ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells',
-                         'roles' => ['super_admin']],
-                        // Eksklusif super_admin
-                        ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth',
                          'roles' => ['super_admin']],
                         // RBAC: dikontrol dari Role & Permission admin (hari_libur.read)
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days',
@@ -539,6 +587,7 @@
                                 </svg>
                                 <span>Profil Saya</span>
                             </a>
+<<<<<<< HEAD
                             @if($activeRole === 'super_admin')
                                 <a href="{{ route('pengaturan') }}" wire:navigate id="settings-link" class="flex items-center gap-2.5 rounded-lg px-4 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
                                     {{-- heroicon: cog-6-tooth (outline) --}}
@@ -555,6 +604,12 @@
                                  saat simulasi aktif, hanya aksi revert yang tampil --}}
                             @if(auth()->check() && ((auth()->user()->hasPermission('users.switch_role') && auth()->user()->canSwitchToAnyRole()) || auth()->user()->temporary_role))
                                 {{-- Submenu switch hanya bagi akun asli yang TIDAK sedang dalam simulasi:
+=======
+                            {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
+                                 switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
+                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
+                                {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
+>>>>>>> secondOrigin/development
                                      selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
                                      role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
                                      yang menyesatkan. Target menu diturunkan dari hierarki ROLE_RANKS milik model. --}}

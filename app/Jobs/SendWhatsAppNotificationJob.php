@@ -15,6 +15,7 @@ use App\Services\Notifications\NotificationEventCatalog;
 use App\Services\Notifications\WhatsApp\WhatsAppDeliveryResult;
 use App\Services\Notifications\WhatsApp\WhatsAppReadiness;
 use App\Services\Notifications\WhatsApp\WhatsAppRecipientResolver;
+use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfig;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateContract;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateMessage;
@@ -34,6 +35,15 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public const MAX_PROVIDER_ATTEMPTS = 3;
+
+    /** @var list<string> */
+    private const TERMINAL_FAILURE_CODES = [
+        'delivery_rejected',
+        'max_retries_exceeded',
+        'network_timeout',
+        'provider_misconfigured',
+        'provider_response_ambiguous',
+    ];
 
     public int $tries = self::MAX_PROVIDER_ATTEMPTS;
 
@@ -83,35 +93,42 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
         NotificationEventCatalog $catalog,
         WhatsAppRecipientResolver $recipientResolver,
         WhatsAppTemplateAdapter $adapter,
+        WhatsAppRuntimeConfig $runtime,
     ): void {
-        // Cek kill-switch dan status kesiapan terbaru
-        if (! $readiness->isReady()
-            || ! $catalog->supportsChannel($this->eventKey, 'whatsapp_business')
+        // Kebijakan channel dibaca tanpa cache; tidak ada alasan untuk mencoba ulang
+        // ketika event memang tidak didukung atau operator menonaktifkan channel.
+        if (! $catalog->supportsChannel($this->eventKey, 'whatsapp_business')
             || ! $channels->isEnabledForEvent($this->eventKey, 'whatsapp_business')) {
             $this->markSkipped('readiness_or_policy_disabled');
 
             return;
         }
 
-        $currentEventTemplates = config('services.whatsapp.event_templates', []);
-        $currentTemplateKey = $currentEventTemplates[$this->eventKey] ?? null;
-        if (! is_string($currentTemplateKey) || trim($currentTemplateKey) === '') {
-            $this->markSkipped('template_contract_invalid');
+        // Worker jangka panjang dapat masih menyimpan konfigurasi belum lengkap ketika
+        // web process baru saja membuat job dari konfigurasi yang sudah lengkap. Refresh
+        // sekali sebelum skip terminal agar delivery baru tidak hilang hanya karena TTL.
+        if (! $readiness->isReady()) {
+            $runtime->invalidate();
 
-            return;
+            if (! $readiness->isReady()) {
+                $this->markSkipped('readiness_or_policy_disabled');
+
+                return;
+            }
         }
 
-        if (! WhatsAppTemplateContract::matchesQueuedPayload(
-            $currentTemplateKey,
-            $this->templateId,
-            $this->language,
-            $this->bodyVariables,
-            $this->buttonVariables,
-            $this->variablesMap,
-        )) {
-            $this->markSkipped('template_contract_invalid');
+        // Mismatch kontrak bisa berasal dari memo setting yang basi pada worker
+        // jangka panjang (operator baru mengganti/mengisi kontrak). Sebelum delivery
+        // ditandai skip terminal, buang memo lalu baca ulang dari database sehingga
+        // job berkontrak baru tidak dikorbankan oleh cache lama.
+        if (! $this->queuedPayloadMatchesContract($runtime)) {
+            $runtime->invalidate();
 
-            return;
+            if (! $this->queuedPayloadMatchesContract($runtime)) {
+                $this->markSkipped('template_contract_invalid');
+
+                return;
+            }
         }
 
         // Resolusi ulang alamat nomor WhatsApp kanonis dari sumber terverifikasi saat runtime
@@ -249,7 +266,7 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        $currentEventTemplates = config('services.whatsapp.event_templates', []);
+        $currentEventTemplates = $runtime->eventTemplates();
         $currentTemplateKey = $currentEventTemplates[$this->eventKey] ?? null;
 
         if (! is_string($currentTemplateKey) || $currentTemplateKey !== $this->templateKey) {
@@ -257,6 +274,8 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+
+        $bodyVariables = $this->bodyVariables;
 
         if (str_starts_with($this->eventKey, 'ews.')) {
             if ($this->ewsAlertId === null) {
@@ -335,6 +354,25 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                     return;
                 }
             }
+
+            $remainingTimeProviderKey = $this->variablesMap['sisa_waktu'] ?? null;
+            if ($remainingTimeProviderKey !== null) {
+                if (! is_string($remainingTimeProviderKey)
+                    || ! array_key_exists($remainingTimeProviderKey, $bodyVariables)) {
+                    $this->markSkipped('template_contract_invalid');
+
+                    return;
+                }
+
+                // Antrean EWS dapat tertunda melewati pergantian hari. Hitung ulang nilai
+                // relatif tepat sebelum kirim agar provider tidak menerima label yang basi.
+                $remainingDays = (int) now()->startOfDay()->diffInDays($alert->target_date->copy()->startOfDay(), false);
+                $bodyVariables[$remainingTimeProviderKey] = match (true) {
+                    $remainingDays > 0 => "H-{$remainingDays} hari",
+                    $remainingDays === 0 => 'Hari ini',
+                    default => 'Lewat jatuh tempo',
+                };
+            }
         }
 
         // Kunci baris delivery untuk menjamin eksekusi atomik dan mencegah race condition antar-worker
@@ -360,7 +398,26 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
             if ($record->status === WhatsAppNotificationDelivery::STATUS_DELIVERED
                 || $record->status === WhatsAppNotificationDelivery::STATUS_SKIPPED
                 || ($record->status === WhatsAppNotificationDelivery::STATUS_FAILED
-                    && $record->failure_code === 'max_retries_exceeded')) {
+                    && in_array($record->failure_code, self::TERMINAL_FAILURE_CODES, true))) {
+                return null;
+            }
+
+            if ($record->status === WhatsAppNotificationDelivery::STATUS_SENDING) {
+                // Lease aktif masih dimiliki worker lain; tunggu sampai hasilnya tersimpan.
+                if ($record->lease_expires_at !== null && $record->lease_expires_at->isFuture()) {
+                    $this->release(self::LEASE_DURATION_SECONDS);
+
+                    return null;
+                }
+
+                // Setelah lease berakhir, tidak dapat dibuktikan apakah worker sebelumnya
+                // mati sebelum atau sesudah POST. Tanpa idempotensi provider, jangan kirim ulang.
+                $record->update([
+                    'status' => WhatsAppNotificationDelivery::STATUS_FAILED,
+                    'lease_expires_at' => null,
+                    'failure_code' => 'provider_response_ambiguous',
+                ]);
+
                 return null;
             }
 
@@ -373,18 +430,6 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                     'lease_expires_at' => null,
                     'failure_code' => 'max_retries_exceeded',
                 ]);
-
-                return null;
-            }
-
-            // Jika sedang diproses worker lain dan lease belum kedaluwarsa, jangan rebut claim
-            if ($record->status === WhatsAppNotificationDelivery::STATUS_SENDING
-                && $record->lease_expires_at !== null
-                && $record->lease_expires_at->isFuture()) {
-                // Jangan menandai job duplikat sebagai sukses: bila worker pemegang
-                // lease mati, queue harus menjadwalkan ulang job ini setelah lease
-                // kedaluwarsa agar delivery tidak tertinggal pada status sending.
-                $this->release(self::LEASE_DURATION_SECONDS);
 
                 return null;
             }
@@ -410,8 +455,10 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
             templateId: $this->templateId,
             language: $this->language,
             recipientAddress: $recipientAddress,
-            bodyVariables: $this->bodyVariables,
+            bodyVariables: $bodyVariables,
             buttonVariables: $this->buttonVariables,
+            recipientName: (string) $employee->nama_lengkap,
+            variablesMap: $this->variablesMap,
         );
 
         try {
@@ -454,7 +501,42 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
             'failure_code' => $safeFailureCode,
         ]);
 
+        // Penolakan 4xx memerlukan koreksi payload/konfigurasi, sedangkan timeout setelah
+        // POST dan respons 5xx tidak membuktikan pesan belum diterima. Ketiganya terminal.
+        if (in_array($safeFailureCode, self::TERMINAL_FAILURE_CODES, true)) {
+            return;
+        }
+
         throw new RuntimeException("Pengiriman notifikasi WhatsApp gagal ({$safeFailureCode}).");
+    }
+
+    /**
+     * Memeriksa payload job terhadap kontrak template efektif yang berlaku saat ini.
+     */
+    private function queuedPayloadMatchesContract(WhatsAppRuntimeConfig $runtime): bool
+    {
+        $currentEventTemplates = $runtime->eventTemplates();
+        $currentTemplateKey = $currentEventTemplates[$this->eventKey] ?? null;
+        if (! is_string($currentTemplateKey) || trim($currentTemplateKey) === '') {
+            return false;
+        }
+
+        $currentArchetype = WhatsAppTemplateContract::eventTemplateArchetypes()[$this->eventKey] ?? null;
+        if (! is_string($currentArchetype) || trim($currentArchetype) === '') {
+            return false;
+        }
+
+        return WhatsAppTemplateContract::matchesQueuedPayload(
+            $currentTemplateKey,
+            $this->templateId,
+            $this->language,
+            $this->bodyVariables,
+            $this->buttonVariables,
+            $this->variablesMap,
+            $runtime->template($currentTemplateKey),
+            $runtime->canonicalUrl(),
+            $currentArchetype,
+        );
     }
 
     private function markSkipped(string $failureCode): void
@@ -469,7 +551,7 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                 WhatsAppNotificationDelivery::STATUS_DELIVERED,
                 WhatsAppNotificationDelivery::STATUS_SKIPPED,
             ], true) || ($delivery->status === WhatsAppNotificationDelivery::STATUS_FAILED
-                && $delivery->failure_code === 'max_retries_exceeded')) {
+                && in_array($delivery->failure_code, self::TERMINAL_FAILURE_CODES, true))) {
                 return;
             }
 

@@ -14,30 +14,61 @@ use Illuminate\Validation\Rule;
  */
 class EmployeeApprovalChainRequest extends FormRequest
 {
+    private bool $hasInvalidStepKeys = false;
+
+    private bool $hasMalformedPybmc = false;
+
     public function authorize(): bool
     {
         return (bool) $this->user()?->hasPermission('cuti.configure_chain');
     }
 
     /**
-     * Menghapus baris PYBMC opsional hanya bila seluruh nilainya kosong.
-     * Payload parsial tetap dipertahankan agar aturan validasi menolaknya secara fail-closed.
+     * Menormalisasi key numeric dari form dan menempatkan PYBMC khusus sebagai tahap terakhir.
+     * Bentuk key atau nilai PYBMC yang malformed ditandai agar validasi gagal tertutup.
      */
     protected function prepareForValidation(): void
     {
         $steps = $this->input('steps');
 
-        if (! is_array($steps) || ! isset($steps['_pybmc']) || ! is_array($steps['_pybmc'])) {
+        if (! is_array($steps)) {
             return;
         }
 
-        $isFullyEmpty = collect($steps['_pybmc'])
-            ->every(fn (mixed $value): bool => $value === null || $value === '');
+        $hasPybmc = array_key_exists('_pybmc', $steps);
+        $pybmc = $hasPybmc ? $steps['_pybmc'] : null;
+        unset($steps['_pybmc']);
 
-        if ($isFullyEmpty) {
-            unset($steps['_pybmc']);
-            $this->merge(['steps' => $steps]);
+        if ($hasPybmc && ! is_array($pybmc)) {
+            $this->hasMalformedPybmc = true;
         }
+
+        foreach (array_keys($steps) as $key) {
+            $isNonNegativeInteger = is_int($key) && $key >= 0;
+            $isCanonicalNumericString = is_string($key)
+                && ctype_digit($key)
+                && (string) (int) $key === $key;
+
+            if (! $isNonNegativeInteger && ! $isCanonicalNumericString) {
+                $this->hasInvalidStepKeys = true;
+
+                return;
+            }
+        }
+
+        ksort($steps, SORT_NUMERIC);
+        $steps = array_values($steps);
+
+        if ($hasPybmc && is_array($pybmc)) {
+            $isFullyEmpty = collect($pybmc)
+                ->every(fn (mixed $value): bool => $value === null || $value === '');
+
+            if (! $isFullyEmpty) {
+                $steps[] = $pybmc;
+            }
+        }
+
+        $this->merge(['steps' => $steps]);
     }
 
     /** @return array<string, list<string>> */
@@ -67,12 +98,18 @@ class EmployeeApprovalChainRequest extends FormRequest
     }
 
     /**
-     * Memastikan tahap pertama selalu memakai Kepala Bagian aktif milik pegawai target.
-     * Relasi kosong ditolak agar chain tidak dapat mengalihkan approval awal ke pegawai sembarang.
+     * Menegakkan urutan Verifikator, Kepala Bagian efektif, lalu PYBMC final pada boundary HTTP.
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            if ($this->hasInvalidStepKeys || $this->hasMalformedPybmc) {
+                $validator->errors()->add(
+                    'steps',
+                    'Struktur langkah approval tidak valid. Muat ulang halaman dan susun kembali chain.',
+                );
+            }
+
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
@@ -83,30 +120,53 @@ class EmployeeApprovalChainRequest extends FormRequest
                 return;
             }
 
-            $kepalaBagianId = $employee->kepala_bagian_id
-                ?? $employee->currentSupervisor()?->kepala_bagian_id;
+            $steps = array_values($this->input('steps', []));
+            $kepalaBagianIndexes = collect($steps)
+                ->keys()
+                ->filter(fn (int $index): bool => ($steps[$index]['step_type'] ?? null) === 'kepala_bagian')
+                ->values();
+            $verifierIndexes = collect($steps)
+                ->keys()
+                ->filter(fn (int $index): bool => ($steps[$index]['step_type'] ?? null) === 'verifier')
+                ->values();
 
-            if ($kepalaBagianId === null) {
+            if ($kepalaBagianIndexes->count() !== 1) {
+                $validator->errors()->add('steps', 'Chain pegawai wajib memiliki tepat satu Kepala Bagian.');
+
+                return;
+            }
+
+            $kepalaBagianIndex = (int) $kepalaBagianIndexes->sole();
+
+            if ($verifierIndexes->contains(fn (int $index): bool => $index > $kepalaBagianIndex)) {
                 $validator->errors()->add(
-                    'steps.0.approver_employee_id',
-                    'Pegawai belum memiliki Kepala Bagian aktif. Tetapkan relasi Kepala Bagian terlebih dahulu.',
+                    'steps',
+                    'Semua Verifikator harus ditempatkan sebelum Kepala Bagian. Pindahkan Verifikator yang berada setelah Kepala Bagian.',
                 );
 
                 return;
             }
 
-            $firstStep = $this->input('steps.0');
+            $kepalaBagianId = $employee->currentSupervisor()?->kepala_bagian_id;
 
-            if (! is_array($firstStep)
-                || ($firstStep['step_type'] ?? null) !== 'kepala_bagian'
-                || ($firstStep['approver_employee_id'] ?? null) !== $kepalaBagianId) {
+            if ($kepalaBagianId === null) {
                 $validator->errors()->add(
-                    'steps.0.approver_employee_id',
-                    'Approver pertama harus sama dengan Kepala Bagian aktif pegawai.',
+                    "steps.{$kepalaBagianIndex}.approver_employee_id",
+                    'Pegawai belum memiliki Kepala Bagian efektif. Tetapkan penugasan Kepala Bagian terlebih dahulu.',
+                );
+
+                return;
+            }
+
+            $kepalaBagianStep = $steps[$kepalaBagianIndex];
+
+            if (($kepalaBagianStep['approver_employee_id'] ?? null) !== $kepalaBagianId) {
+                $validator->errors()->add(
+                    "steps.{$kepalaBagianIndex}.approver_employee_id",
+                    'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
                 );
             }
 
-            $steps = $this->input('steps', []);
             $pybmcIndexes = collect($steps)
                 ->keys()
                 ->filter(fn ($index): bool => ($steps[$index]['step_type'] ?? null) === 'pybmc')

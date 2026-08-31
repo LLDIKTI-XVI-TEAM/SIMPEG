@@ -8,6 +8,7 @@ final class WhatsAppDeliveryResult
     public const ALLOWED_FAILURE_CODES = [
         'provider_unavailable',
         'provider_misconfigured',
+        'provider_response_ambiguous',
         'network_timeout',
         'rate_limited',
         'recipient_invalid',

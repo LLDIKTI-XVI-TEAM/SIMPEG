@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
+use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
@@ -11,10 +12,12 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\StorageRecoveryTask;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
+use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
@@ -22,6 +25,8 @@ use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -1139,16 +1144,16 @@ class SubmitLeaveRequestTest extends TestCase
         $chain->steps()->createMany([
             [
                 'step_order' => 1,
-                'step_type' => 'kepala_bagian',
-                'role_label' => 'Pemohon sebagai Kepala Bagian',
-                'approver_employee_id' => $aktor['employee']->id,
+                'step_type' => 'verifier',
+                'role_label' => 'Verifikator',
+                'approver_employee_id' => $aktor['supervisor']->id,
                 'is_final' => false,
             ],
             [
                 'step_order' => 2,
-                'step_type' => 'verifikator',
-                'role_label' => 'Verifikator',
-                'approver_employee_id' => $aktor['supervisor']->id,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Pemohon sebagai Kepala Bagian',
+                'approver_employee_id' => $aktor['employee']->id,
                 'is_final' => false,
             ],
             [
@@ -1861,7 +1866,7 @@ class SubmitLeaveRequestTest extends TestCase
 
     public function test_post_pengajuan_gagal_tertutup_tanpa_chain_approval_dan_tidak_menyimpan_apa_pun(): void
     {
-        // Pesan resolver dipetakan FormRequest menjadi validation error sebelum persistensi.
+        // Pesan resolver dipetakan Action menjadi validation error sebelum persistensi.
         $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
         $employee = Employee::factory()->create([
             'jenis_pegawai_id' => $jenisPegawai->id,
@@ -1891,6 +1896,198 @@ class SubmitLeaveRequestTest extends TestCase
             'employee_id' => $employee->id,
             'jenis_cuti_id' => $jenis->id,
             'alasan' => 'Uji fail-closed tanpa chain',
+        ]);
+    }
+
+    public function test_submit_tidak_memetakan_query_exception_resolver_menjadi_error_validasi(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit Query Exception');
+        $driverException = new \PDOException('relation employee_lock_view does not exist');
+        $driverException->errorInfo = ['42P01', null, 'relation employee_lock_view does not exist'];
+        $queryException = new QueryException(
+            'pgsql',
+            'select * from employee_lock_view where id = ? for update',
+            [$aktor['supervisor']->id],
+            $driverException,
+        );
+
+        $this->mock(ApprovalChainResolver::class, function (MockInterface $mock) use ($queryException): void {
+            /** @var Expectation $expectation */
+            $expectation = $mock->shouldReceive('resolveEffectiveSteps');
+            $expectation->once()->andThrow($queryException);
+        });
+
+        $httpRequest = Request::create('/cuti', 'POST');
+        $httpRequest->setUserResolver(fn (): User => $aktor['user']);
+
+        $this->expectException(QueryException::class);
+
+        app(SubmitLeaveRequestAction::class)->execute(
+            $aktor['employee'],
+            $this->payload($jenis),
+            $httpRequest,
+        );
+    }
+
+    public function test_post_simulasi_mengambil_lock_konfigurasi_sebelum_lock_pegawai(): void
+    {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Urutan advisory lock submit simulasi diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $aktor = $this->makePemohon('PNS', 'super_admin');
+        $jenis = $this->jenisCuti('Cuti Sakit Urutan Lock Simulasi');
+        $aktor['user']->forceFill([
+            'temporary_role' => 'pegawai',
+            'temporary_role_started_at' => now(),
+            'temporary_role_switched_by' => $aktor['user']->id,
+        ])->save();
+        $lockOrder = [];
+
+        DB::listen(static function (QueryExecuted $query) use (&$lockOrder): void {
+            $sql = strtolower($query->sql);
+
+            if (str_contains($sql, 'pg_advisory_xact_lock')
+                && in_array('simpeg.leave_chain_configuration', $query->bindings, true)) {
+                $lockOrder[] = 'configuration';
+
+                return;
+            }
+
+            if (str_contains($sql, 'from "employees"') && str_contains($sql, 'for update')) {
+                $lockOrder[] = 'employee';
+            }
+        });
+
+        $response = $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis, [
+            'alasan' => 'Uji urutan lock pada submit simulasi.',
+        ]));
+
+        $response->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+            'alasan' => 'Uji urutan lock pada submit simulasi.',
+        ]);
+        $this->assertSame('configuration', $lockOrder[0] ?? null, json_encode($lockOrder, JSON_THROW_ON_ERROR));
+        $this->assertContains('employee', $lockOrder);
+    }
+
+    public function test_post_pengajuan_menolak_chain_legacy_invalid_sebelum_mutasi_domain(): void
+    {
+        $aktor = $this->makePemohon();
+        $chain = LeaveApprovalChain::query()
+            ->where('employee_id', $aktor['employee']->id)
+            ->where('is_active', true)
+            ->sole();
+        $chain->steps()->delete();
+        $chain->steps()->createMany([
+            [
+                'step_order' => 1,
+                'step_type' => 'kepala_bagian',
+                'role_label' => 'Kepala Bagian',
+                'approver_employee_id' => $aktor['supervisor']->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 2,
+                'step_type' => 'verifier',
+                'role_label' => 'Verifikator Legacy',
+                'approver_employee_id' => Employee::factory()->create()->id,
+                'is_final' => false,
+            ],
+            [
+                'step_order' => 3,
+                'step_type' => 'pybmc',
+                'role_label' => 'PYBMC',
+                'approver_employee_id' => $aktor['pybmc']->id,
+                'is_final' => true,
+            ],
+        ]);
+        $jenis = $this->jenisCuti('Cuti Sakit Chain Legacy');
+        $jumlahAuditSebelum = AuditLog::query()->count();
+
+        $response = $this->actingAs($aktor['user'])->postJson(
+            route(self::ROUTE),
+            $this->payload($jenis),
+        );
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['jenis_cuti_id']);
+        $this->assertSame(
+            ['Semua Verifikator harus ditempatkan sebelum Kepala Bagian.'],
+            $response->json('errors.jenis_cuti_id'),
+        );
+        $this->assertDatabaseCount('leave_requests', 0);
+        $this->assertDatabaseCount('leave_request_steps', 0);
+        $this->assertDatabaseCount('notifications', 0);
+        $this->assertSame($jumlahAuditSebelum, AuditLog::query()->count());
+    }
+
+    public function test_post_pengajuan_menolak_kepala_bagian_efektif_yang_menjadi_nonaktif_tanpa_mutasi_domain(): void
+    {
+        $aktor = $this->makePemohon();
+        $statusPensiun = RefStatusPegawai::firstOrCreate(
+            ['kode' => 'PENSIUN'],
+            [
+                'nama' => 'Pensiun',
+                'kelompok' => 'Nonaktif',
+                'keterangan' => 'Pegawai telah memasuki masa pensiun.',
+                'is_active' => true,
+                'is_default' => false,
+            ],
+        );
+        $aktor['supervisor']->update(['status_pegawai_id' => $statusPensiun->id]);
+        $this->assertFalse($aktor['supervisor']->fresh()->isActive());
+
+        $jenis = $this->jenisCuti('Cuti Sakit Kepala Bagian Nonaktif');
+        $jumlahAuditSebelum = AuditLog::query()->count();
+        $jumlahReservasiSebelum = LeaveBalanceReservationEvent::query()->count();
+        $jumlahNotifikasiSebelum = SimpegNotification::query()->count();
+
+        $response = $this->actingAs($aktor['user'])->postJson(
+            route(self::ROUTE),
+            $this->payload($jenis),
+        );
+
+        $response->assertUnprocessable()->assertJsonValidationErrors(['jenis_cuti_id']);
+        $this->assertSame(
+            ['Approver pada rantai approval cuti wajib berstatus Aktif.'],
+            $response->json('errors.jenis_cuti_id'),
+        );
+        $this->assertDatabaseCount('leave_requests', 0);
+        $this->assertDatabaseCount('leave_request_steps', 0);
+        $this->assertSame($jumlahReservasiSebelum, LeaveBalanceReservationEvent::query()->count());
+        $this->assertSame($jumlahNotifikasiSebelum, SimpegNotification::query()->count());
+        $this->assertSame($jumlahAuditSebelum, AuditLog::query()->count());
+    }
+
+    public function test_post_pengajuan_menerima_resolved_approver_dengan_status_aktif_khusus(): void
+    {
+        $aktor = $this->makePemohon();
+        $statusTugasBelajar = RefStatusPegawai::firstOrCreate(
+            ['kode' => 'TUGAS_BELAJAR'],
+            [
+                'nama' => 'Tugas Belajar',
+                'kelompok' => 'Aktif/khusus',
+                'keterangan' => 'Pegawai menjalani tugas belajar.',
+                'is_active' => true,
+                'is_default' => false,
+            ],
+        );
+        $aktor['pybmc']->update(['status_pegawai_id' => $statusTugasBelajar->id]);
+        $jenis = $this->jenisCuti('Cuti Sakit Approver Tugas Belajar');
+
+        $this->actingAs($aktor['user'])
+            ->post(route(self::ROUTE), $this->payload($jenis))
+            ->assertRedirect(route('cuti'));
+
+        $this->assertTrue($aktor['pybmc']->fresh()->isActive());
+        $this->assertDatabaseHas('leave_request_steps', [
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'approver_employee_id' => $aktor['pybmc']->id,
+            'status' => 'pending',
         ]);
     }
 

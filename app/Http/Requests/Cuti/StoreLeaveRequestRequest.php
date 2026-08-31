@@ -4,7 +4,6 @@ namespace App\Http\Requests\Cuti;
 
 use App\Models\Employee;
 use App\Models\RefJenisCuti;
-use App\Services\Cuti\ApprovalChainResolver;
 use App\Services\Cuti\EmploymentStartDateResolver;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
@@ -125,18 +124,6 @@ class StoreLeaveRequestRequest extends FormRequest
                 $validator->errors()->add(
                     'tanggal_mulai',
                     'Akun pengguna belum terhubung ke data pegawai sehingga belum dapat mengajukan cuti.',
-                );
-
-                return;
-            }
-
-            // Chain dinamis wajib dapat di-resolve sebelum pengajuan disimpan agar request langsung punya snapshot step.
-            try {
-                app(ApprovalChainResolver::class)->resolveEffectiveSteps($employee);
-            } catch (\RuntimeException $exception) {
-                $validator->errors()->add(
-                    'jenis_cuti_id',
-                    $exception->getMessage(),
                 );
 
                 return;

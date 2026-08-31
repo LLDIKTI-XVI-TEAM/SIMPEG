@@ -101,7 +101,7 @@ class NotificationChannelPageTest extends TestCase
         );
     }
 
-    public function test_channel_tanpa_adapter_dilabeli_belum_tersedia_dan_tidak_memiliki_kontrol_policy(): void
+    public function test_channel_whatsapp_dilabeli_tersedia_dan_memiliki_kontrol_policy(): void
     {
         $admin = User::factory()->superAdmin()->create();
 
@@ -109,9 +109,9 @@ class NotificationChannelPageTest extends TestCase
 
         $response->assertOk()
             ->assertSee('data-channel-code="whatsapp_business"', false)
-            ->assertSee('data-adapter-available="false"', false)
-            ->assertSee('Belum tersedia')
-            ->assertDontSee('data-policy-control="whatsapp_business"', false)
+            ->assertSee('data-adapter-available="true"', false)
+            ->assertDontSee('Adapter runtime belum tersedia.')
+            ->assertSee('data-policy-control="whatsapp_business"', false)
             ->assertSee('data-policy-control="email"', false)
             ->assertSee('data-policy-unsupported="ews.scheduler_failed:email"', false);
     }

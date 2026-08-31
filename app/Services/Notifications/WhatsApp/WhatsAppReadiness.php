@@ -4,21 +4,31 @@ namespace App\Services\Notifications\WhatsApp;
 
 class WhatsAppReadiness
 {
+    public function __construct(
+        private readonly WhatsAppRuntimeConfiguration $runtime,
+    ) {}
+
     /**
      * WhatsApp tidak boleh aktif hanya karena satu environment variable terisi.
-     * Seluruh artefak provider harus sudah diverifikasi oleh LLDIKTI sebelum dispatcher dapat bekerja.
+     * Gerbang operasional (kill-switch) dibaca dari environment, sedangkan artefak
+     * provider dibaca dari setting aplikasi via WhatsAppRuntimeConfig. Token berasal
+     * dari ciphertext write-only database, sedangkan ID integrasi berasal dari UUID
+     * resmi di setting. Seluruh artefak harus terisi dan tervalidasi sebelum dispatcher bekerja.
      */
     public function isReady(): bool
     {
-        $config = config('services.whatsapp', []);
+        $snapshot = $this->runtime->providerSnapshot();
+        $config = $snapshot['config'];
 
         if (($config['enabled'] ?? false) !== true
             || ($config['sandbox_verified'] ?? false) !== true
             || ($config['recipient_source_verified'] ?? false) !== true
-            || blank($config['provider'] ?? null)
-            || blank($config['base_url'] ?? null)
-            || blank($config['credential_reference'] ?? null)
-            || blank($config['channel_id'] ?? null)
+            || ! QontakWhatsAppProviderContract::supports(
+                $config['provider'] ?? null,
+                $config['base_url'] ?? null,
+            )
+            || blank($snapshot['access_token'])
+            || blank($snapshot['channel_integration_id'])
             || blank($config['template_configuration'] ?? null)
             || ($config['runtime_configuration_valid'] ?? false) !== true
             || blank($config['canonical_url'] ?? null)) {

@@ -10,6 +10,7 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
@@ -34,6 +35,8 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
     private const MARKER_LOCK = 82620262;
 
     private const NOTIFICATION_LOCK = 82620261;
+
+    private const APPROVER_SNAPSHOT_LOCK = 82620263;
 
     private ?string $raceDirectory = null;
 
@@ -171,7 +174,62 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
         }
     }
 
-    /** @return array{employee:Employee, actor:User, annual:RefJenisCuti} */
+    public function test_submit_mempertahankan_lock_approver_sampai_snapshot_terbentuk(): void
+    {
+        $fixture = $this->createFixture();
+        $statusNonaktif = RefStatusPegawai::query()->create([
+            'kode' => 'NONAKTIF_RACE_SUBMIT',
+            'nama' => 'Nonaktif Race Submit',
+            'kelompok' => 'Nonaktif',
+            'keterangan' => 'Fixture serialisasi lifecycle approver saat submit.',
+            'is_active' => true,
+            'is_default' => false,
+        ]);
+        $processes = [];
+
+        try {
+            $this->installApproverSnapshotPauseTrigger();
+            DB::statement('SELECT pg_advisory_lock(?)', [self::APPROVER_SNAPSHOT_LOCK]);
+
+            $submit = $this->startWorker('submit-approver-lock', 'submit', $fixture);
+            $processes[] = $submit['process'];
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_approver_lock', 30_000));
+
+            $status = $this->startWorker('status-approver-lock', 'status', $fixture, [
+                'target_employee_id' => $fixture['kepala_bagian']->id,
+                'status_id' => $statusNonaktif->id,
+            ]);
+            $processes[] = $status['process'];
+
+            $this->assertTrue(
+                $this->waitForDatabaseLock('simpeg_rollover_status_approver_lock', 5_000),
+                'Writer lifecycle wajib menunggu lock approver sampai snapshot pengajuan selesai dibentuk.',
+            );
+            $this->assertFalse(File::exists($status['result']));
+
+            DB::statement('SELECT pg_advisory_unlock(?)', [self::APPROVER_SNAPSHOT_LOCK]);
+            $submitResult = $this->finishWorker($submit);
+            $statusResult = $this->finishWorker($status);
+
+            $this->assertTrue($submitResult['ok'] ?? false, json_encode($submitResult, JSON_THROW_ON_ERROR));
+            $this->assertTrue($statusResult['ok'] ?? false, json_encode($statusResult, JSON_THROW_ON_ERROR));
+            $request = LeaveRequest::query()
+                ->where('employee_id', $fixture['employee']->id)
+                ->sole();
+            $this->assertDatabaseHas('leave_request_steps', [
+                'leave_request_id' => $request->id,
+                'step_type' => 'kepala_bagian',
+                'approver_employee_id' => $fixture['kepala_bagian']->id,
+            ]);
+            $this->assertSame($statusNonaktif->id, $fixture['kepala_bagian']->refresh()->status_pegawai_id);
+        } finally {
+            DB::statement('SELECT pg_advisory_unlock_all()');
+            $this->stopWorkers($processes);
+            $this->dropPauseTriggers();
+        }
+    }
+
+    /** @return array{employee:Employee, actor:User, annual:RefJenisCuti, kepala_bagian:Employee} */
     private function createFixture(): array
     {
         $pns = RefJenisPegawai::query()->where('nama', 'PNS')->firstOrFail();
@@ -231,14 +289,16 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
             'employee' => $employee,
             'actor' => $actor,
             'annual' => RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail(),
+            'kepala_bagian' => $kepalaBagian,
         ];
     }
 
     /**
-     * @param  array{employee:Employee, actor:User, annual:RefJenisCuti}  $fixture
+     * @param  array{employee:Employee, actor:User, annual:RefJenisCuti, kepala_bagian:Employee}  $fixture
+     * @param  array<string, string>  $extra
      * @return array{process:Process,result:string}
      */
-    private function startWorker(string $label, string $operation, array $fixture): array
+    private function startWorker(string $label, string $operation, array $fixture, array $extra = []): array
     {
         $directory = $this->raceDirectory ?? storage_path('framework/testing/leave-rollover-race-'.Str::uuid());
         $this->raceDirectory = $directory;
@@ -249,7 +309,7 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
         $process = new Process([
             PHP_BINARY,
             base_path('tests/Fixtures/LeaveBalanceRolloverRaceWorker.php'),
-            base64_encode(json_encode([
+            base64_encode(json_encode(array_merge([
                 'operation' => $operation,
                 'application_name' => 'simpeg_rollover_'.str_replace('-', '_', $label),
                 'employee_id' => $fixture['employee']->id,
@@ -260,7 +320,7 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
                 'ready' => $ready,
                 'barrier' => $barrier,
                 'result' => $result,
-            ], JSON_THROW_ON_ERROR)),
+            ], $extra), JSON_THROW_ON_ERROR)),
         ], base_path(), timeout: 60);
         $process->start();
         $this->assertTrue($this->waitForFile($ready, 30_000));
@@ -324,6 +384,21 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
         return false;
     }
 
+    private function installApproverSnapshotPauseTrigger(): void
+    {
+        DB::unprepared(sprintf(<<<'SQL'
+CREATE OR REPLACE FUNCTION test_pause_submit_approver_snapshot() RETURNS trigger AS $$
+BEGIN
+    PERFORM pg_advisory_xact_lock(%d);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER test_pause_submit_approver_snapshot
+BEFORE INSERT ON leave_request_steps
+FOR EACH ROW EXECUTE FUNCTION test_pause_submit_approver_snapshot();
+SQL, self::APPROVER_SNAPSHOT_LOCK));
+    }
+
     private function installNotificationPauseTrigger(): void
     {
         DB::unprepared(sprintf(<<<'SQL'
@@ -365,6 +440,8 @@ DROP TRIGGER IF EXISTS test_pause_rollover_submit_notification ON notifications;
 DROP FUNCTION IF EXISTS test_pause_rollover_submit_notification();
 DROP TRIGGER IF EXISTS test_pause_rollover_marker ON leave_balance_ledger;
 DROP FUNCTION IF EXISTS test_pause_rollover_marker();
+DROP TRIGGER IF EXISTS test_pause_submit_approver_snapshot ON leave_request_steps;
+DROP FUNCTION IF EXISTS test_pause_submit_approver_snapshot();
 SQL);
     }
 

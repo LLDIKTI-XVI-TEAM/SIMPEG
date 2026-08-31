@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Actions\Notifications\CreateNotificationChannelAction;
 use App\Actions\Notifications\DeleteNotificationChannelAction;
+use App\Actions\Notifications\SaveWhatsAppChannelConfigAction;
 use App\Actions\Notifications\SetNotificationChannelEnabledAction;
 use App\Actions\Notifications\SetNotificationEventChannelPolicyAction;
 use App\Actions\Notifications\ShowNotificationChannelConfigAction;
@@ -14,6 +15,7 @@ use App\Http\Requests\Notifications\SetNotificationChannelEnabledRequest;
 use App\Http\Requests\Notifications\SetNotificationEventChannelPolicyRequest;
 use App\Http\Requests\Notifications\StoreNotificationChannelRequest;
 use App\Http\Requests\Notifications\UpdateNotificationChannelRequest;
+use App\Http\Requests\Notifications\UpdateWhatsAppChannelConfigRequest;
 use App\Models\RefNotificationChannel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -84,5 +86,15 @@ class NotificationChannelController extends Controller
         );
 
         return back()->with('success', 'Kebijakan channel untuk event berhasil diperbarui.');
+    }
+
+    public function updateWhatsAppConfig(
+        UpdateWhatsAppChannelConfigRequest $request,
+        RefNotificationChannel $notificationChannel,
+        SaveWhatsAppChannelConfigAction $action,
+    ): RedirectResponse {
+        $action->execute($notificationChannel->id, $request->validated(), $request);
+
+        return back()->with('success', 'Konfigurasi WhatsApp Business berhasil diperbarui.');
     }
 }

@@ -14,6 +14,10 @@ use RuntimeException;
  */
 class ApprovalChainResolver
 {
+    public function __construct(
+        private readonly ApprovalChainInvariantService $invariants,
+    ) {}
+
     /** @return Collection<int, LeaveApprovalChainStep> */
     public function resolveEffectiveSteps(Employee $employee): Collection
     {
@@ -51,9 +55,18 @@ class ApprovalChainResolver
             }
         }
 
-        if ($steps->where('is_final', true)->count() !== 1) {
-            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu approver final.');
-        }
+        // Resolver tidak menormalkan chain lama. Bentuk dan lifecycle seluruh approver
+        // diperiksa ulang setelah substitusi Kepala Bagian agar snapshot baru tidak diarahkan
+        // kepada pegawai yang sudah nonaktif sejak konfigurasi terakhir disimpan.
+        $this->invariants->validate(
+            $steps->map(fn (LeaveApprovalChainStep $step): array => [
+                'step_type' => $step->step_type,
+                'role_label' => $step->role_label,
+                'approver_employee_id' => $step->approver_employee_id,
+                'approver_role_key' => $step->approver_role_key,
+                'is_final' => (bool) $step->is_final,
+            ])->all(),
+        );
 
         return $steps->values();
     }

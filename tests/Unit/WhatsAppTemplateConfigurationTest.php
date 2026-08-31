@@ -28,13 +28,59 @@ class WhatsAppTemplateConfigurationTest extends TestCase
                     'button' => ['type' => 'url', 'parameter' => 'cta_url'],
                 ],
             ],
-            'ignored' => 'tidak dipakai',
         ], JSON_THROW_ON_ERROR));
 
         $this->assertTrue($configuration['valid']);
         $this->assertSame('provider_cuti_disetujui_v1', $configuration['event_templates']['cuti.disetujui']);
         $this->assertSame('provider-template-id', $configuration['templates']['provider_cuti_disetujui_v1']['id']);
         $this->assertSame('cta_url', $configuration['templates']['provider_cuti_disetujui_v1']['button']['parameter']);
+    }
+
+    public function test_field_di_luar_schema_ditolak_fail_closed(): void
+    {
+        $invalidConfigurations = [
+            'root' => [
+                'event_templates' => [],
+                'templates' => [],
+                'metadata' => ['consumer_secret' => 'fixture-rahasia'],
+            ],
+            'required variables' => [
+                'event_templates' => [],
+                'templates' => [
+                    'template-status' => [
+                        'required_variables' => ['providerSecret'],
+                    ],
+                ],
+            ],
+            'variables map' => [
+                'event_templates' => [],
+                'templates' => [
+                    'template-status' => [
+                        'variables_map' => ['providerSecret' => 'fixture-rahasia'],
+                    ],
+                ],
+            ],
+            'button' => [
+                'event_templates' => [],
+                'templates' => [
+                    'template-status' => [
+                        'button' => [
+                            'type' => 'url',
+                            'parameter' => 'cta_url',
+                            'providerSecret' => 'fixture-rahasia',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        foreach ($invalidConfigurations as $scope => $configuration) {
+            $decoded = WhatsAppTemplateConfiguration::decode(json_encode($configuration, JSON_THROW_ON_ERROR));
+
+            $this->assertFalse($decoded['valid'], "Field tambahan pada {$scope} harus ditolak.");
+            $this->assertSame([], $decoded['event_templates']);
+            $this->assertSame([], $decoded['templates']);
+        }
     }
 
     public function test_konfigurasi_json_tidak_valid_ditolak_dengan_struktur_kosong(): void

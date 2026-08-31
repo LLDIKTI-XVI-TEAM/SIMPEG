@@ -28,6 +28,7 @@ final class WhatsAppTemplatePayloadMapper
 
     public function __construct(
         private readonly WhatsAppPrivacyGuard $privacy,
+        private readonly WhatsAppRuntimeConfig $runtime,
     ) {}
 
     /**
@@ -76,7 +77,7 @@ final class WhatsAppTemplatePayloadMapper
      */
     private function mapCutiPerluTindakan(string $eventKey, Employee $recipient, array $data): ?WhatsAppMappedTemplate
     {
-        $eventTemplates = config('services.whatsapp.event_templates', []);
+        $eventTemplates = $this->runtime->eventTemplates();
         $templateKey = $eventTemplates[$eventKey] ?? null;
         if (! is_string($templateKey) || trim($templateKey) === '') {
             return null;
@@ -108,12 +109,20 @@ final class WhatsAppTemplatePayloadMapper
         $tanggalSelesai = $this->formatDate($leaveRequest->tanggal_selesai);
         $jumlahHari = ((int) $leaveRequest->jumlah_hari_kerja).' hari kerja';
 
+        // Kontrak template resmi menyertakan alasan pengajuan; alasan wajib terisi
+        // karena form pengajuan mewajibkannya. Kosong berarti data tidak layak dikirim.
+        $alasan = $this->privacy->sanitize($leaveRequest->alasan);
+        if ($alasan === '') {
+            return null;
+        }
+
         $canonicalVariables = [
             'nama_pegawai' => $namaPemohon,
             'jenis_cuti' => $jenisCuti,
             'tanggal_mulai' => $tanggalMulai,
             'tanggal_selesai' => $tanggalSelesai,
             'jumlah_hari' => $jumlahHari,
+            'alasan' => $alasan,
             'tautan_detail' => $url,
         ];
 
@@ -140,7 +149,7 @@ final class WhatsAppTemplatePayloadMapper
      */
     private function mapCutiStatus(string $eventKey, Employee $recipient, array $data): ?WhatsAppMappedTemplate
     {
-        $eventTemplates = config('services.whatsapp.event_templates', []);
+        $eventTemplates = $this->runtime->eventTemplates();
         $templateKey = $eventTemplates[$eventKey] ?? null;
         if (! is_string($templateKey) || trim($templateKey) === '') {
             return null;
@@ -355,7 +364,7 @@ final class WhatsAppTemplatePayloadMapper
      */
     private function mapEwsPengingat(string $eventKey, Employee $recipient, array $data): ?WhatsAppMappedTemplate
     {
-        $eventTemplates = config('services.whatsapp.event_templates', []);
+        $eventTemplates = $this->runtime->eventTemplates();
         $templateKey = $eventTemplates[$eventKey] ?? null;
         if (! is_string($templateKey) || trim($templateKey) === '') {
             return null;
@@ -486,7 +495,7 @@ final class WhatsAppTemplatePayloadMapper
         ?string $url,
         ?string $archetype = null,
     ): ?array {
-        $templateConfig = config("services.whatsapp.templates.{$templateKey}");
+        $templateConfig = $this->runtime->template($templateKey);
         if (! is_array($templateConfig)) {
             return null;
         }
@@ -505,6 +514,11 @@ final class WhatsAppTemplatePayloadMapper
         $bodyVariables = [];
 
         foreach ($variablesMap as $canonicalKey => $providerKey) {
+            // Tautan detail tidak pernah menjadi parameter body; ia disalurkan ke tombol URL.
+            if ($canonicalKey === WhatsAppTemplateContract::BUTTON_ONLY_VARIABLE) {
+                continue;
+            }
+
             if (! array_key_exists($canonicalKey, $canonicalVariables)) {
                 return null;
             }
@@ -525,7 +539,7 @@ final class WhatsAppTemplatePayloadMapper
      */
     private function resolveUrl(?string $url): ?string
     {
-        $canonicalUrl = config('services.whatsapp.canonical_url');
+        $canonicalUrl = $this->runtime->canonicalUrl();
         if (! is_string($canonicalUrl) || trim($canonicalUrl) === '') {
             return null; // Fail-closed: domain resmi SIMPEG belum ditetapkan LLDIKTI
         }
@@ -533,7 +547,7 @@ final class WhatsAppTemplatePayloadMapper
         $canonicalUrl = trim($canonicalUrl);
         $parsedCanonical = parse_url($canonicalUrl);
         $canonicalScheme = strtolower((string) ($parsedCanonical['scheme'] ?? ''));
-        $canonicalHost = strtolower((string) ($parsedCanonical['host'] ?? ''));
+        $canonicalHost = trim(strtolower((string) ($parsedCanonical['host'] ?? '')), '[]');
 
         // Domain resmi wajib HTTPS dan bukan loopback/localhost
         if ($canonicalScheme !== 'https' || $canonicalHost === '' || in_array($canonicalHost, ['localhost', '127.0.0.1', '::1'], true)) {
@@ -560,7 +574,7 @@ final class WhatsAppTemplatePayloadMapper
         if (str_starts_with($url, 'https://')) {
             $parsed = parse_url($url);
             $scheme = strtolower((string) ($parsed['scheme'] ?? ''));
-            $host = strtolower((string) ($parsed['host'] ?? ''));
+            $host = trim(strtolower((string) ($parsed['host'] ?? '')), '[]');
 
             if ($scheme !== 'https' || $host !== $canonicalHost) {
                 return null; // Tolak domain di luar domain resmi yang ditetapkan

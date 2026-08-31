@@ -8,10 +8,13 @@ use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainConfigurationLockService;
+use App\Services\Cuti\ApprovalChainInvariantService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
@@ -40,8 +43,8 @@ class ApplyChainTemplateToUnitAction
     private array $statusKepalaBagian = [];
 
     /**
-     * Kepala bagian dianggap sah hanya bila masih aktif dan belum dihapus, sama dengan syarat approver
-     * pada form konfigurasi rantai per pegawai.
+     * Kepala bagian dianggap sah hanya bila masih berstatus aktif, sama dengan syarat approver pada
+     * form konfigurasi rantai per pegawai.
      */
     private function kepalaBagianAktif(string $kepalaBagianId): bool
     {
@@ -54,6 +57,7 @@ class ApplyChainTemplateToUnitAction
     public function __construct(
         private readonly SaveEmployeeApprovalChainAction $saveChain,
         private readonly ApprovalChainConfigurationLockService $configurationLock,
+        private readonly ApprovalChainInvariantService $invariants,
     ) {}
 
     /**
@@ -83,7 +87,7 @@ class ApplyChainTemplateToUnitAction
             $this->configurationLock->acquire();
             $this->lockUnit($unitKerja);
 
-            $langkahSumber = $this->langkahSumber($sumber);
+            $langkahSumber = $this->langkahSumber($sumber, $request);
 
             $hasil = [
                 'applied_employee_ids' => [],
@@ -117,8 +121,8 @@ class ApplyChainTemplateToUnitAction
                         // itu diterima karena penerapan ini dijalankan sesekali untuk satu unit.
                         $kepalaBagianId = $pegawai->currentSupervisor()?->kepala_bagian_id;
 
-                        // Penugasan atasan dapat tetap efektif walau pejabatnya sudah pensiun atau
-                        // dihapus, sedangkan form per pegawai hanya menerima approver aktif. Kepala
+                        // Penugasan atasan dapat tetap efektif walau pejabatnya sudah berstatus
+                        // nonaktif, sedangkan form per pegawai hanya menerima approver aktif. Kepala
                         // bagian nonaktif diperlakukan sama dengan tidak ada supaya rantai yang
                         // dibuat di sini selalu dapat dipertahankan lewat form konfigurasi.
                         if ($kepalaBagianId === null || ! $this->kepalaBagianAktif($kepalaBagianId)) {
@@ -199,7 +203,7 @@ class ApplyChainTemplateToUnitAction
      *
      * @return list<array{step_type:string, role_label:string, approver_employee_id:string, approver_role_key:?string, is_final:bool}>
      */
-    private function langkahSumber(Employee $sumber): array
+    private function langkahSumber(Employee $sumber, ?Request $request): array
     {
         $rantai = LeaveApprovalChain::query()
             ->with(['steps' => fn ($query) => $query->orderBy('step_order')])
@@ -211,65 +215,7 @@ class ApplyChainTemplateToUnitAction
             throw new RuntimeException('Pegawai sumber belum memiliki rantai approval aktif untuk disalin.');
         }
 
-        // Rantai wajib memiliki langkah Kepala Bagian karena resolver menolak pengajuan tanpa slot
-        // itu. Penyalinan tidak dapat menyisipkan langkah yang tidak ada pada sumber, jadi rantai
-        // sumber yang kehilangan Kepala Bagian akan menghasilkan salinan rusak yang membuat seluruh
-        // anggota unit tidak dapat mengajukan cuti. Ditolak sebelum satu pun chain lama dinonaktifkan.
-        if ($rantai->steps->doesntContain(fn ($step): bool => $step->step_type === 'kepala_bagian')) {
-            throw new RuntimeException('Chain pegawai sumber tidak memiliki langkah Kepala Bagian. Perbaiki chain sumber sebelum diterapkan ke unit.');
-        }
-
-        // Struktur final divalidasi di depan, sekelas dengan pemeriksaan lain, supaya template rusak
-        // tidak lolos ketika unit hanya berisi pegawai sumber dan tidak berakhir sebagai galat di
-        // tengah penyimpanan anggota pertama. Langkah dibaca terurut step_order dari kueri di atas.
-        if ($rantai->steps->where('is_final', true)->count() !== 1) {
-            throw new RuntimeException('Chain pegawai sumber wajib memiliki tepat satu approver final. Perbaiki chain sumber sebelum diterapkan ke unit.');
-        }
-
-        if ((bool) $rantai->steps->last()?->is_final !== true) {
-            throw new RuntimeException('Approver final pada chain pegawai sumber wajib berada di urutan terakhir. Perbaiki chain sumber sebelum diterapkan ke unit.');
-        }
-
-        // Approver pada langkah kepala bagian selalu diganti dengan atasan efektif pegawai tujuan,
-        // dan resolver melakukan substitusi yang sama saat pengajuan dibentuk. Id kepala bagian pada
-        // rantai sumber karena itu tidak pernah disalin, sehingga snapshot yang usang akibat rotasi
-        // jabatan tidak boleh membatalkan penerapan. Pemeriksaan di bawah hanya berlaku bagi langkah
-        // yang approvernya benar-benar diteruskan ke rantai tujuan.
-        $langkahDisalin = $rantai->steps->reject(fn ($step): bool => $step->step_type === 'kepala_bagian');
-
-        // Kunci asing approver memakai SET NULL, jadi penghapusan permanen pegawai meninggalkan
-        // langkah tanpa approver. Langkah seperti itu tidak dapat disalin karena kolom approver pada
-        // rantai tujuan bertipe uuid, dan penyalinan tanpa penjaga ini gagal di tengah penyimpanan
-        // sebagai galat basis data alih-alih menerangkan bahwa rantai sumbernya sudah rusak.
-        $langkahTanpaApprover = $langkahDisalin
-            ->filter(fn ($step): bool => $step->approver_employee_id === null)
-            ->pluck('role_label');
-
-        if ($langkahTanpaApprover->isNotEmpty()) {
-            throw new RuntimeException(sprintf(
-                'Chain pegawai sumber memuat langkah tanpa approver: %s. Perbaiki chain sumber sebelum diterapkan ke unit.',
-                $langkahTanpaApprover->implode(', '),
-            ));
-        }
-
-        // Rantai sumber bisa menua: approver yang aktif saat rantai dibuat mungkin sudah pensiun atau
-        // keluar. Form konfigurasi per pegawai hanya menerima approver aktif dan resolver pengajuan
-        // tidak memeriksa status approver, jadi penyalinan tanpa pemeriksaan ini akan mengarahkan
-        // pengajuan seluruh unit ke pejabat yang sudah tidak menjabat. Seluruh aksi ditolak alih-alih
-        // dilanjutkan sebagian supaya admin memperbaiki rantai sumber lebih dulu.
-        $approverNonaktif = Employee::query()
-            ->whereIn('id', $langkahDisalin->pluck('approver_employee_id')->filter()->unique())
-            ->whereNotActiveStatus()
-            ->pluck('nama_lengkap');
-
-        if ($approverNonaktif->isNotEmpty()) {
-            throw new RuntimeException(sprintf(
-                'Chain pegawai sumber memuat approver nonaktif: %s. Perbarui chain sumber sebelum diterapkan ke unit.',
-                $approverNonaktif->implode(', '),
-            ));
-        }
-
-        return $rantai->steps
+        $langkah = $rantai->steps
             ->map(fn ($step): array => [
                 'step_type' => (string) $step->step_type,
                 'role_label' => (string) $step->role_label,
@@ -279,6 +225,30 @@ class ApplyChainTemplateToUnitAction
             ])
             ->values()
             ->all();
+
+        try {
+            $this->invariants->assertCanonicalShape($langkah);
+
+            // Kepala Bagian sumber selalu diganti. Approver lain disalin apa adanya, sehingga harus
+            // layak sebelum iterasi target agar template kosong sekalipun tidak tercatat berhasil.
+            $approverYangDisalin = array_values(array_map(
+                fn (array $item): string => $item['approver_employee_id'],
+                array_filter($langkah, fn (array $item): bool => $item['step_type'] !== 'kepala_bagian'),
+            ));
+            $this->invariants->validateApproverIds($approverYangDisalin);
+        } catch (QueryException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            if ($request === null) {
+                throw $exception;
+            }
+
+            throw ValidationException::withMessages([
+                'source_employee_id' => $exception->getMessage(),
+            ]);
+        }
+
+        return $langkah;
     }
 
     /**

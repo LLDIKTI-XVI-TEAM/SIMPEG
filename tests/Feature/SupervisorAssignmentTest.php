@@ -12,14 +12,18 @@ use App\Models\RefStatusPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Services\Cuti\ApprovalChainInvariantService;
 use App\Services\Employees\KepalaBagianScopeService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Mockery\Expectation;
+use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -259,6 +263,49 @@ class SupervisorAssignmentTest extends TestCase
         $supervisor->delete();
 
         $this->assertDirectAssignmentRejectsInvalidSupervisor($supervisor->id, '2026-08-01');
+    }
+
+    public static function assignmentQueryExceptionBoundaryProvider(): array
+    {
+        return [
+            'penugasan efektif hari ini' => ['2026-07-23'],
+            'penugasan masa depan' => ['2026-08-01'],
+        ];
+    }
+
+    #[DataProvider('assignmentQueryExceptionBoundaryProvider')]
+    public function test_direct_action_tetap_mempropagasikan_kegagalan_database_pada_validasi_approver(
+        string $effectiveDate,
+    ): void {
+        $employee = Employee::factory()->create();
+        $supervisor = Employee::factory()->create();
+        $queryException = new QueryException(
+            'pgsql',
+            'select * from employees where id = ?',
+            [$supervisor->id],
+            new \RuntimeException('Koneksi database terputus.'),
+        );
+        $this->mock(ApprovalChainInvariantService::class, function (MockInterface $mock) use ($queryException): void {
+            /** @var Expectation $expectation */
+            $expectation = $mock->shouldReceive('validateApproverIds');
+            $expectation->once()->andThrow($queryException);
+        });
+        $exception = null;
+
+        try {
+            $this->app->make(AssignSupervisorAction::class)->execute(
+                $employee,
+                $supervisor->id,
+                $effectiveDate,
+            );
+        } catch (\Throwable $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertSame($queryException, $exception);
+        $this->assertDatabaseCount('supervisor_assignments', 0);
+        $this->assertNull($employee->fresh()->kepala_bagian_id);
+        $this->assertDatabaseCount('audit_logs', 0);
     }
 
     public static function invalidDirectSupervisorIdProvider(): array
@@ -624,7 +671,7 @@ class SupervisorAssignmentTest extends TestCase
         );
     }
 
-    public function test_assignment_masa_depan_hanya_mengambil_lock_timeline(): void
+    public function test_assignment_masa_depan_mengambil_lock_konfigurasi_sebelum_lock_timeline(): void
     {
         if (DB::connection()->getDriverName() !== 'pgsql') {
             $this->markTestSkipped('Advisory lock penugasan masa depan diverifikasi khusus pada PostgreSQL.');
@@ -647,7 +694,10 @@ class SupervisorAssignmentTest extends TestCase
         );
 
         $this->assertSame(
-            ['simpeg.supervisor_assignment:'.$employee->id],
+            [
+                'simpeg.leave_chain_configuration',
+                'simpeg.supervisor_assignment:'.$employee->id,
+            ],
             $advisoryBindings,
         );
     }
