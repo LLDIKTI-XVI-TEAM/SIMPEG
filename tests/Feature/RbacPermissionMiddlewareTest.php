@@ -168,6 +168,30 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
     }
 
+    public function test_operational_permissions_are_provisioned_during_migration_for_default_roles(): void
+    {
+        $names = ['employee_histories.export', 'dokumen_sk.read', 'ews.read'];
+        Permission::query()->whereIn('name', $names)->delete();
+
+        $migration = require database_path('migrations/2026_08_31_000002_provision_operational_rbac_permissions.php');
+        $migration->up();
+        $migration->up();
+
+        foreach ($names as $name) {
+            $permission = Permission::query()->where('name', $name)->firstOrFail();
+
+            foreach (['super_admin', 'admin_kepegawaian', 'pimpinan'] as $roleName) {
+                $role = Role::query()->where('name', $roleName)->firstOrFail();
+                $this->assertDatabaseHas('role_permissions', [
+                    'role_id' => $role->id,
+                    'permission_id' => $permission->id,
+                ]);
+            }
+
+            $this->assertSame(3, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
+        }
+    }
+
     public function test_permission_middleware_allows_user_with_permission(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

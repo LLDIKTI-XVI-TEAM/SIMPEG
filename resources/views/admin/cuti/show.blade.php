@@ -416,6 +416,13 @@
                         </a>
                     @endif
 
+                    @if ($canGenerateFormulir)
+                        <form action="{{ route('cuti.formulir-pdf.generate', $cuti) }}" method="POST" class="inline">
+                            @csrf
+                            <x-ui.button type="submit" variant="secondary">Bentuk Bukti Formulir Cuti</x-ui.button>
+                        </form>
+                    @endif
+
                     @if ($canAct)
                         <x-ui.button type="button" variant="secondary" data-action-visual="temporary-secondary" @click="open('postpone', $event)">
                             Tangguhkan

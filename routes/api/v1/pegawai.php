@@ -18,20 +18,20 @@ $disableEmployeeApiAuth = app()->environment('local')
 $employeeGroupMiddleware = $disableEmployeeApiAuth
     ? []
     : ['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'];
-// Otorisasi modul employees permission-driven: permission granular (evaluasi role efektif)
-// menjadi gerbang tunggal per route; hierarki akses dikelola dinamis lewat RBAC matrix.
+// Permission menjaga aksi, sedangkan employee.scope mencegah permission mandiri
+// dipakai untuk merekam data pegawai lain melalui UUID pada URL.
 $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
     ? []
-    : ['permission:'.$permission];
-// Mutasi modul employees permission-driven: permission granular (evaluasi role efektif)
-// menjadi gerbang tunggal; hierarki akses dikelola lewat RBAC matrix, bukan role gate.
+    : ['permission:'.$permission, 'employee.scope'];
+// Mutasi data pegawai hanya berada pada surface pengelola. Permission menjaga aksi
+// granularnya; role gate menjaga kontrak bahwa Pegawai/Pimpinan tidak dapat memutasi API admin.
 $adminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['permission:'.$permission];
-// Mutasi sub-modul pegawai (keluarga, disiplin, riwayat, dokumen) dikelola lewat RBAC matrix.
+    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission, 'employee.scope'];
+// Sub-modul keluarga, disiplin, riwayat, dan dokumen memakai kontrak pengelola yang sama.
 $adminSubModuleMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['permission:'.$permission];
+    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission, 'employee.scope'];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
@@ -40,6 +40,8 @@ Route::middleware($employeeGroupMiddleware)
     ->name('pegawai.')
     ->group(function () use ($adminEmployeeMutationMiddleware, $adminSubModuleMutationMiddleware, $adminEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
         Route::get('/', [EmployeeController::class, 'index'])
+            // Daftar dipakai oleh halaman pemantauan Pimpinan dan tidak menerima UUID target;
+            // pembatasan employee.scope diterapkan pada endpoint yang menunjuk satu rekam pegawai.
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->name('index');
         Route::post('/', [EmployeeController::class, 'store'])
@@ -85,7 +87,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('show');
         Route::get('/{employee}/table-row', [EmployeeController::class, 'tableRow'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
+            ->middleware($adminEmployeeReadMiddleware())
             ->whereUuid('employee')
             ->name('table-row');
         Route::put('/{employee}', [EmployeeController::class, 'update'])
@@ -101,7 +103,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('disiplin.store');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read,dokumen_sk.read'])
+            ->middleware($adminEmployeeReadMiddleware('employees.read,dokumen_sk.read'))
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
         Route::post('/{employee}/berkas-lainnya', [EmployeeDocumentController::class, 'storeBerkasLainnya'])
@@ -119,7 +121,7 @@ Route::middleware($employeeGroupMiddleware)
             ->scopeBindings()
             ->name('berkas-lainnya.destroy');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
-            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read,dokumen_sk.read'])
+            ->middleware($adminEmployeeReadMiddleware('employees.read,dokumen_sk.read'))
             ->whereUuid('employee')
             ->name('status-dokumen');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])

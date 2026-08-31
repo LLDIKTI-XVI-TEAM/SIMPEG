@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\ValidationException;
 
 class UploadAppointmentSkAction
 {
@@ -18,23 +19,18 @@ class UploadAppointmentSkAction
         UploadedFile $file,
         ?Request $request = null,
     ): Appointment {
-        $path = $this->files->storeSk($file);
         $appointment = $employee->appointment;
 
-        if ($appointment) {
-            $oldValues = $appointment->toArray();
-            $appointment->update(['file_sk' => $path]);
-            AuditService::log('UPDATE', 'Appointment', $appointment->id, $oldValues, $appointment->toArray(), $request);
-        } else {
-            $appointment = $employee->appointment()->create([
-                'jenis_pengangkatan' => $employee->jenisPegawai?->nama ?? 'CPNS',
-                'no_sk' => '-',
-                'tanggal_sk' => now()->toDateString(),
-                'tmt_pengangkatan' => now()->toDateString(),
-                'file_sk' => $path,
+        if ($appointment === null) {
+            throw ValidationException::withMessages([
+                'appointment' => 'Simpan data pengangkatan lengkap terlebih dahulu sebelum mengunggah SK.',
             ]);
-            AuditService::log('CREATE', 'Appointment', $appointment->id, null, $appointment->toArray(), $request);
         }
+
+        $path = $this->files->storeSk($file);
+        $oldValues = $appointment->toArray();
+        $appointment->update(['file_sk' => $path]);
+        AuditService::log('UPDATE', 'Appointment', $appointment->id, $oldValues, $appointment->toArray(), $request);
 
         $employee->documents()->updateOrCreate([
             'jenis_dokumen' => 'sk_pengangkatan',

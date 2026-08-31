@@ -33,6 +33,7 @@ class BuildCutiDetailAction
      *     canAct: bool,
      *     isVerifierContext: bool,
      *     canDownloadFormulir: bool,
+     *     canGenerateFormulir: bool,
      *     canResubmit: bool,
      *     isRolloverReturn: bool,
      *     targetBalance: array<string, mixed>|null,
@@ -63,6 +64,9 @@ class BuildCutiDetailAction
         $canAct = $isCurrentApprover
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
+        $canGenerateFormulir = $canDownloadFormulir
+            && $cuti->proof?->document_path === null
+            && $user->hasPermission('cuti.proof.generate');
         $canReadAll = $user->hasPermission('cuti.read_all');
         $canReadOwn = $user->hasPermission('cuti.read_own')
             && $user->employee_id !== null
@@ -95,6 +99,7 @@ class BuildCutiDetailAction
             'canAct' => $canAct,
             'isVerifierContext' => $isVerifierContext,
             'canDownloadFormulir' => $canDownloadFormulir,
+            'canGenerateFormulir' => $canGenerateFormulir,
             'attachmentAvailable' => $this->attachmentDownloads->canReadAsGeneralActor($cuti, $user)
                 && $this->files->hasLeaveAttachment($cuti->lampiran_path, $cuti->employee_id),
             'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)

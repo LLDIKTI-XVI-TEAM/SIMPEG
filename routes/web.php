@@ -526,6 +526,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
         ->name('cuti.formulir-pdf')
         ->whereUuid('leaveRequest');
+    Route::post('/dashboard/cuti/{leaveRequest}/formulir-pdf/generate', [CutiController::class, 'generateFormulirPdf'])
+        ->middleware('permission:cuti.proof.generate')
+        ->name('cuti.formulir-pdf.generate')
+        ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/lampiran', [CutiController::class, 'downloadAttachment'])
         ->name('cuti.attachment.download')
         ->whereUuid('leaveRequest');
@@ -738,9 +742,27 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
             Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
 
-            Route::get('/laporan/kepangkatan', fn () => redirect()->route('laporan.kepangkatan'))->name('laporan.kepangkatan');
-            Route::get('/laporan/nominatif', fn () => redirect()->route('laporan.pegawai'))->name('laporan.nominatif');
-            Route::get('/laporan/pegawai', fn () => redirect()->route('laporan.pegawai'))->name('laporan.pegawai');
+            Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])
+                ->middleware('permission:employee_histories.export')
+                ->name('laporan.kepangkatan');
+            Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])
+                ->middleware('permission:employee_histories.export')
+                ->name('laporan.kepangkatan.excel');
+            Route::get('/laporan/kepangkatan/pdf', [PimpinanReportController::class, 'exportRankHistoriesPdf'])
+                ->middleware('permission:employee_histories.export')
+                ->name('laporan.kepangkatan.pdf');
+            Route::get('/laporan/nominatif', [PimpinanReportController::class, 'fixedEmployeeReport'])
+                ->middleware('permission:employees.read')
+                ->name('laporan.nominatif');
+            Route::get('/laporan/nominatif/excel', [PimpinanReportController::class, 'exportFixedEmployeeReportExcel'])
+                ->middleware('permission:employees.read')
+                ->name('laporan.nominatif.excel');
+            Route::get('/laporan/nominatif/pdf', [PimpinanReportController::class, 'exportFixedEmployeeReportPdf'])
+                ->middleware('permission:employees.read')
+                ->name('laporan.nominatif.pdf');
+            Route::get('/laporan/pegawai', [PimpinanReportController::class, 'fixedEmployeeReport'])
+                ->middleware('permission:employees.read')
+                ->name('laporan.pegawai');
             Route::get('/laporan/cuti', fn () => redirect()->route('cuti.rekap'))->name('laporan.cuti');
             Route::get('/laporan', fn () => redirect()->route('laporan.pegawai'))->name('laporan.index');
         });

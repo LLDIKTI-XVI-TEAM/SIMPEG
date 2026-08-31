@@ -53,6 +53,28 @@ class CutiFormulirPdfTest extends TestCase
             ->assertOk();
     }
 
+    public function test_proof_generation_permission_is_enforced_and_can_materialize_legacy_artifact(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $operator = User::factory()->superAdmin()->create();
+        $fixture['proof']->update(['generated_by' => $operator->id]);
+
+        // Pemohon tetap dapat mengunduh bukti miliknya bila ada, tetapi tidak
+        // dapat membentuk artefak baru tanpa permission cuti.proof.generate.
+        $this->actingAs($fixture['requester_user'])
+            ->post(route('cuti.formulir-pdf.generate', $fixture['leave_request']))
+            ->assertForbidden();
+
+        $this->actingAs($operator)
+            ->post(route('cuti.formulir-pdf.generate', $fixture['leave_request']))
+            ->assertRedirect(route('cuti.show', $fixture['leave_request']));
+
+        $proof = $fixture['proof']->fresh();
+        $this->assertNotNull($proof->document_path);
+        Storage::disk('local')->assertExists($proof->document_path);
+    }
+
     public function test_final_official_form_is_legal_portrait_pdf_attachment(): void
     {
         $fixture = $this->makeOfficialFormFixture();

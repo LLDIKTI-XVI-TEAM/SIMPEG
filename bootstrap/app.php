@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuditRoleSimulationUsage;
 use App\Http\Middleware\EnsureActiveEmployeeAccount;
+use App\Http\Middleware\EnsureEmployeeApiScope;
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'keycloak.auth' => EnsureKeycloakAuthenticated::class,
+            'employee.scope' => EnsureEmployeeApiScope::class,
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,
             'session.timeout' => SessionTimeoutMessage::class,

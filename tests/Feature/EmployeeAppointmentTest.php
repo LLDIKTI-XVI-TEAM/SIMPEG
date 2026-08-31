@@ -5,8 +5,11 @@ namespace Tests\Feature;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\EmployeeMilestone;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +24,7 @@ class EmployeeAppointmentTest extends TestCase
         parent::setUp();
         Storage::fake(Document::STORAGE_DISK);
         $this->seed(RbacSeeder::class);
+        $this->seed(ReferenceSeeder::class);
     }
 
     public function test_admin_can_view_appointment(): void
@@ -78,6 +82,19 @@ class EmployeeAppointmentTest extends TestCase
             'jenis_dokumen' => 'sk_pengangkatan',
             'nomor_dokumen' => 'SK-PNS-2025-001',
             'file_path' => $appointment->file_sk,
+        ]);
+
+        // Endpoint pengangkatan adalah sumber masa kerja: jenis pegawai dan
+        // milestone Satyalancana harus ikut sinkron, seperti form edit pegawai.
+        $employee->refresh();
+        $this->assertSame(
+            RefJenisPegawai::query()->where('nama', 'PNS')->value('id'),
+            $employee->jenis_pegawai_id,
+        );
+        $this->assertDatabaseHas('employee_milestones', [
+            'employee_id' => $employee->id,
+            'type' => EmployeeMilestone::TYPE_SATYALANCANA,
+            'is_active' => true,
         ]);
     }
 
@@ -158,5 +175,20 @@ class EmployeeAppointmentTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['jenis_pengangkatan']);
+    }
+
+    public function test_upload_sk_without_appointment_is_rejected_without_creating_fake_appointment(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($admin)
+            ->postJson("/api/v1/pegawai/{$employee->id}/pengangkatan/upload-sk", [
+                'file_sk' => UploadedFile::fake()->create('sk.pdf', 500, 'application/pdf'),
+            ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['appointment']);
+        $this->assertDatabaseMissing('appointments', ['employee_id' => $employee->id]);
     }
 }
