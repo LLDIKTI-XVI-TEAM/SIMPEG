@@ -2609,8 +2609,6 @@
                         <option value="CPNS">CPNS</option>
                         <option value="PNS">PNS</option>
                         <option value="PPPK">PPPK</option>
-                        <option value="Pegawai Tetap Non-PNS">Pegawai Tetap Non-PNS</option>
-                        <option value="Kontrak / Lainnya">Kontrak / Lainnya</option>
                     </select>
                 </div>
 

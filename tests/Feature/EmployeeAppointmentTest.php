@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace Tests\Feature;
 
@@ -141,5 +141,22 @@ class EmployeeAppointmentTest extends TestCase
             'nomor_dokumen' => 'SK-PPPK-2026',
             'file_path' => $appointment->file_sk,
         ]);
+    }
+
+    public function test_jenis_pengangkatan_only_allows_pns_cpns_pppk(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($admin)
+            ->postJson("/api/v1/pegawai/{$employee->id}/pengangkatan", [
+                'jenis_pengangkatan' => 'HONORER',
+                'no_sk' => 'SK-INVALID',
+                'tanggal_sk' => '2026-01-01',
+                'tmt_pengangkatan' => '2026-02-01',
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['jenis_pengangkatan']);
     }
 }

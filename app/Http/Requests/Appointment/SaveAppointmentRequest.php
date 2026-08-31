@@ -1,8 +1,9 @@
-﻿<?php
+<?php
 
 namespace App\Http\Requests\Appointment;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SaveAppointmentRequest extends FormRequest
 {
@@ -25,7 +26,7 @@ class SaveAppointmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'jenis_pengangkatan' => ['required', 'string', 'max:100'],
+            'jenis_pengangkatan' => ['required', 'string', Rule::in(['PNS', 'CPNS', 'PPPK'])],
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
             'tmt_pengangkatan' => ['required', 'date'],
@@ -40,6 +41,7 @@ class SaveAppointmentRequest extends FormRequest
     {
         return [
             'jenis_pengangkatan.required' => 'Jenis pengangkatan wajib dipilih atau diisi.',
+            'jenis_pengangkatan.in' => 'Jenis pengangkatan hanya boleh bernilai PNS, CPNS, atau PPPK.',
             'no_sk.required' => 'Nomor SK pengangkatan wajib diisi.',
             'tanggal_sk.required' => 'Tanggal SK pengangkatan wajib diisi.',
             'tanggal_sk.date' => 'Format tanggal SK tidak valid.',
