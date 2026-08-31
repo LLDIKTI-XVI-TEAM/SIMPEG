@@ -435,7 +435,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('employee')
         ->whereUuid('history')
         ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'discipline', 'education', 'status', 'status-snapshot'])
-        ->middleware(['permission:employees.read'])
+        ->middleware(['permission:employees.read,employee_histories.read,dokumen_sk.read'])
         ->name('pegawai.history-attachments.download');
     Route::get('/pegawai/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
         ->whereUuid('id')

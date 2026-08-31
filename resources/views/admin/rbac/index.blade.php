@@ -11,6 +11,7 @@ $permissionPaths = [
     'view_all_pegawai'        => 'Data Pegawai (Lihat)',
     'manage_pegawai'          => 'Data Pegawai (Kelola)',
     'manage_riwayat'          => 'Data Pegawai (Riwayat)',
+    'employee_histories.read' => 'Riwayat Pegawai (Pangkat, Jabatan, KGB, Pendidikan, Pengangkatan)',
     'import_pegawai'          => 'Import Pegawai',
     'manage_supervisor'       => 'Data Pegawai (Supervisor)',
     'manage_documents'        => 'Dokumen & SK',
