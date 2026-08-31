@@ -178,7 +178,7 @@
                         <h3 class="text-sm font-bold text-ink font-sans">Kenaikan Pangkat Bulan Ini</h3>
                         <p class="text-xs text-muted">Riwayat kepangkatan dengan TMT pada bulan berjalan</p>
                     </div>
-                    <a href="{{ route('pimpinan.laporan.kepangkatan') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
+                    <a href="{{ route('laporan.kepangkatan') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                         Buka laporan
                     </a>
                 </div>

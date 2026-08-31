@@ -728,9 +728,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
             Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
 
-            Route::get('/laporan/kepangkatan', fn () => redirect()->route('laporan.kepangkatan'))->name('laporan.kepangkatan.redirect');
+            Route::get('/laporan/kepangkatan', fn () => redirect()->route('laporan.kepangkatan'))->name('laporan.kepangkatan');
             Route::get('/laporan/nominatif', fn () => redirect()->route('laporan.pegawai'))->name('laporan.nominatif');
-            Route::get('/laporan', [PimpinanReportController::class, 'index'])->name('laporan.index');
+            Route::get('/laporan/pegawai', fn () => redirect()->route('laporan.pegawai'))->name('laporan.pegawai');
+            Route::get('/laporan/cuti', fn () => redirect()->route('cuti.rekap'))->name('laporan.cuti');
+            Route::get('/laporan', fn () => redirect()->route('laporan.pegawai'))->name('laporan.index');
         });
 
     Route::middleware(['role:kepala_bagian'])
