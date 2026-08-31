@@ -98,29 +98,42 @@
             // - Fitur eksklusif role dikunci via 'roles' (contoh: Daftar Bawahan khusus kepala_bagian).
             // - Fitur bersama dikontrol via 'permission' (dinamis dari halaman Role & Permission).
             // - Menu yang tidak mendapatkan akses akan tampil dengan style disabled (abu-abu & non-aktif).
+            // ============================================================
+            // PANDUAN STRUKTUR MENU:
+            // - 'roles' saja         → Menu EKSKLUSIF role, tidak bisa diubah dari RBAC admin.
+            //                          Contoh: Daftar Bawahan (hanya kepala_bagian).
+            // - 'permission' saja    → Menu RBAC, aksesnya diatur dari halaman Role & Permission.
+            //                          Contoh: Data Pegawai (tergantung employees.read).
+            // - Tanpa keduanya       → Dapat diakses semua role yang login.
+            //                          Contoh: Dashboard, Monitoring Cuti.
+            // ============================================================
             $menuGroups = [
                 [
                     'group' => '',
                     'items' => [
+                        // Semua role dapat mengakses dashboard
                         ['label' => 'Dashboard', 'route' => $dashboardRoute, 'icon' => 'squares-2x2'],
                     ]
                 ],
                 [
                     'group' => 'Kepegawaian',
                     'items' => [
+                        // RBAC: dikontrol dari Role & Permission admin (employees.read)
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
                          'permission' => 'employees.read'],
+                        // Eksklusif kepala_bagian: tidak bisa diubah dari RBAC
                         ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users',
                          'roles' => ['kepala_bagian']],
+                        // RBAC: dikontrol dari Role & Permission admin (dokumen_sk.read)
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
-                         'permission' => 'employees.read'],
+                         'permission' => 'dokumen_sk.read'],
+                        // RBAC: dikontrol dari Role & Permission admin (employees.read)
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
                          'permission' => 'employees.read'],
+                        // Eksklusif pimpinan: tidak bisa diubah dari RBAC
                         ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text',
                          'roles' => ['pimpinan']],
+                        // Eksklusif pimpinan: tidak bisa diubah dari RBAC
                         ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar',
                          'roles' => ['pimpinan']],
                     ]
@@ -128,37 +141,50 @@
                 [
                     'group' => 'Cuti',
                     'items' => [
+                        // Semua role dapat akses Monitoring Cuti
                         ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                        // Eksklusif pimpinan: tidak bisa diubah dari RBAC
                         ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge',
                          'roles' => ['pimpinan']],
+                        // Eksklusif kepala_bagian: tidak bisa diubah dari RBAC
                         ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge',
                          'roles' => ['kepala_bagian']],
+                        // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
                          'permission' => 'cuti.read_all'],
+                        // Eksklusif admin_kepegawaian: tidak bisa diubah dari RBAC
                         ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal',
                          'roles' => ['admin_kepegawaian']],
+                        // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down',
-                         'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan'],
                          'permission' => 'cuti.read_all'],
+                        // RBAC: dikontrol dari Role & Permission admin (cuti.configure)
                         ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth',
-                         'roles' => ['super_admin'],
                          'permission' => 'cuti.configure'],
                     ]
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => [
+                        // Eksklusif super_admin, admin_kepegawaian, pimpinan
                         ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle',
                          'roles' => ['super_admin', 'admin_kepegawaian', 'pimpinan']],
+                        // Eksklusif pegawai
                         ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle',
                          'roles' => ['pegawai']],
+                        // Eksklusif kepala_bagian
                         ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle',
                          'roles' => ['kepala_bagian']],
+                        // RBAC: dikontrol dari Role & Permission admin (ews.read)
+                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle',
+                         'permission' => 'ews.read'],
+                        // RBAC: dikontrol dari Role & Permission admin (ews.configure)
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth',
-                         'roles' => ['super_admin']],
+                         'permission' => 'ews.configure'],
+                        // RBAC: dikontrol dari Role & Permission admin (notifications.read)
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell',
                          'permission' => 'notifications.read'],
+                        // Eksklusif super_admin
                         ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal',
                          'roles' => ['super_admin']],
                     ]
@@ -166,19 +192,23 @@
                 [
                     'group' => 'Administrasi Sistem',
                     'items' => [
+                        // Eksklusif super_admin
                         ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check',
                          'roles' => ['super_admin']],
+                        // Eksklusif super_admin
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key',
                          'roles' => ['super_admin']],
+                        // Eksklusif super_admin
                         ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells',
                          'roles' => ['super_admin']],
+                        // Eksklusif super_admin
                         ['label' => 'Pengaturan Sistem', 'route' => 'pengaturan', 'icon' => 'cog-6-tooth',
                          'roles' => ['super_admin']],
+                        // RBAC: dikontrol dari Role & Permission admin (hari_libur.read)
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days',
-                         'roles' => ['super_admin'],
                          'permission' => 'hari_libur.read'],
+                        // RBAC: dikontrol dari Role & Permission admin (audit_logs.read)
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list',
-                         'roles' => ['super_admin', 'admin_kepegawaian'],
                          'permission' => 'audit_logs.read'],
                     ]
                 ]
@@ -198,11 +228,28 @@
                     foreach ($group['items'] as $menu) {
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
                         if ($routeExists) {
+                            // Cek apakah role aktif diizinkan berdasarkan daftar roles eksklusif
                             $roleAllowed = !isset($menu['roles']) || in_array($activeRole, $menu['roles'], true);
-                            $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
-                            if ($activeRole === 'super_admin' && !isset($menu['roles'])) {
+
+                            // Cek permission RBAC hanya jika:
+                            // 1. Menu tidak punya batasan 'roles' (menu bersama/shared), ATAU
+                            // 2. Menu punya 'roles' tapi role aktif TIDAK ada di dalamnya (sudah tidak allowed)
+                            // Jika role aktif sudah ada di 'roles', tidak perlu cek permission tambahan
+                            if (!$roleAllowed) {
+                                // Role tidak diizinkan, langsung disabled
+                                $permissionAllowed = false;
+                            } elseif (isset($menu['roles']) && $roleAllowed) {
+                                // Role eksklusif dan sudah diizinkan -> tidak perlu cek permission
                                 $permissionAllowed = true;
+                            } else {
+                                // Menu bersama (tanpa 'roles') -> cek permission RBAC
+                                $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
+                                // Super admin selalu dapat akses menu bersama
+                                if ($activeRole === 'super_admin') {
+                                    $permissionAllowed = true;
+                                }
                             }
+
                             $menu['disabled'] = ! ($roleAllowed && $permissionAllowed);
                             $visibleItems[] = $menu;
                         }

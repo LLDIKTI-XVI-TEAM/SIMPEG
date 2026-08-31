@@ -20,6 +20,10 @@ $permissionPaths = [
     'approve_cuti_stage3'     => 'Approval Cuti (Stage 3)',
     'view_all_ews'            => 'EWS Aktif',
     'generate_reports'        => 'Laporan (Export)',
+    // Permission baru — dikontrol dari halaman ini
+    'dokumen_sk.read'         => 'Dokumen & SK (Lihat)',
+    'ews.read'                => 'EWS Aktif (Lihat)',
+    'ews.configure'           => 'Konfigurasi EWS',
 ];
 
 $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $moduleName) use ($permissionPaths) {

@@ -63,6 +63,9 @@ class RbacSeeder extends Seeder
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
             'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
+            'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
+            'ews.read' => ['module' => 'ews', 'description' => 'Melihat daftar EWS aktif seluruh pegawai'],
+            'ews.configure' => ['module' => 'ews', 'description' => 'Mengonfigurasi parameter dan threshold EWS'],
         ];
 
         foreach ($roles as $name => $description) {
@@ -111,6 +114,9 @@ class RbacSeeder extends Seeder
                 'audit_logs.read',
                 'notifications.read',
                 'notifications.update',
+                // Admin kepegawaian dapat melihat dokumen & SK pegawai dan memantau EWS aktif
+                'dokumen_sk.read',
+                'ews.read',
                 // Admin kepegawaian dapat mengajukan cuti sendiri dan memonitor seluruh pengajuan tanpa menyetujui.
                 'cuti.create',
                 'cuti.read_all',
@@ -121,6 +127,9 @@ class RbacSeeder extends Seeder
             ],
             'pimpinan' => [
                 'employees.read',
+                // Pimpinan dapat melihat dokumen & SK dan memantau EWS aktif
+                'dokumen_sk.read',
+                'ews.read',
                 'notifications.read',
                 'notifications.update',
                 // Role pimpinan dapat mengajukan cuti sendiri bila bukan pegawai bertanda Kepala Lembaga.
