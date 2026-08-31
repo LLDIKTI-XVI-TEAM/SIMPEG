@@ -129,8 +129,10 @@ class RbacSeeder extends Seeder
             ],
             'pimpinan' => [
                 'employees.read',
-                // Pimpinan dapat melihat riwayat kepangkatan, dokumen & SK, dan memantau EWS aktif
+                'employee_histories.read',
                 'employee_histories.export',
+                'employee_families.read',
+                'discipline_records.read',
                 'dokumen_sk.read',
                 'ews.read',
                 'notifications.read',
