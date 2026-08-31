@@ -16,9 +16,13 @@ class StoreKgbHistoryRequest extends FormRequest
 
         // Mutasi riwayat KGB hanya boleh dilakukan oleh pengelola data kepegawaian.
         $user = $this->user();
+        if (! $user) {
+            return false;
+        }
 
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return in_array($user->role, ['super_admin', 'admin_kepegawaian'], true)
+            || in_array($user->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true)
+            || $user->hasPermission('employee_histories.create');
     }
 
     public function rules(): array
@@ -29,6 +33,19 @@ class StoreKgbHistoryRequest extends FormRequest
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
             'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'tmt_kgb.required' => 'TMT KGB wajib diisi.',
+            'tmt_kgb.date' => 'Format TMT KGB tidak valid.',
+            'gaji_pokok.required' => 'Gaji pokok wajib diisi.',
+            'gaji_pokok.numeric' => 'Gaji pokok harus berupa angka.',
+            'no_sk.required' => 'Nomor SK wajib diisi.',
+            'tanggal_sk.required' => 'Tanggal SK wajib diisi.',
+            'tanggal_sk.date' => 'Format Tanggal SK tidak valid.',
         ];
     }
 
