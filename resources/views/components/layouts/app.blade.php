@@ -165,6 +165,7 @@
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
+                    'items' => [
                         // Eksklusif pegawai
                         ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle',
                          'roles' => ['pegawai']],
