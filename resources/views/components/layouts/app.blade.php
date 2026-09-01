@@ -540,15 +540,11 @@
                                 <span>Profil Saya</span>
                             </a>
 
-                            {{-- Switch Role Menu (permission-driven): role asli apa pun yang role efektifnya
-                                 memiliki users.switch_role dan punya target lebih rendah dapat switch;
-                                 saat simulasi aktif, hanya aksi revert yang tampil --}}
-                            @if(auth()->check() && ((auth()->user()->hasPermission('users.switch_role') && auth()->user()->canSwitchToAnyRole()) || auth()->user()->temporary_role))
-                                {{-- Submenu switch hanya bagi akun asli yang TIDAK sedang dalam simulasi:
-                                     selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
-                                     role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
-                                     yang menyesatkan. Target menu diturunkan dari hierarki ROLE_RANKS milik model. --}}
-                                @if(auth()->user()->hasPermission('users.switch_role') && auth()->user()->canSwitchToAnyRole() && ! auth()->user()->temporary_role)
+                            {{-- Switch Role hanya bagi Super Admin asli dengan users.switch_role;
+                                 saat simulasi aktif, hanya aksi revert yang tampil. --}}
+                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasOriginalRolePermission('users.switch_role') && auth()->user()->canSwitchToAnyRole()) || auth()->user()->temporary_role))
+                                {{-- Submenu hanya bagi Super Admin asli yang belum simulasi. --}}
+                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasOriginalRolePermission('users.switch_role') && auth()->user()->canSwitchToAnyRole() && ! auth()->user()->temporary_role)
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"

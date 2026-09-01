@@ -71,7 +71,7 @@ class UpdateUserMappingAction
                 // Jika role asli akun diubah dan temporary_role tidak lagi valid (misalnya role diturunkan
                 // sehingga temporary_role tidak lagi lebih rendah dari role baru), batalkan simulasi.
                 $simulationCancelled = false;
-                if ($user->temporary_role !== null && ! $user->canSwitchToRole($user->temporary_role)) {
+                if ($user->temporary_role !== null && ! $this->isTemporaryRoleValidForOriginalRole($user->role, $user->temporary_role)) {
                     $simulationCancelled = true;
                     $user->temporary_role = null;
                     $user->temporary_permission = null;
@@ -155,6 +155,14 @@ class UpdateUserMappingAction
         }
 
         return $this->findLegacyUser($employee) ?? new User;
+    }
+
+    private function isTemporaryRoleValidForOriginalRole(?string $originalRole, string $temporaryRole): bool
+    {
+        $originalRank = User::ROLE_RANKS[$originalRole] ?? null;
+        $temporaryRank = User::ROLE_RANKS[$temporaryRole] ?? null;
+
+        return $originalRank !== null && $temporaryRank !== null && $temporaryRank < $originalRank;
     }
 
     private function findLegacyUser(Employee $employee): ?User

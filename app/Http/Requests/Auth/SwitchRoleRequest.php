@@ -9,12 +9,9 @@ class SwitchRoleRequest extends FormRequest
     /**
      * Determine if the user is authorized to make this request.
      *
-     * Invariant keamanan (permission-driven): aksi switch tersedia bagi akun yang
-     * role EFEKTIF-nya memiliki permission users.switch_role. Batas hierarki
-     * (target wajib lebih rendah dari role asli) dipaksa terpisah oleh
-     * canSwitchToRole() di validator dan SwitchRoleAction — jadi memberikan
-     * permission kepada role rendah tidak pernah membuka simulasi ke role yang
-     * lebih tinggi atau setara.
+     * Invariant keamanan: Switch Role adalah exception yang hanya tersedia bagi
+     * Super Admin asli dengan permission users.switch_role. Permission fitur
+     * setelah simulasi tetap berasal dari effective role target.
      */
     public function authorize(): bool
     {
@@ -24,7 +21,8 @@ class SwitchRoleRequest extends FormRequest
             return false;
         }
 
-        return $user->hasPermission('users.switch_role');
+        return $user->role === 'super_admin'
+            && $user->hasOriginalRolePermission('users.switch_role');
     }
 
     /**

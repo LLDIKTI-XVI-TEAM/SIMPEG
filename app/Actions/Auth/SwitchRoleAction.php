@@ -39,6 +39,10 @@ class SwitchRoleAction
                 throw new SwitchRoleConflictException('Tidak dapat switch ke role yang sama dengan role asli.');
             }
 
+            if ($locked->role !== 'super_admin' || ! $locked->hasOriginalRolePermission('users.switch_role')) {
+                throw new SwitchRoleConflictException('Hanya Super Admin dengan permission switch role yang dapat memulai simulasi role.');
+            }
+
             if (! $locked->canSwitchToRole($targetRole)) {
                 throw new SwitchRoleConflictException("Tidak dapat switch ke role {$targetRole}. Role target harus lebih rendah dari role asli.");
             }

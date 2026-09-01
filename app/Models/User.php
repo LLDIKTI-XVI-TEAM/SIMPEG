@@ -114,7 +114,7 @@ class User extends Authenticatable
     {
         if ($this->temporary_role !== null) {
             // Validasi bahwa temporary_role harus selalu berada di hierarki yang lebih rendah dari role asli saat ini
-            if ($this->canSwitchToRole($this->temporary_role)) {
+            if ($this->isSwitchTargetBelowOriginalRole($this->temporary_role)) {
                 return $this->temporary_role;
             }
         }
@@ -149,19 +149,9 @@ class User extends Authenticatable
             ->exists();
     }
 
-    /**
-     * Menentukan apakah user dapat switch (simulasi) ke target_role yang dipilih.
-     *
-     * Kontrak permission-driven: role asli apa pun yang diberi permission
-     * users.switch_role boleh mensimulasikan role, tetapi target wajib LEBIH RENDAH
-     * dari role asli menurut ROLE_RANKS — aturan hierarki dipaksa di sini, di
-     * SwitchRoleRequest, dan di SwitchRoleAction. Target bukan allowlist, switch ke
-     * role yang sama, atau role asli tanpa target lebih rendah (pegawai) ditolak
-     * fail-closed.
-     */
-    public function canSwitchToRole(string $targetRole): bool
+    /** Menentukan validitas hierarki target simulasi tanpa mengevaluasi permission. */
+    private function isSwitchTargetBelowOriginalRole(string $targetRole): bool
     {
-        // Switch ke role yang sama dengan role asli tidak pernah diizinkan.
         if ($targetRole === $this->role) {
             return false;
         }
@@ -169,22 +159,54 @@ class User extends Authenticatable
         $originRank = self::ROLE_RANKS[$this->role] ?? null;
         $targetRank = self::ROLE_RANKS[$targetRole] ?? null;
 
-        if ($originRank === null || $targetRank === null) {
-            return false;
-        }
-
-        return $targetRank < $originRank;
+        return $originRank !== null && $targetRank !== null && $targetRank < $originRank;
     }
 
     /**
-     * Opsi role tujuan simulasi untuk user ini: seluruh role ber-rank lebih rendah
-     * dari role asli, dengan label tampilannya. Dipakai menu "Simulasi Role" agar
-     * UI dan backend selalu sepakat soal target yang sah.
+     * Mengecek permission pada role asli tanpa membaca temporary_role.
+     * Dipakai untuk boundary origin-role agar evaluasi role efektif tidak rekursif.
+     */
+    public function hasOriginalRolePermission(string $permission): bool
+    {
+        if ($this->role === null || $this->role === '') {
+            return false;
+        }
+
+        return Role::query()
+            ->where('name', $this->role)
+            ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
+            ->exists();
+    }
+
+    /**
+     * Menentukan apakah Super Admin dapat switch (simulasi) ke target_role yang dipilih.
+     *
+     * Switch Role adalah exception RBAC yang dibatasi oleh kontrak produk: hanya
+     * role asli Super Admin dengan permission users.switch_role yang boleh
+     * mensimulasikan role target. Permission fitur biasa tetap ditentukan dari
+     * effective role saat simulasi aktif.
+     */
+    public function canSwitchToRole(string $targetRole): bool
+    {
+        if ($this->role !== 'super_admin' || ! $this->hasOriginalRolePermission('users.switch_role')) {
+            return false;
+        }
+
+        return $this->isSwitchTargetBelowOriginalRole($targetRole);
+    }
+
+    /**
+     * Opsi role tujuan simulasi untuk Super Admin: seluruh role ber-rank lebih
+     * rendah dari role asli, dengan label tampilannya.
      *
      * @return array<string, string>
      */
     public function switchableRoleOptions(): array
     {
+        if ($this->role !== 'super_admin' || ! $this->hasOriginalRolePermission('users.switch_role')) {
+            return [];
+        }
+
         $originRank = self::ROLE_RANKS[$this->role] ?? null;
 
         if ($originRank === null) {

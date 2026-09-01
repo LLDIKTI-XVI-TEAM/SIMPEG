@@ -651,10 +651,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // SWITCH & REVERT ROLE
     // =========================================================================
 
-    // Gate route eksplisit: aksi switch permission-driven — role asli apa pun yang
-    // role efektifnya memiliki users.switch_role dapat mensimulasikan role yang
-    // LEBIH RENDAH dari role aslinya (hierarki ROLE_RANKS dipaksa di FormRequest dan
-    // SwitchRoleAction; anti-chain "simulasi sudah aktif" tetap berlaku).
+    // Switch Role adalah exception RBAC: hanya Super Admin asli dengan permission
+    // users.switch_role dapat memulai simulasi. FormRequest dan Action mengulang
+    // guard ini pada boundary otorisasi dan state terkunci.
     Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
         ->middleware(['permission:users.switch_role'])
         ->name('switch-role');
