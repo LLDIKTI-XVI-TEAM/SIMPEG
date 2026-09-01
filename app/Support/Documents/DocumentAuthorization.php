@@ -25,7 +25,11 @@ class DocumentAuthorization
             return false;
         }
 
-        return $user->hasPermission('dokumen_sk.read') || $user->hasPermission('employees.read');
+        // Arsip terpusat memuat dokumen lintas pegawai yang sensitif. Permission
+        // read saja tidak cukup karena Pimpinan juga memilikinya untuk surface
+        // khusus yang sudah dimasking; arsip mentah tetap hanya untuk pengelola.
+        return self::hasManagerRole($user)
+            && ($user->hasPermission('dokumen_sk.read') || $user->hasPermission('employees.read'));
     }
 
     public static function canManage(?User $user): bool
@@ -34,7 +38,7 @@ class DocumentAuthorization
             return false;
         }
 
-        return $user->hasPermission('employees.update');
+        return self::hasManagerRole($user) && $user->hasPermission('employees.update');
     }
 
     private static function hasManagerRole(?User $user): bool

@@ -259,6 +259,48 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertSame('sso_bootstrap', $audit->new_values['source'] ?? null);
     }
 
+    /**
+     * Role dari Admin yang committed setelah resolver membaca snapshot lama tidak
+     * boleh ditimpa default pegawai ketika callback mengambil lock sebelum save.
+     */
+    public function test_callback_preserves_role_committed_by_admin_before_locked_save(): void
+    {
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Role Terkunci',
+            'email' => 'role-terkunci@example.com',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'role-terkunci@example.com',
+            'employee_id' => $employee->id,
+            'keycloak_id' => null,
+            'role' => null,
+        ]);
+
+        $injected = false;
+        DB::listen(function (QueryExecuted $query) use (&$injected, $user): void {
+            if ($injected
+                || ! str_contains((string) $query->sql, 'from "users" where "employee_id" =')
+                || ! str_contains((string) $query->sql, 'for update')) {
+                return;
+            }
+
+            $injected = true;
+            DB::table('users')->where('id', $user->id)->update(['role' => 'admin_kepegawaian']);
+        });
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-role-terkunci',
+            'nickname' => 'role-terkunci',
+            'name' => 'Role Terkunci',
+            'email' => 'role-terkunci@example.com',
+            'raw' => ['email' => 'role-terkunci@example.com', 'email_verified' => true, 'preferred_username' => 'role-terkunci'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+
+        $this->assertSame('admin_kepegawaian', $user->refresh()->role);
+    }
+
     /** User lama ber-role kosong dengan mapping valid diinisialisasi menjadi pegawai saat login; inisialisasi diaudit. */
     public function test_existing_mapped_user_with_blank_role_is_initialized_to_pegawai_on_login(): void
     {
@@ -455,6 +497,43 @@ class KeycloakCallbackMappingTest extends TestCase
             'employee_id' => $employee->id,
         ]);
         $this->assertDatabaseCount('users', 1);
+    }
+
+    /**
+     * Fallback email bukan identity kanonis. Variasi kapitalisasi legacy yang
+     * menunjuk lebih dari satu user harus ditolak, bukan dipilih secara arbitrer.
+     */
+    public function test_ambiguous_case_insensitive_user_email_fallback_is_rejected(): void
+    {
+        Employee::factory()->create([
+            'nama_lengkap' => 'Budi Santoso',
+            'email' => 'budi@example.com',
+        ]);
+        $first = User::factory()->pegawai()->create([
+            'email' => 'Budi@Example.COM',
+            'employee_id' => null,
+            'keycloak_id' => null,
+        ]);
+        $second = User::factory()->pegawai()->create([
+            'email' => 'budi@example.com',
+            'employee_id' => null,
+            'keycloak_id' => null,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-user-ambiguous',
+            'nickname' => 'budi',
+            'name' => 'Budi SSO',
+            'email' => 'budi@example.com',
+            'raw' => ['email' => 'budi@example.com', 'email_verified' => true, 'preferred_username' => 'budi'],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk()->assertSee('Konflik identitas akun SIMPEG terdeteksi.');
+        $this->assertGuest();
+        $this->assertDatabaseHas('users', ['id' => $first->id, 'keycloak_id' => null]);
+        $this->assertDatabaseHas('users', ['id' => $second->id, 'keycloak_id' => null]);
     }
 
     public function test_existing_privileged_user_with_employee_email_is_not_auto_bound(): void

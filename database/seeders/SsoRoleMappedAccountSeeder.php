@@ -9,8 +9,9 @@ use Illuminate\Database\Seeder;
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Daftar akun UAT SSO (HANYA local/testing): email Keycloak terverifikasi,
-     * preferred_username, password lokal, dan role internal yang diharapkan.
+     * Persona SSO sintetis (HANYA local/testing): tidak ada email, username, atau
+     * credential Keycloak nyata yang disimpan di repository. Password di bawah
+     * hanya dipakai untuk fixture lokal dan bukan credential UAT/produksi.
      *
      * Akun-akun ini adalah evidence UAT Issue #6 — persona yang dipakai untuk
      * browser smoke test dengan login Keycloak nyata. Auth callback TIDAK PERNAH
@@ -22,33 +23,33 @@ class SsoRoleMappedAccountSeeder extends Seeder
      */
     public const UAT_ACCOUNTS = [
         [
-            'email' => 'dayensite@gmail.com',
-            'username' => 'demo-klabat',
-            'password' => 'demo-klabat',
+            'email' => 'super-admin@example.test',
+            'username' => 'fixture-super-admin',
+            'password' => 'fixture-only-super-admin',
             'role' => 'super_admin',
         ],
         [
-            'email' => 'sitedayen@gmail.com',
-            'username' => 'demo-klabat-kepeg',
-            'password' => 'demo-klabat-kepeg',
+            'email' => 'admin-kepegawaian@example.test',
+            'username' => 'fixture-admin-kepegawaian',
+            'password' => 'fixture-only-admin-kepegawaian',
             'role' => 'admin_kepegawaian',
         ],
         [
-            'email' => 'dionkobi08@gmail.com',
-            'username' => 'demo-klabat-pimpinan',
-            'password' => 'demo-klabat-pimpinan',
+            'email' => 'pimpinan@example.test',
+            'username' => 'fixture-pimpinan',
+            'password' => 'fixture-only-pimpinan',
             'role' => 'pimpinan',
         ],
         [
-            'email' => 'dayen6153@gmail.com',
-            'username' => 'demo-klabat-kabag',
-            'password' => 'demo-klabat-kabag',
+            'email' => 'kepala-bagian@example.test',
+            'username' => 'fixture-kepala-bagian',
+            'password' => 'fixture-only-kepala-bagian',
             'role' => 'kepala_bagian',
         ],
         [
-            'email' => 'dionleonn05@gmail.com',
-            'username' => 'demo-klabat-pegawai',
-            'password' => 'demo-klabat-pegawai',
+            'email' => 'pegawai@example.test',
+            'username' => 'fixture-pegawai',
+            'password' => 'fixture-only-pegawai',
             'role' => 'pegawai',
         ],
     ];

@@ -61,4 +61,14 @@ class EmployeeExcelExportTest extends TestCase
             @unlink($temporaryFile);
         }
     }
+
+    public function test_pimpinan_cannot_access_raw_employee_export(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $pimpinan = User::factory()->pimpinan()->create();
+
+        $this->actingAs($pimpinan)
+            ->get(route('pegawai.export'))
+            ->assertForbidden();
+    }
 }

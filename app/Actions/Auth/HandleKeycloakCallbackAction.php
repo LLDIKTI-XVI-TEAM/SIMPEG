@@ -202,7 +202,7 @@ class HandleKeycloakCallbackAction
      */
     private function resolveUserForEmployee(Employee $employee, string $keycloakId, ?string $username, ?string $name, string $matchedEmail, Request $request): User
     {
-        $state = DB::transaction(function () use ($employee, $keycloakId, $username, $name, $matchedEmail): array {
+        $state = DB::transaction(function () use ($employee, $keycloakId, $username, $name, $matchedEmail, $request): array {
             // Serialisasi callback paralel untuk pegawai yang sama: kunci baris employee
             // sebelum re-check identitas (TOCTOU guard pada boundary database).
             Employee::query()->whereKey($employee->id)->lockForUpdate()->first();
@@ -214,7 +214,19 @@ class HandleKeycloakCallbackAction
             // binding baru tersebut.
             $userBySubject = User::where('keycloak_id', $keycloakId)->lockForUpdate()->first();
             $userByEmployee = User::where('employee_id', $employee->id)->lockForUpdate()->first();
-            $userByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])->lockForUpdate()->first();
+            $usersByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])
+                ->lockForUpdate()
+                ->limit(2)
+                ->get();
+
+            // Email hanya fallback terkontrol. Data legacy dapat memuat variasi
+            // kapitalisasi yang lolos constraint unik database; memilih satu secara
+            // arbitrer berisiko menautkan subject ke identitas yang salah.
+            if ($usersByEmail->count() > 1) {
+                return ['reject' => ['reason' => 'identity_conflict', 'user' => $usersByEmail->first()]];
+            }
+
+            $userByEmail = $usersByEmail->first();
 
             if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
                 // Dua user berbeda menunjuk identitas yang sama → fail-closed, jangan menebak.
@@ -253,12 +265,9 @@ class HandleKeycloakCallbackAction
                     'employee_id' => $employee->id,
                 ]);
             } else {
-                // Keputusan bootstrap harus atomik lintas pegawai: transaksi ini hanya
-                // mengunci baris employee sendiri, sehingga dua callback paralel untuk
-                // pegawai BERBEDA pada tabel users kosong dapat sama-sama melihat
-                // exists() == false dan sama-sama bootstrap super_admin. Advisory lock
-                // transaksional menyerialisasi keputusan bootstrap; callback kedua
-                // membaca ulang state setelah memperoleh lock dan memilih pegawai.
+                // Keputusan bootstrap dan INSERT user pertama harus berada dalam
+                // transaksi/global lock yang sama. Mengunci lalu mengembalikan User
+                // belum tersimpan akan membuka kembali race dua callback pertama.
                 if (DB::getDriverName() === 'pgsql') {
                     DB::statement('select pg_advisory_xact_lock(?)', [self::BOOTSTRAP_LOCK_KEY]);
                 }
@@ -282,6 +291,14 @@ class HandleKeycloakCallbackAction
             // database tetap dilakukan lewat unique constraint saat save (loginMappedUser).
             if ($this->usernameIsAvailable($user, $username)) {
                 $user->keycloak_username = $username;
+            }
+
+            if (! $user->exists) {
+                // Persist sebelum advisory transaction lock dilepas. Audit ikut satu
+                // transaksi supaya bootstrap tanpa evidence tidak pernah committed.
+                $user->save();
+                $this->auditIdentityBinding($user, $request);
+                $this->auditRoleInitialization($user, null, $request);
             }
 
             return ['user' => $user];
@@ -378,6 +395,18 @@ class HandleKeycloakCallbackAction
 
                     $rawCurrentRole = $fresh->getRawOriginal('role');
                     $previousRole = is_string($rawCurrentRole) ? $rawCurrentRole : null;
+                    // Role pada row terkunci adalah sumber kebenaran. Callback bisa
+                    // membawa role pegawai dari snapshot lama; jangan biarkan save
+                    // berikutnya menimpa promotion/demotion yang baru di-commit Admin.
+                    // Default pegawai hanya ditetapkan bila row terkunci MASIH kosong.
+                    if ($fresh->employee_id !== null
+                        && is_string($fresh->employee_id)
+                        && ! $this->employeeIsInactive($fresh->employee_id)
+                        && in_array($fresh->role, [null, ''], true)) {
+                        $user->role = 'pegawai';
+                    } else {
+                        $user->role = $fresh->role;
+                    }
                     $roleInitialized = in_array($previousRole, [null, ''], true)
                         && $user->role !== null
                         && $user->role !== '';
