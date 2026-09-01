@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class UploadAppointmentSkAction
@@ -19,28 +20,49 @@ class UploadAppointmentSkAction
         UploadedFile $file,
         ?Request $request = null,
     ): Appointment {
-        $appointment = $employee->appointment;
+        $storedPath = null;
+        $replacedPath = null;
 
-        if ($appointment === null) {
-            throw ValidationException::withMessages([
-                'appointment' => 'Simpan data pengangkatan lengkap terlebih dahulu sebelum mengunggah SK.',
-            ]);
+        try {
+            $appointment = DB::transaction(function () use ($employee, $file, $request, &$storedPath, &$replacedPath): Appointment {
+                $appointment = Appointment::query()
+                    ->where('employee_id', $employee->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($appointment === null) {
+                    throw ValidationException::withMessages([
+                        'appointment' => 'Simpan data pengangkatan lengkap terlebih dahulu sebelum mengunggah SK.',
+                    ]);
+                }
+
+                $oldValues = $appointment->toArray();
+                $replacedPath = $appointment->file_sk;
+                $storedPath = $this->files->storeSk($file);
+                $appointment->update(['file_sk' => $storedPath]);
+                AuditService::log('UPDATE', 'Appointment', $appointment->id, $oldValues, $appointment->toArray(), $request);
+
+                $employee->documents()->updateOrCreate([
+                    'jenis_dokumen' => 'sk_pengangkatan',
+                ], [
+                    'nama_dokumen' => 'SK Pengangkatan ' . ($appointment->jenis_pengangkatan ?: ''),
+                    'nomor_dokumen' => $appointment->no_sk,
+                    'tanggal_dokumen' => $appointment->tanggal_sk,
+                    'file_path' => $storedPath,
+                    'keterangan' => 'Unggah berkas SK pengangkatan pertama.',
+                ]);
+
+                return $appointment;
+            });
+        } catch (\Throwable $exception) {
+            $this->files->deleteEmployeeDocumentFile($storedPath);
+
+            throw $exception;
         }
 
-        $path = $this->files->storeSk($file);
-        $oldValues = $appointment->toArray();
-        $appointment->update(['file_sk' => $path]);
-        AuditService::log('UPDATE', 'Appointment', $appointment->id, $oldValues, $appointment->toArray(), $request);
-
-        $employee->documents()->updateOrCreate([
-            'jenis_dokumen' => 'sk_pengangkatan',
-        ], [
-            'nama_dokumen' => 'SK Pengangkatan ' . ($appointment->jenis_pengangkatan ?: ''),
-            'nomor_dokumen' => $appointment->no_sk,
-            'tanggal_dokumen' => $appointment->tanggal_sk,
-            'file_path' => $path,
-            'keterangan' => 'Unggah berkas SK pengangkatan pertama.',
-        ]);
+        if ($replacedPath !== $storedPath) {
+            $this->files->deleteReplacedEmployeeDocumentFile($replacedPath);
+        }
 
         return $appointment;
     }

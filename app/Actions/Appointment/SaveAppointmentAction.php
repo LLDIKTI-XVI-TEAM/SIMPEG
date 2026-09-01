@@ -40,75 +40,92 @@ class SaveAppointmentAction
         ?UploadedFile $file = null,
         ?Request $request = null,
     ): Appointment {
+        $storedPath = null;
         if ($file instanceof UploadedFile) {
-            $data['file_sk'] = $this->files->storeSk($file);
+            $storedPath = $this->files->storeSk($file);
+            $data['file_sk'] = $storedPath;
         }
 
-        return DB::transaction(function () use ($employee, $data, $request): Appointment {
-            $employee = Employee::query()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
-            $effectiveTmtBefore = $this->employmentStartDate->earliestAppointmentTmt($employee);
-            $annualLeaveCeilingsBefore = $this->annualLeaveCeilingSnapshot($employee);
+        $replacedPath = null;
 
-            $appointment = $employee->appointment;
-            if ($appointment) {
-                $oldValues = $appointment->toArray();
-                $appointment->update($data);
-                AuditService::log('UPDATE', 'Appointment', $appointment->id, $oldValues, $appointment->toArray(), $request);
-            } else {
-                $appointment = $employee->appointment()->create($data);
-                AuditService::log('CREATE', 'Appointment', $appointment->id, null, $appointment->toArray(), $request);
-            }
+        try {
+            $appointment = DB::transaction(function () use ($employee, $data, $request, &$replacedPath): Appointment {
+                $employee = Employee::query()->whereKey($employee->id)->lockForUpdate()->firstOrFail();
+                $effectiveTmtBefore = $this->employmentStartDate->earliestAppointmentTmt($employee);
+                $annualLeaveCeilingsBefore = $this->annualLeaveCeilingSnapshot($employee);
 
-            $jenisPegawai = RefJenisPegawai::query()
-                ->whereRaw('UPPER(nama) = ?', [strtoupper($appointment->jenis_pengangkatan)])
-                ->first();
-            if ($jenisPegawai === null) {
-                throw ValidationException::withMessages([
-                    'jenis_pengangkatan' => 'Referensi jenis pegawai untuk pengangkatan belum tersedia.',
-                ]);
-            }
-            $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
+                $appointment = $employee->appointment;
+                if ($appointment) {
+                    $oldValues = $appointment->toArray();
+                    $replacedPath = $appointment->file_sk;
+                    $appointment->update($data);
+                    AuditService::log('UPDATE', 'Appointment', $appointment->id, $oldValues, $appointment->toArray(), $request);
+                } else {
+                    $appointment = $employee->appointment()->create($data);
+                    AuditService::log('CREATE', 'Appointment', $appointment->id, null, $appointment->toArray(), $request);
+                }
 
-            if ($appointment->file_sk) {
-                $employee->documents()->updateOrCreate([
-                    'jenis_dokumen' => 'sk_pengangkatan',
-                ], [
-                    'nama_dokumen' => 'SK Pengangkatan ' . ($appointment->jenis_pengangkatan ?: ''),
-                    'nomor_dokumen' => $appointment->no_sk,
-                    'tanggal_dokumen' => $appointment->tanggal_sk,
-                    'file_path' => $appointment->file_sk,
-                    'keterangan' => 'Dokumen SK pengangkatan pertama pegawai.',
-                ]);
-            }
-
-            // Endpoint JSON ini juga mengubah syarat masa kerja. Samakan efek domainnya
-            // dengan UpdateEmployeeAction: saldo tahunan diproyeksikan ulang dan milestone EWS disegarkan.
-            $employee->unsetRelation('appointments')->unsetRelation('jenisPegawai');
-            $effectiveTmtAfter = $this->employmentStartDate->earliestAppointmentTmt($employee);
-            $annualLeaveCeilingsAfter = $this->annualLeaveCeilingSnapshot($employee);
-            if ($this->dateChanged($effectiveTmtBefore, $effectiveTmtAfter)
-                || $annualLeaveCeilingsBefore !== $annualLeaveCeilingsAfter) {
-                $actor = $request?->user();
-                if (! $actor instanceof User) {
+                $jenisPegawai = RefJenisPegawai::query()
+                    ->whereRaw('UPPER(nama) = ?', [strtoupper($appointment->jenis_pengangkatan)])
+                    ->first();
+                if ($jenisPegawai === null) {
                     throw ValidationException::withMessages([
-                        'actor' => 'Aktor perubahan pengangkatan tidak dapat diverifikasi.',
+                        'jenis_pengangkatan' => 'Referensi jenis pegawai untuk pengangkatan belum tersedia.',
+                    ]);
+                }
+                $employee->update(['jenis_pegawai_id' => $jenisPegawai->id]);
+
+                if ($appointment->file_sk) {
+                    $employee->documents()->updateOrCreate([
+                        'jenis_dokumen' => 'sk_pengangkatan',
+                    ], [
+                        'nama_dokumen' => 'SK Pengangkatan ' . ($appointment->jenis_pengangkatan ?: ''),
+                        'nomor_dokumen' => $appointment->no_sk,
+                        'tanggal_dokumen' => $appointment->tanggal_sk,
+                        'file_path' => $appointment->file_sk,
+                        'keterangan' => 'Dokumen SK pengangkatan pertama pegawai.',
                     ]);
                 }
 
-                $this->leaveBalanceRecalculation->recalculateForEmploymentTermsChange(
-                    $employee,
-                    $this->annualLeaveReplayStartYear($employee),
-                    $effectiveTmtBefore,
-                    $actor,
-                    'Proyeksi saldo cuti tahunan direkalkulasi karena data pengangkatan berubah.',
-                    $request,
-                );
-            }
+                // Endpoint JSON ini juga mengubah syarat masa kerja. Samakan efek domainnya
+                // dengan UpdateEmployeeAction: saldo tahunan diproyeksikan ulang dan milestone EWS disegarkan.
+                $employee->unsetRelation('appointments')->unsetRelation('jenisPegawai');
+                $effectiveTmtAfter = $this->employmentStartDate->earliestAppointmentTmt($employee);
+                $annualLeaveCeilingsAfter = $this->annualLeaveCeilingSnapshot($employee);
+                if ($this->dateChanged($effectiveTmtBefore, $effectiveTmtAfter)
+                    || $annualLeaveCeilingsBefore !== $annualLeaveCeilingsAfter) {
+                    $actor = $request?->user();
+                    if (! $actor instanceof User) {
+                        throw ValidationException::withMessages([
+                            'actor' => 'Aktor perubahan pengangkatan tidak dapat diverifikasi.',
+                        ]);
+                    }
 
-            $this->tmtCalculator->syncForEmployee($employee);
+                    $this->leaveBalanceRecalculation->recalculateForEmploymentTermsChange(
+                        $employee,
+                        $this->annualLeaveReplayStartYear($employee),
+                        $effectiveTmtBefore,
+                        $actor,
+                        'Proyeksi saldo cuti tahunan direkalkulasi karena data pengangkatan berubah.',
+                        $request,
+                    );
+                }
 
-            return $appointment->fresh() ?? $appointment;
-        });
+                $this->tmtCalculator->syncForEmployee($employee);
+
+                return $appointment->fresh() ?? $appointment;
+            });
+        } catch (\Throwable $exception) {
+            $this->files->deleteEmployeeDocumentFile($storedPath);
+
+            throw $exception;
+        }
+
+        if ($storedPath !== null && $replacedPath !== $storedPath) {
+            $this->files->deleteReplacedEmployeeDocumentFile($replacedPath);
+        }
+
+        return $appointment;
     }
 
     /** @return array<int, int> */

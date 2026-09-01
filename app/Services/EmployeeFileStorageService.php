@@ -3,7 +3,13 @@
 namespace App\Services;
 
 use App\Models\Document;
+use App\Models\Appointment;
+use App\Models\DisciplineRecord;
+use App\Models\EmployeeStatusHistory;
 use App\Models\LeaveRequest;
+use App\Models\PositionHistory;
+use App\Models\RankHistory;
+use App\Models\SalaryHistory;
 use App\Models\StorageRecoveryTask;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
@@ -278,6 +284,40 @@ class EmployeeFileStorageService
     public function deleteEmployeeDocumentFile(?string $path): void
     {
         $this->deleteOnDisk($path, Document::STORAGE_DISK, 'dokumen privat pegawai');
+    }
+
+    /**
+     * Menghapus file SK yang telah digantikan hanya setelah referensi baru committed.
+     * Pemeriksaan lintas tabel melindungi file legacy yang kebetulan masih dibagi oleh lebih dari satu record.
+     */
+    public function deleteReplacedEmployeeDocumentFile(?string $path): void
+    {
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        $cleanup = function () use ($path): void {
+            if ($this->isEmployeeDocumentFileStillReferenced($path)) {
+                return;
+            }
+
+            $this->deleteEmployeeDocumentFile($path);
+        };
+
+        if (! $this->sideEffects->afterCommit($cleanup)) {
+            $cleanup();
+        }
+    }
+
+    private function isEmployeeDocumentFileStillReferenced(string $path): bool
+    {
+        return Document::query()->where('file_path', $path)->exists()
+            || EmployeeStatusHistory::query()->where('file_sk', $path)->exists()
+            || RankHistory::query()->where('file_sk', $path)->exists()
+            || PositionHistory::query()->where('file_sk', $path)->exists()
+            || SalaryHistory::query()->where('file_sk', $path)->exists()
+            || DisciplineRecord::query()->where('file_sk', $path)->exists()
+            || Appointment::query()->where('file_sk', $path)->exists();
     }
 
     private function store(UploadedFile $file, string $directory): string

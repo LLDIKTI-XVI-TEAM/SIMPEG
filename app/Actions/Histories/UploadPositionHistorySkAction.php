@@ -8,6 +8,7 @@ use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 
 class UploadPositionHistorySkAction
 {
@@ -15,26 +16,42 @@ class UploadPositionHistorySkAction
 
     public function execute(Employee $employee, PositionHistory $history, UploadedFile $file, ?Request $request = null): PositionHistory
     {
-        abort_unless($history->employee_id === $employee->id, 404);
+        $storedPath = null;
+        $replacedPath = null;
 
-        $oldValues = $history->toArray();
-        $path = $this->files->storeSk($file);
+        try {
+            $history = DB::transaction(function () use ($employee, $history, $file, $request, &$storedPath, &$replacedPath): PositionHistory {
+                $history = PositionHistory::query()->whereKey($history->id)->lockForUpdate()->firstOrFail();
+                abort_unless($history->employee_id === $employee->id, 404);
 
-        $history->update(['file_sk' => $path]);
-        $history->load(['jabatan', 'unitKerja']);
+                $oldValues = $history->toArray();
+                $replacedPath = $history->file_sk;
+                $storedPath = $this->files->storeSk($file);
+                $history->update(['file_sk' => $storedPath]);
+                $history->load(['jabatan', 'unitKerja']);
 
-        // Sinkronisasi ke koleksi dokumen pegawai
-        $employee->documents()->updateOrCreate([
-            'jenis_dokumen' => 'sk_jabatan',
-            'nomor_dokumen' => $history->no_sk,
-        ], [
-            'nama_dokumen' => 'SK Kenaikan Jabatan '.($history->jabatan?->nama ?? $history->nama_jabatan ?? ''),
-            'tanggal_dokumen' => $history->tanggal_sk,
-            'file_path' => $path,
-            'keterangan' => 'Unggah berkas riwayat jabatan.',
-        ]);
+                $employee->documents()->updateOrCreate([
+                    'jenis_dokumen' => 'sk_jabatan',
+                    'nomor_dokumen' => $history->no_sk,
+                ], [
+                    'nama_dokumen' => 'SK Kenaikan Jabatan '.($history->jabatan?->nama ?? $history->nama_jabatan ?? ''),
+                    'tanggal_dokumen' => $history->tanggal_sk,
+                    'file_path' => $storedPath,
+                    'keterangan' => 'Unggah berkas riwayat jabatan.',
+                ]);
+                AuditService::log('UPDATE', 'PositionHistory', $history->id, $oldValues, $history->toArray(), $request);
 
-        AuditService::log('UPDATE', 'PositionHistory', $history->id, $oldValues, $history->toArray(), $request);
+                return $history;
+            });
+        } catch (\Throwable $exception) {
+            $this->files->deleteEmployeeDocumentFile($storedPath);
+
+            throw $exception;
+        }
+
+        if ($replacedPath !== $storedPath) {
+            $this->files->deleteReplacedEmployeeDocumentFile($replacedPath);
+        }
 
         return $history;
     }

@@ -8,6 +8,11 @@ class UploadAppointmentSkRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        // Selaras dengan seluruh FormRequest riwayat pada mode API lokal tanpa autentikasi.
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            return true;
+        }
+
         $user = $this->user();
         if (! $user) {
             return false;

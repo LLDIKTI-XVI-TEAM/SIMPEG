@@ -129,13 +129,22 @@ class EmployeeAppointmentTest extends TestCase
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
+        $oldPath = 'sk/old-appointment-sk.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($oldPath, 'old appointment document');
         $appointment = Appointment::create([
             'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PPPK',
             'no_sk' => 'SK-PPPK-2026',
             'tanggal_sk' => '2026-01-01',
             'tmt_pengangkatan' => '2026-02-01',
-            'file_sk' => null,
+            'file_sk' => $oldPath,
+        ]);
+        $employee->documents()->create([
+            'jenis_dokumen' => 'sk_pengangkatan',
+            'nama_dokumen' => 'SK Pengangkatan PPPK',
+            'nomor_dokumen' => $appointment->no_sk,
+            'tanggal_dokumen' => $appointment->tanggal_sk,
+            'file_path' => $oldPath,
         ]);
 
         $file = UploadedFile::fake()->create('sk_pppk.pdf', 600, 'application/pdf');
@@ -151,6 +160,7 @@ class EmployeeAppointmentTest extends TestCase
         $appointment->refresh();
         $this->assertNotNull($appointment->file_sk);
         Storage::disk(Document::STORAGE_DISK)->assertExists($appointment->file_sk);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($oldPath);
 
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
