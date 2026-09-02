@@ -241,6 +241,22 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->middleware(['permission:employees.restore', 'employee.scope'])
                 ->whereUuid('id')
                 ->name('pegawai.restore');
+            Route::post('/pegawai/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.assign-atasan');
+            Route::post('/pegawai/{id}/kinerja-baik', [PegawaiController::class, 'updatePerformanceFlag'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.kinerja.update');
+            Route::post('/pegawai/{id}/satyalancana-eligibility', [PegawaiController::class, 'updateSatyalancanaEligibility'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.satyalancana.update');
+            Route::get('/pegawai/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
+                ->middleware(['permission:employees.update', 'throttle:60,1', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.supervisor-lookup');
             Route::get('/pegawai/{employee}/dokumen/{document}/unduh', [RbacEmployeeController::class, 'downloadDocument'])
                 ->middleware(['permission:employees.read', 'permission:dokumen_sk.read', 'employee.scope'])
                 ->whereUuid('employee')->whereUuid('document')
@@ -785,6 +801,22 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->middleware(['permission:employees.restore', 'employee.scope'])
                 ->whereUuid('id')
                 ->name('pegawai.restore');
+            Route::post('/pegawai/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.assign-atasan');
+            Route::post('/pegawai/{id}/kinerja-baik', [PegawaiController::class, 'updatePerformanceFlag'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.kinerja.update');
+            Route::post('/pegawai/{id}/satyalancana-eligibility', [PegawaiController::class, 'updateSatyalancanaEligibility'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.satyalancana.update');
+            Route::get('/pegawai/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
+                ->middleware(['permission:employees.update', 'throttle:60,1', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.supervisor-lookup');
             Route::get('/pegawai/{employee}/dokumen/{document}/unduh', [PimpinanEmployeeController::class, 'downloadDocument'])
                 ->middleware(['permission:employees.read', 'permission:dokumen_sk.read'])
                 ->whereUuid('employee')

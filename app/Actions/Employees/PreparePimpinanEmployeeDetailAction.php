@@ -2,28 +2,37 @@
 
 namespace App\Actions\Employees;
 
+use App\Actions\Documents\PrepareEmployeeDocumentRowsAction;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EmployeeStatusHistory;
-use App\Models\PositionHistory;
-use App\Models\RankHistory;
-use App\Models\SupervisorAssignment;
+use App\Models\RefEselon;
+use App\Models\RefGolongan;
+use App\Models\RefJabatan;
+use App\Models\RefJenisJabatan;
+use App\Models\RefJenjangPendidikan;
+use App\Models\RefProgramStudi;
+use App\Models\RefUnitKerja;
 use App\Models\User;
+use App\Services\EmployeeDocumentStatusService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Documents\DocumentCategory;
 use App\Support\Employees\EmployeeProfilePresentation;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class PreparePimpinanEmployeeDetailAction
 {
-    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+    public function __construct(
+        private readonly EmployeeHistoryAttachmentService $attachments,
+        private readonly EmployeeDocumentStatusService $documentStatusService,
+        private readonly PrepareEmployeeDocumentRowsAction $prepareDocuments,
+    ) {}
 
     /**
-     * Menyiapkan seluruh data detail pegawai yang boleh dibaca Pimpinan tanpa membawa opsi mutasi Admin.
+     * Menyiapkan seluruh data detail pegawai yang boleh dibaca Pimpinan dengan opsi aksi yang sama seperti dashboard.
      *
-     * @return array{p: Employee, statusPresentation: array{label: string, badge: string, dot: string, effectiveDate: Carbon|null}, activePosition: PositionHistory|null, latestRank: RankHistory|null, latestStatusHistory: EmployeeStatusHistory|null, activeSupervisorAssignments: Collection<int, SupervisorAssignment>, retirementDate: Carbon|null}
+     * @return array<string, mixed>
      */
     public function execute(string $employeeId, User $viewer): array
     {
@@ -31,6 +40,17 @@ class PreparePimpinanEmployeeDetailAction
         $canReadHistories = $viewer->hasPermission('employee_histories.read');
         $canReadDiscipline = $viewer->hasPermission('discipline_records.read');
         $canReadDocuments = $viewer->hasPermission('dokumen_sk.read');
+        $canCreateFamily = $viewer->hasPermission('employee_families.create');
+        $canDeleteFamily = $viewer->hasPermission('employee_families.delete');
+        $canCreateDiscipline = $viewer->hasPermission('discipline_records.create');
+        $canCreateEmployeeHistory = $viewer->hasPermission('employee_histories.create');
+        $canUpdateEmployeeHistory = $viewer->hasPermission('employee_histories.update') || $viewer->hasPermission('employee_histories.create') || $viewer->getEffectiveRole() === 'super_admin';
+        $canCreateDocument = $viewer->hasPermission('dokumen_sk.create');
+        $canUpdateDocument = $viewer->hasPermission('dokumen_sk.update');
+        $canDeleteDocument = $viewer->hasPermission('dokumen_sk.delete');
+        $canUpdateEmployee = $viewer->hasPermission('employees.update');
+        $canDeactivateEmployee = $viewer->hasPermission('employees.deactivate');
+        $canRestoreEmployee = $viewer->hasPermission('employees.restore');
 
         $employee = Employee::query()
             // Kolom NIK dan No. KK tidak diambil agar plaintext hasil dekripsi tidak pernah masuk payload view Pimpinan.
@@ -163,19 +183,73 @@ class PreparePimpinanEmployeeDetailAction
             ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
         $latestRank = $employee->rankHistories->firstWhere('is_latest', true);
+        $latestPosition = $employee->positionHistories->firstWhere('is_latest', true);
+        $golonganOptions = RefGolongan::all();
+        $jabatanOptions = RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
+        $jenisJabatanOptions = RefJenisJabatan::all();
+        $unitKerjaOptions = RefUnitKerja::all();
+        $eselonOptions = RefEselon::all();
+        $jenjangOptions = RefJenjangPendidikan::orderBy('urutan')->get();
+        $programStudiOptions = RefProgramStudi::query()->where('is_active', true)->orderBy('nama')->get();
+        $educationProgramStudiOptions = RefProgramStudi::query()
+            ->where(function ($q) use ($employee): void {
+                $q->where('is_active', true)->orWhereIn('id', $employee->educationHistories->pluck('program_studi_id')->filter());
+            })->orderBy('nama')->get();
+        $estimasiTanggalPensiun = EmployeeProfilePresentation::retirementDate($employee);
+        $currentSupervisor = $employee->supervisorAssignments->filter(fn ($a): bool => $a->tanggal_mulai->lte(today()) && ($a->tanggal_berakhir === null || $a->tanggal_berakhir->gte(today())))->sortByDesc('tanggal_mulai')->first();
+        $currentSupervisorPosition = $currentSupervisor?->supervisor?->positionHistories->where('is_latest', true)->sortByDesc('tmt_jabatan')->first();
+        $oldSupervisorId = old('kepala_bagian_id');
+        $selectedSupervisor = is_string($oldSupervisorId) && Str::isUuid($oldSupervisorId) ? Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($oldSupervisorId) : null;
+        $selectedSupervisorId = $selectedSupervisor?->id ?? $currentSupervisor?->supervisor?->id;
+        $selectedSupervisorName = $selectedSupervisor?->nama_lengkap ?? $currentSupervisor?->supervisor?->nama_lengkap;
+        $documentRows = $this->prepareDocuments->execute($employee);
+        $documentStatus = $this->documentStatusService->summarize($employee);
+        $archivedSkRows = $documentRows['sk'];
+        $otherDocumentRows = $documentRows['others'];
+        $statusPresentation = EmployeeProfilePresentation::status($employee, $latestStatusHistory);
+        $pendidikanCacheVersion = md5((string) (RefProgramStudi::max('updated_at') ?? '0').'|'.(string) ($employee->updated_at ?? '0').'|'.(string) ($employee->educationHistories->max('updated_at') ?? '0').'|'.(string) $employee->educationHistories->count());
 
         return [
             'p' => $employee,
-            'statusPresentation' => EmployeeProfilePresentation::status($employee, $latestStatusHistory),
+            'statusPresentation' => $statusPresentation,
             'activePosition' => $activePosition,
             'latestRank' => $latestRank,
+            'latestPosition' => $latestPosition,
             'latestStatusHistory' => $latestStatusHistory,
             'activeSupervisorAssignments' => $employee->supervisorAssignments,
-            'retirementDate' => EmployeeProfilePresentation::retirementDate($employee),
+            'retirementDate' => $estimasiTanggalPensiun,
             'canReadFamilies' => $canReadFamilies,
             'canReadHistories' => $canReadHistories,
             'canReadDiscipline' => $canReadDiscipline,
             'canReadDocuments' => $canReadDocuments,
+            'canCreateFamily' => $canCreateFamily,
+            'canDeleteFamily' => $canDeleteFamily,
+            'canCreateDiscipline' => $canCreateDiscipline,
+            'canCreateEmployeeHistory' => $canCreateEmployeeHistory,
+            'canUpdateEmployeeHistory' => $canUpdateEmployeeHistory,
+            'canCreateDocument' => $canCreateDocument,
+            'canUpdateDocument' => $canUpdateDocument,
+            'canDeleteDocument' => $canDeleteDocument,
+            'canUpdateEmployee' => $canUpdateEmployee,
+            'canDeactivateEmployee' => $canDeactivateEmployee && $employee->isActive(),
+            'canRestoreEmployee' => $canRestoreEmployee && ! $employee->isActive(),
+            'golonganOptions' => $golonganOptions,
+            'jabatanOptions' => $jabatanOptions,
+            'jenisJabatanOptions' => $jenisJabatanOptions,
+            'unitKerjaOptions' => $unitKerjaOptions,
+            'eselonOptions' => $eselonOptions,
+            'jenjangOptions' => $jenjangOptions,
+            'programStudiOptions' => $programStudiOptions,
+            'educationProgramStudiOptions' => $educationProgramStudiOptions,
+            'estimasiTanggalPensiun' => $estimasiTanggalPensiun,
+            'currentSupervisor' => $currentSupervisor,
+            'currentSupervisorPosition' => $currentSupervisorPosition,
+            'selectedSupervisorId' => $selectedSupervisorId,
+            'selectedSupervisorName' => $selectedSupervisorName,
+            'documentStatus' => $documentStatus,
+            'archivedSkRows' => $archivedSkRows,
+            'otherDocumentRows' => $otherDocumentRows,
+            'pendidikanCacheVersion' => $pendidikanCacheVersion,
         ];
     }
 
