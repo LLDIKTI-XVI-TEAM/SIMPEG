@@ -14,10 +14,7 @@ class UpdateEducationHistoryRequest extends FormRequest
             return true;
         }
 
-        $user = $this->user();
-
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return $this->user()?->hasPermission('employee_histories.create') ?? false;
     }
 
     public function rules(): array

@@ -95,8 +95,12 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                 (this.moduleFilter === '' || this.moduleFilter === module)
                 && this.matchesPermission(search)
             );
+        },
+
+        saveBarVisible() {
+            return this.isDirty;
         }
-    }" @confirm-rbac.window="$refs.rbacForm.submit()" class="space-y-6">
+    }" @confirm-rbac.window="$refs.rbacForm.submit()" :class="{ 'pb-32 sm:pb-24': saveBarVisible() }" class="space-y-6 transition-[padding] duration-200">
 
         {{-- PAGE HEADER & BREADCRUMBS --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -317,6 +321,8 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
             </x-ui.card>
 
             {{-- STICKY SAVE BAR --}}
+            {{-- Ruang bawah dinamis pada wrapper x-data memastikan permission terakhir
+                 tetap dapat digulir di atas sticky save bar saat ada perubahan. --}}
             <div
                 x-show="isDirty"
                 x-transition:enter="transition ease-out duration-300"
@@ -325,7 +331,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 translate-y-0"
                 x-transition:leave-end="opacity-0 translate-y-10"
-                class="fixed bottom-6 left-6 right-6 lg:left-[280px] z-40 bg-ink text-white rounded-xl shadow-2xl px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border border-white/10"
+                class="fixed inset-x-4 bottom-4 z-40 flex flex-col gap-3 rounded-xl border border-white/10 bg-ink px-4 py-4 text-white shadow-2xl sm:bottom-6 sm:left-6 sm:right-6 sm:px-6 lg:left-[280px] sm:flex-row sm:items-center sm:justify-between"
                 style="display: none;"
             >
                 <div class="flex items-center gap-3">

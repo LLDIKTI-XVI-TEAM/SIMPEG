@@ -5,13 +5,14 @@ namespace Database\Seeders;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Persona SSO sintetis (HANYA local/testing): tidak ada email, username, atau
-     * credential Keycloak nyata yang disimpan di repository. Password di bawah
-     * hanya dipakai untuk fixture lokal dan bukan credential UAT/produksi.
+     * Persona akun SSO UAT (HANYA local/testing): email dicocokkan dengan klaim
+     * terverifikasi dari Keycloak. Password autentikasi dikelola sepenuhnya oleh
+     * Keycloak dan tidak disimpan oleh seeder SIMPEG.
      *
      * Akun-akun ini adalah evidence UAT Issue #6 — persona yang dipakai untuk
      * browser smoke test dengan login Keycloak nyata. Auth callback TIDAK PERNAH
@@ -19,37 +20,32 @@ class SsoRoleMappedAccountSeeder extends Seeder
      * aplikasi SIMPEG (role kosong pada pegawai valid → pegawai, role existing
      * tidak pernah dioverwrite).
      *
-     * @var list<array{email: string, username: string, password: string, role: string}>
+     * @var list<array{email: string, username: string, role: string}>
      */
     public const UAT_ACCOUNTS = [
         [
-            'email' => 'super-admin@example.test',
-            'username' => 'fixture-super-admin',
-            'password' => 'fixture-only-super-admin',
+            'email' => 'dayensite@gmail.com',
+            'username' => 'demo-klabat',
             'role' => 'super_admin',
         ],
         [
-            'email' => 'admin-kepegawaian@example.test',
-            'username' => 'fixture-admin-kepegawaian',
-            'password' => 'fixture-only-admin-kepegawaian',
+            'email' => 'sitedayen@gmail.com',
+            'username' => 'demo-klabat-kepeg',
             'role' => 'admin_kepegawaian',
         ],
         [
-            'email' => 'pimpinan@example.test',
-            'username' => 'fixture-pimpinan',
-            'password' => 'fixture-only-pimpinan',
+            'email' => 'dionkobi08@gmail.com',
+            'username' => 'demo-klabat-pimpinan',
             'role' => 'pimpinan',
         ],
         [
-            'email' => 'kepala-bagian@example.test',
-            'username' => 'fixture-kepala-bagian',
-            'password' => 'fixture-only-kepala-bagian',
+            'email' => 'dayen6153@gmail.com',
+            'username' => 'demo-klabat-kabag',
             'role' => 'kepala_bagian',
         ],
         [
-            'email' => 'pegawai@example.test',
-            'username' => 'fixture-pegawai',
-            'password' => 'fixture-only-pegawai',
+            'email' => 'dionleonn05@gmail.com',
+            'username' => 'demo-klabat-pegawai',
             'role' => 'pegawai',
         ],
     ];
@@ -91,8 +87,9 @@ class SsoRoleMappedAccountSeeder extends Seeder
      * - nama, email internal, dan role user existing TIDAK ditimpa;
      * - resolver user memakai kontrak kanonis Issue #6: employee_id dulu, baru
      *   email case-insensitive (termasuk email_pribadi pegawai).
-     * - password dan keycloak_username adalah milik fixture akun UAT: direset
-     *   idempoten oleh seeder ini setiap dijalankan (mengikuti pola akun demo).
+     * - keycloak_username adalah atribut fixture; direset idempoten oleh seeder
+     *   saat belum berbenturan. Password lokal tidak pernah disetel karena login
+     *   diautentikasi oleh Keycloak.
      */
     public function run(): void
     {
@@ -207,6 +204,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
             }
 
             $user = $userByEmployee ?? $userByEmail ?? new User;
+            $isNewUser = ! $user->exists;
 
             // Tolak ketidakcocokan relasi: user yang sudah terhubung ke pegawai lain
             // tidak boleh dipindahkan ke pegawai hasil lookup email (email pegawai asal
@@ -228,6 +226,7 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 'email' => $user->exists ? $user->email : $email,
                 'role' => $user->exists ? $user->role : $role,
                 'employee_id' => $employee->id,
+                'password' => $isNewUser ? Str::random(48) : $user->password,
             ]);
 
             // Status verifikasi email user existing TIDAK disentuh: Keycloak tidak pernah
@@ -250,10 +249,9 @@ class SsoRoleMappedAccountSeeder extends Seeder
                 );
             }
 
-            // Password adalah milik fixture akun UAT (dipakai tooling/QA lokal):
-            // direset idempoten setiap seeder dijalankan — mengikuti pola akun demo.
-            // Model memakai cast 'hashed' sehingga nilai plain langsung di-hash.
-            $user->password = $uatAccount['password'];
+            // Password lokal tidak dipakai untuk autentikasi Keycloak dan tidak boleh
+            // dibuat/reset oleh seeder. User baru mendapat password acak saat dibuat
+            // agar memenuhi schema tanpa menyimpan credential SSO.
 
             $user->save();
 

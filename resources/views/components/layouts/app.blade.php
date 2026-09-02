@@ -126,7 +126,7 @@
                          'roles' => ['kepala_bagian']],
                         // RBAC: dikontrol dari Role & Permission admin (dokumen_sk.read)
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open',
-                         'permission' => 'dokumen_sk.read'],
+                         'permission' => 'dokumen_sk.read', 'capability' => 'document_archive'],
                         // RBAC: dikontrol dari Role & Permission admin (employees.read)
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
                          'permission' => 'employees.read'],
@@ -235,7 +235,10 @@
                             } else {
                                 // 2. Menu RBAC / Bersama (tidak memiliki 'roles'):
                                 // Cek permission dari matriks RBAC database. Jika belum diberi izin, tampilkan sebagai disabled.
-                                if ($activeRole === 'super_admin') {
+                                if (($menu['capability'] ?? null) === 'document_archive') {
+                                    $permissionAllowed = $authUser !== null
+                                        && \App\Support\Documents\DocumentAuthorization::canViewArchive($authUser);
+                                } elseif ($activeRole === 'super_admin') {
                                     $permissionAllowed = true;
                                 } elseif (isset($menu['permissions_any'])) {
                                     $permissionAllowed = false;

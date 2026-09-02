@@ -23,15 +23,14 @@ $employeeGroupMiddleware = $disableEmployeeApiAuth
 $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
     ? []
     : ['permission:'.$permission, 'employee.scope'];
-// Mutasi data pegawai hanya berada pada surface pengelola. Permission menjaga aksi
-// granularnya; role gate menjaga kontrak bahwa Pegawai/Pimpinan tidak dapat memutasi API admin.
+// Permission menjaga aksi; employee.scope menjaga batas record sesuai role/ownership.
+// Tidak ada role allowlist agar matriks RBAC menjadi sumber kebenaran mutasi.
 $adminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission, 'employee.scope'];
-// Sub-modul keluarga, disiplin, riwayat, dan dokumen memakai kontrak pengelola yang sama.
+    : ['permission:'.$permission, 'employee.scope'];
 $adminSubModuleMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
-    : ['role:super_admin,admin_kepegawaian', 'permission:'.$permission, 'employee.scope'];
+    : ['permission:'.$permission, 'employee.scope'];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.

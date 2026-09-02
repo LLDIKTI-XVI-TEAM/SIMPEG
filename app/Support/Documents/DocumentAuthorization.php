@@ -38,7 +38,7 @@ class DocumentAuthorization
             return false;
         }
 
-        return self::hasManagerRole($user) && $user->hasPermission('employees.update');
+        return $user->hasPermission('employees.update');
     }
 
     private static function hasManagerRole(?User $user): bool

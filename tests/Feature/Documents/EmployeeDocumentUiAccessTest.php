@@ -48,7 +48,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
             ->assertSee('Hapus Berkas')
             ->assertSee('Form ini hanya untuk dokumen tambahan')
             ->assertDontSee('Tambah Berkas SK')
-            ->assertDontSee('Ganti Berkas SK');
+            ->assertSee('Ganti Berkas SK');
     }
 
     public function test_pimpinan_cannot_open_archive_or_admin_employee_detail(): void
@@ -57,7 +57,18 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $employee = Employee::factory()->create();
 
         $this->get(route('dokumen'))->assertForbidden();
-        $this->get(route('pegawai.show', $employee->id))->assertForbidden();
+        $this->get(route('pegawai.show', $employee->id))
+            ->assertRedirect(route('pimpinan.pegawai.show', $employee->id));
+    }
+
+    public function test_pimpinan_does_not_receive_an_archive_link_despite_document_permission(): void
+    {
+        $this->actingAsRole('pimpinan');
+
+        $this->get(route('pimpinan.dashboard'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('dokumen').'"', false)
+            ->assertSee('Dokumen &amp; SK', false);
     }
 
     public function test_admin_kepegawaian_can_upload_berkas_lainnya(): void

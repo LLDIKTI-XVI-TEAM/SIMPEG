@@ -9,8 +9,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureEmployeeApiScope
 {
-    /** Role pengelola boleh memakai surface API pegawai lintas pegawai. */
-    private const MANAGER_ROLES = ['super_admin', 'admin_kepegawaian'];
+    /** Role ber-permission boleh memakai surface API pegawai lintas pegawai. */
+    private const MANAGER_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
 
     /**
      * RBAC menentukan aksi yang boleh dilakukan, sedangkan middleware ini
