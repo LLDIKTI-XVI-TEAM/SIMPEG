@@ -14,11 +14,15 @@ class StoreEmployeeFamilyRequest extends FormRequest
             return true;
         }
 
-        // Mutasi data keluarga hanya untuk pengelola data kepegawaian.
         $user = $this->user();
 
         return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+            && (
+                $user->hasPermission('employee_families.create')
+                || $user->getEffectiveRole() === 'super_admin'
+                || in_array($user->role, ['super_admin', 'admin_kepegawaian'], true)
+                || in_array($user->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true)
+            );
     }
 
     public function rules(): array

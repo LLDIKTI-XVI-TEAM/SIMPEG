@@ -11,7 +11,15 @@ class EmployeeLookupRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return in_array($this->user()?->role, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true);
+        $user = $this->user();
+
+        return $user !== null
+            && (
+                $user->hasPermission('cuti.read_all')
+                || $user->hasPermission('cuti.configure')
+                || in_array($user->getEffectiveRole(), ['super_admin', 'admin_kepegawaian', 'pimpinan'], true)
+                || in_array($user->role, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true)
+            );
     }
 
     /** @return array<string, list<string>> */
