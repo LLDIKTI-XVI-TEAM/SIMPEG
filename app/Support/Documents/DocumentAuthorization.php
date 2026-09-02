@@ -7,11 +7,12 @@ use App\Models\User;
 class DocumentAuthorization
 {
     /**
-     * Role efektif yang boleh melihat arsip dan mengunggah dokumen tambahan.
+     * Role efektif yang dapat membuka arsip lintas pegawai saat memiliki permission.
+     * Arsip tetap read-only; mutasi dokumen mengikuti canManage().
      *
      * @var list<string>
      */
-    public const MANAGER_ROLES = ['super_admin', 'admin_kepegawaian'];
+    public const ARCHIVE_VIEWER_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
 
     public static function allowsLocalApiBypass(): bool
     {
@@ -25,10 +26,7 @@ class DocumentAuthorization
             return false;
         }
 
-        // Arsip terpusat memuat dokumen lintas pegawai yang sensitif. Permission
-        // read saja tidak cukup karena Pimpinan juga memilikinya untuk surface
-        // khusus yang sudah dimasking; arsip mentah tetap hanya untuk pengelola.
-        return self::hasManagerRole($user)
+        return self::hasArchiveViewerRole($user)
             && ($user->hasPermission('dokumen_sk.read') || $user->hasPermission('employees.read'));
     }
 
@@ -38,12 +36,41 @@ class DocumentAuthorization
             return false;
         }
 
-        return $user->hasPermission('employees.update');
+        return $user->hasPermission('dokumen_sk.create')
+            || $user->hasPermission('dokumen_sk.update')
+            || $user->hasPermission('dokumen_sk.delete');
     }
 
-    private static function hasManagerRole(?User $user): bool
+    public static function canCreate(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermission('dokumen_sk.create');
+    }
+
+    public static function canUpdate(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermission('dokumen_sk.update');
+    }
+
+    public static function canDelete(?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermission('dokumen_sk.delete');
+    }
+
+    private static function hasArchiveViewerRole(?User $user): bool
     {
         return $user !== null
-            && in_array($user->getEffectiveRole(), self::MANAGER_ROLES, true);
+            && in_array($user->getEffectiveRole(), self::ARCHIVE_VIEWER_ROLES, true);
     }
 }

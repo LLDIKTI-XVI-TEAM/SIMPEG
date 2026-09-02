@@ -102,25 +102,25 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('disiplin.store');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('employees.read,dokumen_sk.read'))
+            ->middleware($adminEmployeeReadMiddleware('dokumen_sk.read'))
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
         Route::post('/{employee}/berkas-lainnya', [EmployeeDocumentController::class, 'storeBerkasLainnya'])
-            ->middleware($adminEmployeeMutationMiddleware('employees.update'))
+            ->middleware($adminEmployeeMutationMiddleware('dokumen_sk.create'))
             ->whereUuid('employee')
             ->name('berkas-lainnya.store');
         Route::put('/{employee}/berkas-lainnya/{document}', [EmployeeDocumentController::class, 'updateBerkasLainnya'])
-            ->middleware($adminEmployeeMutationMiddleware('employees.update'))
+            ->middleware($adminEmployeeMutationMiddleware('dokumen_sk.update'))
             ->whereUuid(['employee', 'document'])
             ->scopeBindings()
             ->name('berkas-lainnya.update');
         Route::delete('/{employee}/berkas-lainnya/{document}', [EmployeeDocumentController::class, 'destroyBerkasLainnya'])
-            ->middleware($adminEmployeeMutationMiddleware('employees.update'))
+            ->middleware($adminEmployeeMutationMiddleware('dokumen_sk.delete'))
             ->whereUuid(['employee', 'document'])
             ->scopeBindings()
             ->name('berkas-lainnya.destroy');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
-            ->middleware($adminEmployeeReadMiddleware('employees.read,dokumen_sk.read'))
+            ->middleware($adminEmployeeReadMiddleware('dokumen_sk.read'))
             ->whereUuid('employee')
             ->name('status-dokumen');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
@@ -132,7 +132,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-kepangkatan.store');
         Route::post('/{employee}/riwayat-kepangkatan/{rank}/upload-sk', [RankHistoryController::class, 'uploadSk'])
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update,employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.update'))
             ->whereUuid(['employee', 'rank'])
             ->name('riwayat-kepangkatan.upload-sk');
         Route::get('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'index'])
@@ -144,7 +144,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-jabatan.store');
         Route::post('/{employee}/riwayat-jabatan/{position}/upload-sk', [PositionHistoryController::class, 'uploadSk'])
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update,employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.update'))
             ->whereUuid(['employee', 'position'])
             ->name('riwayat-jabatan.upload-sk');
         Route::get('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'index'])
@@ -156,7 +156,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-kgb.store');
         Route::post('/{employee}/riwayat-kgb/{kgb}/upload-sk', [KgbHistoryController::class, 'uploadSk'])
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update,employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.update'))
             ->whereUuid(['employee', 'kgb'])
             ->name('riwayat-kgb.upload-sk');
         Route::get('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'index'])
@@ -184,7 +184,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('pengangkatan.save');
         Route::post('/{employee}/pengangkatan/upload-sk', [AppointmentController::class, 'uploadSk'])
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create,employee_histories.update,employees.update'))
+            ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.update'))
             ->whereUuid('employee')
             ->name('pengangkatan.upload-sk');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])

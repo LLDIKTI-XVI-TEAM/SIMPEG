@@ -10,6 +10,7 @@ use App\Http\Requests\Appointment\UploadAppointmentSkRequest;
 use App\Models\Employee;
 use App\Support\Histories\EmployeeHistoryPayload;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\UploadedFile;
 
 class AppointmentController extends Controller
 {
@@ -29,17 +30,26 @@ class AppointmentController extends Controller
         SaveAppointmentAction $action,
         EmployeeHistoryPayload $payload,
     ): JsonResponse {
-        $appointment = $action->execute(
-            $employee,
-            $request->safe()->except(['file_sk']),
-            $request->file('file_sk'),
-            $request,
-        );
+        $data = $request->safe()->except(['file_sk']);
+        $file = $request->file('file_sk');
+        $warning = null;
+        $canCreateDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+        if ($file instanceof UploadedFile && ! $canCreateDoc) {
+            $file = null;
+            $warning = 'Data pengangkatan berhasil disimpan, tetapi berkas SK tidak diunggah karena Anda tidak memiliki permission dokumen_sk.create.';
+        }
 
-        return response()->json([
+        $appointment = $action->execute($employee, $data, $file, $request);
+
+        $response = [
             'message' => 'Data SK Pengangkatan pertama berhasil disimpan.',
             'appointment' => $payload->appointment($appointment, $employee),
-        ]);
+        ];
+        if ($warning !== null) {
+            $response['warning'] = $warning;
+        }
+
+        return response()->json($response);
     }
 
     public function uploadSk(

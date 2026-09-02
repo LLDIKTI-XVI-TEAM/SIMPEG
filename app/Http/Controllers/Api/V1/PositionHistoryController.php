@@ -31,12 +31,26 @@ class PositionHistoryController extends Controller
         CreatePositionHistoryAction $action,
         EmployeeHistoryPayload $payload,
     ): JsonResponse {
-        $history = $action->execute($employee, $request->validated(), $request);
+        $validated = $request->validated();
+        $warning = null;
+        $hasFile = array_key_exists('file_sk', $validated) && $validated['file_sk'] !== null && $validated['file_sk'] !== '';
+        $canCreateDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+        if ($hasFile && ! $canCreateDoc) {
+            unset($validated['file_sk']);
+            $warning = 'Riwayat jabatan berhasil disimpan, tetapi berkas SK tidak diunggah karena Anda tidak memiliki permission dokumen_sk.create.';
+        }
 
-        return response()->json([
+        $history = $action->execute($employee, $validated, $request);
+
+        $response = [
             'message' => 'Riwayat jabatan berhasil ditambahkan.',
             'history' => $payload->position($history, $employee),
-        ], 201);
+        ];
+        if ($warning !== null) {
+            $response['warning'] = $warning;
+        }
+
+        return response()->json($response, 201);
     }
 
     public function uploadSk(

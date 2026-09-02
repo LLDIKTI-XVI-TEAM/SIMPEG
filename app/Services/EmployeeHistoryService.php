@@ -236,6 +236,16 @@ class EmployeeHistoryService
      */
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
+        $user = $request?->user() ?? auth()->user();
+        $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user?->getEffectiveRole() === 'super_admin';
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            $canCreateDoc = true;
+        }
+        if (! $canCreateDoc) {
+            // Tanpa hak dokumen, abaikan berkas dan dokumen_id agar riwayat tetap tersimpan tanpa lampiran
+            unset($data['dokumen_id'], $data['file_sk']);
+        }
+
         $document = null;
         if (! empty($data['dokumen_id'])) {
             // Arsip yang dipakai ulang wajib tetap menjadi SK disiplin milik pegawai ini.
@@ -344,8 +354,32 @@ class EmployeeHistoryService
         $uploadedSkPath = null;
 
         if (($data['file_sk'] ?? null) instanceof UploadedFile) {
+            $user = auth()->user();
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user->getEffectiveRole() === 'super_admin';
+            // Di environment lokal dengan disable auth, bypass dianggap memiliki hak dokumen
+            if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+                $canCreateDoc = true;
+            }
+            if (! $canCreateDoc) {
+                // Permission dokumen tidak aktif: jangan simpan file, riwayat tetap dibuat tanpa berkas
+                $data['file_sk'] = null;
+
+                return [$data, null];
+            }
             $data['file_sk'] = $this->files->storeSk($data['file_sk']);
             $uploadedSkPath = $data['file_sk'];
+        }
+
+        // String controlled path (reuse arsip) juga memerlukan dokumen_sk.create
+        if (is_string($data['file_sk'] ?? null) && $data['file_sk'] !== '') {
+            $user = auth()->user();
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user->getEffectiveRole() === 'super_admin';
+            if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+                $canCreateDoc = true;
+            }
+            if (! $canCreateDoc) {
+                $data['file_sk'] = null;
+            }
         }
 
         return [$data, $uploadedSkPath];

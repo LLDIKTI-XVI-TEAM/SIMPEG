@@ -15,9 +15,8 @@ class UploadHistorySkRequest extends FormRequest
         $user = $this->user();
 
         return $user !== null && (
-            $user->hasPermission('employee_histories.update') ||
-            $user->hasPermission('employee_histories.create') ||
-            in_array($user->role, ['super_admin', 'admin_kepegawaian'], true)
+            $user->hasPermission('dokumen_sk.update') ||
+            $user->getEffectiveRole() === 'super_admin'
         );
     }
 

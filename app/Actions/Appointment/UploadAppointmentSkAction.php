@@ -45,7 +45,7 @@ class UploadAppointmentSkAction
                 $employee->documents()->updateOrCreate([
                     'jenis_dokumen' => 'sk_pengangkatan',
                 ], [
-                    'nama_dokumen' => 'SK Pengangkatan ' . ($appointment->jenis_pengangkatan ?: ''),
+                    'nama_dokumen' => 'SK Pengangkatan '.($appointment->jenis_pengangkatan ?: ''),
                     'nomor_dokumen' => $appointment->no_sk,
                     'tanggal_dokumen' => $appointment->tanggal_sk,
                     'file_path' => $storedPath,

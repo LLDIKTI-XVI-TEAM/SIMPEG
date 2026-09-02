@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Appointment;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UploadAppointmentSkRequest extends FormRequest
@@ -19,13 +20,11 @@ class UploadAppointmentSkRequest extends FormRequest
         }
 
         return $user->getEffectiveRole() === 'super_admin'
-            || $user->hasPermission('employee_histories.create')
-            || $user->hasPermission('employee_histories.update')
-            || $user->hasPermission('employees.update');
+            || $user->hasPermission('dokumen_sk.update');
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {

@@ -42,8 +42,17 @@ class SaveAppointmentAction
     ): Appointment {
         $storedPath = null;
         if ($file instanceof UploadedFile) {
-            $storedPath = $this->files->storeSk($file);
-            $data['file_sk'] = $storedPath;
+            $user = $request?->user() ?? auth()->user();
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user?->getEffectiveRole() === 'super_admin';
+            if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+                $canCreateDoc = true;
+            }
+            if (! $canCreateDoc) {
+                $file = null;
+            } else {
+                $storedPath = $this->files->storeSk($file);
+                $data['file_sk'] = $storedPath;
+            }
         }
 
         $replacedPath = null;
@@ -79,7 +88,7 @@ class SaveAppointmentAction
                     $employee->documents()->updateOrCreate([
                         'jenis_dokumen' => 'sk_pengangkatan',
                     ], [
-                        'nama_dokumen' => 'SK Pengangkatan ' . ($appointment->jenis_pengangkatan ?: ''),
+                        'nama_dokumen' => 'SK Pengangkatan '.($appointment->jenis_pengangkatan ?: ''),
                         'nomor_dokumen' => $appointment->no_sk,
                         'tanggal_dokumen' => $appointment->tanggal_sk,
                         'file_path' => $appointment->file_sk,
