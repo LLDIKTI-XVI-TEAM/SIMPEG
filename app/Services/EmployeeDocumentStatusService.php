@@ -78,6 +78,7 @@ class EmployeeDocumentStatusService
     public function summarize(Employee $employee): array
     {
         $requiredSksMap = $this->requiredSkFor($employee);
+        $appointmentType = $this->requiredAppointmentType($employee);
         if ($requiredSksMap === []) {
             return [
                 'status_kelengkapan' => 'tidak_dinilai',
@@ -94,8 +95,10 @@ class EmployeeDocumentStatusService
         $sources = [
             'sk_pengangkatan' => $this->historySources(
                 $employee->appointments
-                    // SK Pengangkatan berasal dari pengangkatan pertama; berbeda
-                    // dari pangkat, jabatan, dan KGB yang memakai riwayat terbaru.
+                    ->filter(fn (object $appointment): bool => $this->appointmentMatchesActiveEmployeeType($appointment, $appointmentType))
+                    // SK Pengangkatan PNS/CPNS hanya dapat dipenuhi oleh riwayat
+                    // pengangkatan dengan jenis yang sama. Jenis lain mempertahankan
+                    // perilaku matriks generik yang sudah ada.
                     ->sort(fn ($a, $b): int => $this->compareFirstAppointment($a, $b))
                     ->values(),
             ),
@@ -117,7 +120,8 @@ class EmployeeDocumentStatusService
         ];
 
         foreach ($employee->documents->sortByDesc('created_at')->values() as $document) {
-            if (! array_key_exists($document->jenis_dokumen, SkCompleteness::POOL)) {
+            if (! array_key_exists($document->jenis_dokumen, SkCompleteness::POOL)
+                || ($document->jenis_dokumen === 'sk_pengangkatan' && $appointmentType !== null)) {
                 continue;
             }
 
@@ -140,6 +144,10 @@ class EmployeeDocumentStatusService
         $repairCount = 0;
 
         foreach ($requiredSksMap as $key => $label) {
+            if ($key === 'sk_pengangkatan' && $appointmentType !== null) {
+                $label .= ' '.$appointmentType;
+            }
+
             $candidates = collect($sources[$key]);
             $canonical = $candidates->first();
             $canonicalBroken = $canonical !== null
@@ -202,6 +210,34 @@ class EmployeeDocumentStatusService
             'perlu_perbaikan_count' => $repairCount,
             'required_sks' => $requiredSks,
         ];
+    }
+
+    /**
+     * PNS/CPNS memerlukan SK pengangkatan dengan jenis yang sama. Nilai lain
+     * dibiarkan matrix-driven agar tidak menetapkan default baru untuk PPPK.
+     */
+    private function requiredAppointmentType(Employee $employee): ?string
+    {
+        $typeName = $this->normalizeTypeName($employee->jenisPegawai?->nama);
+
+        return in_array($typeName, ['PNS', 'CPNS'], true) ? $typeName : null;
+    }
+
+    private function appointmentMatchesActiveEmployeeType(object $appointment, ?string $requiredType): bool
+    {
+        return $requiredType === null
+            || $this->normalizeTypeName($appointment->jenis_pengangkatan ?? null) === $requiredType;
+    }
+
+    private function normalizeTypeName(mixed $typeName): ?string
+    {
+        if (! is_string($typeName)) {
+            return null;
+        }
+
+        $normalized = mb_strtoupper(trim($typeName));
+
+        return $normalized === '' ? null : $normalized;
     }
 
     /**
