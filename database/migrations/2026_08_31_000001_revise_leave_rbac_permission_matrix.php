@@ -3,6 +3,7 @@
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
@@ -99,9 +100,9 @@ return new class extends Migration
     }
 
     /**
-     * @param \Illuminate\Support\Collection<string, Role> $rolesByName
-     * @param \Illuminate\Support\Collection<string, Permission> $permissionsByName
-     * @param array<int, string> $roleNames
+     * @param  Collection<string, Role>  $rolesByName
+     * @param  Collection<string, Permission>  $permissionsByName
+     * @param  array<int, string>  $roleNames
      */
     private function detachPermissionsFromRoles($rolesByName, $permissionsByName, string $permissionName, array $roleNames): void
     {

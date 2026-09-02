@@ -1762,7 +1762,7 @@ class KeycloakCallbackMappingTest extends TestCase
     public function test_bootstrap_takes_transactional_advisory_lock_on_first_account(): void
     {
         $statements = [];
-        DB::listen(function (\Illuminate\Database\Events\QueryExecuted $query) use (&$statements): void {
+        DB::listen(function (QueryExecuted $query) use (&$statements): void {
             if (str_contains((string) $query->sql, 'pg_advisory_xact_lock')) {
                 $statements[] = $query->sql;
             }
@@ -1812,7 +1812,7 @@ class KeycloakCallbackMappingTest extends TestCase
         ]);
 
         $injected = false;
-        DB::listen(function (\Illuminate\Database\Events\QueryExecuted $query) use (&$injected): void {
+        DB::listen(function (QueryExecuted $query) use (&$injected): void {
             if ($injected || ! str_contains((string) $query->sql, 'keycloak_username')) {
                 return;
             }

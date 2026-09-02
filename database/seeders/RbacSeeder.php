@@ -62,6 +62,9 @@ class RbacSeeder extends Seeder
             'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat ulang bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
             'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
+            'dokumen_sk.create' => ['module' => 'dokumen_sk', 'description' => 'Mengunggah dokumen dan SK pegawai (riwayat, status, pengangkatan, berkas tambahan)'],
+            'dokumen_sk.update' => ['module' => 'dokumen_sk', 'description' => 'Mengganti berkas SK riwayat dan memperbarui berkas tambahan pegawai'],
+            'dokumen_sk.delete' => ['module' => 'dokumen_sk', 'description' => 'Menghapus berkas tambahan mandiri pegawai (KTP, KK, ijazah, lainnya)'],
             'ews.read' => ['module' => 'ews', 'description' => 'Melihat daftar EWS aktif seluruh pegawai'],
             'ews.configure' => ['module' => 'ews', 'description' => 'Mengonfigurasi parameter dan threshold EWS'],
         ];
@@ -109,6 +112,9 @@ class RbacSeeder extends Seeder
                 'notifications.update',
                 // Admin kepegawaian dapat melihat dokumen & SK pegawai dan memantau EWS aktif
                 'dokumen_sk.read',
+                'dokumen_sk.create',
+                'dokumen_sk.update',
+                'dokumen_sk.delete',
                 'ews.read',
                 // Admin kepegawaian dapat mengajukan, memantau, mengelola konfigurasi, dan administrasi cuti.
                 'cuti.create',

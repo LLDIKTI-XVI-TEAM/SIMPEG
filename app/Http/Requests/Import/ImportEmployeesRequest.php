@@ -13,6 +13,8 @@ class ImportEmployeesRequest extends FormRequest
             return true;
         }
 
+        $user = $this->user();
+
         return $user !== null && $user->hasPermission('employees.import');
     }
 

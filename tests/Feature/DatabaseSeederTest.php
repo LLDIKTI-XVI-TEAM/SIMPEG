@@ -500,7 +500,7 @@ class DatabaseSeederTest extends TestCase
 
         try {
             $this->seed(PhaseSevenBrowserQaSeeder::class);
-        } catch (\RuntimeException $caught) {
+        } catch (RuntimeException $caught) {
             $exception = $caught;
         } finally {
             Carbon::setTestNow();

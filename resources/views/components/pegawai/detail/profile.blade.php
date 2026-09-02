@@ -6,6 +6,7 @@
     'latestStatusHistory' => null,
     'activeSupervisorAssignments' => null,
     'retirementDate' => null,
+    'canReadHistories' => true,
     'maskSensitive' => true,
     'downloadSurface' => 'pimpinan',
 ])
@@ -23,6 +24,7 @@
         'latestStatusHistory' => $latestStatusHistory,
         'activeSupervisorAssignments' => $activeSupervisorAssignments ?? collect(),
         'retirementDate' => $retirementDate,
+        'canReadHistories' => $canReadHistories ?? true,
         'maskSensitive' => $maskSensitive,
         'downloadSurface' => $downloadSurface,
     ])

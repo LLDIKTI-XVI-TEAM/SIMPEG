@@ -8,6 +8,7 @@ use App\Models\EmployeeStatusHistory;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
 use App\Models\SupervisorAssignment;
+use App\Models\User;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Documents\DocumentCategory;
 use App\Support\Employees\EmployeeProfilePresentation;
@@ -24,8 +25,13 @@ class PreparePimpinanEmployeeDetailAction
      *
      * @return array{p: Employee, statusPresentation: array{label: string, badge: string, dot: string, effectiveDate: Carbon|null}, activePosition: PositionHistory|null, latestRank: RankHistory|null, latestStatusHistory: EmployeeStatusHistory|null, activeSupervisorAssignments: Collection<int, SupervisorAssignment>, retirementDate: Carbon|null}
      */
-    public function execute(string $employeeId): array
+    public function execute(string $employeeId, User $viewer): array
     {
+        $canReadFamilies = $viewer->hasPermission('employee_families.read');
+        $canReadHistories = $viewer->hasPermission('employee_histories.read');
+        $canReadDiscipline = $viewer->hasPermission('discipline_records.read');
+        $canReadDocuments = $viewer->hasPermission('dokumen_sk.read');
+
         $employee = Employee::query()
             // Kolom NIK dan No. KK tidak diambil agar plaintext hasil dekripsi tidak pernah masuk payload view Pimpinan.
             ->select([
@@ -75,6 +81,7 @@ class PreparePimpinanEmployeeDetailAction
                 'statusPegawai:id,kode,nama,kelompok',
                 'programStudi:id,nama',
                 'statusHistories' => fn ($query) => $query
+                    ->when(! $canReadHistories, fn ($query) => $query->whereRaw('1 = 0'))
                     ->select([
                         'id',
                         'employee_id',
@@ -90,24 +97,32 @@ class PreparePimpinanEmployeeDetailAction
                     ->orderByDesc('tanggal_efektif')
                     ->orderByDesc('created_at')
                     ->orderBy('id'),
-                'appointment',
+                'appointment' => fn ($query) => $query
+                    ->when(! $canReadHistories, fn ($query) => $query->whereRaw('1 = 0')),
                 'rankHistories' => fn ($query) => $query
-                    ->with('golongan:id,kode,nama')
+                    ->when(! $canReadHistories, fn ($query) => $query->whereRaw('1 = 0'))
                     ->orderByDesc('tmt_pangkat'),
                 'positionHistories' => fn ($query) => $query
-                    ->with(['jabatan:id,nama', 'unitKerja:id,nama'])
+                    ->when(! $canReadHistories, fn ($query) => $query->whereRaw('1 = 0'))
                     ->orderByDesc('is_latest')
                     ->orderByDesc('tmt_jabatan'),
-                'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
-                'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
+                'salaryHistories' => fn ($query) => $query
+                    ->when(! $canReadHistories, fn ($query) => $query->whereRaw('1 = 0'))
+                    ->orderByDesc('tmt_kgb'),
+                'disciplineRecords' => fn ($query) => $query
+                    ->when(! $canReadDiscipline, fn ($query) => $query->whereRaw('1 = 0'))
+                    ->orderByDesc('tanggal_mulai'),
                 'educationHistories' => fn ($query) => $query
+                    ->when(! $canReadHistories, fn ($query) => $query->whereRaw('1 = 0'))
                     ->with(['jenjang:id,nama,urutan', 'programStudi:id,nama'])
                     ->orderByDesc('tahun_lulus'),
                 'documents' => fn ($query) => $query
+                    ->when(! $canReadDocuments, fn ($query) => $query->whereRaw('1 = 0'))
                     // KTP/KK tidak masuk payload karena metadata dan file-nya memuat identitas sensitif.
                     ->whereIn('jenis_dokumen', DocumentCategory::visibleToPimpinanKeys())
                     ->orderByDesc('tanggal_dokumen'),
                 'families' => fn ($query) => $query
+                    ->when(! $canReadFamilies, fn ($query) => $query->whereRaw('1 = 0'))
                     // NIK keluarga sengaja tidak dipilih agar jalur baca Pimpinan fail-closed.
                     ->select([
                         'id',
@@ -157,6 +172,10 @@ class PreparePimpinanEmployeeDetailAction
             'latestStatusHistory' => $latestStatusHistory,
             'activeSupervisorAssignments' => $employee->supervisorAssignments,
             'retirementDate' => EmployeeProfilePresentation::retirementDate($employee),
+            'canReadFamilies' => $canReadFamilies,
+            'canReadHistories' => $canReadHistories,
+            'canReadDiscipline' => $canReadDiscipline,
+            'canReadDocuments' => $canReadDocuments,
         ];
     }
 

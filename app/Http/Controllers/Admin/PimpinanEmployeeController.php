@@ -13,6 +13,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\User;
 use App\Services\Documents\SkRequirementMatrixVersionService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
@@ -121,7 +122,10 @@ class PimpinanEmployeeController extends Controller
 
     public function show(Employee $employee, PreparePimpinanEmployeeDetailAction $action)
     {
-        return view('pimpinan.pegawai.show', $action->execute($employee->id));
+        /** @var User $viewer */
+        $viewer = request()->user();
+
+        return view('pimpinan.pegawai.show', $action->execute($employee->id, $viewer));
     }
 
     public function downloadDocument(

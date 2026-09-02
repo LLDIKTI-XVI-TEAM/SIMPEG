@@ -94,6 +94,46 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertDontSee('Snapshot Program Studi Lama');
     }
 
+    public function test_pimpinan_detail_hides_granular_sections_and_denies_downloads_when_permissions_are_revoked(): void
+    {
+        $pimpinanRole = Role::where('name', 'pimpinan')->firstOrFail();
+        $revokedPermissions = Permission::whereIn('name', [
+            'employee_families.read',
+            'employee_histories.read',
+            'discipline_records.read',
+            'dokumen_sk.read',
+        ])->pluck('id');
+        $pimpinanRole->permissions()->detach($revokedPermissions);
+
+        $employee = Employee::factory()->create();
+        $discipline = DisciplineRecord::create([
+            'employee_id' => $employee->id,
+            'jenis_hukuman' => 'Ringan',
+            'deskripsi' => 'Pelanggaran uji',
+            'tanggal_mulai' => '2025-01-01',
+            'no_sk' => 'SK-DISIPLIN-001',
+            'tanggal_sk' => '2025-01-01',
+        ]);
+        $pimpinan = User::factory()->pimpinan()->create();
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk()
+            ->assertDontSee('Data Keluarga')
+            ->assertDontSee('Riwayat Kepangkatan &amp; Golongan', false)
+            ->assertDontSee('Riwayat Pendidikan Formal')
+            ->assertDontSee('Data &amp; SK Pengangkatan Pertama', false)
+            ->assertDontSee('Informasi Pekerjaan Utama')
+            ->assertDontSee('Kenaikan Pangkat Terdekat')
+            ->assertDontSee('Riwayat Perubahan Status Kepegawaian')
+            ->assertDontSee('Riwayat Hukuman Disiplin')
+            ->assertDontSee('Daftar Dokumen &amp; Berkas Pegawai', false);
+
+        $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.discipline-attachments.download', [$employee, $discipline]))
+            ->assertForbidden();
+    }
+
     public function test_pimpinan_employee_list_uses_real_employee_rows(): void
     {
         $employee = Employee::factory()->create([

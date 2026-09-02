@@ -17,6 +17,14 @@ class EmployeeHistoryAttachmentController extends Controller
         string $history,
         PrepareEmployeeHistoryAttachmentDownloadAction $action,
     ): StreamedResponse {
+        $user = request()->user();
+        // Granular permission gate per type + dokumen_sk.read sudah di middleware, tapi cek histories/discipline spesifik di sini
+        if (in_array($type, ['rank', 'position', 'salary', 'appointment', 'education', 'status', 'status-snapshot'], true)) {
+            abort_unless($user && ($user->hasPermission('employee_histories.read') || $user->getEffectiveRole() === 'super_admin'), 403);
+        }
+        if ($type === 'discipline') {
+            abort_unless($user && ($user->hasPermission('discipline_records.read') || $user->getEffectiveRole() === 'super_admin'), 403);
+        }
         $download = $action->execute($employee, $type, $history);
 
         return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [

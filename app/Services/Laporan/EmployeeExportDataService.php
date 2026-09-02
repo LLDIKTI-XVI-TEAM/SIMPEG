@@ -4,11 +4,13 @@ namespace App\Services\Laporan;
 
 use App\Models\Employee;
 use App\Models\EwsConfig;
+use App\Models\PositionHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Services\Employees\KepalaBagianScopeService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -62,7 +64,7 @@ class EmployeeExportDataService
                     ->orderByDesc('tmt_jabatan'),
             ])
             ->when($isKabag, function (Builder $query) use ($user): void {
-                $reportIds = app(\App\Services\Employees\KepalaBagianScopeService::class)->directReportIds($user);
+                $reportIds = app(KepalaBagianScopeService::class)->directReportIds($user);
                 $kabagUnitId = $user->employee?->positionHistories()->where('is_latest', true)->value('unit_kerja_id');
 
                 $query->where(function (Builder $q) use ($reportIds, $kabagUnitId) {
@@ -209,8 +211,8 @@ class EmployeeExportDataService
 
         $unitsQuery = RefUnitKerja::query()->orderBy('nama');
         if ($isKabag) {
-            $reportIds = app(\App\Services\Employees\KepalaBagianScopeService::class)->directReportIds($user);
-            $unitIds = \App\Models\PositionHistory::query()
+            $reportIds = app(KepalaBagianScopeService::class)->directReportIds($user);
+            $unitIds = PositionHistory::query()
                 ->where('is_latest', true)
                 ->whereIn('employee_id', $reportIds)
                 ->whereNotNull('unit_kerja_id')

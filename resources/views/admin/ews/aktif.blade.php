@@ -203,7 +203,8 @@
                                 <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ ($alerts->firstItem() ?? 1) + $index }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
-                                        <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
+                                        @php $ewsDetailUrl = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('pegawai.show', $alert['pegawai_id']) : route('rbac.pegawai.show', $alert['pegawai_id']); @endphp
+                                        <a href="{{ $ewsDetailUrl }}">{{ $alert['nama'] }}</a>
                                     </div>
                                     <div class="mt-1 text-xs text-muted">{{ $alert['nip'] }}</div>
                                 </x-ui.table-td>

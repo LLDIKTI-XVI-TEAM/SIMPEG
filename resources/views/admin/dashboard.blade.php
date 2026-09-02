@@ -552,7 +552,8 @@
                                             </div>
                                             <div class="min-w-0">
                                                 @if (filled($pegawaiId))
-                                                    <a href="{{ route('pegawai.show', $pegawaiId) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary">
+                                                    @php $detailPegawaiUrl = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('pegawai.show', $pegawaiId) : route('rbac.pegawai.show', $pegawaiId); @endphp
+                                                    <a href="{{ $detailPegawaiUrl }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary">
                                                         {{ $nama }}
                                                     </a>
                                                 @else

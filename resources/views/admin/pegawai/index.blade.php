@@ -1,6 +1,7 @@
 <div>
     @php
-        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
+        $defaultPrefix = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('data-pegawai') : url('/rbac/pegawai');
+        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? $defaultPrefix;
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
         $isReadOnly = $isReadOnly ?? false;
         $openStatusModal = $openStatusModal ?? false;
