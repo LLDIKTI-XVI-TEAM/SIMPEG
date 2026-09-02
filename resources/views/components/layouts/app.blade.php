@@ -540,11 +540,11 @@
                                 <span>Profil Saya</span>
                             </a>
 
-                            {{-- Switch Role hanya bagi Super Admin asli dengan users.switch_role;
+                            {{-- Switch Role hanya bagi role asal yang diizinkan dan memiliki users.switch_role;
                                  saat simulasi aktif, hanya aksi revert yang tampil. --}}
-                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasOriginalRolePermission('users.switch_role') && auth()->user()->canSwitchToAnyRole()) || auth()->user()->temporary_role))
-                                {{-- Submenu hanya bagi Super Admin asli yang belum simulasi. --}}
-                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasOriginalRolePermission('users.switch_role') && auth()->user()->canSwitchToAnyRole() && ! auth()->user()->temporary_role)
+                            @if(auth()->check() && (auth()->user()->canInitiateSwitchRole() || auth()->user()->temporary_role))
+                                {{-- Submenu hanya bagi akun yang belum simulasi. --}}
+                                @if(auth()->user()->canInitiateSwitchRole() && ! auth()->user()->temporary_role)
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"

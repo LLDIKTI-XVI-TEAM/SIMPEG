@@ -178,8 +178,25 @@ class User extends Authenticatable
             ->exists();
     }
 
+    /** Role asli yang boleh memakai Switch Role bila permission diberikan dari RBAC. */
+    public const SWITCH_ROLE_ORIGIN_ROLES = [
+        'super_admin',
+        'admin_kepegawaian',
+        'pimpinan',
+    ];
+
     /**
-     * Menentukan apakah Super Admin dapat switch (simulasi) ke target_role yang dipilih.
+     * Switch Role dibatasi pada role asal yang disetujui. Hak memulai simulasi
+     * tetap membutuhkan permission users.switch_role dari konfigurasi RBAC.
+     */
+    public function canInitiateSwitchRole(): bool
+    {
+        return in_array($this->role, self::SWITCH_ROLE_ORIGIN_ROLES, true)
+            && $this->hasOriginalRolePermission('users.switch_role');
+    }
+
+    /**
+     * Menentukan apakah role asli boleh memulai simulasi role.
      *
      * Switch Role adalah exception RBAC yang dibatasi oleh kontrak produk: hanya
      * role asli Super Admin dengan permission users.switch_role yang boleh
@@ -188,7 +205,7 @@ class User extends Authenticatable
      */
     public function canSwitchToRole(string $targetRole): bool
     {
-        if ($this->role !== 'super_admin' || ! $this->hasOriginalRolePermission('users.switch_role')) {
+        if (! $this->canInitiateSwitchRole()) {
             return false;
         }
 
@@ -203,7 +220,7 @@ class User extends Authenticatable
      */
     public function switchableRoleOptions(): array
     {
-        if ($this->role !== 'super_admin' || ! $this->hasOriginalRolePermission('users.switch_role')) {
+        if (! $this->canInitiateSwitchRole()) {
             return [];
         }
 

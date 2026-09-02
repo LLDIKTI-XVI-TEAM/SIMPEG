@@ -167,6 +167,25 @@ class RolePermissionMatrixAuditTest extends TestCase
         $this->assertFalse($pegawai->fresh()->permissions->contains('id', $readAll->id));
     }
 
+    public function test_matriks_menolak_switch_role_untuk_kepala_bagian_dan_pegawai(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $kepalaBagian = Role::query()->where('name', 'kepala_bagian')->firstOrFail();
+        $pegawai = Role::query()->where('name', 'pegawai')->firstOrFail();
+        $switchRole = Permission::query()->where('name', 'users.switch_role')->sole();
+
+        $response = $this->actingAs($superAdmin)->post(route('rbac.update'), [
+            'matrix' => [
+                $kepalaBagian->id => array_merge($kepalaBagian->permissions->pluck('id')->all(), [$switchRole->id]),
+                $pegawai->id => array_merge($pegawai->permissions->pluck('id')->all(), [$switchRole->id]),
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertFalse($kepalaBagian->fresh()->permissions->contains('id', $switchRole->id));
+        $this->assertFalse($pegawai->fresh()->permissions->contains('id', $switchRole->id));
+    }
+
     public function test_peran_tanpa_kewenangan_tidak_dapat_mengubah_hak_akses(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

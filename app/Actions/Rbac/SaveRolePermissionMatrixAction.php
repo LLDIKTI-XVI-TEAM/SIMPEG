@@ -22,6 +22,12 @@ class SaveRolePermissionMatrixAction
     private const PROTECTED_ROLES = ['super_admin'];
 
     /**
+     * Permission Switch Role hanya relevan untuk role asal yang dapat memulai
+     * simulasi. Pembatasan ini wajib diselaraskan dengan User::canInitiateSwitchRole().
+     */
+    public const SWITCH_ROLE_ASSIGNABLE_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
+
+    /**
      * Menyimpan matriks hak akses peran dan mencatat setiap peran yang berubah.
      *
      * Ketiadaan kunci peran pada matriks dibaca sebagai pelepasan seluruh centang, karena peramban
@@ -52,7 +58,8 @@ class SaveRolePermissionMatrixAction
                         $permissionName = $namaPermission->get($permissionId);
 
                         return is_string($permissionName)
-                            && CutiPermissionMatrixPolicy::isAssignableToRole($permissionName, $role->name);
+                            && CutiPermissionMatrixPolicy::isAssignableToRole($permissionName, $role->name)
+                            && $this->isAssignableToRole($permissionName, $role->name);
                     })
                     ->sort()
                     ->values()
@@ -79,6 +86,12 @@ class SaveRolePermissionMatrixAction
 
             return $jumlahBerubah;
         });
+    }
+
+    private function isAssignableToRole(string $permissionName, string $roleName): bool
+    {
+        return $permissionName !== 'users.switch_role'
+            || in_array($roleName, self::SWITCH_ROLE_ASSIGNABLE_ROLES, true);
     }
 
     /**

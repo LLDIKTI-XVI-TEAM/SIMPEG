@@ -20,7 +20,9 @@ class RbacController extends Controller
         $permissionsByModule = $permissions->groupBy('module');
         $lockedPermissionIdsByRole = $roles->mapWithKeys(function (Role $role) use ($permissions): array {
             $lockedPermissionIds = $permissions
-                ->filter(fn (Permission $permission): bool => ! CutiPermissionMatrixPolicy::isAssignableToRole($permission->name, $role->name))
+                ->filter(fn (Permission $permission): bool => ! CutiPermissionMatrixPolicy::isAssignableToRole($permission->name, $role->name)
+                    || ($permission->name === 'users.switch_role'
+                        && ! in_array($role->name, SaveRolePermissionMatrixAction::SWITCH_ROLE_ASSIGNABLE_ROLES, true)))
                 ->pluck('id')
                 ->values()
                 ->all();
