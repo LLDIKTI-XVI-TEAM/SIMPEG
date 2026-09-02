@@ -202,3 +202,9 @@ input:-webkit-autofill:active {
 .turbo-progress-bar {
     display: none !important;
 }
+
+/* Sembunyikan elemen Alpine sebelum inisialisasi selesai untuk mencegah flash of uninitialized content */
+[x-cloak] {
+    display: none !important;
+}
+
