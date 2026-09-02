@@ -27,7 +27,7 @@ class DocumentAuthorization
         }
 
         return self::hasArchiveViewerRole($user)
-            && ($user->hasPermission('dokumen_sk.read') || $user->hasPermission('employees.read'));
+            && $user->hasPermission('dokumen_sk.read');
     }
 
     public static function canManage(?User $user): bool
