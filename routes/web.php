@@ -207,14 +207,40 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('rbac.update');
 
     // Canonical RBAC detail pegawai — permission-driven dengan employee.scope
+    // Aksi tambah/edit/hapus dari /dashboard/pegawai dialihkan juga ke surface RBAC & Pimpinan agar konsisten dengan scope.
     Route::middleware(['role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])
         ->prefix('rbac')
         ->name('rbac.')
         ->group(function (): void {
+            Route::get('/pegawai', Index::class)
+                ->middleware(['permission:employees.read'])
+                ->name('pegawai.index');
+            Route::get('/pegawai/create', Create::class)
+                ->middleware(['permission:employees.create'])
+                ->name('pegawai.create');
+            Route::post('/pegawai', [PegawaiController::class, 'store'])
+                ->middleware(['permission:employees.create'])
+                ->name('pegawai.store');
             Route::get('/pegawai/{employee}', [RbacEmployeeController::class, 'show'])
                 ->middleware(['permission:employees.read', 'employee.scope'])
                 ->whereUuid('employee')
                 ->name('pegawai.show');
+            Route::get('/pegawai/{id}/edit', Edit::class)
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.edit');
+            Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.update');
+            Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
+                ->middleware(['permission:employees.deactivate', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.destroy');
+            Route::post('/pegawai/{id}/restore', [PegawaiController::class, 'restore'])
+                ->middleware(['permission:employees.restore', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.restore');
             Route::get('/pegawai/{employee}/dokumen/{document}/unduh', [RbacEmployeeController::class, 'downloadDocument'])
                 ->middleware(['permission:employees.read', 'permission:dokumen_sk.read', 'employee.scope'])
                 ->whereUuid('employee')->whereUuid('document')
@@ -729,13 +755,36 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             Route::get('/dashboard', [PimpinanDashboardController::class, 'index'])->name('dashboard');
 
             // Daftar dan detail pegawai Pimpinan tetap memakai permission granular selain gate role.
+            // Aksi tambah/edit/hapus dari dashboard dipetakan juga ke surface Pimpinan agar konsisten dengan scope.
             Route::get('/pegawai', [PimpinanEmployeeController::class, 'index'])
                 ->middleware('permission:employees.read')
                 ->name('pegawai.index');
+            Route::get('/pegawai/create', Create::class)
+                ->middleware(['permission:employees.create'])
+                ->name('pegawai.create');
+            Route::post('/pegawai', [PegawaiController::class, 'store'])
+                ->middleware(['permission:employees.create'])
+                ->name('pegawai.store');
             Route::get('/pegawai/{employee}', [PimpinanEmployeeController::class, 'show'])
                 ->middleware('permission:employees.read')
                 ->whereUuid('employee')
                 ->name('pegawai.show');
+            Route::get('/pegawai/{id}/edit', Edit::class)
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.edit');
+            Route::post('/pegawai/{id}', [PegawaiController::class, 'update'])
+                ->middleware(['permission:employees.update', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.update');
+            Route::post('/pegawai/{id}/delete', [PegawaiController::class, 'destroy'])
+                ->middleware(['permission:employees.deactivate', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.destroy');
+            Route::post('/pegawai/{id}/restore', [PegawaiController::class, 'restore'])
+                ->middleware(['permission:employees.restore', 'employee.scope'])
+                ->whereUuid('id')
+                ->name('pegawai.restore');
             Route::get('/pegawai/{employee}/dokumen/{document}/unduh', [PimpinanEmployeeController::class, 'downloadDocument'])
                 ->middleware(['permission:employees.read', 'permission:dokumen_sk.read'])
                 ->whereUuid('employee')

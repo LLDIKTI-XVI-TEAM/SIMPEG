@@ -52,6 +52,35 @@
                 </x-slot:badges>
             </x-pegawai.detail.identity-header>
 
+            @php
+                $canCreateRbac = auth()->user()?->hasPermission('employees.create');
+                $canUpdateRbac = auth()->user()?->hasPermission('employees.update');
+                $canDeactivateRbac = auth()->user()?->hasPermission('employees.deactivate');
+                $canRestoreRbac = auth()->user()?->hasPermission('employees.restore');
+            @endphp
+            @if($canCreateRbac || $canUpdateRbac || $canDeactivateRbac || $canRestoreRbac)
+                <div class="flex flex-wrap items-center gap-2 border-b border-border bg-soft/20 px-4 py-3">
+                    @if($canCreateRbac)
+                        <x-ui.button as="a" href="{{ route('rbac.pegawai.create') }}" variant="secondary" size="sm">Tambah Pegawai</x-ui.button>
+                    @endif
+                    @if($canUpdateRbac)
+                        <x-ui.button as="a" href="{{ route('rbac.pegawai.edit', $p->id) }}" variant="secondary" size="sm">Edit</x-ui.button>
+                    @endif
+                    @if($canDeactivateRbac && $p->isActive())
+                        <form method="POST" action="{{ route('rbac.pegawai.destroy', $p->id) }}" onsubmit="return confirm('Nonaktifkan pegawai ini?')">
+                            @csrf
+                            <x-ui.button type="submit" variant="danger" size="sm">Hapus / Nonaktifkan</x-ui.button>
+                        </form>
+                    @endif
+                    @if($canRestoreRbac && ! $p->isActive())
+                        <form method="POST" action="{{ route('rbac.pegawai.restore', $p->id) }}">
+                            @csrf
+                            <x-ui.button type="submit" variant="success" size="sm">Pulihkan</x-ui.button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+
             <x-pegawai.detail.tabs :tabs="$tabs" id-prefix="rbac" />
 
             <div class="min-w-0 flex-1">

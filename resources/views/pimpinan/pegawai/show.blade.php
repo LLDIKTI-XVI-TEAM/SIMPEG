@@ -55,6 +55,35 @@
                 </x-slot:badges>
             </x-pegawai.detail.identity-header>
 
+            @php
+                $canCreatePimpinan = auth()->user()?->hasPermission('employees.create');
+                $canUpdatePimpinan = auth()->user()?->hasPermission('employees.update');
+                $canDeactivatePimpinan = auth()->user()?->hasPermission('employees.deactivate');
+                $canRestorePimpinan = auth()->user()?->hasPermission('employees.restore');
+            @endphp
+            @if($canCreatePimpinan || $canUpdatePimpinan || $canDeactivatePimpinan || $canRestorePimpinan)
+                <div class="flex flex-wrap items-center gap-2 border-b border-border bg-soft/20 px-4 py-3">
+                    @if($canCreatePimpinan)
+                        <x-ui.button as="a" href="{{ route('pimpinan.pegawai.create') }}" variant="secondary" size="sm">Tambah Pegawai</x-ui.button>
+                    @endif
+                    @if($canUpdatePimpinan)
+                        <x-ui.button as="a" href="{{ route('pimpinan.pegawai.edit', $p->id) }}" variant="secondary" size="sm">Edit</x-ui.button>
+                    @endif
+                    @if($canDeactivatePimpinan && $p->isActive())
+                        <form method="POST" action="{{ route('pimpinan.pegawai.destroy', $p->id) }}" onsubmit="return confirm('Nonaktifkan pegawai ini?')">
+                            @csrf
+                            <x-ui.button type="submit" variant="danger" size="sm">Hapus / Nonaktifkan</x-ui.button>
+                        </form>
+                    @endif
+                    @if($canRestorePimpinan && ! $p->isActive())
+                        <form method="POST" action="{{ route('pimpinan.pegawai.restore', $p->id) }}">
+                            @csrf
+                            <x-ui.button type="submit" variant="success" size="sm">Pulihkan</x-ui.button>
+                        </form>
+                    @endif
+                </div>
+            @endif
+
             <x-pegawai.detail.tabs :tabs="$tabs" id-prefix="pimpinan" />
 
             <p class="history-export-unavailable hidden">Ekspor riwayat tidak tersedia</p>

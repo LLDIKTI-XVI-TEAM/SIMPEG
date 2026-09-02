@@ -35,7 +35,7 @@ class EnsureEmployeeApiScope
             return $next($request);
         }
 
-        $target = $request->route('employee');
+        $target = $request->route('employee') ?? $request->route('id') ?? $request->route('employeeId');
         $targetEmployeeId = $target instanceof Employee ? $target->id : $target;
 
         if ($effectiveRole === 'kepala_bagian') {
