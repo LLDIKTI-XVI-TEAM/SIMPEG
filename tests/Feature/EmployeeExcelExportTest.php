@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,10 +64,23 @@ class EmployeeExcelExportTest extends TestCase
         }
     }
 
-    public function test_pimpinan_cannot_access_raw_employee_export(): void
+    public function test_pimpinan_dengan_employees_read_boleh_export(): void
     {
         $this->seed(RbacSeeder::class);
         $pimpinan = User::factory()->pimpinan()->create();
+
+        // RbacSeeder memberi pimpinan employees.read → export permission-driven, tanpa gate role.
+        $this->actingAs($pimpinan)
+            ->get(route('pegawai.export'))
+            ->assertOk();
+    }
+
+    public function test_tanpa_employees_read_tetap_dilarang_export(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $pimpinan = User::factory()->pimpinan()->create();
+        Role::where('name', 'pimpinan')->firstOrFail()
+            ->permissions()->detach(Permission::where('name', 'employees.read')->firstOrFail()->id);
 
         $this->actingAs($pimpinan)
             ->get(route('pegawai.export'))

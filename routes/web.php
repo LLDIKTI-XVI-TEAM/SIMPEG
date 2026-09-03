@@ -757,7 +757,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware('permission:notifications.read');
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['permission:employees.read'])
         ->name('pegawai.export');
 
     // =========================================================================
