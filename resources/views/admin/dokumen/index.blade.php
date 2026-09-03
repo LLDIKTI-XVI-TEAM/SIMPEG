@@ -2,6 +2,7 @@
 
     @php
         $isKepalaBagianArchive = ($isKepalaBagian ?? false) === true;
+        $isPegawaiArchive = ($isPegawai ?? false) === true || auth()->user()?->getEffectiveRole() === 'pegawai';
         $archiveBawahans = $bawahans ?? collect();
     @endphp
     <div x-data="{
@@ -183,8 +184,9 @@
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h2>
                 @php
-                    $archiveDashboardUrl = auth()->user()?->getEffectiveRole() === 'kepala_bagian' ? route('kepala-bagian.dashboard') : route('dashboard');
-                    $archivePegawaiUrl = auth()->user()?->getEffectiveRole() === 'kepala_bagian' ? route('kepala-bagian.bawahan.index') : route('data-pegawai');
+                    $archiveEffectiveRole = auth()->user()?->getEffectiveRole();
+                    $archiveDashboardUrl = $archiveEffectiveRole === 'kepala_bagian' ? route('kepala-bagian.dashboard') : route('dashboard');
+                    $archivePegawaiUrl = $archiveEffectiveRole === 'kepala_bagian' ? route('kepala-bagian.bawahan.index') : ($archiveEffectiveRole === 'pegawai' ? route('profil') : route('data-pegawai'));
                 @endphp
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => $archiveDashboardUrl],
@@ -192,6 +194,8 @@
                 ]" />
                 @if($isKepalaBagianArchive)
                     <p class="mt-1 text-xs text-muted font-sans">Hanya menampilkan dokumen bawahan langsung Anda.</p>
+                @elseif($isPegawaiArchive)
+                    <p class="mt-1 text-xs text-muted font-sans">Hanya menampilkan dokumen Anda sendiri.</p>
                 @endif
             </div>
             <div class="flex shrink-0 items-center gap-3">

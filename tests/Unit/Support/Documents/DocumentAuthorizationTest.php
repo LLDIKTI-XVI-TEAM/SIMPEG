@@ -62,6 +62,22 @@ class DocumentAuthorizationTest extends TestCase
         $this->assertFalse(DocumentAuthorization::canManage($user));
     }
 
+    public function test_pegawai_can_view_archive_with_read_permission(): void
+    {
+        $user = User::factory()->create(['role' => 'pegawai']);
+
+        // RbacSeeder default tanpa dokumen_sk.read → awalnya tidak boleh; setelah grant manual boleh (scope dokumen sendiri).
+        $this->assertFalse(DocumentAuthorization::canViewArchive($user));
+
+        Role::where('name', 'pegawai')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id,
+            ]);
+
+        $this->assertTrue(DocumentAuthorization::canViewArchive($user->refresh()));
+        $this->assertFalse(DocumentAuthorization::canManage($user));
+    }
+
     public function test_guest_has_no_document_access(): void
     {
         $this->assertFalse(DocumentAuthorization::canViewArchive(null));

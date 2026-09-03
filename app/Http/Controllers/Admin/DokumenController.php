@@ -45,6 +45,17 @@ class DokumenController extends Controller
                 'Dokumen hanya tersedia untuk bawahan langsung Anda.'
             );
         }
+        if ($user !== null && $user->getEffectiveRole() === 'pegawai') {
+            $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');
+            $ownId = (string) ($user->employee_id ?? '');
+            abort_unless(
+                $ownId !== ''
+                    && is_string($documentEmployeeId)
+                    && hash_equals($ownId, $documentEmployeeId),
+                403,
+                'Dokumen hanya tersedia untuk data Anda sendiri.'
+            );
+        }
 
         return view('admin.dokumen.show', $payload);
     }
@@ -71,6 +82,17 @@ class DokumenController extends Controller
                     && app(KepalaBagianScopeService::class)->hasDirectReport($user, $documentEmployeeId),
                 403,
                 'Dokumen hanya tersedia untuk bawahan langsung Anda.'
+            );
+        }
+        if ($user !== null && $user->getEffectiveRole() === 'pegawai') {
+            $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');
+            $ownId = (string) ($user->employee_id ?? '');
+            abort_unless(
+                $ownId !== ''
+                    && is_string($documentEmployeeId)
+                    && hash_equals($ownId, $documentEmployeeId),
+                403,
+                'Dokumen hanya tersedia untuk data Anda sendiri.'
             );
         }
 

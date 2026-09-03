@@ -16,7 +16,8 @@ class ListDocumentsAction
     /**
      * Mengambil daftar dokumen dengan filter dan paginasi server-side.
      *
-     * Kepala Bagian selalu di-scope ke bawahan langsung (fail-closed).
+     * Kepala Bagian selalu di-scope ke bawahan langsung, Pegawai ke dokumen
+     * sendiri (fail-closed).
      *
      * @param  array<string, mixed>  $validated
      * @return LengthAwarePaginator<int, array<string, mixed>>
@@ -37,6 +38,17 @@ class ListDocumentsAction
                 $query->where('documents.employee_id', $requestedEmployeeId);
             } else {
                 $query->whereIn('documents.employee_id', $reportIds);
+            }
+        } elseif ($viewer !== null && $viewer->getEffectiveRole() === 'pegawai') {
+            $ownId = (string) ($viewer->employee_id ?? '');
+            $requestedEmployeeId = $validated['employee_id'] ?? null;
+            if (is_string($requestedEmployeeId) && $requestedEmployeeId !== '') {
+                abort_unless($ownId !== '' && hash_equals($ownId, $requestedEmployeeId), 403, 'Dokumen hanya tersedia untuk data Anda sendiri.');
+            }
+            if ($ownId === '') {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('documents.employee_id', $ownId);
             }
         } elseif (! empty($validated['employee_id'])) {
             $query->where('documents.employee_id', $validated['employee_id']);
