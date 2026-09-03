@@ -9,7 +9,7 @@
             <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi jenis jabatan dan maksimal
                 usia pensiun. Dipakai riwayat jabatan dan referensi jabatan.</p>
         </div>
-        <x-ui.button type="button" @click="showTambah = !showTambah" variant="primary" class="shrink-0">
+        <x-ui.button type="button" @click="showTambah = !showTambah" variant="secondary" class="shrink-0">
             Tambah
         </x-ui.button>
     </div>
@@ -46,11 +46,9 @@
                         <x-ui.table-td align="center" padding="sm" class="text-sm font-medium text-warning">{{ $item->maks_usia_pensiun }}</x-ui.table-td>
                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item->catatan ?? '—' }}</x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm">
-                            @if ($item->is_active)
-                                <span class="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">Aktif</span>
-                            @else
-                                <span class="inline-flex items-center rounded-full bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">Nonaktif</span>
-                            @endif
+                            <x-ui.badge :variant="$item->is_active ? 'success' : 'danger'" size="sm" pill>
+                                {{ $item->is_active ? 'Aktif' : 'Nonaktif' }}
+                            </x-ui.badge>
                         </x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm" class="text-sm text-muted">{{ $dipakai }} pemakai</x-ui.table-td>
                         <x-ui.table-td padding="sm" class="whitespace-nowrap">

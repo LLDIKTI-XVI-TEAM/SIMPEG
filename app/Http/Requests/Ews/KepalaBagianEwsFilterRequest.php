@@ -19,6 +19,7 @@ class KepalaBagianEwsFilterRequest extends FormRequest
             'search' => ['nullable', 'string', 'max:100'],
             'event' => ['nullable', 'string', Rule::in(ListActiveEwsAlertsAction::allowedEventFilters())],
             'status' => ['nullable', Rule::in(['aktif', 'ditangani', 'tidak_perlu', 'kedaluwarsa'])],
+            'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50])],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

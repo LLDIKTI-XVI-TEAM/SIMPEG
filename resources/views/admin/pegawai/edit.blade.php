@@ -431,7 +431,6 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span>{{ $currentStatusPegawai?->nama ?? $p->status_aktif ?? '-' }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Sinkron PRD</span>
                             </div>
                         </div>
 
@@ -585,25 +584,15 @@
                             <label for="pendidikan_terakhir"
                                 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pendidikan
                                 Terakhir</label>
-                            <div class="relative">
-                                <select id="pendidikan_terakhir" name="pendidikan_terakhir"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" {{ empty($p->pendidikan_terakhir) ? 'selected' : '' }}>-- Kosong --</option>
-                                    <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
-                                    <option value="Sarjana (S1)" {{ in_array($p->pendidikan_terakhir, ['Sarjana (S1)', 'S1']) ? 'selected' : '' }}>Sarjana (S1)</option>
-                                    <option value="Magister (S2)" {{ in_array($p->pendidikan_terakhir, ['Magister (S2)', 'S2']) ? 'selected' : '' }}>Magister (S2)</option>
-                                    <option value="Doktor (S3)" {{ in_array($p->pendidikan_terakhir, ['Doktor (S3)', 'S3']) ? 'selected' : '' }}>Doktor (S3)</option>
-                                    <option value="SMA / Sederajat" {{ $p->pendidikan_terakhir == 'SMA / Sederajat' ? 'selected' : '' }}>SMA / Sederajat</option>
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                        stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
+                            <select id="pendidikan_terakhir" name="pendidikan_terakhir"
+                                class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <option value="" {{ empty($p->pendidikan_terakhir) ? 'selected' : '' }}>-- Kosong --</option>
+                                <option value="Diploma III (D3)" {{ $p->pendidikan_terakhir == 'Diploma III (D3)' ? 'selected' : '' }}>Diploma III (D3)</option>
+                                <option value="Sarjana (S1)" {{ in_array($p->pendidikan_terakhir, ['Sarjana (S1)', 'S1']) ? 'selected' : '' }}>Sarjana (S1)</option>
+                                <option value="Magister (S2)" {{ in_array($p->pendidikan_terakhir, ['Magister (S2)', 'S2']) ? 'selected' : '' }}>Magister (S2)</option>
+                                <option value="Doktor (S3)" {{ in_array($p->pendidikan_terakhir, ['Doktor (S3)', 'S3']) ? 'selected' : '' }}>Doktor (S3)</option>
+                                <option value="SMA / Sederajat" {{ $p->pendidikan_terakhir == 'SMA / Sederajat' ? 'selected' : '' }}>SMA / Sederajat</option>
+                            </select>
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                         </div>
 
@@ -682,46 +671,26 @@
                             <label for="jenis_kelamin"
                                 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis
                                 Kelamin</label>
-                            <div class="relative">
-                                <select id="jenis_kelamin" name="jenis_kelamin"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="L" {{ $p->jenis_kelamin == 'L' ? 'selected' : '' }}>Laki-laki</option>
-                                    <option value="P" {{ $p->jenis_kelamin == 'P' ? 'selected' : '' }}>Perempuan</option>
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                        stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
+                            <select id="jenis_kelamin" name="jenis_kelamin"
+                                class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <option value="L" {{ $p->jenis_kelamin == 'L' ? 'selected' : '' }}>Laki-laki</option>
+                                <option value="P" {{ $p->jenis_kelamin == 'P' ? 'selected' : '' }}>Perempuan</option>
+                            </select>
                         </div>
 
                         {{-- Agama --}}
                         <div class="space-y-1">
                             <label for="agama_id"
                                 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Agama</label>
-                            <div class="relative">
-                                <select id="agama_id" name="agama_id"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->agama_id) ? 'selected' : '' }}>Pilih Agama
-                                    </option>
-                                    @foreach($agama as $a)
-                                        <option value="{{ $a->id }}" {{ $p->agama_id == $a->id ? 'selected' : '' }}>
-                                            {{ $a->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                        stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
+                            <select id="agama_id" name="agama_id"
+                                class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <option value="" disabled {{ empty($p->agama_id) ? 'selected' : '' }}>Pilih Agama
+                                </option>
+                                @foreach($agama as $a)
+                                    <option value="{{ $a->id }}" {{ $p->agama_id == $a->id ? 'selected' : '' }}>
+                                        {{ $a->nama }}</option>
+                                @endforeach
+                            </select>
                         </div>
 
                         {{-- Status Pernikahan --}}
@@ -729,25 +698,15 @@
                             <label for="status_kawin_id"
                                 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Status
                                 Kawin</label>
-                            <div class="relative">
-                                <select id="status_kawin_id" name="status_kawin_id"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->status_kawin_id) ? 'selected' : '' }}>Pilih
-                                        Status Kawin</option>
-                                    @foreach($statusKawin as $sk)
-                                        <option value="{{ $sk->id }}" {{ $p->status_kawin_id == $sk->id ? 'selected' : '' }}>
-                                            {{ $sk->nama }}</option>
-                                    @endforeach
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                        stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
+                            <select id="status_kawin_id" name="status_kawin_id"
+                                class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <option value="" disabled {{ empty($p->status_kawin_id) ? 'selected' : '' }}>Pilih
+                                    Status Kawin</option>
+                                @foreach($statusKawin as $sk)
+                                    <option value="{{ $sk->id }}" {{ $p->status_kawin_id == $sk->id ? 'selected' : '' }}>
+                                        {{ $sk->nama }}</option>
+                                @endforeach
+                            </select>
                         </div>
 
                         {{-- Golongan Darah --}}
@@ -755,23 +714,13 @@
                             <label for="golongan_darah"
                                 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan
                                 Darah</label>
-                            <div class="relative">
-                                <select id="golongan_darah" name="golongan_darah"
-                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="A" {{ $p->golongan_darah == 'A' ? 'selected' : '' }}>A</option>
-                                    <option value="B" {{ $p->golongan_darah == 'B' ? 'selected' : '' }}>B</option>
-                                    <option value="AB" {{ $p->golongan_darah == 'AB' ? 'selected' : '' }}>AB</option>
-                                    <option value="O" {{ $p->golongan_darah == 'O' ? 'selected' : '' }}>O</option>
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                        stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                    </svg>
-                                </div>
-                            </div>
+                            <select id="golongan_darah" name="golongan_darah"
+                                class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                <option value="A" {{ $p->golongan_darah == 'A' ? 'selected' : '' }}>A</option>
+                                <option value="B" {{ $p->golongan_darah == 'B' ? 'selected' : '' }}>B</option>
+                                <option value="AB" {{ $p->golongan_darah == 'AB' ? 'selected' : '' }}>AB</option>
+                                <option value="O" {{ $p->golongan_darah == 'O' ? 'selected' : '' }}>O</option>
+                            </select>
                         </div>
 
                         {{-- Upload Foto Profil --}}
@@ -900,24 +849,14 @@
                                 <label for="pangkat_golongan_id"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span
                                         class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="pangkat_golongan_id" name="pangkat_golongan_id"
-                                        x-model="pangkatForm.golongan_id"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Golongan</option>
-                                        @foreach($golonganRefOptions as $gol)
-                                            <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div
-                                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="pangkat_golongan_id" name="pangkat_golongan_id"
+                                    x-model="pangkatForm.golongan_id"
+                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Golongan</option>
+                                    @foreach($golonganRefOptions as $gol)
+                                        <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Nomor SK Pangkat --}}
@@ -1014,23 +953,13 @@
                                 <div x-show="skPangkatMode === 'arsip'" class="mt-1 space-y-2">
                                     <input type="hidden" name="existing_document_id_pangkat"
                                         :value="selectedArsipPangkatId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipPangkatId" @change="onSelectArsipPangkat()"
-                                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipPangkatList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div
-                                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                                stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                            </svg>
-                                        </div>
-                                    </div>
+                                    <select x-model="selectedArsipPangkatId" @change="onSelectArsipPangkat()"
+                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="">-- Pilih dokumen dari arsip --</option>
+                                        <template x-for="doc in arsipPangkatList" :key="doc.id">
+                                            <option :value="doc.id" x-text="doc.label"></option>
+                                        </template>
+                                    </select>
                                     <template x-if="selectedArsipPangkatId">
                                         <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
                                             No. SK dan Tanggal SK telah terisi otomatis.</p>
@@ -1066,26 +995,16 @@
                                 <label for="jabatan_jabatan_id"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span
                                         class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="jabatan_jabatan_id" name="jabatan_jabatan_id"
-                                        x-model="jabatanForm.jabatan_id"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Jabatan</option>
-                                        @foreach($jabatanOptions->where('is_active', true) as $jabatan)
-                                            <option value="{{ $jabatan->id }}">
-                                                {{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - ' . $jabatan->jenisJabatan->nama : '' }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                    <div
-                                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_jabatan_id" name="jabatan_jabatan_id"
+                                    x-model="jabatanForm.jabatan_id"
+                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Jabatan</option>
+                                    @foreach($jabatanOptions->where('is_active', true) as $jabatan)
+                                        <option value="{{ $jabatan->id }}">
+                                            {{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - ' . $jabatan->jenisJabatan->nama : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Jenis Jabatan --}}
@@ -1093,24 +1012,14 @@
                                 <label for="jabatan_jenis_jabatan_id"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis
                                     Jabatan</label>
-                                <div class="relative">
-                                    <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id"
-                                        x-model="jabatanForm.jenis_jabatan_id"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Jenis Jabatan</option>
-                                        @foreach($jenisJabatanOptions as $jj)
-                                            <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div
-                                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id"
+                                    x-model="jabatanForm.jenis_jabatan_id"
+                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Jenis Jabatan</option>
+                                    @foreach($jenisJabatanOptions as $jj)
+                                        <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Kelas Jabatan --}}
@@ -1129,24 +1038,14 @@
                                 <label for="jabatan_eselon_id"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon
                                     (Opsional)</label>
-                                <div class="relative">
-                                    <select id="jabatan_eselon_id" name="jabatan_eselon_id"
-                                        x-model="jabatanForm.eselon_id"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="">-- Pilih --</option>
-                                        @foreach($eselonOptions as $esl)
-                                            <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div
-                                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_eselon_id" name="jabatan_eselon_id"
+                                    x-model="jabatanForm.eselon_id"
+                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="">-- Pilih --</option>
+                                    @foreach($eselonOptions as $esl)
+                                        <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Unit Kerja --}}
@@ -1154,24 +1053,14 @@
                                 <label for="jabatan_unit_kerja_id"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja
                                     <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id"
-                                        x-model="jabatanForm.unit_kerja_id"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Unit Kerja</option>
-                                        @foreach($unitKerja as $unit)
-                                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div
-                                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id"
+                                    x-model="jabatanForm.unit_kerja_id"
+                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Unit Kerja</option>
+                                    @foreach($unitKerja as $unit)
+                                        <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Nomor SK Jabatan --}}
@@ -1196,7 +1085,7 @@
                             </div>
 
                             {{-- TMT Jabatan --}}
-                            <div class="space-y-1 sm:col-span-2">
+                            <div class="space-y-1">
                                 <label for="jabatan_tmt_jabatan"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan
                                     <span class="text-danger">*</span></label>
@@ -1264,22 +1153,13 @@
                                 <div x-show="skJabatanMode === 'arsip'" class="mt-1 space-y-2">
                                     <input type="hidden" name="existing_document_id_jabatan"
                                         :value="selectedArsipJabatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()"
-                                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipJabatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div
-                                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                                stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                            </svg></div>
-                                    </div>
+                                    <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()"
+                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="">-- Pilih dokumen dari arsip --</option>
+                                        <template x-for="doc in arsipJabatanList" :key="doc.id">
+                                            <option :value="doc.id" x-text="doc.label"></option>
+                                        </template>
+                                    </select>
                                     <template x-if="selectedArsipJabatanId">
                                         <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
                                             No. SK dan Tanggal SK telah terisi otomatis.</p>
@@ -1408,22 +1288,13 @@
                                 </div>
                                 <div x-show="skKgbMode === 'arsip'" class="mt-1 space-y-2">
                                     <input type="hidden" name="existing_document_id_kgb" :value="selectedArsipKgbId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()"
-                                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipKgbList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div
-                                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                                stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                            </svg></div>
-                                    </div>
+                                    <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()"
+                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="">-- Pilih dokumen dari arsip --</option>
+                                        <template x-for="doc in arsipKgbList" :key="doc.id">
+                                            <option :value="doc.id" x-text="doc.label"></option>
+                                        </template>
+                                    </select>
                                     <template x-if="selectedArsipKgbId">
                                         <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
                                             No. SK dan Tanggal SK telah terisi otomatis.</p>
@@ -1476,23 +1347,13 @@
                                 <label for="pengangkatan_jenis_pengangkatan"
                                     class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis
                                     Pengangkatan <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
-                                        <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
-                                        <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
-                                        <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
-                                    </select>
-                                    <div
-                                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                            stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"
+                                    class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
+                                    <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
+                                    <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
+                                    <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                                </select>
                             </div>
 
                             {{-- TMT Pengangkatan --}}
@@ -1586,23 +1447,14 @@
                                 <div x-show="skPengangkatanMode === 'arsip'" class="mt-1 space-y-2">
                                     <input type="hidden" name="existing_document_id_pengangkatan"
                                         :value="selectedArsipPengangkatanId">
-                                    <div class="relative">
-                                        <select x-model="selectedArsipPengangkatanId"
-                                            @change="onSelectArsipPengangkatan()"
-                                            class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                            <option value="">-- Pilih dokumen dari arsip --</option>
-                                            <template x-for="doc in arsipPengangkatanList" :key="doc.id">
-                                                <option :value="doc.id" x-text="doc.label"></option>
-                                            </template>
-                                        </select>
-                                        <div
-                                            class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                                stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                            </svg></div>
-                                    </div>
+                                    <select x-model="selectedArsipPengangkatanId"
+                                        @change="onSelectArsipPengangkatan()"
+                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                        <option value="">-- Pilih dokumen dari arsip --</option>
+                                        <template x-for="doc in arsipPengangkatanList" :key="doc.id">
+                                            <option :value="doc.id" x-text="doc.label"></option>
+                                        </template>
+                                    </select>
                                     <template x-if="selectedArsipPengangkatanId">
                                         <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
                                             No. SK dan Tanggal SK telah terisi otomatis.</p>

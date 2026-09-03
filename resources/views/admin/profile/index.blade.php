@@ -160,12 +160,6 @@
                             </div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-3 shrink-0">
-                        {{-- No action buttons since it's read-only profile view --}}
-                        <div class="text-xs text-muted">
-                            <p>Data profil dikelola oleh Admin Kepegawaian.</p>
-                        </div>
-                    </div>
                 </div>
 
                 {{-- TAB NAVIGATION --}}
@@ -523,7 +517,7 @@
                                         <x-ui.table-td>
                                             <span class="font-bold text-danger">{{ $d->jenis_hukuman }}</span>
                                             @if($d->is_active)
-                                                <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold text-danger uppercase">Aktif</span>
+                                                <x-ui.badge variant="danger" size="xs" pill uppercase class="ml-1 !font-bold">Aktif</x-ui.badge>
                                             @endif
                                         </x-ui.table-td>
                                         <x-ui.table-td>{{ $d->deskripsi }}</x-ui.table-td>
@@ -614,7 +608,7 @@
                                 </div>
                                 <div class="flex justify-between border-b border-border pb-1">
                                     <span class="font-semibold text-muted">Status Dokumen:</span>
-                                    <span class="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.2 text-[9px] font-bold text-success uppercase">VERIFIED</span>
+                                    <x-ui.badge variant="success" size="xs" uppercase class="!font-bold">VERIFIED</x-ui.badge>
                                 </div>
                             </div>
                         </div>

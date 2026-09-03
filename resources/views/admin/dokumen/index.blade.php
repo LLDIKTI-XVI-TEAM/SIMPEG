@@ -173,7 +173,7 @@
     }" class="space-y-6">
 
         {{-- PAGE HEADER --}}
-        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h2>
                 <x-ui.breadcrumb :items="[
@@ -182,19 +182,27 @@
                 ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
-                <div class="hidden sm:flex max-w-xs flex-col items-end gap-1 text-right">
-                    <p class="text-xs text-muted font-sans">Arsip bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari bagian Dokumen &amp; SK pada halaman detail pegawai.</p>
-                    <a href="{{ route('data-pegawai') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Buka Data Pegawai</a>
-                </div>
-                <x-ui.button type="button" variant="secondary" @click="clearCache(); fetchPage(meta.current_page, true);"
-                    title="Refresh data dan periksa ulang status file di storage">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    aria-label="Refresh status dokumen dari storage"
+                    x-bind:disabled="isLoading"
+                    x-bind:aria-busy="isLoading"
+                    @click="clearCache(); fetchPage(meta.current_page, true);"
+                >
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    Refresh
+                    <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
                 </x-ui.button>
             </div>
         </div>
+
+        {{-- READ-ONLY INFO CARD --}}
+        <x-ui.alert variant="info">
+            Arsip bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari bagian Dokumen &amp; SK pada halaman detail pegawai.
+        </x-ui.alert>
 
         {{-- ============================================================ --}}
         {{-- DATA TABLE (x-ui.data-table) --}}
@@ -218,7 +226,7 @@
             searchModel="filters.search"
             searchPlaceholder="Cari dokumen, nama, atau NIP pegawai..."
             emptyTitle="Tidak ada dokumen ditemukan"
-            emptyIcon="document"
+            emptyIcon="none"
             :colspanCount="7"
         >
             {{-- ---- Filter Slots ---- --}}
@@ -288,42 +296,54 @@
                         <td class="px-4 py-3.5 text-xs text-muted" x-text="doc.nomor"></td>
 
                         {{-- Tanggal --}}
-                        <td class="px-4 py-3.5 text-xs text-muted" x-text="doc.tanggal"></td>
+                        <td class="px-4 py-3.5 text-xs text-muted whitespace-nowrap" x-text="doc.tanggal"></td>
 
                         {{-- Status --}}
-                        <td class="px-4 py-3.5">
-                            <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
+                        <td class="px-4 py-3.5 whitespace-nowrap">
+                            <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md whitespace-nowrap"
                                 :class="{
                                     'bg-success/10 text-success': doc.status_dokumen === 'tersedia',
                                     'bg-danger/10 text-danger':   doc.status_dokumen === 'file_tidak_ditemukan',
                                 }">
-                                <span class="h-1.5 w-1.5 rounded-full"
+                                <span class="h-1.5 w-1.5 rounded-full shrink-0"
                                     :class="{
                                         'bg-success': doc.status_dokumen === 'tersedia',
                                         'bg-danger':  doc.status_dokumen === 'file_tidak_ditemukan',
                                     }"></span>
-                                <span x-text="doc.status_label"></span>
+                                <span class="whitespace-nowrap" x-text="doc.status_label"></span>
                             </span>
                         </td>
 
                         {{-- Aksi --}}
                         <td class="px-4 py-3.5">
                             <div class="flex items-center gap-1.5">
-                                <a :href="'/dashboard/dokumen/' + doc.id"
-                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                    title="Detail" :aria-label="'Lihat detail ' + doc.nama">
+                                <x-ui.button
+                                    as="a"
+                                    ::href="'/dashboard/dokumen/' + doc.id"
+                                    variant="secondary"
+                                    size="icon"
+                                    title="Lihat Detail"
+                                    tooltip-position="top-end"
+                                    ::aria-label="'Lihat detail ' + doc.nama"
+                                >
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                     </svg>
-                                </a>
-                                <a :href="'/dashboard/dokumen/' + doc.id + '/download'"
-                                    class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm"
-                                    title="Unduh" :aria-label="'Unduh ' + doc.nama">
+                                </x-ui.button>
+                                <x-ui.button
+                                    as="a"
+                                    ::href="'/dashboard/dokumen/' + doc.id + '/download'"
+                                    variant="secondary"
+                                    size="icon"
+                                    title="Unduh"
+                                    tooltip-position="top-end"
+                                    ::aria-label="'Unduh ' + doc.nama"
+                                >
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                     </svg>
-                                </a>
+                                </x-ui.button>
                             </div>
                         </td>
 

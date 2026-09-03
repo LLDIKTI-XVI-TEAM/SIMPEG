@@ -49,7 +49,7 @@
                 @click="showTambah = !showTambah"
                 x-bind:aria-expanded="showTambah.toString()"
                 aria-controls="form-tambah-jabatan"
-                variant="primary"
+                variant="secondary"
                 class="shrink-0"
             >
                 Tambah

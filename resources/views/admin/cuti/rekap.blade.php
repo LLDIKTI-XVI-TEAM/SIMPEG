@@ -37,6 +37,7 @@
 
         <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Filter rekap cuti">
             <form id="rekap-filter" method="GET" action="{{ route('cuti.rekap') }}" class="space-y-5">
+                <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
                 <x-cuti.period-filter :period="$periode" id-prefix="rekap" />
 
                 <div class="grid gap-4 md:grid-cols-3">
@@ -102,36 +103,29 @@
         </div>
 
         <div class="flex flex-col gap-4">
-            <div class="space-y-4">
+            <div class="space-y-6">
+                {{-- CARD 1: REKAP SALDO PER PEGAWAI --}}
                 <x-ui.card padding="none" class="overflow-hidden">
-                    <div class="border-b border-border px-5 py-4">
-                        <h3 class="text-sm font-semibold text-ink">Rekap Saldo Per Pegawai</h3>
+                    <div class="border-b border-border px-6 py-4">
+                        <h3 class="text-base font-semibold text-ink">Rekap Saldo Per Pegawai</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Ringkasan alokasi jatah, carry over, pemakaian, dan sisa saldo cuti tahunan per pegawai pada periode terpilih.</p>
                     </div>
                     <div class="overflow-x-auto">
-
                         <x-ui.table>
                             <x-ui.table-head>
                                 <x-ui.table-row>
-                                    <x-ui.table-th>
-                                        Pegawai</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Unit</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Jatah</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Carry</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Terpakai</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Sisa</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Status</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Aksi</x-ui.table-th>
+                                    <x-ui.table-th>Pegawai</x-ui.table-th>
+                                    <x-ui.table-th>Unit</x-ui.table-th>
+                                    <x-ui.table-th align="right">Jatah</x-ui.table-th>
+                                    <x-ui.table-th align="right">Carry</x-ui.table-th>
+                                    <x-ui.table-th align="right">Terpakai</x-ui.table-th>
+                                    <x-ui.table-th align="right">Sisa</x-ui.table-th>
+                                    <x-ui.table-th>Status</x-ui.table-th>
+                                    <x-ui.table-th align="right">Aksi</x-ui.table-th>
                                 </x-ui.table-row>
                             </x-ui.table-head>
                             <x-ui.table-body>
-                                @foreach($leaveBalances as $row)
+                                @forelse($leaveBalances as $row)
                                     <x-ui.table-row :interactive="true">
                                         <x-ui.table-td padding="sm">
                                             <p class="text-sm font-semibold text-ink">{{ $row['nama'] }}</p>
@@ -140,14 +134,12 @@
                                         <x-ui.table-td padding="sm" class="text-sm">{{ $row['unit'] }}</x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['jatah'] }}</x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['carry'] }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['terpakai'] }}
-                                        </x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row['terpakai'] }}</x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm" class="text-sm font-bold text-primary">
                                             {{ $row['sisa'] }}
                                         </x-ui.table-td>
                                         <x-ui.table-td padding="sm">
-                                            <span
-                                                class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
+                                            <span class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
                                         <x-ui.table-td align="right" padding="sm">
                                             @if($canAdministerBalance)
@@ -156,54 +148,84 @@
                                             @endif
                                         </x-ui.table-td>
                                     </x-ui.table-row>
-
-                                @endforeach
+                                @empty
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-muted">
+                                            Tidak ada data rekap saldo cuti sesuai filter.
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
+                                @endforelse
                             </x-ui.table-body>
                         </x-ui.table>
                     </div>
+
                     {{-- TABLE FOOTER --}}
-                    <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-                        <div>
-                            @if($leaveBalances->total() > 0)
-                            <p class="text-sm text-muted">
-                                Menampilkan <span class="font-semibold text-ink">{{ $leaveBalances->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $leaveBalances->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $leaveBalances->total() }}</span> hasil
-                            </p>
-                            @endif
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                        <div class="flex items-center gap-3 text-sm text-muted">
+                            <form method="GET" action="{{ route('cuti.rekap') }}" class="flex items-center gap-2">
+                                @if($periode)
+                                    <input type="hidden" name="periode" value="{{ $periode }}">
+                                @endif
+                                @if($unit)
+                                    <input type="hidden" name="unit" value="{{ $unit }}">
+                                @endif
+                                @if($pegawaiId)
+                                    <input type="hidden" name="pegawai" value="{{ $pegawaiId }}">
+                                @endif
+                                @if($jenisId)
+                                    <input type="hidden" name="jenis" value="{{ $jenisId }}">
+                                @endif
+                                <span class="whitespace-nowrap">Tampilkan</span>
+                                <label for="per_page_saldo" class="sr-only">Jumlah baris per halaman</label>
+                                <select
+                                    id="per_page_saldo"
+                                    name="per_page"
+                                    onchange="this.form.submit()"
+                                    class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
+                                >
+                                    @foreach ([10, 25, 50] as $opsi)
+                                        <option value="{{ $opsi }}" @selected((int) request('per_page', 10) === $opsi)>{{ $opsi }}</option>
+                                    @endforeach
+                                </select>
+                                <span class="hidden sm:inline">data</span>
+                            </form>
+
+                            {{-- Meta Info --}}
+                            <div class="hidden md:block ml-2 border-l border-border pl-4">
+                                Menampilkan <span class="font-medium text-ink">{{ $leaveBalances->firstItem() ?? 0 }}</span>
+                                - <span class="font-medium text-ink">{{ $leaveBalances->lastItem() ?? 0 }}</span>
+                                dari <span class="font-medium text-ink">{{ $leaveBalances->total() }}</span> data
+                            </div>
                         </div>
-                        <div class="w-full sm:w-auto">
-                            {{ $leaveBalances->onEachSide(1)->links('vendor.pagination.simpeg') }}
+
+                        <div class="flex items-center gap-1.5">
+                            {{ $leaveBalances->appends(request()->query())->links('vendor.pagination.simpeg') }}
                         </div>
                     </div>
                 </x-ui.card>
 
+                {{-- CARD 2: DETAIL PENGGUNAAN CUTI --}}
                 <x-ui.card padding="none" class="overflow-hidden">
-                    <div class="border-b border-border px-5 py-4">
-                        <h3 class="text-sm font-semibold text-ink">Detail Penggunaan Cuti</h3>
+                    <div class="border-b border-border px-6 py-4">
+                        <h3 class="text-base font-semibold text-ink">Detail Penggunaan Cuti</h3>
+                        <p class="text-xs text-muted font-sans mt-0.5">Daftar riwayat dan rincian transaksi pemakaian cuti pegawai pada periode terpilih.</p>
                     </div>
                     <div class="overflow-x-auto">
                         <x-ui.table>
                             <x-ui.table-head>
                                 <x-ui.table-row>
-                                    <x-ui.table-th>
-                                        No</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Pegawai</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Jenis Cuti</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Tanggal Mulai</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Tanggal Selesai</x-ui.table-th>
-                                    <x-ui.table-th align="right">
-                                        Hari</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Sumber</x-ui.table-th>
-                                    <x-ui.table-th>
-                                        Status</x-ui.table-th>
+                                    <x-ui.table-th>No</x-ui.table-th>
+                                    <x-ui.table-th>Pegawai</x-ui.table-th>
+                                    <x-ui.table-th>Jenis Cuti</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal Mulai</x-ui.table-th>
+                                    <x-ui.table-th>Tanggal Selesai</x-ui.table-th>
+                                    <x-ui.table-th align="right">Hari</x-ui.table-th>
+                                    <x-ui.table-th>Sumber</x-ui.table-th>
+                                    <x-ui.table-th>Status</x-ui.table-th>
                                 </x-ui.table-row>
                             </x-ui.table-head>
                             <x-ui.table-body>
-                                @foreach($usageRows as $row)
+                                @forelse($usageRows as $row)
                                     <x-ui.table-row :interactive="true">
                                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
@@ -216,25 +238,61 @@
                                         <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row->hari }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm" class="text-sm">{{ $row->sourceLabel }}</x-ui.table-td>
                                         <x-ui.table-td padding="sm">
-                                            <span
-                                                class="text-xs font-semibold {{ $statusClass[$row->status] ?? 'text-muted' }}">{{ $row->statusLabel }}</span>
+                                            <span class="text-xs font-semibold {{ $statusClass[$row->status] ?? 'text-muted' }}">{{ $row->statusLabel }}</span>
                                         </x-ui.table-td>
                                     </x-ui.table-row>
-                                @endforeach
+                                @empty
+                                    <x-ui.table-row>
+                                        <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-muted">
+                                            Tidak ada data penggunaan cuti sesuai filter.
+                                        </x-ui.table-td>
+                                    </x-ui.table-row>
+                                @endforelse
                             </x-ui.table-body>
                         </x-ui.table>
                     </div>
+
                     {{-- TABLE FOOTER --}}
-                    <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-                        <div>
-                            @if($usageRows->total() > 0)
-                            <p class="text-sm text-muted">
-                                Menampilkan <span class="font-semibold text-ink">{{ $usageRows->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $usageRows->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $usageRows->total() }}</span> hasil
-                            </p>
-                            @endif
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                        <div class="flex items-center gap-3 text-sm text-muted">
+                            <form method="GET" action="{{ route('cuti.rekap') }}" class="flex items-center gap-2">
+                                @if($periode)
+                                    <input type="hidden" name="periode" value="{{ $periode }}">
+                                @endif
+                                @if($unit)
+                                    <input type="hidden" name="unit" value="{{ $unit }}">
+                                @endif
+                                @if($pegawaiId)
+                                    <input type="hidden" name="pegawai" value="{{ $pegawaiId }}">
+                                @endif
+                                @if($jenisId)
+                                    <input type="hidden" name="jenis" value="{{ $jenisId }}">
+                                @endif
+                                <span class="whitespace-nowrap">Tampilkan</span>
+                                <label for="per_page_usage" class="sr-only">Jumlah baris per halaman</label>
+                                <select
+                                    id="per_page_usage"
+                                    name="per_page"
+                                    onchange="this.form.submit()"
+                                    class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
+                                >
+                                    @foreach ([10, 25, 50] as $opsi)
+                                        <option value="{{ $opsi }}" @selected((int) request('per_page', 10) === $opsi)>{{ $opsi }}</option>
+                                    @endforeach
+                                </select>
+                                <span class="hidden sm:inline">data</span>
+                            </form>
+
+                            {{-- Meta Info --}}
+                            <div class="hidden md:block ml-2 border-l border-border pl-4">
+                                Menampilkan <span class="font-medium text-ink">{{ $usageRows->firstItem() ?? 0 }}</span>
+                                - <span class="font-medium text-ink">{{ $usageRows->lastItem() ?? 0 }}</span>
+                                dari <span class="font-medium text-ink">{{ $usageRows->total() }}</span> data
+                            </div>
                         </div>
-                        <div class="w-full sm:w-auto">
-                            {{ $usageRows->onEachSide(1)->links('vendor.pagination.simpeg') }}
+
+                        <div class="flex items-center gap-1.5">
+                            {{ $usageRows->appends(request()->query())->links('vendor.pagination.simpeg') }}
                         </div>
                     </div>
                 </x-ui.card>

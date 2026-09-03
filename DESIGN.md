@@ -71,6 +71,14 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 | Metadata | `text-xs text-muted` | Bantuan, label, data sekunder |
 | Status | `text-xs font-semibold` | Badge/status |
 
+### Ukuran Badge
+
+- Gunakan `x-ui.badge` untuk badge teks status; jangan menyalin markup badge langsung di view.
+- `md` adalah default untuk status utama, dengan `px-2.5 py-1`.
+- `sm` hanya untuk kolom tabel yang padat, dengan `px-2 py-0.5`.
+- `xs` hanya untuk ruang sangat terbatas. Ketiga ukuran tetap memakai `text-xs font-semibold`; ukuran tidak boleh mengecilkan teks status.
+- Badge penghitung yang hanya memuat angka adalah pengecualian dan harus memiliki nama aksesibel pada kontrol induknya.
+
 ### Font Stack
 
 - Primary: `Poppins`, `ui-sans-serif`, `system-ui`, `sans-serif`.

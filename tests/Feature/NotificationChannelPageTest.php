@@ -173,7 +173,7 @@ class NotificationChannelPageTest extends TestCase
             ->assertSee('data-channel-code="in_app"', false)
             ->assertSee('data-channel-code="email"', false)
             ->assertSee('data-channel-code="whatsapp_business"', false);
-        $this->assertSame(12, substr_count($response->getContent(), 'data-channel-code="'));
+        $this->assertSame(10, substr_count($response->getContent(), 'data-channel-code="'));
     }
 
     public function test_pagination_menjangkau_channel_ke_51_dengan_query_dan_payload_tetap_bounded(): void
@@ -187,15 +187,15 @@ class NotificationChannelPageTest extends TestCase
             $queries[] = $query->sql;
         });
 
-        $response = $this->actingAs($admin)->get(self::PAGE_URI.'?page=5');
+        $response = $this->actingAs($admin)->get(self::PAGE_URI.'?page=6');
 
         $response->assertOk()
             ->assertSee('data-channel-code="custom_051"', false)
             ->assertSee(route('data-master.channel-notifikasi.update', $lastChannel->id), false)
             ->assertSee(route('data-master.channel-notifikasi.destroy', $lastChannel->id), false)
-            ->assertSee('page=4', false)
+            ->assertSee('page=5', false)
             ->assertDontSee('data-channel-code="in_app"', false);
-        $this->assertSame(6, substr_count($response->getContent(), 'data-channel-code="'));
+        $this->assertSame(4, substr_count($response->getContent(), 'data-channel-code="'));
         $this->assertLessThan(20, count($queries), 'Page lanjutan channel notifikasi melebihi budget 20 query.');
         $this->assertSame(
             1,

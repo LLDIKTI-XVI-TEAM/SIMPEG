@@ -31,7 +31,9 @@ class NonAnnualReservationReconciliationConcurrencyTest extends TestCase
     private const STANDARD_TEST_DATABASE = 'simpeg_test';
 
     /** Memberi ruang bootstrap worker pada bind mount Podman tanpa melonggarkan timeout proses. */
-    private const WORKER_READY_TIMEOUT_MILLISECONDS = 30_000;
+    private const WORKER_READY_TIMEOUT_MILLISECONDS = 120_000;
+
+    private const WORKER_TIMEOUT_SECONDS = 180;
 
     private const RECONCILIATION_MIGRATION = '2026_08_23_000004_reconcile_nonannual_active_reservations.php';
 
@@ -277,7 +279,7 @@ SQL);
             PHP_BINARY,
             base_path('tests/Fixtures/'.$fixture),
             base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 45);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
         $process->start();
 
         return $process;

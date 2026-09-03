@@ -83,7 +83,7 @@ return new class extends Migration
                 DB::table('employees')
                     ->leftJoin('ref_status_pegawai as current_status', 'current_status.id', '=', 'employees.status_pegawai_id')
                     ->whereNotNull('employees.deleted_at')
-                    ->select('employees.*', DB::raw('LOWER(BTRIM(current_status.kelompok)) as current_status_group'))
+                    ->select('employees.*', DB::raw('LOWER(TRIM(current_status.kelompok)) as current_status_group'))
                     ->orderBy('employees.id')
                     ->chunk(100, function ($employees) use ($statusNonaktif): void {
                         foreach ($employees as $employee) {
@@ -364,7 +364,7 @@ return new class extends Migration
     private function resolveRollbackDeletedAt(object $employee, object $backfill): ?string
     {
         $status = DB::table('ref_status_pegawai')
-            ->select(DB::raw('LOWER(BTRIM(kelompok)) as kelompok_normalisasi'))
+            ->select(DB::raw('LOWER(TRIM(kelompok)) as kelompok_normalisasi'))
             ->where('id', $employee->status_pegawai_id)
             ->first();
 

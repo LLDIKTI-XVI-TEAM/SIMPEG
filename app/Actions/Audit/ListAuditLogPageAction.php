@@ -22,7 +22,7 @@ class ListAuditLogPageAction
      * Batas jumlah baris per halaman. Nilai bawaan mengikuti kriteria halaman audit, sedangkan
      * batas atas menjaga permintaan buatan tangan tidak menarik seluruh tabel.
      */
-    private const DEFAULT_PER_PAGE = 25;
+    private const DEFAULT_PER_PAGE = 10;
 
     private const MAX_PER_PAGE = 100;
 

@@ -19,6 +19,8 @@ require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(ConsoleKernel::class)->bootstrap();
 
+const BARRIER_TIMEOUT_SECONDS = 45;
+
 $payload = json_decode(base64_decode((string) ($argv[1] ?? ''), true), true, flags: JSON_THROW_ON_ERROR);
 
 if (! is_array($payload)) {
@@ -56,7 +58,7 @@ try {
 
             $lockReported = true;
             File::put((string) $payload['lock_ready'], 'locked');
-            $deadline = microtime(true) + 30;
+            $deadline = microtime(true) + BARRIER_TIMEOUT_SECONDS;
             while (! File::exists((string) $payload['release']) && microtime(true) < $deadline) {
                 usleep(10_000);
             }
@@ -86,7 +88,7 @@ try {
 
             $readReported = true;
             File::put((string) $payload['read_ready'], 'read');
-            $deadline = microtime(true) + 30;
+            $deadline = microtime(true) + BARRIER_TIMEOUT_SECONDS;
             while (! File::exists((string) $payload['read_release']) && microtime(true) < $deadline) {
                 usleep(10_000);
             }

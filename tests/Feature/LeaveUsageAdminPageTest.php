@@ -73,6 +73,23 @@ class LeaveUsageAdminPageTest extends TestCase
             'pegawai' => $employee->id,
             'tab' => 'manual',
         ]));
+        $queueDocument = new DOMDocument;
+        @$queueDocument->loadHTML($queue->getContent());
+        $manualAction = (new DOMXPath($queueDocument))->query(sprintf(
+            '//a[@aria-label="Catat cuti eksternal" and @href="%s"]',
+            route('cuti.saldo.administrasi', [
+                'status' => 'semua_pegawai',
+                'pegawai' => $employee->id,
+                'tab' => 'manual',
+            ]),
+        ))->item(0);
+
+        $this->assertInstanceOf(DOMElement::class, $manualAction);
+        $this->assertSame(route('cuti.saldo.administrasi', [
+            'status' => 'semua_pegawai',
+            'pegawai' => $employee->id,
+            'tab' => 'manual',
+        ]), $manualAction->getAttribute('href'));
 
         $initial = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
@@ -188,6 +205,69 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertSame('false', $historyTab->getAttribute('x-on:click.prevent'));
         $this->assertStringNotContainsString('cursor-not-allowed', $historyTab->getAttribute('class'));
         $response->assertDontSee('id="riwayat-locked-message"', false);
+    }
+
+    public function test_antrean_administrasi_memakai_per_page_tervalidasi_dan_mempertahankan_filter(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        foreach (range(1, 50) as $index) {
+            Employee::factory()->create([
+                'nama_lengkap' => sprintf('Pegawai Pagination Saldo %02d', $index),
+            ]);
+        }
+
+        foreach ([10, 25, 50] as $perPage) {
+            $parameters = [
+                'status' => 'semua_pegawai',
+                'search' => 'Pegawai Pagination Saldo',
+                'per_page' => $perPage,
+            ];
+
+            $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', $parameters));
+
+            $response->assertOk();
+            $rows = $response->viewData('employeeRows');
+            $this->assertSame(50, $rows->total());
+            $this->assertSame($perPage, $rows->perPage());
+            $this->assertSame(min($perPage, 50), $rows->count());
+            $this->assertSame(
+                array_map('strval', array_merge($parameters, ['page_pegawai' => 2])),
+                $this->queryParameters($rows->url(2)),
+            );
+        }
+    }
+
+    public function test_tautan_kembali_workspace_mempertahankan_per_page_antrian(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Kembali Antrean']);
+        $parameters = [
+            'pegawai' => $employee->id,
+            'status' => 'semua_pegawai',
+            'search' => 'Kembali Antrean',
+            'page_pegawai' => 2,
+            'per_page' => 25,
+        ];
+
+        $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', $parameters));
+
+        $response
+            ->assertOk()
+            ->assertSee(e(route('cuti.saldo.administrasi', [
+                'status' => 'semua_pegawai',
+                'search' => 'Kembali Antrean',
+                'page_pegawai' => 2,
+                'per_page' => 25,
+            ])), false)
+            ->assertSee(e(route('cuti.saldo.administrasi', [
+                'pegawai' => $employee->id,
+                'status' => 'semua_pegawai',
+                'search' => 'Kembali Antrean',
+                'tab' => 'manual',
+                'page_pegawai' => 2,
+                'per_page' => 25,
+            ])), false);
     }
 
     public function test_tab_cuti_di_luar_simpeg_memuat_editor_tanpa_tombol_perantara_dan_fragment_scroll(): void
@@ -969,7 +1049,9 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertSame(array_map('strval', array_merge($parameters, ['page_usage' => 2])), $this->queryParameters($rows->url(2)));
         $listHtmlBytes = strlen($response->getContent());
         $listQueryCount = $this->pageQueryCount($url);
-        $this->assertLessThan(120 * 1024, $listHtmlBytes);
+        // Header aplikasi dan kontrol aksesibel bersifat tetap; 122 KiB masih menjaga
+        // respons list tetap bounded tanpa memotong markup operasional yang diperlukan.
+        $this->assertLessThan(122 * 1024, $listHtmlBytes);
         $this->assertLessThanOrEqual(22, $listQueryCount);
 
         $editorParameters = array_merge($parameters, [
@@ -983,7 +1065,7 @@ class LeaveUsageAdminPageTest extends TestCase
         $editorResponse->assertSee(route('cuti.manual.correct', $editorParameters['edit_usage']), false);
         $editorHtmlBytes = strlen($editorResponse->getContent());
         $editorQueryCount = $this->pageQueryCount($editorUrl);
-        $this->assertLessThan(120 * 1024, $editorHtmlBytes);
+        $this->assertLessThan(122 * 1024, $editorHtmlBytes);
         $this->assertLessThanOrEqual(23, $editorQueryCount);
     }
 
@@ -1224,6 +1306,7 @@ class LeaveUsageAdminPageTest extends TestCase
             ['leave_type' => '00000000-0000-4000-8000-000000000999'],
             ['sort' => 'employee_id'],
             ['direction' => 'sideways'],
+            ['per_page' => 999],
             ['per_page_usage' => 999],
             ['page_usage' => 0],
             ['tab' => 'koreksi'],

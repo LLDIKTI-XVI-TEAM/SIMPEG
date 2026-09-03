@@ -48,16 +48,23 @@
                     <h2 id="add-channel-title" class="text-base font-semibold text-ink">Tambah channel</h2>
                     <p class="mt-1 text-xs leading-relaxed text-muted">Channel baru selalu dibuat nonaktif. Konfigurasi integrasi dikelola sesuai kebijakan masing-masing channel.</p>
                 </div>
-                <button
+                <x-ui.button
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     @click="showAddForm = !showAddForm"
-                    :aria-expanded="showAddForm.toString()"
+                    x-bind:aria-expanded="showAddForm.toString()"
                     aria-controls="add-channel-panel"
-                    class="inline-flex items-center gap-1.5 rounded-xl border border-border bg-soft px-3.5 py-2 text-xs font-semibold text-ink shadow-sm transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary"
+                    class="shrink-0"
                 >
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                    <span x-text="showAddForm ? 'Tutup form' : '+ Tambah channel baru'">+ Tambah channel baru</span>
-                </button>
+                    <svg x-show="!showAddForm" class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    <svg x-show="showAddForm" x-cloak class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span x-text="showAddForm ? 'Tutup form' : 'Tambah channel baru'">Tambah channel baru</span>
+                </x-ui.button>
             </div>
 
             <!-- Expandable Form (Concept 2) -->

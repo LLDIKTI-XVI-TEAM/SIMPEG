@@ -130,11 +130,29 @@
                 </x-ui.table>
             </div>
 
-            @if($previewData->hasPages())
-                <div class="border-t border-border bg-surface px-6 py-4">
-                    {{ $previewData->links() }}
+            {{-- TABLE FOOTER --}}
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <select form="filter-form" name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
+                            <option value="10" @selected(request('per_page', 10) == 10)>10</option>
+                            <option value="25" @selected(request('per_page') == 25)>25</option>
+                            <option value="50" @selected(request('per_page') == 50)>50</option>
+                        </select>
+                        <span class="text-sm text-muted font-sans">data per halaman</span>
+                    </div>
                 </div>
-            @endif
+                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <p class="text-sm text-muted font-sans">
+                        Menampilkan
+                        <span class="font-medium">{{ $previewData->firstItem() ?? 0 }}</span>–<span class="font-medium">{{ $previewData->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium">{{ $previewData->total() }}</span> data
+                    </p>
+                    <div class="flex items-center gap-1.5">
+                        {{ $previewData->appends(request()->query())->links('vendor.pagination.simpeg') }}
+                    </div>
+                </div>
+            </div>
         </x-ui.card>
     </div>
 </x-layouts.app>

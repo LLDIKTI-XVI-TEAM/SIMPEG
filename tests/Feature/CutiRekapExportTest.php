@@ -235,7 +235,7 @@ class CutiRekapExportTest extends TestCase
         $response->assertDontSee('/laporan/export-cuti', false);
     }
 
-    public function test_preview_memakai_filter_dan_urutan_query_bersama_dengan_paginasi_15_baris(): void
+    public function test_preview_memakai_filter_dan_urutan_query_bersama_dengan_paginasi_10_baris(): void
     {
         $user = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create(['jabatan_terakhir' => 'Bagian Laporan']);
@@ -252,14 +252,14 @@ class CutiRekapExportTest extends TestCase
         $this->createLeaveRequest($pegawaiLain, $jenis, '2026-06-20');
 
         $filters = ['periode' => '2026-06', 'unit' => $unit->id, 'pegawai' => $pegawai->id, 'jenis' => $jenis->id];
-        $expectedIds = app(CutiRekapQuery::class)->detailRows($filters)->limit(15)->pluck('id')->all();
+        $expectedIds = app(CutiRekapQuery::class)->detailRows($filters)->limit(10)->pluck('id')->all();
 
         $response = $this->actingAs($user)->get(route('cuti.laporan', $filters));
 
         $response->assertOk()->assertViewIs('admin.cuti.laporan');
         $response->assertViewHas('filters', $filters);
         $response->assertViewHas('rows', function ($rows) use ($expectedIds): bool {
-            return $rows->perPage() === 15
+            return $rows->perPage() === 10
                 && $rows->total() === 16
                 && $rows->getCollection()->pluck('id')->all() === $expectedIds;
         });
@@ -698,10 +698,15 @@ class CutiRekapExportTest extends TestCase
         ] as $routeName => $expectation) {
             $response = $this->actingAs($user)->get(route($routeName, $filters))->assertOk();
             $html = (string) $response->getContent();
+            $sectionPattern = sprintf(
+                '/<section\\b(?=[^>]*\\baria-label="%s")[^>]*>.*?<\\/section>/s',
+                preg_quote($expectation['label'], '/'),
+            );
+            $this->assertSame(1, preg_match($sectionPattern, $html, $sectionMatches));
             $document = new \DOMDocument;
 
             libxml_use_internal_errors(true);
-            $document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+            $document->loadHTML('<?xml encoding="utf-8" ?>'.$sectionMatches[0]);
             libxml_clear_errors();
 
             $xpath = new \DOMXPath($document);
