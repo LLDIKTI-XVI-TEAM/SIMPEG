@@ -248,10 +248,16 @@ class PegawaiController extends Controller
     {
         try {
             $employee = $action->execute($request->validated(), $request);
+            $warnings = $action->warnings;
 
-            return redirect()->route('data-pegawai')
+            $redirect = redirect()->route('data-pegawai')
                 ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
                 ->with('employee_data_changed', true);
+            if (! empty($warnings)) {
+                $redirect = $redirect->with('warnings', $warnings)->with('warning', implode(' ', $warnings));
+            }
+
+            return $redirect;
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->except(array_keys($request->allFiles())))
@@ -329,6 +335,7 @@ class PegawaiController extends Controller
 
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
+            $warnings = $action->warnings;
 
             $employee->load([
                 'jenisPegawai:id,nama',
@@ -358,9 +365,14 @@ class PegawaiController extends Controller
                 ->with('employee_data_changed', true)
                 ->with('edited_employee_id', $employee->id)
                 ->with('edited_employee_data', $editedEmployeeData);
+            if (! empty($warnings)) {
+                $redirect = $redirect->with('warnings', $warnings)->with('warning', implode(' ', $warnings));
+            }
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
-            if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {
+            // Hanya jika file benar-benar tersimpan (ada permission), bukan warning
+            $hasBerkasUploaded = $request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid() && empty(array_filter($warnings, fn ($w) => str_contains($w, 'Berkas lainnya')));
+            if ($hasBerkasUploaded) {
                 $redirect = $redirect->with('document_data_changed', true);
             }
 

@@ -98,6 +98,14 @@ class UpdateEmployeeRequest extends FormRequest
                 $rules['tanggal_akhir_kontrak'] = ['prohibited'];
             }
 
+            // Berkas Lainnya untuk edit (juga warning)
+            $rules['berkas_lainnya_jenis'] = ['nullable', 'string', 'in:KTP,KK,SK Mutasi,SK Pensiun,Lainnya'];
+            $rules['berkas_lainnya_jenis_manual'] = ['nullable', 'string', 'max:100'];
+            $rules['berkas_lainnya_nomor'] = ['nullable', 'string', 'max:100'];
+            $rules['berkas_lainnya_deskripsi'] = ['nullable', 'string', 'max:2000'];
+            $rules['berkas_lainnya_tanggal'] = ['nullable', 'date'];
+            $rules['file_berkas_lainnya'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png'];
+
             // Override foto khusus web (file upload)
             $rules['foto'] = ['nullable', 'image', 'max:10240', 'mimes:jpg,jpeg,png'];
         }

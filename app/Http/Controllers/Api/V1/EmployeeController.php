@@ -36,12 +36,19 @@ class EmployeeController extends Controller
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($request->validated(), $request);
+        $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
-            return response()->json([
+            $payload = [
                 'message' => 'Data pegawai berhasil ditambahkan.',
                 'employee' => $employee,
-            ], 201);
+            ];
+            if (! empty($warnings)) {
+                $payload['warnings'] = $warnings;
+                $payload['warning'] = implode(' ', $warnings);
+            }
+
+            return response()->json($payload, 201);
         }
 
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
@@ -83,12 +90,19 @@ class EmployeeController extends Controller
     public function update(UpdateEmployeeRequest $request, Employee $employee, UpdateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($employee, $request->validated(), $request);
+        $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
-            return response()->json([
+            $payload = [
                 'message' => 'Data pegawai berhasil diperbarui.',
                 'employee' => $employee,
-            ]);
+            ];
+            if (! empty($warnings)) {
+                $payload['warnings'] = $warnings;
+                $payload['warning'] = implode(' ', $warnings);
+            }
+
+            return response()->json($payload);
         }
 
         return back()->with('success', 'Data pegawai berhasil diperbarui.');
