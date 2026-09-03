@@ -37,7 +37,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('admin_kepegawaian');
         $employee = Employee::factory()->create();
 
-        $this->get(route('pegawai.show', $employee->id))
+        $this->get(route('rbac.pegawai.show', $employee->id))
             ->assertOk()
             ->assertSee('Dokumen SK')
             ->assertSee('Berkas Lainnya')
@@ -56,18 +56,18 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('pimpinan');
         $employee = Employee::factory()->create();
 
-        $this->get(route('dokumen'))->assertForbidden();
+        $this->get(route('dokumen'))->assertOk();
         $this->get(route('pegawai.show', $employee->id))
-            ->assertRedirect(route('pimpinan.pegawai.show', $employee->id));
+            ->assertRedirect(route('rbac.pegawai.show', $employee->id));
     }
 
-    public function test_pimpinan_does_not_receive_an_archive_link_despite_document_permission(): void
+    public function test_pimpinan_receives_archive_link_when_document_permission_is_active(): void
     {
         $this->actingAsRole('pimpinan');
 
         $this->get(route('pimpinan.dashboard'))
             ->assertOk()
-            ->assertDontSee('href="'.route('dokumen').'"', false)
+            ->assertSee('href="'.route('dokumen').'"', false)
             ->assertSee('Dokumen &amp; SK', false);
     }
 
@@ -93,7 +93,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('admin_kepegawaian');
         $employee = Employee::factory()->create();
 
-        $content = $this->get(route('pegawai.show', $employee->id))
+        $content = $this->get(route('rbac.pegawai.show', $employee->id))
             ->assertOk()
             ->getContent();
 

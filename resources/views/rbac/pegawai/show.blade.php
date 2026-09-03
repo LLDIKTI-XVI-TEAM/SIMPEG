@@ -273,6 +273,8 @@
                 endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan/${this.uploadSkRecord.id}/upload-sk`;
             } else if (this.uploadSkType === 'kgb') {
                 endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb/${this.uploadSkRecord.id}/upload-sk`;
+            } else if (this.uploadSkType === 'disiplin') {
+                endpoint = `/api/v1/pegawai/{{ $p->id }}/disiplin/${this.uploadSkRecord.id}/upload-sk`;
             } else if (this.uploadSkType === 'pengangkatan') {
                 endpoint = `/api/v1/pegawai/{{ $p->id }}/pengangkatan/upload-sk`;
             } else {
@@ -310,6 +312,13 @@
                             if (idx !== -1) {
                                 this.jabatanList[idx].download_url = updated.download_url;
                                 this.jabatanList[idx].file_sk = updated.file_sk;
+                            }
+                        } else if (this.uploadSkType === 'disiplin') {
+                            const updated = result.record;
+                            const idx = this.disiplinList.findIndex(item => item.id === this.uploadSkRecord.id);
+                            if (idx !== -1) {
+                                this.disiplinList[idx].download_url = updated.download_url;
+                                this.disiplinList[idx].file_sk = updated.file_sk;
                             }
                         } else if (this.uploadSkType === 'kgb') {
                             const idx = this.kgbList.findIndex(item => item.id === this.uploadSkRecord.id);
@@ -1730,8 +1739,25 @@
                                     <td class="px-4 py-3" x-text="formatDate(d.tgl_sk)"></td>
                                     <td class="px-4 py-3" x-text="formatDate(d.tgl_mulai) + ' s/d ' + (d.tgl_akhir ? formatDate(d.tgl_akhir) : 'Sekarang')"></td>
                                     <td class="px-4 py-3">
-                                        <a x-show="d.download_url" :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
-                                        <span x-show="!d.download_url" class="text-muted">-</span>
+                                        <template x-if="d.download_url">
+                                            <div class="flex items-center gap-2">
+                                                <a :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
+                                                @if($canUpdateDocument)
+                                                    <button type="button" @click="openUploadSkModal('disiplin', d)" class="inline-flex items-center gap-0.5 text-xs text-muted transition hover:text-primary" title="Ganti Berkas SK">
+                                                        <span>Ganti</span>
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </template>
+                                        <template x-if="!d.download_url">
+                                            @if($canCreateDocument)
+                                                <button type="button" @click="openUploadSkModal('disiplin', d)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                                                    <span>Upload Berkas</span>
+                                                </button>
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </template>
                                     </td>
                                 </tr>
                             </template>

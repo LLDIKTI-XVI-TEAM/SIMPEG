@@ -245,6 +245,13 @@ class Employee extends Model
         return $this->hasMany(DisciplineRecord::class);
     }
 
+    /** Alias untuk scoped binding Livewire/API yang memakai {discipline} */
+    /** @return HasMany<DisciplineRecord, $this> */
+    public function disciplines(): HasMany
+    {
+        return $this->hasMany(DisciplineRecord::class);
+    }
+
     /** @return HasMany<EducationHistory, $this> */
     public function educationHistories(): HasMany
     {

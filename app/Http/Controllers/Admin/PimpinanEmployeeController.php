@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeHistoryAttachmentDownloadAction;
-use App\Actions\Employees\PreparePimpinanEmployeeDetailAction;
 use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
@@ -13,7 +12,6 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
-use App\Models\User;
 use App\Services\Documents\SkRequirementMatrixVersionService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
@@ -61,7 +59,7 @@ class PimpinanEmployeeController extends Controller
         $serverRenderedDetailLinks = collect($initialRows)
             ->map(fn (array $employee): array => [
                 'name' => $employee['nama_lengkap'],
-                'url' => route('pimpinan.pegawai.show', $employee['id']),
+                'url' => route('rbac.pegawai.show', $employee['id']),
             ])
             ->all();
         // Permission-driven (kontrak RBAC): capability halaman mengikuti permission
@@ -120,12 +118,9 @@ class PimpinanEmployeeController extends Controller
         ));
     }
 
-    public function show(Employee $employee, PreparePimpinanEmployeeDetailAction $action)
+    public function show(Employee $employee)
     {
-        /** @var User $viewer */
-        $viewer = request()->user();
-
-        return view('pimpinan.pegawai.show', $action->execute($employee->id, $viewer));
+        return redirect()->route('rbac.pegawai.show', $employee);
     }
 
     public function downloadDocument(

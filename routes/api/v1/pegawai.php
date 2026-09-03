@@ -101,6 +101,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('discipline_records.create'))
             ->whereUuid('employee')
             ->name('disiplin.store');
+        Route::post('/{employee}/disiplin/{discipline}/upload-sk', [DisciplineRecordController::class, 'uploadSk'])
+            ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.update'))
+            ->whereUuid(['employee', 'discipline'])
+            ->name('disiplin.upload-sk');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
             ->middleware($adminEmployeeReadMiddleware('dokumen_sk.read'))
             ->whereUuid('employee')

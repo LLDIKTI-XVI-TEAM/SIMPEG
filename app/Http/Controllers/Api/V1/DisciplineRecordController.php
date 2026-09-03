@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Histories\CreateDisciplineRecordAction;
 use App\Actions\Histories\ListDisciplineRecordsAction;
+use App\Actions\Histories\UploadDisciplineRecordSkAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\History\StoreDisciplineRecordRequest;
+use App\Http\Requests\History\UploadDisciplineRecordSkRequest;
+use App\Models\DisciplineRecord;
 use App\Models\Employee;
+use App\Services\Employees\EmployeeHistoryAttachmentService;
+use App\Support\Histories\DisciplineRecordPayload;
 use Illuminate\Http\JsonResponse;
 
 class DisciplineRecordController extends Controller
@@ -44,5 +49,29 @@ class DisciplineRecordController extends Controller
         }
 
         return response()->json($response, 201);
+    }
+
+    public function uploadSk(
+        UploadDisciplineRecordSkRequest $request,
+        Employee $employee,
+        DisciplineRecord $discipline,
+        UploadDisciplineRecordSkAction $action,
+        DisciplineRecordPayload $payload,
+        EmployeeHistoryAttachmentService $attachments,
+    ): JsonResponse {
+        $record = $action->execute($employee, $discipline, $request->file('file_sk'), $request);
+        $response = $payload->response($record);
+        $response['file_sk'] = $record->file_sk;
+        $response['download_url'] = $attachments->downloadUrl(
+            $employee,
+            'discipline',
+            $record,
+            'pegawai.history-attachments.download',
+        );
+
+        return response()->json([
+            'message' => 'Berkas SK hukuman disiplin berhasil diunggah.',
+            'record' => $response,
+        ]);
     }
 }
