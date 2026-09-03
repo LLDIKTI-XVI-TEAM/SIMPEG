@@ -78,11 +78,16 @@ class RbacPegawaiDetailTest extends TestCase
         $employeeOther = $this->employeeWithReferences(['nama_lengkap' => 'Other', 'nip' => '198001012005011099', 'email' => 'other@example.test']);
         $user = User::factory()->pegawai()->create(['employee_id' => $employeeSelf->id]);
         $user->refresh();
-        // Grant employees.read to pegawai for canonical
-        Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
 
-        $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeSelf))->assertOk();
+        // Tanpa grant → hanya self (read_self) tidak bisa /rbac (butuh employees.read)
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeSelf))->assertForbidden();
         $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeOther))->assertForbidden();
+
+        // Dengan grant employees.read (A1-pegawai) → bypass self-only, bisa semua via /rbac
+        Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
+        $user->refresh();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeSelf))->assertOk();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeOther))->assertOk();
     }
 
     public function test_kepala_bagian_can_access_bawahan_via_rbac_but_not_other(): void
@@ -279,11 +284,18 @@ class RbacPegawaiDetailTest extends TestCase
         $pimpinan->refresh();
         $this->actingAs($pimpinan)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertForbidden();
 
-        // Without employees.read also forbidden
-        // Pegawai trying to access other employee should be forbidden via scope
+        // Pegawai dengan employees.read (A1) kini bypass self-only → bisa download milik orang lain
         $pegawaiUser = User::factory()->pegawai()->create();
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id, Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id, Permission::where('name', 'employee_histories.read')->firstOrFail()->id]);
-        $this->actingAs($pegawaiUser)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertForbidden();
+        $pegawaiUser->refresh();
+        $this->actingAs($pegawaiUser)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertOk();
+
+        // Tanpa employees.read tetap forbidden (self-only) - detach dulu karena role sudah di-grant di atas
+        Role::where('name', 'pegawai')->firstOrFail()->permissions()->detach(Permission::where('name', 'employees.read')->firstOrFail()->id);
+        $pegawaiNoRead = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $this->actingAs($pegawaiNoRead)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertForbidden();
+        // Kembalikan grant untuk test lain yang mungkin pakai pegawai role
+        Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
     }
 
     public function test_dashboard_pegawai_legacy_redirect(): void

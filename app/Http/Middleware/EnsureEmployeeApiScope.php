@@ -56,14 +56,26 @@ class EnsureEmployeeApiScope
             return $next($request);
         }
 
-        abort_unless(
-            $effectiveRole === 'pegawai'
-                && is_string($user->employee_id)
-                && is_string($targetEmployeeId)
-                && hash_equals($user->employee_id, $targetEmployeeId),
-            403,
-        );
+        if ($effectiveRole === 'pegawai') {
+            // A1-pegawai: jika di-grant employees.* via RBAC (manual), bypass self-only untuk /rbac
+            if ($user->hasPermission('employees.read')
+                || $user->hasPermission('employees.create')
+                || $user->hasPermission('employees.update')
+                || $user->hasPermission('employees.deactivate')
+                || $user->hasPermission('employees.restore')) {
+                return $next($request);
+            }
 
-        return $next($request);
+            abort_unless(
+                is_string($user->employee_id)
+                    && is_string($targetEmployeeId)
+                    && hash_equals($user->employee_id, $targetEmployeeId),
+                403,
+            );
+
+            return $next($request);
+        }
+
+        abort(403);
     }
 }
