@@ -21,6 +21,7 @@ class ListDocumentsRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:100'],
             'kategori' => ['nullable', 'string', 'max:100'],
+            'employee_id' => ['nullable', 'uuid', 'exists:employees,id'],
             // Dikirim tombol Refresh untuk menandai pemeriksaan filesystem terbaru.
             'refresh' => ['nullable', 'boolean'],
             'per_page' => ['nullable', 'integer', 'in:5,10,25,50'],
@@ -33,6 +34,7 @@ class ListDocumentsRequest extends FormRequest
         return [
             'search' => 'Kata Pencarian',
             'kategori' => 'Kategori Dokumen',
+            'employee_id' => 'Pegawai',
             'per_page' => 'Jumlah Data per Halaman',
             'page' => 'Halaman',
         ];

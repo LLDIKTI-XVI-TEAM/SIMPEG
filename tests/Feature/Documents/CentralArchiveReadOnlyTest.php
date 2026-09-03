@@ -4,6 +4,8 @@ namespace Tests\Feature\Documents;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -96,16 +98,30 @@ class CentralArchiveReadOnlyTest extends TestCase
     /**
      * K-privasi (lapisan terpisah dari RBAC aksi): arsip memuat dokumen sensitif
      * lintas pegawai (mis. ktp_kk) — permission employees.read saja tidak cukup;
-     * baca/unduh wajib lolos DocumentAuthorization::canViewArchive (pengelola).
+     * baca/unduh wajib lolos DocumentAuthorization::canViewArchive.
+     * Pimpinan default (dengan dokumen_sk.read) boleh akses; tanpa dokumen_sk.read tetap dilarang.
      */
     public function test_pimpinan_dengan_employees_read_tetap_dilarang_mengakses_arsip(): void
     {
         $this->actingAsRole('pimpinan');
+        // Cabut dokumen_sk.read agar tersisa employees.read saja.
+        Role::where('name', 'pimpinan')->firstOrFail()
+            ->permissions()->detach(Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id);
         $document = $this->createBerkas();
 
         $this->get(route('dokumen'))->assertForbidden();
         $this->get(route('dokumen.show', $document->id))->assertForbidden();
         $this->get(route('dokumen.download', $document->id))->assertForbidden();
+    }
+
+    public function test_pimpinan_dengan_dokumen_read_boleh_mengakses_arsip(): void
+    {
+        $this->actingAsRole('pimpinan');
+        $document = $this->createBerkas();
+
+        $this->get(route('dokumen'))->assertOk();
+        $this->get(route('dokumen.show', $document->id))->assertOk();
+        $this->get(route('dokumen.download', $document->id))->assertOk();
     }
 
     public function test_archive_search_matches_category_label_and_key(): void

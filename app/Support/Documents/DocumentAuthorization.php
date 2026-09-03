@@ -12,7 +12,7 @@ class DocumentAuthorization
      *
      * @var list<string>
      */
-    public const ARCHIVE_VIEWER_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
+    public const ARCHIVE_VIEWER_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian'];
 
     public static function allowsLocalApiBypass(): bool
     {

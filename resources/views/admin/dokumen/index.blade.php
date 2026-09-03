@@ -1,9 +1,14 @@
 <x-layouts.app title="Arsip Dokumen Kepegawaian">
 
+    @php
+        $isKepalaBagianArchive = ($isKepalaBagian ?? false) === true;
+        $archiveBawahans = $bawahans ?? collect();
+    @endphp
     <div x-data="{
         filters: {
             search: '',
             kategori: '',
+            employee_id: '',
         },
         documentsRows: [],
         meta: { current_page: 1, last_page: 1, total: 0, from: 0, to: 0 },
@@ -18,7 +23,7 @@
 
         get cacheKey() {
             const f = this.filters;
-            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}`;
+            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}_e${f.employee_id}`;
         },
 
         clearCache() {
@@ -168,6 +173,7 @@
                 this.searchTimer = setTimeout(() => this.applyFilter(), 300);
             });
             this.$watch('filters.kategori', () => this.applyFilter());
+            this.$watch('filters.employee_id', () => this.applyFilter());
             this.$watch('perPage', () => this.applyFilter());
         },
     }" class="space-y-6">
@@ -176,15 +182,22 @@
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h2>
+                @php
+                    $archiveDashboardUrl = auth()->user()?->getEffectiveRole() === 'kepala_bagian' ? route('kepala-bagian.dashboard') : route('dashboard');
+                    $archivePegawaiUrl = auth()->user()?->getEffectiveRole() === 'kepala_bagian' ? route('kepala-bagian.bawahan.index') : route('data-pegawai');
+                @endphp
                 <x-ui.breadcrumb :items="[
-                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Dashboard', 'url' => $archiveDashboardUrl],
                     ['label' => 'Arsip Dokumen'],
                 ]" />
+                @if($isKepalaBagianArchive)
+                    <p class="mt-1 text-xs text-muted font-sans">Hanya menampilkan dokumen bawahan langsung Anda.</p>
+                @endif
             </div>
             <div class="flex shrink-0 items-center gap-3">
                 <div class="hidden sm:flex max-w-xs flex-col items-end gap-1 text-right">
                     <p class="text-xs text-muted font-sans">Arsip bersifat baca-saja. Unggah, ubah, dan hapus dokumen dilakukan dari bagian Dokumen &amp; SK pada halaman detail pegawai.</p>
-                    <a href="{{ route('data-pegawai') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Buka Data Pegawai</a>
+                    <a href="{{ $archivePegawaiUrl }}" class="text-xs font-semibold text-primary hover:underline font-sans">Buka Data Pegawai</a>
                 </div>
                 <x-ui.button type="button" variant="secondary" @click="clearCache(); fetchPage(meta.current_page, true);"
                     title="Refresh data dan periksa ulang status file di storage">
@@ -233,6 +246,17 @@
                         @endforeach
                     </x-form.select>
                 </div>
+                @if($isKepalaBagianArchive)
+                    {{-- Filter Bawahan khusus Kepala Bagian --}}
+                    <div class="relative col-span-1">
+                        <x-form.select x-model="filters.employee_id" aria-label="Filter bawahan">
+                            <option value="">Semua Bawahan</option>
+                            @foreach ($archiveBawahans as $bawahan)
+                                <option value="{{ $bawahan->id }}">{{ $bawahan->nama_lengkap }} — {{ $bawahan->nip }}</option>
+                            @endforeach
+                        </x-form.select>
+                    </div>
+                @endif
             </x-slot:filters>
 
             {{-- ---- Custom Body Rows ---- --}}

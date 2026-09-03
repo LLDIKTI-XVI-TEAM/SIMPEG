@@ -3,6 +3,8 @@
 namespace App\Actions\Documents;
 
 use App\Models\Document;
+use App\Models\User;
+use App\Services\Employees\KepalaBagianScopeService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -14,25 +16,43 @@ class ListDocumentsAction
     /**
      * Mengambil daftar dokumen dengan filter dan paginasi server-side.
      *
+     * Kepala Bagian selalu di-scope ke bawahan langsung (fail-closed).
+     *
      * @param  array<string, mixed>  $validated
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    public function execute(array $validated): LengthAwarePaginator
+    public function execute(array $validated, ?User $viewer = null): LengthAwarePaginator
     {
         $perPage = (int) ($validated['per_page'] ?? 10);
 
-        $query = Document::query()
-            ->select([
-                'documents.id',
-                'documents.employee_id',
-                'documents.jenis_dokumen',
-                'documents.nama_dokumen',
-                'documents.nomor_dokumen',
-                'documents.tanggal_dokumen',
-                'documents.file_path',
-                'documents.keterangan',
-                'documents.created_at',
-            ])
+        $query = Document::query();
+
+        if ($viewer !== null && $viewer->getEffectiveRole() === 'kepala_bagian') {
+            $scope = app(KepalaBagianScopeService::class);
+            $reportIds = $scope->directReportIds($viewer);
+
+            $requestedEmployeeId = $validated['employee_id'] ?? null;
+            if (is_string($requestedEmployeeId) && $requestedEmployeeId !== '') {
+                abort_unless(in_array($requestedEmployeeId, $reportIds, true), 403, 'Dokumen hanya tersedia untuk bawahan langsung Anda.');
+                $query->where('documents.employee_id', $requestedEmployeeId);
+            } else {
+                $query->whereIn('documents.employee_id', $reportIds);
+            }
+        } elseif (! empty($validated['employee_id'])) {
+            $query->where('documents.employee_id', $validated['employee_id']);
+        }
+
+        $query->select([
+            'documents.id',
+            'documents.employee_id',
+            'documents.jenis_dokumen',
+            'documents.nama_dokumen',
+            'documents.nomor_dokumen',
+            'documents.tanggal_dokumen',
+            'documents.file_path',
+            'documents.keterangan',
+            'documents.created_at',
+        ])
             ->with([
                 // Hanya employee data ringkas — tidak perlu load semua relasi
                 'employee:id,nama_lengkap,nip,foto',

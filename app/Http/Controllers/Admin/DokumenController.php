@@ -7,6 +7,7 @@ use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Documents\ShowDocumentPageAction;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
+use App\Services\Employees\KepalaBagianScopeService;
 use App\Support\Documents\DocumentAuthorization;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -26,14 +27,26 @@ class DokumenController extends Controller
     {
         abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
-        return view('admin.dokumen.index', $action->execute());
+        return view('admin.dokumen.index', $action->execute($request->user()));
     }
 
     public function show(Request $request, string $id, ShowDocumentPageAction $action)
     {
-        abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+        $user = $request->user();
+        abort_unless(DocumentAuthorization::canViewArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
-        return view('admin.dokumen.show', $action->execute($id));
+        $payload = $action->execute($id);
+        if ($user !== null && $user->getEffectiveRole() === 'kepala_bagian') {
+            $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');
+            abort_unless(
+                is_string($documentEmployeeId)
+                    && app(KepalaBagianScopeService::class)->hasDirectReport($user, $documentEmployeeId),
+                403,
+                'Dokumen hanya tersedia untuk bawahan langsung Anda.'
+            );
+        }
+
+        return view('admin.dokumen.show', $payload);
     }
 
     public function store()
@@ -48,7 +61,18 @@ class DokumenController extends Controller
 
     public function download(Request $request, string $id, PrepareDocumentDownloadAction $action)
     {
-        abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+        $user = $request->user();
+        abort_unless(DocumentAuthorization::canViewArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+
+        if ($user !== null && $user->getEffectiveRole() === 'kepala_bagian') {
+            $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');
+            abort_unless(
+                is_string($documentEmployeeId)
+                    && app(KepalaBagianScopeService::class)->hasDirectReport($user, $documentEmployeeId),
+                403,
+                'Dokumen hanya tersedia untuk bawahan langsung Anda.'
+            );
+        }
 
         $download = $action->execute($id);
 
