@@ -35,7 +35,7 @@
         <div>
             <h4 id="{{ $editorId }}-title" class="text-sm font-semibold text-ink">Riwayat Persetujuan Eksternal</h4>
             <p class="mt-1 text-xs leading-relaxed text-muted">
-                Susun 2-10 tahap: maksimal 8 Verifikator, tepat satu Kepala Bagian, lalu tepat satu PYBMC pada tahap terakhir.
+                Susun 2-10 tahap: maksimal 8 Verifikator, tepat satu Atasan Langsung, lalu tepat satu PYBMC pada tahap terakhir.
             </p>
         </div>
         <div class="flex flex-wrap gap-2">
@@ -115,7 +115,7 @@
                             class="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
                         >
                             <option value="verifier">Verifikator</option>
-                            <option value="kepala_bagian">Kepala Bagian</option>
+                            <option value="kepala_bagian">Atasan Langsung</option>
                             <option value="pybmc">PYBMC</option>
                         </select>
                         <p x-show="step.fieldErrors.step_type" x-bind:id="`{{ $editorId }}-type-${index}-error`" x-text="step.fieldErrors.step_type" class="mt-1 text-xs text-danger" role="alert"></p>

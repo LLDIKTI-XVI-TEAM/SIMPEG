@@ -76,7 +76,7 @@ class CutiConfigPageTest extends TestCase
             ->assertSee('x-show="selectedId"', false)
             ->assertSee($pegawai->nama_lengkap)
             ->assertSee($kepalaBagian->nama_lengkap)
-            ->assertSee('Kepala Bagian')
+            ->assertSee('Atasan Langsung')
             ->assertSee('Tambah Verifikator')
             ->assertSee('x-for="(verifier, index) in verifiers"', false)
             ->assertSee('maxVerifierSteps: 8', false)
@@ -86,16 +86,18 @@ class CutiConfigPageTest extends TestCase
             ->assertSee('Hapus verifikator ${index + 1}', false)
             ->assertSee('h-11 w-11', false)
             ->assertSee('sm:h-8 sm:w-8', false)
-            ->assertSee('Tanpa Verifikator', false)
+            ->assertDontSee('Tanpa Verifikator', false)
             ->assertSee('Verifikator ×${verifiers.length}', false)
+            ->assertSee('value="Atasan Langsung"', false)
+            ->assertSee('Alasan Perubahan (opsional)')
             ->assertSee(':name="`steps[${index}][step_type]`"', false)
             ->assertSee(':name="`steps[${verifiers.length}][step_type]`"', false)
             ->assertSee(':key="verifier.client_key"', false)
             ->assertSee(':data-verifier-key="verifier.client_key"', false)
             ->assertSee('x-ref="addVerifierButton"', false)
             ->assertSee('aria-live="polite" aria-atomic="true" x-text="announcement"', false)
-            ->assertSee('Dilewati karena actor digunakan lagi pada tahap yang lebih akhir.', false)
-            ->assertSee('Tahap efektif untuk actor ini.', false)
+            ->assertDontSee('Dilewati karena actor digunakan lagi pada tahap yang lebih akhir.', false)
+            ->assertDontSee('Approver duplikat dilewati otomatis.', false)
             ->assertSee('verifier.validation_errors.role_label', false)
             ->assertSee('verifier.validation_errors.approver_employee_id', false)
             ->assertSee('kepalaBagianError', false)
@@ -121,10 +123,11 @@ class CutiConfigPageTest extends TestCase
             ->assertSee('aria-labelledby="backfill-help-title"', false)
             ->assertSee('aria-describedby="backfill-help-description"', false)
             ->assertSee('Apa itu Backfill Chain Dinamis?')
-            ->assertSee('Kepala Bagian')
+            ->assertSee('Atasan Langsung')
             ->assertSee('Verifikator')
             ->assertSee('PYBMC')
-            ->assertSee('Alasan Backfill disimpan pada setiap chain yang berhasil dibuat dan catatan auditnya.')
+            ->assertSee('Alasan Backfill (opsional)')
+            ->assertSee('Alasan Backfill bersifat opsional dan, bila diisi, disimpan pada setiap chain yang berhasil dibuat serta catatan auditnya.')
             ->assertSee('data-modal-initial-focus="true"', false)
             ->assertSee('closeBackfillHelp()', false)
             ->assertSee('hidden overflow-x-auto md:block', false)
@@ -148,7 +151,7 @@ class CutiConfigPageTest extends TestCase
         $this->assertNotFalse($pybmcPosition);
         $this->assertTrue(
             $verifierPosition < $kepalaBagianPosition && $kepalaBagianPosition < $pybmcPosition,
-            'Urutan DOM harus Verifikator, Kepala Bagian, lalu PYBMC khusus.',
+            'Urutan DOM harus Verifikator, Atasan Langsung, lalu PYBMC khusus.',
         );
 
         $component = file_get_contents(resource_path('views/components/cuti/employee-combobox.blade.php'));
@@ -197,7 +200,7 @@ class CutiConfigPageTest extends TestCase
 
             $response->assertOk()
                 ->assertSee('Belum ditetapkan')
-                ->assertSee('Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.')
+                ->assertSee('Atasan Langsung belum ditetapkan untuk pegawai. Tetapkan penugasan Atasan Langsung sebelum menyimpan chain.')
                 ->assertDontSee($kepalaBagianMendatang->nama_lengkap)
                 ->assertDontSee(':name="`steps[${verifiers.length}][approver_employee_id]`"', false)
                 ->assertDontSee('value="'.$kepalaBagianMendatang->id.'"', false);
@@ -230,7 +233,7 @@ class CutiConfigPageTest extends TestCase
             $response->assertOk()
                 ->assertSee($kepalaBagianAktif->nama_lengkap)
                 ->assertSee(':name="`steps[${verifiers.length}][approver_employee_id]`" value="'.$kepalaBagianAktif->id.'"', false)
-                ->assertDontSee('Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.');
+                ->assertDontSee('Atasan Langsung belum ditetapkan untuk pegawai. Tetapkan penugasan Atasan Langsung sebelum menyimpan chain.');
         } finally {
             Carbon::setTestNow();
         }
@@ -260,7 +263,7 @@ class CutiConfigPageTest extends TestCase
             $response->assertOk()
                 ->assertSee($kepalaBagianHariTerakhir->nama_lengkap)
                 ->assertSee(':name="`steps[${verifiers.length}][approver_employee_id]`" value="'.$kepalaBagianHariTerakhir->id.'"', false)
-                ->assertDontSee('Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.');
+                ->assertDontSee('Atasan Langsung belum ditetapkan untuk pegawai. Tetapkan penugasan Atasan Langsung sebelum menyimpan chain.');
         } finally {
             Carbon::setTestNow();
         }

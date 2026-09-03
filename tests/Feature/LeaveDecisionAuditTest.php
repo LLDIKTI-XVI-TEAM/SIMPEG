@@ -35,6 +35,10 @@ class LeaveDecisionAuditTest extends TestCase
     public function test_decline_menyimpan_audit_dengan_id_dan_status_sebelum_sesudah(): void
     {
         [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_decline_audit');
+        $cuti->steps()->update([
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
+        ]);
 
         $komentar = 'Dokumen pendukung tidak lengkap sehingga pengajuan tidak disetujui.';
 
@@ -42,6 +46,7 @@ class LeaveDecisionAuditTest extends TestCase
         $this->assertSame("/cuti/{$cuti->id}/decline", parse_url($url, PHP_URL_PATH));
 
         $response = $this->actingAs($user)->post($url, [
+            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => $komentar,
         ]);
 
@@ -59,7 +64,7 @@ class LeaveDecisionAuditTest extends TestCase
             'employee_id' => $pemohon->id,
             'status' => 'menunggu_approval',
             'step_order' => 1,
-            'step_label' => 'Verifikator',
+            'step_label' => 'Atasan Langsung',
             'approver_id' => $approver->id,
         ], $audit->old_values);
 
@@ -73,7 +78,7 @@ class LeaveDecisionAuditTest extends TestCase
             'status' => 'tidak_disetujui',
             'decision' => 'NOT_APPROVED',
             'step_order' => 1,
-            'step_label' => 'Verifikator',
+            'step_label' => 'Atasan Langsung',
             'approver_id' => $approver->id,
             'acted_at' => $audit->new_values['acted_at'],
             'komentar' => $komentar,
@@ -88,6 +93,7 @@ class LeaveDecisionAuditTest extends TestCase
         $komentar = 'Mohon perbaiki tanggal mulai dan lampirkan surat keterangan.';
 
         $response = $this->actingAs($user)->post(route('cuti.request-changes', ['id' => $cuti->id]), [
+            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => $komentar,
         ]);
 
@@ -132,6 +138,7 @@ class LeaveDecisionAuditTest extends TestCase
         [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanDuaTahap('cuti_sakit_verify_audit');
 
         $response = $this->actingAs($user)->post(route('cuti.approve', ['id' => $cuti->id]), [
+            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => 'Diteruskan ke tahap berikutnya.',
         ]);
 
@@ -150,6 +157,7 @@ class LeaveDecisionAuditTest extends TestCase
         [$user, , , $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_decide_audit');
 
         $response = $this->actingAs($user)->post(route('cuti.approve', ['id' => $cuti->id]), [
+            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => 'Disetujui.',
         ]);
 
@@ -166,6 +174,7 @@ class LeaveDecisionAuditTest extends TestCase
         [$user, , , $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_defer_audit');
 
         $response = $this->actingAs($user)->post(route('cuti.postpone', ['id' => $cuti->id]), [
+            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => 'Ditangguhkan karena kebutuhan unit kerja.',
         ]);
 
@@ -180,11 +189,13 @@ class LeaveDecisionAuditTest extends TestCase
     {
         [$userPerubahan, , , $cutiPerubahan] = $this->buatPengajuanMenungguApproval('cuti_sakit_filter_ubah');
         $this->actingAs($userPerubahan)->post(route('cuti.request-changes', ['id' => $cutiPerubahan->id]), [
+            'active_step_id' => $cutiPerubahan->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => 'Mohon perbaiki tanggal pengajuan.',
         ]);
 
         [$userTolak, , , $cutiTolak] = $this->buatPengajuanMenungguApproval('cuti_sakit_filter_tolak');
         $this->actingAs($userTolak)->post(route('cuti.decline', ['id' => $cutiTolak->id]), [
+            'active_step_id' => $cutiTolak->steps()->where('status', 'active')->valueOrFail('id'),
             'komentar' => 'Kuota unit kerja tidak memungkinkan.',
         ]);
 

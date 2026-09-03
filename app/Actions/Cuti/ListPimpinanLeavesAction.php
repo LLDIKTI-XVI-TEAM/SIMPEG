@@ -5,6 +5,7 @@ namespace App\Actions\Cuti;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\LeaveApprovalService;
+use App\Support\Cuti\ApprovalStepLabel;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListPimpinanLeavesAction
@@ -21,7 +22,7 @@ class ListPimpinanLeavesAction
             'employee',
             'jenisCuti',
             'steps' => fn ($steps) => $steps
-                ->select(['id', 'leave_request_id', 'role_label', 'status', 'step_order'])
+                ->select(['id', 'leave_request_id', 'step_type', 'role_label', 'status', 'step_order'])
                 ->where('status', 'active')
                 ->orderBy('step_order'),
         ]);
@@ -74,7 +75,13 @@ class ListPimpinanLeavesAction
 
         $paginator->getCollection()->transform(function (LeaveRequest $r): LeaveRequest {
             // Label memakai snapshot pengajuan, bukan nama approver atau konfigurasi terkini.
-            $r->setAttribute('current_step_label', $r->steps->first()?->role_label);
+            $activeStep = $r->steps->first();
+            $r->setAttribute(
+                'current_step_label',
+                $activeStep === null
+                    ? null
+                    : ApprovalStepLabel::display($activeStep->step_type, $activeStep->role_label),
+            );
 
             return $r;
         });

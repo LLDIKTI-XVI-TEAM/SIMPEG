@@ -5,6 +5,7 @@ namespace App\Queries\Cuti;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
+use App\Support\Cuti\ApprovalStepLabel;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -134,7 +135,7 @@ final class CurrentApprovalChainPreviewQuery
         }
 
         if ($steps->where('step_type', 'kepala_bagian')->count() !== 1) {
-            $warnings[] = 'Chain harus memiliki tepat satu tahap Kepala Bagian.';
+            $warnings[] = 'Chain harus memiliki tepat satu tahap Atasan Langsung.';
         }
 
         if ($steps->where('step_type', 'pybmc')->count() !== 1) {
@@ -142,7 +143,7 @@ final class CurrentApprovalChainPreviewQuery
         }
 
         if ($kepalaBagianIndex !== null && $steps->take($kepalaBagianIndex)->contains('step_type', 'pybmc')) {
-            $warnings[] = 'PYBMC tidak boleh mendahului Kepala Bagian.';
+            $warnings[] = 'PYBMC tidak boleh mendahului Atasan Langsung.';
         }
 
         if (count($finalIndexes) !== 1) {
@@ -164,7 +165,7 @@ final class CurrentApprovalChainPreviewQuery
         }
 
         if ($kepalaBagianIndex !== null && $steps->skip($kepalaBagianIndex + 1)->contains('step_type', 'verifier')) {
-            $warnings[] = 'Verifier tidak boleh berada setelah Kepala Bagian.';
+            $warnings[] = 'Verifier tidak boleh berada setelah Atasan Langsung.';
         }
 
         return array_values(array_unique($warnings));
@@ -185,7 +186,7 @@ final class CurrentApprovalChainPreviewQuery
         return [
             'step_order' => $step->step_order,
             'step_type' => $step->step_type,
-            'role_label' => $step->role_label,
+            'role_label' => ApprovalStepLabel::display($step->step_type, $step->role_label),
             'is_final' => $step->is_final,
             'approver' => ! is_string($approverId) ? null : [
                 'id' => $approverId,

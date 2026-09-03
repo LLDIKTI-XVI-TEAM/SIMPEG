@@ -5,6 +5,7 @@ namespace App\Queries\Cuti;
 use App\Data\Cuti\CutiRekapReadRow;
 use App\Models\LeaveBalance;
 use App\Models\LeaveUsageRecord;
+use App\Support\Cuti\ApprovalStepLabel;
 use App\Support\Cuti\CutiPeriodFilter;
 use App\Support\Cuti\CutiReportStatusFormatter;
 use Carbon\CarbonImmutable;
@@ -36,7 +37,7 @@ class CutiRekapQuery
         $this->guardUuidFilters($filters);
 
         $activeSteps = DB::table('leave_request_steps as step_rows')
-            ->selectRaw('DISTINCT ON (step_rows.leave_request_id) step_rows.leave_request_id, step_rows.role_label::text AS current_step_label')
+            ->selectRaw('DISTINCT ON (step_rows.leave_request_id) step_rows.leave_request_id, step_rows.step_type::text AS current_step_type, step_rows.role_label::text AS current_step_label')
             ->where('step_rows.status', 'active')
             ->orderBy('step_rows.leave_request_id')
             ->orderBy('step_rows.step_order')
@@ -66,6 +67,7 @@ CAST(lr.tanggal_mulai AS date) AS tanggal_mulai,
 CAST(lr.tanggal_selesai AS date) AS tanggal_selesai,
 CAST(lr.jumlah_hari_kerja AS integer) AS hari,
 CAST(lr.status AS text) AS status,
+CAST(active_steps.current_step_type AS text) AS current_step_type,
 CAST(active_steps.current_step_label AS text) AS current_step_label,
 CAST(lr.created_at AS timestamp) AS created_at
 SQL);
@@ -93,6 +95,7 @@ CAST(usage.start_date AS date) AS tanggal_mulai,
 CAST(usage.end_date AS date) AS tanggal_selesai,
 CAST(usage.workdays AS integer) AS hari,
 CAST('disetujui' AS text) AS status,
+CAST(NULL AS text) AS current_step_type,
 CAST(NULL AS text) AS current_step_label,
 CAST(usage.created_at AS timestamp) AS created_at
 SQL);
@@ -101,7 +104,7 @@ SQL);
             ->fromSub($requests->unionAll($manual), 'cuti_rekap')
             ->select([
                 'id', 'employee_id', 'leave_type_id', 'source_type', 'nip', 'nama', 'unit_id', 'unit', 'jenis',
-                'tanggal_mulai', 'tanggal_selesai', 'hari', 'status', 'current_step_label', 'created_at',
+                'tanggal_mulai', 'tanggal_selesai', 'hari', 'status', 'current_step_type', 'current_step_label', 'created_at',
             ]);
 
         $this->applyDetailFilters($query, $filters);
@@ -484,7 +487,12 @@ SQL);
     {
         $sourceType = (string) $row->source_type;
         $status = (string) $row->status;
-        $currentStepLabel = $row->current_step_label === null ? null : (string) $row->current_step_label;
+        $currentStepLabel = $row->current_step_label === null
+            ? null
+            : ApprovalStepLabel::display(
+                (string) ($row->current_step_type ?? ''),
+                (string) $row->current_step_label,
+            );
 
         return new CutiRekapReadRow(
             id: (string) $row->id,

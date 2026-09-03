@@ -58,7 +58,7 @@ class LeaveApprovalService
     ) {}
 
     /**
-     * Menyetujui step aktif. Step berikutnya diaktifkan, duplikasi approver dilewati, dan final approval
+     * Menyetujui step aktif. Step berikutnya diaktifkan, dan final approval
      * membentuk fakta pemakaian yang menjadi satu-satunya sumber replay saldo tahunan.
      *
      * Aktor Employee adalah approver snapshot, sedangkan User adalah akun manusia yang wajib cocok agar
@@ -67,6 +67,7 @@ class LeaveApprovalService
     public function approve(
         LeaveRequest $leaveRequest,
         Employee $actor,
+        string $expectedActiveStepId,
         ?string $komentar = null,
         ?User $actingUser = null,
         ?Request $httpRequest = null,
@@ -76,7 +77,7 @@ class LeaveApprovalService
             throw new AuthorizationException('Akun Anda tidak cocok dengan approver yang berwenang untuk tahap persetujuan ini.');
         }
 
-        return DB::transaction(function () use ($leaveRequest, $actor, $komentar, $actingUser, $httpRequest): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar, $actingUser, $httpRequest): LeaveRequest {
             // Mutasi request existing selalu mengunci request lebih dahulu, lalu employee,
             // agar approval, penangguhan dinas, rollover, dan resubmit tidak membentuk siklus lock.
             $locked = LeaveRequest::query()
@@ -91,6 +92,7 @@ class LeaveApprovalService
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
+            $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
 
             $activeStep->forceFill([
                 'status' => 'approved',
@@ -100,7 +102,7 @@ class LeaveApprovalService
 
             $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'APPROVE', $komentar);
 
-            $nextStep = $this->activateNextStep($locked, $actor, $activeStep->step_order);
+            $nextStep = $this->activateNextStep($locked, $activeStep->step_order);
 
             if ($nextStep !== null) {
                 $locked->forceFill(['status' => self::STATUS_MENUNGGU])->save();
@@ -144,16 +146,14 @@ class LeaveApprovalService
      * Menangguhkan pengajuan pada step aktif tanpa mengubah approver aktif.
      * Approver yang sama dapat melanjutkan dengan approve pada step yang sama.
      */
-    public function postpone(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
+    public function postpone(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar): LeaveRequest
     {
-        $this->assertApprovalActionable($leaveRequest);
-        $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
-
-        return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
+            $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
 
             $activeStep->forceFill(['decision_note' => $komentar])->save();
             $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'POSTPONE', $komentar);
@@ -169,16 +169,14 @@ class LeaveApprovalService
      * Mengembalikan pengajuan ke pemohon untuk diperbaiki tanpa memindahkan step aktif.
      * Catatan wajib menjadi dasar pemohon memperbaiki data sebelum mengirim ulang.
      */
-    public function requestChanges(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
+    public function requestChanges(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar): LeaveRequest
     {
-        $this->assertApprovalActionable($leaveRequest);
-        $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
-
-        return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
+            $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
 
             $activeStep->forceFill(['decision_note' => $komentar])->save();
             $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'REQUEST_CHANGES', $komentar);
@@ -194,16 +192,14 @@ class LeaveApprovalService
      * Menutup pengajuan sebagai Tidak Disetujui tanpa memotong saldo.
      * Step aktif dan seluruh step lanjutan ditutup agar pengajuan tidak kembali muncul di antrean.
      */
-    public function decline(LeaveRequest $leaveRequest, Employee $actor, string $komentar): LeaveRequest
+    public function decline(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar): LeaveRequest
     {
-        $this->assertApprovalActionable($leaveRequest);
-        $this->assertActorIsApprover($leaveRequest, $actor, $this->pendingStageOrFail($leaveRequest));
-
-        return DB::transaction(function () use ($leaveRequest, $actor, $komentar): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
+            $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
 
             $activeStep->forceFill([
                 'status' => self::STATUS_TIDAK_DISETUJUI,
@@ -245,19 +241,6 @@ class LeaveApprovalService
             ->value('approver_employee_id');
     }
 
-    private function pendingStageOrFail(LeaveRequest $leaveRequest): int
-    {
-        $stage = $this->pendingStage($leaveRequest);
-
-        if ($stage === null) {
-            throw ValidationException::withMessages([
-                'status' => 'Pengajuan cuti ini belum memiliki step approval aktif.',
-            ]);
-        }
-
-        return $stage;
-    }
-
     private function assertApprovalActionable(LeaveRequest $leaveRequest): void
     {
         if (! in_array($leaveRequest->status, self::ACTIONABLE_STATUSES, true)) {
@@ -284,26 +267,20 @@ class LeaveApprovalService
         return $step;
     }
 
-    /** Memastikan aktor adalah approver pada snapshot step aktif, bukan sekadar pemegang role/permission. */
-    private function assertActorIsApprover(LeaveRequest $leaveRequest, Employee $actor, int $stage): void
-    {
-        $approverId = $this->approverEmployeeIdForStage($leaveRequest, $stage);
-
-        if ($approverId === null) {
-            throw ValidationException::withMessages([
-                'status' => 'Step approval aktif belum memiliki approver.',
-            ]);
-        }
-
-        if ($approverId !== $actor->id) {
-            throw new AuthorizationException('Anda bukan approver yang berwenang untuk tahap persetujuan ini.');
-        }
-    }
-
     private function assertActorMatchesStep(LeaveRequestStep $step, Employee $actor): void
     {
         if ($step->approver_employee_id !== $actor->id) {
             throw new AuthorizationException('Anda bukan approver yang berwenang untuk tahap persetujuan ini.');
+        }
+    }
+
+    /** Token form hanya sah untuk step aktif yang sudah terkunci dan telah lolos otorisasi aktor. */
+    private function assertExpectedActiveStep(LeaveRequestStep $step, string $expectedActiveStepId): void
+    {
+        if (strtolower($step->id) !== strtolower($expectedActiveStepId)) {
+            throw ValidationException::withMessages([
+                'active_step_id' => 'Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.',
+            ]);
         }
     }
 
@@ -319,7 +296,7 @@ class LeaveApprovalService
         ]);
     }
 
-    private function activateNextStep(LeaveRequest $leaveRequest, Employee $actor, int $currentOrder): ?LeaveRequestStep
+    private function activateNextStep(LeaveRequest $leaveRequest, int $currentOrder): ?LeaveRequestStep
     {
         $steps = $leaveRequest->steps()
             ->where('step_order', '>', $currentOrder)
@@ -329,18 +306,6 @@ class LeaveApprovalService
             ->get();
 
         foreach ($steps as $step) {
-            if ($step->approver_employee_id === $actor->id) {
-                $step->forceFill([
-                    'status' => 'skipped',
-                    'skipped_reason' => 'duplicate_approver',
-                    'decision_note' => 'Dilewati otomatis karena approver sama dengan step sebelumnya.',
-                    'acted_at' => Carbon::now(),
-                ])->save();
-                $this->recordApproval($leaveRequest, $actor, $step->step_order, 'SKIP', 'Dilewati otomatis karena approver sama dengan step sebelumnya.');
-
-                continue;
-            }
-
             $step->forceFill(['status' => 'active'])->save();
 
             return $step;

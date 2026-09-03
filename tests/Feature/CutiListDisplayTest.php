@@ -63,7 +63,7 @@ class CutiListDisplayTest extends TestCase
         $row = $riwayatCuti->first();
 
         $this->assertArrayHasKey('current_step_label', $row);
-        $this->assertSame('Kepala Bagian', $row['current_step_label']);
+        $this->assertSame('Atasan Langsung', $row['current_step_label']);
         $this->assertArrayNotHasKey('current_step', $row);
         $this->assertArrayNotHasKey('stage_atasan', $row);
         $this->assertArrayNotHasKey('stage_kepala', $row);

@@ -166,7 +166,7 @@ class LeaveEligibilityPolicyTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $leaveRequest = LeaveRequest::query()->sole();
-        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], 'Tanggal cuti perlu diperbaiki.');
+        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal cuti perlu diperbaiki.');
 
         $this->actingAs($aktor['user'])
             ->patchJson(route('cuti.resubmit', $leaveRequest), [
@@ -678,7 +678,7 @@ class LeaveEligibilityPolicyTest extends TestCase
 
         $leaveRequest = LeaveRequest::query()->sole();
         $caseId = $leaveRequest->leave_request_case_id;
-        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], 'Tanggal perlu diperbaiki.');
+        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal perlu diperbaiki.');
 
         $this->actingAs($aktor['user'])
             ->patchJson(route('cuti.resubmit', $leaveRequest), [

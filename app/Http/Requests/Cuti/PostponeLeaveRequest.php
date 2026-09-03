@@ -26,6 +26,7 @@ class PostponeLeaveRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'active_step_id' => ['required', 'uuid'],
             // Alasan wajib saat menunda agar pemohon memahami dasar penundaan dan dapat menindaklanjuti.
             'komentar' => ['required', 'string', 'min:5', 'max:500'],
         ];
@@ -45,6 +46,7 @@ class PostponeLeaveRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'active_step_id' => 'tahap persetujuan',
             'komentar' => 'alasan penundaan',
         ];
     }

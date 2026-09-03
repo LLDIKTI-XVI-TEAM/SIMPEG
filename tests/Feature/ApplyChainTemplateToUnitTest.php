@@ -371,7 +371,7 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
         $this->assertInstanceOf(RuntimeException::class, $exception);
         $this->assertSame(
-            'Semua Verifikator harus ditempatkan sebelum Kepala Bagian.',
+            'Semua Verifikator harus ditempatkan sebelum Atasan Langsung.',
             $exception->getMessage(),
         );
         $this->assertSame(
@@ -420,7 +420,7 @@ class ApplyChainTemplateToUnitTest extends TestCase
                 'template_reason' => 'Menguji template legacy melalui HTTP.',
             ])
             ->assertSessionHasErrors([
-                'source_employee_id' => 'Semua Verifikator harus ditempatkan sebelum Kepala Bagian.',
+                'source_employee_id' => 'Semua Verifikator harus ditempatkan sebelum Atasan Langsung.',
             ]);
 
         $this->assertDatabaseCount('leave_approval_chains', 1);
@@ -457,7 +457,7 @@ class ApplyChainTemplateToUnitTest extends TestCase
             $this->terapkan($unit, $sumber, $aktor);
             $this->fail('Penerapan seharusnya ditolak karena template sumber tidak memiliki Kepala Bagian.');
         } catch (RuntimeException $exception) {
-            $this->assertStringContainsString('Kepala Bagian', $exception->getMessage());
+            $this->assertStringContainsString('Atasan Langsung', $exception->getMessage());
         }
 
         // Chain lama anggota wajib tetap aktif; penerapan yang gagal tidak boleh menonaktifkannya.
@@ -615,12 +615,8 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $this->assertSame([$anggota->id], $hasil['applied_employee_ids']);
     }
 
-    public function test_langkah_approver_duplikat_dipertahankan_saat_disalin(): void
+    public function test_template_dengan_verifikator_duplikat_ditolak_tanpa_mutasi(): void
     {
-        // Snapshot pengajuan mempertahankan seluruh langkah lalu menandai kemunculan lebih awal
-        // sebagai dilewati, sehingga kemunculan terakhir yang menjadi otoritas efektif. Penyalinan
-        // tidak boleh membuang langkah duplikat karena itu akan menghilangkan label dan peran yang
-        // dipakai snapshot serta audit keputusan seluruh anggota unit.
         $aktor = User::factory()->superAdmin()->create();
         $unit = $this->unit('Bagian Keuangan');
         $verifikator = Employee::factory()->create();
@@ -628,34 +624,37 @@ class ApplyChainTemplateToUnitTest extends TestCase
 
         $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
         $anggota = $this->pegawaiUnit($unit, 'Anggota Unit');
+        $chain = LeaveApprovalChain::create([
+            'employee_id' => $sumber->id,
+            'name' => 'Fixture template verifier duplikat',
+            'is_active' => true,
+            'effective_from' => today(),
+            'created_by' => $aktor->id,
+            'updated_by' => $aktor->id,
+        ]);
+        $chain->steps()->createMany([
+            ['step_order' => 1, 'step_type' => 'verifier', 'role_label' => 'Verifikasi Awal', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_order' => 2, 'step_type' => 'verifier', 'role_label' => 'Verifikasi Akhir', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
+            ['step_order' => 3, 'step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => (string) $sumber->kepala_bagian_id, 'is_final' => false],
+            ['step_order' => 4, 'step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
+        ]);
+        $jumlahAuditSebelum = AuditLog::query()->count();
+        $exception = null;
 
-        $this->actingAs($aktor)->app->make(SaveEmployeeApprovalChainAction::class)->execute($sumber, [
-            ['step_type' => 'verifier', 'role_label' => 'Verifikasi Awal', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
-            ['step_type' => 'verifier', 'role_label' => 'Verifikasi Akhir', 'approver_employee_id' => $verifikator->id, 'is_final' => false],
-            ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver_employee_id' => (string) $sumber->kepala_bagian_id, 'is_final' => false],
-            ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver_employee_id' => $pybmc->id, 'is_final' => true],
-        ], $aktor, 'Rantai dengan verifikator berulang.');
+        try {
+            $this->terapkan($unit, $sumber, $aktor);
+        } catch (RuntimeException $caught) {
+            $exception = $caught;
+        }
 
-        $this->terapkan($unit, $sumber, $aktor);
-
-        $langkah = LeaveApprovalChain::query()
-            ->where('employee_id', $anggota->id)
-            ->where('is_active', true)
-            ->sole()
-            ->steps()
-            ->orderBy('step_order')
-            ->get();
-
+        $this->assertInstanceOf(RuntimeException::class, $exception);
         $this->assertSame(
-            ['verifier', 'verifier', 'kepala_bagian', 'pybmc'],
-            $langkah->pluck('step_type')->all(),
+            'Pegawai yang sama tidak boleh mengisi lebih dari satu tahap dengan peran approval yang sama.',
+            $exception->getMessage(),
         );
-        $this->assertSame(
-            ['Verifikasi Awal', 'Verifikasi Akhir', 'Kepala Bagian', 'PYBMC'],
-            $langkah->pluck('role_label')->all(),
-        );
-        $this->assertSame($verifikator->id, $langkah[0]->approver_employee_id);
-        $this->assertSame($verifikator->id, $langkah[1]->approver_employee_id);
+        $this->assertTrue($chain->fresh()->is_active);
+        $this->assertDatabaseMissing('leave_approval_chains', ['employee_id' => $anggota->id]);
+        $this->assertSame($jumlahAuditSebelum, AuditLog::query()->count());
     }
 
     public function test_langkah_kepala_bagian_memakai_atasan_pegawai_tujuan_bukan_atasan_sumber(): void
@@ -1104,6 +1103,13 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $unitNonaktif->update(['is_active' => false]);
         $unit = $this->unit('Bagian Keuangan');
         $sumberTanpaRantai = $this->pegawaiUnit($unit, 'Pegawai Tanpa Rantai');
+
+        $this->actingAs($aktor)
+            ->post(route('cuti.config.unit-template.apply'), [
+                'unit_kerja_id' => $unit->id,
+                'source_employee_id' => $sumberTanpaRantai->id,
+            ])
+            ->assertSessionHasErrors('template_reason');
 
         // Pengenal cacat harus tertangkap validasi, bukan menjadi galat basis data.
         $this->actingAs($aktor)

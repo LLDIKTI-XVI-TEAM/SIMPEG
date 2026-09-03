@@ -742,8 +742,8 @@ class EwsRetirementConcurrencyTest extends TestCase
         try {
             $first->start();
             $second->start();
-            $this->assertTrue($this->waitForFile($firstPaths['ready'], 5_000), 'Engine pertama tidak melihat alert kosong.');
-            $this->assertTrue($this->waitForFile($secondPaths['ready'], 5_000), 'Engine kedua tidak mencapai snapshot alert kosong yang sama.');
+            $this->assertTrue($this->waitForFile($firstPaths['ready']), 'Engine pertama tidak melihat alert kosong.');
+            $this->assertTrue($this->waitForFile($secondPaths['ready']), 'Engine kedua tidak mencapai snapshot alert kosong yang sama.');
 
             File::put($sharedRelease, 'continue');
             $first->wait();

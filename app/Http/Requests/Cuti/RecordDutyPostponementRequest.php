@@ -19,6 +19,7 @@ class RecordDutyPostponementRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'active_step_id' => ['required', 'uuid'],
             'alasan' => ['required', 'string', 'min:5', 'max:500'],
         ];
     }

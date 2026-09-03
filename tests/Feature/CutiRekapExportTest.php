@@ -979,29 +979,31 @@ class CutiRekapExportTest extends TestCase
 
     #[DataProvider('rekapWaitingStatusProvider')]
     public function test_rekap_menampilkan_label_tahap_persetujuan_aktif(
+        string $stepType,
         ?string $roleLabel,
         string $expected,
     ): void {
         $user = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create();
-        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahap Rekap '.$expected]);
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahap Rekap']);
         $leaveRequest = $this->createLeaveRequest($pegawai, $jenis, '2026-06-15', 'menunggu_approval');
 
         if ($roleLabel !== null) {
             LeaveRequestStep::create([
                 'leave_request_id' => $leaveRequest->id,
                 'step_order' => 1,
-                'step_type' => 'verifikator',
+                'step_type' => $stepType,
                 'role_label' => $roleLabel,
                 'status' => 'active',
                 'is_final' => false,
             ]);
         }
 
-        $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]))
-            ->assertOk()
-            ->assertSee($expected)
-            ->assertDontSee('menunggu_approval', false);
+        $response = $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]));
+        $row = collect($response->viewData('usageRows')->items())->firstWhere('id', $leaveRequest->id);
+
+        $response->assertOk()->assertDontSee('menunggu_approval', false);
+        $this->assertSame($expected, $row->statusLabel);
     }
 
     public function test_tahap_aktif_memilih_step_order_terawal_dan_mengabaikan_future_pending_tanpa_duplikasi(): void
@@ -1055,12 +1057,13 @@ class CutiRekapExportTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{string|null, string}> */
+    /** @return array<string, array{string, string|null, string}> */
     public static function rekapWaitingStatusProvider(): array
     {
         return [
-            'tahap aktif' => ['Verifikator', 'Menunggu Verifikator'],
-            'fallback approver' => [null, 'Menunggu Approver'],
+            'tahap aktif' => ['verifier', 'Verifikator', 'Menunggu Verifikator'],
+            'label lama atasan langsung' => ['kepala_bagian', 'Kepala Bagian', 'Menunggu Atasan Langsung'],
+            'fallback approver' => ['verifier', null, 'Menunggu Approver'],
         ];
     }
 

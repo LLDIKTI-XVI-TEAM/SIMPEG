@@ -16,6 +16,12 @@
             </x-admin.page-header>
         </x-ui.card>
 
+        @error('active_step_id')
+            <x-ui.alert variant="danger" title="Keputusan belum dapat disimpan">
+                {{ $message }}
+            </x-ui.alert>
+        @enderror
+
         {{-- Table Card --}}
         <x-ui.card padding="none" class="overflow-hidden">
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
@@ -56,7 +62,7 @@
                             <x-ui.table-td padding="comfortable" class="text-sm font-medium">
                                 {{ $r->jenisCuti->nama ?? '-' }}
                                 <div class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                                    {{ $activeStep?->role_label ?? 'Approver' }}
+                                    {{ $activeStep === null ? 'Approver' : \App\Support\Cuti\ApprovalStepLabel::display($activeStep->step_type, $activeStep->role_label) }}
                                 </div>
                             </x-ui.table-td>
                             <x-ui.table-td padding="comfortable" class="text-sm">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
@@ -81,6 +87,7 @@
                                         <x-ui.button type="button" variant="success-solid" size="sm" x-show="!confirming" @click="open($event)">Setuju</x-ui.button>
                                         <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
                                             @csrf
+                                            <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                                             <span class="text-xs text-muted">Yakin?</span>
                                             <x-ui.button type="submit" variant="success-solid" size="sm" x-ref="confirmApprove">Ya, setujui</x-ui.button>
                                             <x-ui.button type="button" variant="secondary" size="sm" @click="close()">Batal</x-ui.button>

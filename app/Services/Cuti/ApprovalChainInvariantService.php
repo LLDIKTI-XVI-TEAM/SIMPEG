@@ -64,12 +64,12 @@ class ApprovalChainInvariantService
             ->firstWhere('step_type', 'kepala_bagian')['approver_employee_id'] ?? null;
 
         if ($effectiveKepalaBagianId === null) {
-            throw new RuntimeException('Pegawai belum memiliki Kepala Bagian efektif.');
+            throw new RuntimeException('Atasan Langsung belum ditetapkan untuk pegawai.');
         }
 
         if ($configuredKepalaBagianId !== $effectiveKepalaBagianId) {
             throw new RuntimeException(
-                'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
+                'Approver tahap Atasan Langsung harus sesuai penugasan Atasan Langsung efektif pegawai.',
             );
         }
     }
@@ -176,7 +176,7 @@ class ApprovalChainInvariantService
         $pybmcIndexes = array_keys($stepTypes, 'pybmc', true);
 
         if (count($kepalaBagianIndexes) !== 1) {
-            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu step Kepala Bagian.');
+            throw new RuntimeException('Rantai approval cuti wajib memiliki tepat satu step Atasan Langsung.');
         }
 
         if (count($pybmcIndexes) !== 1) {
@@ -187,7 +187,7 @@ class ApprovalChainInvariantService
 
         foreach ($verifierIndexes as $verifierIndex) {
             if ($verifierIndex > $kepalaBagianIndex) {
-                throw new RuntimeException('Semua Verifikator harus ditempatkan sebelum Kepala Bagian.');
+                throw new RuntimeException('Semua Verifikator harus ditempatkan sebelum Atasan Langsung.');
             }
         }
 
@@ -217,6 +217,32 @@ class ApprovalChainInvariantService
 
         if (($finalStep['step_type'] ?? null) !== 'pybmc') {
             throw new RuntimeException('Approver final cuti wajib bertipe PYBMC.');
+        }
+
+        // Verifikator dapat lebih dari satu, tetapi pegawai yang sama tidak boleh mengisi
+        // peran itu berulang kali. UUID dinormalisasi karena PostgreSQL membandingkannya tanpa case.
+        $assignedVerifierIds = [];
+
+        foreach ($steps as $step) {
+            if (($step['step_type'] ?? null) !== 'verifier') {
+                continue;
+            }
+
+            $approverId = $step['approver_employee_id'] ?? null;
+
+            if (! is_string($approverId) || $approverId === '') {
+                continue;
+            }
+
+            $normalizedApproverId = strtolower($approverId);
+
+            if (isset($assignedVerifierIds[$normalizedApproverId])) {
+                throw new RuntimeException(
+                    'Pegawai yang sama tidak boleh mengisi lebih dari satu tahap dengan peran approval yang sama.',
+                );
+            }
+
+            $assignedVerifierIds[$normalizedApproverId] = true;
         }
     }
 

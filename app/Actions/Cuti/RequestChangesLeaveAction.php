@@ -21,7 +21,7 @@ class RequestChangesLeaveAction
         private readonly NotificationService $notifications,
     ) {}
 
-    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $komentar, Request $request): LeaveRequest
+    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
         $stepSebelum = $leaveRequest->steps()
@@ -31,8 +31,8 @@ class RequestChangesLeaveAction
 
         // Keputusan dan jejaknya disatukan dalam satu transaksi supaya pengajuan tidak pernah
         // berpindah status tanpa baris audit yang menerangkan siapa yang memutuskan.
-        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $komentar, $request, $statusSebelum, $stepSebelum): LeaveRequest {
-            $leaveRequest = $this->approvals->requestChanges($leaveRequest, $actor, $komentar);
+        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar, $request, $statusSebelum, $stepSebelum): LeaveRequest {
+            $leaveRequest = $this->approvals->requestChanges($leaveRequest, $actor, $expectedActiveStepId, $komentar);
             $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'CHANGE_REQUESTED', $komentar);
 
             AuditService::logOrFail(

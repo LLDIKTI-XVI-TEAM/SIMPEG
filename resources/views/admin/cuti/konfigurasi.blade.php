@@ -79,8 +79,6 @@
         nextVerifierKey: @js(count($verifierSteps)),
         verifiers: @js($verifierSteps),
         pybmcEmployeeId: @js($pybmcEmployeeId),
-        kepalaBagianEmployeeId: @js($selectedKepalaBagian?->id ?? ''),
-        globalPybmcEmployeeId: @js($globalPybmc?->approver_employee_id ?? ''),
         kepalaBagianError: @js($kepalaBagianError),
         pybmcError: @js($pybmcError),
         announcement: '',
@@ -158,7 +156,7 @@
                     approver_employee_id: '',
                 },
             });
-            this.announce('Verifikator ditambahkan. Status tahap duplikat diperbarui.');
+            this.announce('Verifikator ditambahkan.');
             this.$nextTick(() => this.focusVerifier(clientKey));
         },
         removeVerifier(index) {
@@ -166,7 +164,7 @@
                 ?? this.verifiers[index - 1]?.client_key
                 ?? null;
             this.verifiers.splice(index, 1);
-            this.announce('Verifikator dihapus. Status tahap duplikat diperbarui.');
+            this.announce('Verifikator dihapus.');
             this.$nextTick(() => {
                 if (neighborKey) {
                     this.focusVerifier(neighborKey);
@@ -181,8 +179,8 @@
             const verifier = this.verifiers[index];
             [this.verifiers[index], this.verifiers[nextIndex]] = [this.verifiers[nextIndex], this.verifiers[index]];
             this.announce(direction < 0
-                ? 'Verifikator dipindahkan naik. Status tahap duplikat diperbarui.'
-                : 'Verifikator dipindahkan turun. Status tahap duplikat diperbarui.');
+                ? 'Verifikator dipindahkan naik.'
+                : 'Verifikator dipindahkan turun.');
             this.$nextTick(() => this.focusVerifier(verifier.client_key));
         },
         focusVerifier(clientKey) {
@@ -193,46 +191,6 @@
             this.announcement = '';
             this.$nextTick(() => { this.announcement = message; });
         },
-        announceDuplicateDisposition() {
-            this.announce('Status tahap duplikat diperbarui.');
-        },
-        effectivePybmcEmployeeId() {
-            return this.pybmcEmployeeId || this.globalPybmcEmployeeId;
-        },
-        duplicateDisposition(employeeId, index) {
-            if (! employeeId) return null;
-
-            const appearsLater = this.verifiers
-                .slice(index + 1)
-                .some((verifier) => verifier.approver_employee_id === employeeId)
-                || employeeId === this.kepalaBagianEmployeeId
-                || employeeId === this.effectivePybmcEmployeeId();
-
-            if (appearsLater) return 'skipped';
-
-            const appearedEarlier = this.verifiers
-                .slice(0, index)
-                .some((verifier) => verifier.approver_employee_id === employeeId);
-
-            return appearedEarlier ? 'effective' : null;
-        },
-        kepalaBagianDisposition() {
-            if (! this.kepalaBagianEmployeeId) return null;
-            if (this.kepalaBagianEmployeeId === this.effectivePybmcEmployeeId()) return 'skipped';
-
-            return this.verifiers.some((verifier) => verifier.approver_employee_id === this.kepalaBagianEmployeeId)
-                ? 'effective'
-                : null;
-        },
-        pybmcDisposition() {
-            const employeeId = this.effectivePybmcEmployeeId();
-            if (! employeeId) return null;
-
-            const appearedEarlier = employeeId === this.kepalaBagianEmployeeId
-                || this.verifiers.some((verifier) => verifier.approver_employee_id === employeeId);
-
-            return appearedEarlier ? 'effective' : null;
-        }
     }">
         {{-- PAGE HEADER & BREADCRUMB --}}
         <p class="sr-only" aria-live="polite" aria-atomic="true" x-text="announcement"></p>
@@ -381,7 +339,7 @@
                                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                                     });
                                     if (!response.ok) {
-                                        throw new Error('Lookup Kepala Bagian tidak tersedia.');
+                                        throw new Error('Lookup Atasan Langsung tidak tersedia.');
                                     }
                                     const result = await response.json();
                                     if (requestId !== this.kabagRequestId) return;
@@ -389,7 +347,7 @@
                                 } catch (error) {
                                     if (requestId !== this.kabagRequestId) return;
                                     this.kabagResults = [];
-                                    this.kabagError = 'Pencarian Kepala Bagian gagal. Coba lagi.';
+                                    this.kabagError = 'Pencarian Atasan Langsung gagal. Coba lagi.';
                                 } finally {
                                     if (requestId === this.kabagRequestId) {
                                         this.kabagLoading = false;
@@ -422,25 +380,25 @@
                             guardKabagSubmit(event) {
                                 if (! this.kabagSelectedId) {
                                     event.preventDefault();
-                                    this.kabagSelectionError = 'Pilih Kepala Bagian dari hasil pencarian terlebih dahulu.';
+                                    this.kabagSelectionError = 'Pilih Atasan Langsung dari hasil pencarian terlebih dahulu.';
                                 }
                             }
                         }"
                     >
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                                <h4 class="text-sm font-semibold text-ink">Penetapan Kepala Bagian</h4>
+                                <h4 class="text-sm font-semibold text-ink">Penetapan Atasan Langsung</h4>
                                 <p class="mt-0.5 max-w-2xl text-xs leading-relaxed text-muted">
                                     @if ($selectedKepalaBagian)
-                                        Kepala Bagian efektif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>
+                                        Atasan Langsung efektif: <span class="font-semibold text-ink">{{ $selectedKepalaBagian->nama_lengkap }} ({{ $selectedKepalaBagian->nip }})</span>
                                     @else
-                                        Belum ada Kepala Bagian efektif — tetapkan di bawah ini.
+                                        Belum ada Atasan Langsung efektif — tetapkan di bawah ini.
                                     @endif
                                 </p>
                             </div>
                             @if ($selectedKepalaBagian)
                                 <button type="button" @click="kabagFormOpen = ! kabagFormOpen" :aria-expanded="kabagFormOpen.toString()" aria-controls="kabag-inline-form" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
-                                    <span x-text="kabagFormOpen ? 'Tutup Form' : 'Ubah Kepala Bagian'"></span>
+                                    <span x-text="kabagFormOpen ? 'Tutup Form' : 'Ubah Atasan Langsung'"></span>
                                 </button>
                             @endif
                         </div>
@@ -459,7 +417,7 @@
                             <input type="hidden" name="kepala_bagian_id" :value="kabagSelectedId">
                             <div class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_13rem_auto] sm:items-start">
                                 <div class="space-y-1">
-                                    <label for="kabag_inline_lookup" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kepala Bagian</label>
+                                    <label for="kabag_inline_lookup" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Atasan Langsung</label>
                                     <div class="relative">
                                         <input
                                             id="kabag_inline_lookup"
@@ -488,7 +446,7 @@
                                             x-cloak
                                             x-show="kabagOpen"
                                             role="listbox"
-                                            aria-label="Hasil pencarian Kepala Bagian"
+                                            aria-label="Hasil pencarian Atasan Langsung"
                                             class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
                                         >
                                             <div x-show="kabagLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
@@ -534,7 +492,7 @@
                                     help="Gunakan hari ini atau tanggal sebelumnya agar penugasan langsung aktif."
                                 />
                                 <div class="sm:pt-6">
-                                    <x-ui.button type="submit" size="sm">Simpan Kepala Bagian</x-ui.button>
+                                    <x-ui.button type="submit" size="sm">Simpan Atasan Langsung</x-ui.button>
                                 </div>
                             </div>
                         </form>
@@ -549,9 +507,9 @@
                         </div>
                         @if ($selectedKepalaBagian)
                             <p class="rounded-xl border border-primary/15 bg-soft px-4 py-2 text-center text-xs font-semibold text-primary">
-                                <span x-text="verifiers.length ? `Verifikator ×${verifiers.length}` : 'Tanpa Verifikator'"></span>
-                                <span aria-hidden="true">→</span>
-                                Kepala Bagian
+                                <span x-show="verifiers.length" x-text="`Verifikator ×${verifiers.length}`"></span>
+                                <span x-show="verifiers.length" aria-hidden="true">→</span>
+                                Atasan Langsung
                                 <span aria-hidden="true">→</span>
                                 PYBMC
                             </p>
@@ -567,36 +525,30 @@
                             <p class="text-xs text-muted">{{ $selectedEmployee->nip }}@if ($selectedEmployee->jabatan_terakhir), {{ $selectedEmployee->jabatan_terakhir }}@endif</p>
                         </div>
                         <div>
-                            <label for="kepala-bagian-display" class="text-xs font-bold uppercase tracking-wider text-muted">Kepala Bagian</label>
+                            <label for="kepala-bagian-display" class="text-xs font-bold uppercase tracking-wider text-muted">Atasan Langsung</label>
                             <input
                                 id="kepala-bagian-display"
                                 type="text"
                                 readonly
                                 value="{{ $selectedKepalaBagian ? $selectedKepalaBagian->nama_lengkap . ' (' . $selectedKepalaBagian->nip . ')' : 'Belum ditetapkan' }}"
-                                :aria-describedby="`${kepalaBagianDisposition() ? 'kepala-bagian-disposition ' : ''}${kepalaBagianError ? 'kepala-bagian-error' : ''}`.trim() || null"
+                                :aria-describedby="kepalaBagianError ? 'kepala-bagian-error' : null"
                                 :aria-invalid="Boolean(kepalaBagianError)"
                                 class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm"
                             >
-                            <p
-                                id="kepala-bagian-disposition"
-                                x-show="kepalaBagianDisposition()"
-                                x-text="kepalaBagianDisposition() === 'skipped' ? 'Dilewati karena actor digunakan lagi pada tahap yang lebih akhir.' : 'Tahap efektif untuk actor ini.'"
-                                class="mt-1 text-[11px] font-semibold text-warning"
-                            ></p>
                             <p id="kepala-bagian-error" x-show="kepalaBagianError" x-text="kepalaBagianError" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                         </div>
                     </div>
 
                     @if (! $selectedKepalaBagian)
                         <div class="px-5 pb-5">
-                            <x-ui.alert variant="warning">Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.</x-ui.alert>
+                            <x-ui.alert variant="warning">Atasan Langsung belum ditetapkan untuk pegawai. Tetapkan penugasan Atasan Langsung sebelum menyimpan chain.</x-ui.alert>
                         </div>
                     @else
                         <fieldset class="space-y-4 px-5 py-5">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                                 <div>
                                     <legend class="text-sm font-semibold text-ink">Verifikator</legend>
-                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Approver duplikat dilewati otomatis.</p>
+                                    <p class="mt-0.5 text-xs leading-relaxed text-muted">Opsional. Tambahkan satu atau beberapa verifikator sesuai kebutuhan.</p>
                                 </div>
                                 <x-ui.button type="button" variant="secondary" size="sm" class="min-h-11" x-ref="addVerifierButton" @click="addVerifier()" ::disabled="verifiers.length >= maxVerifierSteps">Tambah Verifikator</x-ui.button>
                             </div>
@@ -617,7 +569,7 @@
                                         </div>
                                         <div>
                                             <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-${verifier.client_key}`" x-text="`Pegawai Verifikator ${index + 1}`"></label>
-                                            <select :id="`verifier-${verifier.client_key}`" :name="`steps[${index}][approver_employee_id]`" x-model="verifier.approver_employee_id" @change="announceDuplicateDisposition()" required :aria-describedby="`${duplicateDisposition(verifier.approver_employee_id, index) ? `verifier-disposition-${verifier.client_key} ` : ''}${verifier.validation_errors.approver_employee_id ? `verifier-error-${verifier.client_key}` : ''}`.trim() || null" :aria-invalid="Boolean(verifier.validation_errors.approver_employee_id)" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <select :id="`verifier-${verifier.client_key}`" :name="`steps[${index}][approver_employee_id]`" x-model="verifier.approver_employee_id" required :aria-describedby="verifier.validation_errors.approver_employee_id ? `verifier-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.approver_employee_id)" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                                 <option value="">Pilih verifikator</option>
                                                 @foreach ($approverCandidates as $approver)
                                                     <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
@@ -626,7 +578,6 @@
                                                     <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
                                                 </template>
                                             </select>
-                                            <p :id="`verifier-disposition-${verifier.client_key}`" x-show="duplicateDisposition(verifier.approver_employee_id, index)" x-text="duplicateDisposition(verifier.approver_employee_id, index) === 'skipped' ? 'Dilewati karena actor digunakan lagi pada tahap yang lebih akhir.' : 'Tahap efektif untuk actor ini.'" class="mt-1 text-[11px] font-semibold text-warning"></p>
                                             <p :id="`verifier-error-${verifier.client_key}`" x-show="verifier.validation_errors.approver_employee_id" x-text="verifier.validation_errors.approver_employee_id" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                                         </div>
                                     </div>
@@ -640,7 +591,7 @@
                         </fieldset>
 
                         <input type="hidden" :name="`steps[${verifiers.length}][step_type]`" value="kepala_bagian">
-                        <input type="hidden" :name="`steps[${verifiers.length}][role_label]`" value="Kepala Bagian">
+                        <input type="hidden" :name="`steps[${verifiers.length}][role_label]`" value="Atasan Langsung">
                         <input type="hidden" :name="`steps[${verifiers.length}][approver_employee_id]`" value="{{ $selectedKepalaBagian->id }}">
 
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
@@ -651,7 +602,7 @@
                             <div>
                                 <input type="hidden" name="steps[_pybmc][step_type]" value="pybmc" x-bind:disabled="! pybmcEmployeeId">
                                 <input type="hidden" name="steps[_pybmc][role_label]" value="PYBMC" x-bind:disabled="! pybmcEmployeeId">
-                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" @change="announceDuplicateDisposition()" :aria-describedby="`employee-pybmc-help ${pybmcDisposition() ? 'employee-pybmc-disposition ' : ''}${pybmcError ? 'employee-pybmc-error' : ''}`.trim()" :aria-invalid="Boolean(pybmcError)" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" :aria-describedby="`employee-pybmc-help ${pybmcError ? 'employee-pybmc-error' : ''}`.trim()" :aria-invalid="Boolean(pybmcError)" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                     <option value="">Gunakan PYBMC global</option>
                                     @foreach ($approverCandidates as $approver)
                                         <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
@@ -661,18 +612,17 @@
                                     </template>
                                 </select>
                                 <p id="employee-pybmc-help" class="mt-1 text-[11px] text-muted">Perubahan chain berlaku untuk pengajuan berikutnya.</p>
-                                <p id="employee-pybmc-disposition" x-show="pybmcDisposition()" class="mt-1 text-[11px] font-semibold text-warning">Tahap efektif untuk actor ini.</p>
                                 <p id="employee-pybmc-error" x-show="pybmcError" x-text="pybmcError" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
                             </div>
                         </div>
 
                         <div class="grid gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-start">
                             <div>
-                                <label for="employee-chain-reason" class="text-sm font-semibold text-ink">Alasan Perubahan <span class="text-danger">*</span></label>
+                                <label for="employee-chain-reason" class="text-sm font-semibold text-ink">Alasan Perubahan (opsional)</label>
                                 <p class="mt-1 text-xs leading-relaxed text-muted">Dicatat dalam log audit.</p>
                             </div>
                              <div class="space-y-3">
-                                 <x-form.textarea name="reason" id="employee-chain-reason" :required="true" rows="3" placeholder="Contoh: Penyesuaian verifikator setelah mutasi jabatan" />
+                                 <x-form.textarea name="reason" id="employee-chain-reason" rows="3" placeholder="Contoh: Penyesuaian verifikator setelah mutasi jabatan" />
                                 <x-ui.button type="submit" class="hidden w-full sm:inline-flex">Simpan Chain Pegawai</x-ui.button>
                              </div>
                          </div>
@@ -685,7 +635,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                         </svg>
                         <p class="text-sm font-semibold text-ink">Pilih pegawai dari hasil pencarian</p>
-                        <p class="max-w-sm text-xs leading-relaxed text-muted">Penetapan Kepala Bagian dan susunan chain tampil setelah pegawai dipilih.</p>
+                        <p class="max-w-sm text-xs leading-relaxed text-muted">Penetapan Atasan Langsung dan susunan chain tampil setelah pegawai dipilih.</p>
                     </div>
                 </div>
             @else
@@ -900,7 +850,7 @@
                 <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Dapat diulang — pegawai yang sudah punya chain aktif dilewati.</p>
                 <form method="POST" action="{{ route('cuti.config.backfill') }}" class="space-y-3">
                     @csrf
-                    <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill" :required="true" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
+                    <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill (opsional)" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
                     <x-ui.button type="submit" class="w-full">Jalankan Backfill Chain</x-ui.button>
                 </form>
             </div>
@@ -1040,15 +990,15 @@
                 <p>Backfill membuat alur persetujuan cuti secara otomatis untuk pegawai aktif yang belum mempunyai chain.</p>
 
                 <div class="rounded-xl border border-primary/15 bg-soft px-4 py-3 text-center font-semibold text-primary">
-                    Verifikator (jika tersedia) -> Kepala Bagian -> PYBMC
+                    Verifikator (jika tersedia) -> Atasan Langsung -> PYBMC
                 </div>
 
                 <ul class="list-disc space-y-2 pl-5">
-                    <li>Chain dibuat dari Verifikator lama, Kepala Bagian efektif pegawai, dan PYBMC lama yang tersedia.</li>
+                    <li>Chain dibuat dari Verifikator lama, penugasan Atasan Langsung efektif, dan PYBMC lama yang tersedia.</li>
                     <li>Pegawai yang sudah mempunyai chain aktif dilewati dan tidak diubah.</li>
-                    <li>Pegawai tanpa Kepala Bagian atau approver final belum dapat dibuatkan chain.</li>
+                    <li>Pegawai tanpa penugasan Atasan Langsung efektif atau tanpa approver final belum dapat dibuatkan chain.</li>
                     <li>Backfill dapat dijalankan kembali setelah data pegawai diperbaiki.</li>
-                    <li>Alasan Backfill disimpan pada setiap chain yang berhasil dibuat dan catatan auditnya.</li>
+                    <li>Alasan Backfill bersifat opsional dan, bila diisi, disimpan pada setiap chain yang berhasil dibuat serta catatan auditnya.</li>
                 </ul>
 
                 <p class="rounded-xl bg-warning/10 px-4 py-3 text-ink">

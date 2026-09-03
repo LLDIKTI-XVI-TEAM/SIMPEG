@@ -46,6 +46,7 @@ final class LeaveApprovalRaceWorker
                     $leaveRequest,
                     $approver,
                     $actor,
+                    $input['active_step_id'],
                     'Penangguhan tugas dinas race.',
                 );
                 $result = [
@@ -58,20 +59,24 @@ final class LeaveApprovalRaceWorker
                 $approved = app(ApproveLeaveAction::class)->execute(
                     $leaveRequest,
                     $approver,
+                    $input['active_step_id'],
                     'Persetujuan final race.',
                     $request,
                 );
-                $proof = LeaveProof::query()->where('leave_request_id', $approved->id)->sole();
-                $fact = LeaveUsageRecord::query()->where('leave_request_id', $approved->id)->sole();
                 $result = [
                     'ok' => true,
                     'operation' => $operation,
                     'request_id' => $approved->id,
                     'status' => $approved->status,
-                    'proof_id' => $proof->id,
-                    'proof_path' => $proof->document_path,
-                    'fact_id' => $fact->id,
                 ];
+
+                if ($approved->status === 'disetujui') {
+                    $proof = LeaveProof::query()->where('leave_request_id', $approved->id)->sole();
+                    $fact = LeaveUsageRecord::query()->where('leave_request_id', $approved->id)->sole();
+                    $result['proof_id'] = $proof->id;
+                    $result['proof_path'] = $proof->document_path;
+                    $result['fact_id'] = $fact->id;
+                }
             }
         } catch (Throwable $exception) {
             $result = [

@@ -285,7 +285,7 @@ class LeaveUsageAdminPageTest extends TestCase
                         [
                             'step_order' => 1,
                             'step_type' => 'kepala_bagian',
-                            'role_label' => 'Kepala Bagian',
+                            'role_label' => 'Atasan Langsung',
                             'is_final' => false,
                             'approver' => [
                                 'id' => $kepalaBagian->id,
@@ -434,7 +434,7 @@ class LeaveUsageAdminPageTest extends TestCase
         $preview = $this->assertInvalidPreview($employee);
 
         $this->assertContains('Urutan tahap chain tidak kontigu.', $preview['warnings']);
-        $this->assertContains('Verifier tidak boleh berada setelah Kepala Bagian.', $preview['warnings']);
+        $this->assertContains('Verifier tidak boleh berada setelah Atasan Langsung.', $preview['warnings']);
     }
 
     public function test_preview_menandai_nol_atau_dua_approver_final_sebagai_tidak_valid(): void

@@ -300,6 +300,7 @@ class LeaveApprovalUsageCutoverTest extends TestCase
                 app(LeaveApprovalService::class)->approve(
                     $fixture['request'],
                     $fixture['approver'],
+                    $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'),
                     'Disetujui final.',
                     $actingUser,
                 );
@@ -573,7 +574,7 @@ class LeaveApprovalUsageCutoverTest extends TestCase
             'nomor_telepon' => '081234567890',
             'status' => 'menunggu_approval',
         ]);
-        LeaveRequestStep::query()->create([
+        $activeStep = LeaveRequestStep::query()->create([
             'leave_request_id' => $request->id,
             'step_order' => 1,
             'step_type' => 'pybmc',
@@ -597,17 +598,19 @@ class LeaveApprovalUsageCutoverTest extends TestCase
             'approver_user' => $approverUser,
             'jenis' => $jenis,
             'request' => $request->fresh(),
+            'active_step_id' => $activeStep->id,
         ];
     }
 
     /**
-     * @param  array{request: LeaveRequest, approver: Employee, approver_user: User}  $fixture
+     * @param  array{request: LeaveRequest, approver: Employee, approver_user: User, active_step_id: string}  $fixture
      */
     private function approveThroughAction(array $fixture): LeaveRequest
     {
         return app(ApproveLeaveAction::class)->execute(
             $fixture['request']->fresh(),
             $fixture['approver'],
+            $fixture['active_step_id'],
             'Disetujui final melalui SIMPEG.',
             $this->approvalRequest($fixture['approver_user']),
         );

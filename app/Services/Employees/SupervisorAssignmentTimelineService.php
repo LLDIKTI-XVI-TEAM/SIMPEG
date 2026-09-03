@@ -192,7 +192,7 @@ class SupervisorAssignmentTimelineService
             if ($previous->tanggal_berakhir === null
                 || $previous->tanggal_berakhir->gte($current->tanggal_mulai)) {
                 throw ValidationException::withMessages([
-                    'effective_date' => 'Rentang penugasan Kepala Bagian tidak boleh tumpang tindih.',
+                    'effective_date' => 'Rentang penugasan Atasan Langsung tidak boleh tumpang tindih.',
                 ]);
             }
         }

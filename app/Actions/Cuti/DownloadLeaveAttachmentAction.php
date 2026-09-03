@@ -47,7 +47,7 @@ final class DownloadLeaveAttachmentAction
     /** Kepala Bagian hanya dapat membaca lampiran laporan langsungnya. */
     public function forKepalaBagian(LeaveRequest $leave, User $actor): StreamedResponse
     {
-        abort_if($actor->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        abort_if($actor->employee_id === null, 403, 'Akun Atasan Langsung belum tertaut ke data pegawai.');
         abort_unless($this->kepalaBagianScope->hasDirectReport($actor, $leave->employee_id), 403);
 
         return $this->download($leave);

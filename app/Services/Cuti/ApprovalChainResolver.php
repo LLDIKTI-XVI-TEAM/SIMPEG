@@ -5,12 +5,13 @@ namespace App\Services\Cuti;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
+use App\Support\Cuti\ApprovalStepLabel;
 use Illuminate\Database\Eloquent\Collection;
 use RuntimeException;
 
 /**
  * Me-resolve chain approval aktif menjadi step siap snapshot.
- * Duplikasi approver tetap disnapshot agar runtime approval mencatat skip otomatis sebagai jejak audit.
+ * Approver yang sama pada peran berbeda tetap disnapshot agar setiap kewenangan diproses berurutan.
  */
 class ApprovalChainResolver
 {
@@ -31,22 +32,30 @@ class ApprovalChainResolver
             throw new RuntimeException('Konfigurasi approval cuti pegawai belum tersedia.');
         }
 
-        $steps = $chain->steps->map(fn (LeaveApprovalChainStep $step): LeaveApprovalChainStep => clone $step);
+        $steps = $chain->steps->map(function (LeaveApprovalChainStep $step): LeaveApprovalChainStep {
+            $resolved = clone $step;
+            $resolved->setAttribute(
+                'role_label',
+                ApprovalStepLabel::display($resolved->step_type, $resolved->role_label),
+            );
+
+            return $resolved;
+        });
         $currentSupervisorId = $employee->currentSupervisor()?->kepala_bagian_id;
         $configuredKepalaBagian = $steps->firstWhere('step_type', 'kepala_bagian');
 
         // Penugasan efektif wajib memiliki slot Kepala Bagian agar snapshot tidak menyembunyikan chain rusak.
         if ($currentSupervisorId !== null) {
             if ($configuredKepalaBagian === null) {
-                throw new RuntimeException('Rantai approval cuti wajib memiliki step Kepala Bagian.');
+                throw new RuntimeException('Rantai approval cuti wajib memiliki step Atasan Langsung.');
             }
 
             // Hanya clone untuk request baru yang diperbarui; template chain dan snapshot lama tetap utuh.
             $configuredKepalaBagian->setAttribute('approver_employee_id', $currentSupervisorId);
         } else {
-            // Fail-closed tanpa syarat: tanpa Kepala Bagian efektif pada hari server, isi chain tidak boleh menjadi celah.
+            // Fail-closed tanpa syarat: tanpa Atasan Langsung efektif pada hari server, isi chain tidak boleh menjadi celah.
             // Approver basi, pemohon sendiri, maupun struktur chain lain sama-sama ditolak sebelum snapshot dibentuk.
-            throw new RuntimeException('Pegawai belum memiliki Kepala Bagian efektif sehingga pengajuan cuti tidak dapat diproses.');
+            throw new RuntimeException('Atasan Langsung belum ditetapkan untuk pegawai sehingga pengajuan cuti tidak dapat diproses.');
         }
 
         foreach ($steps as $step) {

@@ -22,6 +22,7 @@ class ReviewLeaveDecisionRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'active_step_id' => ['required', 'uuid'],
             'komentar' => ['required', 'string', 'min:5', 'max:500'],
         ];
     }
@@ -39,6 +40,7 @@ class ReviewLeaveDecisionRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'active_step_id' => 'tahap persetujuan',
             'komentar' => 'catatan keputusan',
         ];
     }
