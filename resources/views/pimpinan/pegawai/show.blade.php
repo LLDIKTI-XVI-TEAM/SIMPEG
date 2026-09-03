@@ -1747,7 +1747,7 @@
                 </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="disiplin"
-                    :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas', 'Aksi']"
+                    :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas']"
                     :show-actions="$canDeleteDiscipline"
                 >
                             <template x-for="d in disiplinList" :key="d.id">
