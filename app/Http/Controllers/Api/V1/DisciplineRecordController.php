@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Histories\CreateDisciplineRecordAction;
+use App\Actions\Histories\DeleteDisciplineRecordAction;
 use App\Actions\Histories\ListDisciplineRecordsAction;
 use App\Actions\Histories\UploadDisciplineRecordSkAction;
 use App\Http\Controllers\Controller;
@@ -49,6 +50,18 @@ class DisciplineRecordController extends Controller
         }
 
         return response()->json($response, 201);
+    }
+
+    public function destroy(
+        Employee $employee,
+        DisciplineRecord $discipline,
+        DeleteDisciplineRecordAction $action,
+    ): JsonResponse {
+        $action->execute($employee, $discipline, request());
+
+        return response()->json([
+            'message' => 'Riwayat hukuman disiplin berhasil dihapus.',
+        ]);
     }
 
     public function uploadSk(

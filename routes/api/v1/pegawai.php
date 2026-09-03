@@ -101,6 +101,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('discipline_records.create'))
             ->whereUuid('employee')
             ->name('disiplin.store');
+        Route::delete('/{employee}/disiplin/{discipline}', [DisciplineRecordController::class, 'destroy'])
+            ->middleware($adminSubModuleMutationMiddleware('discipline_records.delete'))
+            ->whereUuid(['employee', 'discipline'])
+            ->name('disiplin.destroy');
         Route::post('/{employee}/disiplin/{discipline}/upload-sk', [DisciplineRecordController::class, 'uploadSk'])
             ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.update'))
             ->whereUuid(['employee', 'discipline'])

@@ -12,6 +12,8 @@
             && auth()->user()->hasPermission('employee_families.delete');
         $canCreateDiscipline = auth()->check()
             && auth()->user()->hasPermission('discipline_records.create');
+        $canDeleteDiscipline = auth()->check()
+            && auth()->user()->hasPermission('discipline_records.delete');
 
         $canAssignSupervisor = $canUpdateEmployee
             && in_array(auth()->user()->role, ['super_admin', 'admin_kepegawaian'], true);
@@ -107,6 +109,7 @@
         _initialProgramStudiId: null,
         isUpdatingPendidikan: false,
         isDeletingPendidikan: false,
+        isDeletingDisiplin: false,
         
         // Form states
         newKeluarga: { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' },
@@ -971,6 +974,35 @@
             }
         },
 
+        async deleteDisiplin(id, index) {
+            if (!window.confirm('Apakah Anda yakin ingin menghapus riwayat hukuman disiplin ini? Berkas SK terkait juga akan dihapus. Tindakan ini tidak dapat dibatalkan.')) return;
+            this.isDeletingDisiplin = true;
+            try {
+                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/disiplin/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    this.toast = { show: true, message: result.message ?? 'Gagal menghapus riwayat hukuman disiplin.', type: 'error' };
+                    setTimeout(() => this.toast.show = false, 4000);
+                    return;
+                }
+                this.disiplinList.splice(index, 1);
+                this.toast = { show: true, message: 'Riwayat hukuman disiplin berhasil dihapus.', type: 'success' };
+                setTimeout(() => this.toast.show = false, 3000);
+            } catch (e) {
+                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
+                setTimeout(() => this.toast.show = false, 4000);
+            } finally {
+                this.isDeletingDisiplin = false;
+            }
+        },
+
         async submitForm() {
             this.modalError = '';
             let payload = { type: this.modalType };
@@ -1715,7 +1747,8 @@
                 </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="disiplin"
-                    :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas']"
+                    :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas', 'Aksi']"
+                    :show-actions="$canDeleteDiscipline"
                 >
                             <template x-for="d in disiplinList" :key="d.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
@@ -1733,10 +1766,23 @@
                                         <a x-show="d.download_url" :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                         <span x-show="!d.download_url" class="text-muted">-</span>
                                     </td>
+                                    @if($canDeleteDiscipline)
+                                            <td class="px-4 py-3 text-right">
+                                        <button
+                                            type="button"
+                                            @click="deleteDisiplin(d.id, index)"
+                                            :disabled="isDeletingDisiplin"
+                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            title="Hapus riwayat hukuman disiplin"
+                                        >
+                                            Hapus
+                                        </button>
+                                    </td>
+                                            @endif
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
-                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="{{ $canDeleteDiscipline ? 7 : 6 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini tidak memiliki riwayat hukuman disiplin.
                                 </td>
                             </tr>
