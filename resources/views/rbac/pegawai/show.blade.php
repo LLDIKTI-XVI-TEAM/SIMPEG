@@ -1740,23 +1740,10 @@
                                     <td class="px-4 py-3" x-text="formatDate(d.tgl_mulai) + ' s/d ' + (d.tgl_akhir ? formatDate(d.tgl_akhir) : 'Sekarang')"></td>
                                     <td class="px-4 py-3">
                                         <template x-if="d.download_url">
-                                            <div class="flex items-center gap-2">
-                                                <a :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('disiplin', d)" class="inline-flex items-center gap-0.5 text-xs text-muted transition hover:text-primary" title="Ganti Berkas SK">
-                                                        <span>Ganti</span>
-                                                    </button>
-                                                @endif
-                                            </div>
+                                            <a :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                         </template>
                                         <template x-if="!d.download_url">
-                                            @if($canCreateDocument)
-                                                <button type="button" @click="openUploadSkModal('disiplin', d)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                                                    <span>Upload Berkas</span>
-                                                </button>
-                                            @else
-                                                <span class="text-muted">-</span>
-                                            @endif
+                                            <span class="text-muted">-</span>
                                         </template>
                                     </td>
                                 </tr>
