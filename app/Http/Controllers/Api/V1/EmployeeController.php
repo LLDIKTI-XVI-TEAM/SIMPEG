@@ -39,13 +39,16 @@ class EmployeeController extends Controller
         $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
+            $message = 'Data pegawai berhasil ditambahkan.';
+            if (! empty($warnings)) {
+                $message .= ' Peringatan: '.implode(' ', $warnings);
+            }
             $payload = [
-                'message' => 'Data pegawai berhasil ditambahkan.',
+                'message' => $message,
                 'employee' => $employee,
             ];
             if (! empty($warnings)) {
                 $payload['warnings'] = $warnings;
-                $payload['warning'] = implode(' ', $warnings);
             }
 
             return response()->json($payload, 201);
@@ -93,13 +96,16 @@ class EmployeeController extends Controller
         $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
+            $message = 'Data pegawai berhasil diperbarui.';
+            if (! empty($warnings)) {
+                $message .= ' Peringatan: '.implode(' ', $warnings);
+            }
             $payload = [
-                'message' => 'Data pegawai berhasil diperbarui.',
+                'message' => $message,
                 'employee' => $employee,
             ];
             if (! empty($warnings)) {
                 $payload['warnings'] = $warnings;
-                $payload['warning'] = implode(' ', $warnings);
             }
 
             return response()->json($payload);

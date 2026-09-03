@@ -250,11 +250,16 @@ class PegawaiController extends Controller
             $employee = $action->execute($request->validated(), $request);
             $warnings = $action->warnings;
 
+            $successMsg = 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.';
+            if (! empty($warnings)) {
+                $successMsg .= ' Peringatan: '.implode(' ', $warnings);
+            }
+
             $redirect = redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
+                ->with('success', $successMsg)
                 ->with('employee_data_changed', true);
             if (! empty($warnings)) {
-                $redirect = $redirect->with('warnings', $warnings)->with('warning', implode(' ', $warnings));
+                $redirect = $redirect->with('warnings', $warnings);
             }
 
             return $redirect;
@@ -360,13 +365,18 @@ class PegawaiController extends Controller
             // (termasuk relasi dan file SK) tercatat di cache sessionStorage
             $editedEmployeeData = array_merge($employee->toArray(), $tableRow);
 
+            $successMsg = 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.';
+            if (! empty($warnings)) {
+                $successMsg .= ' Peringatan: '.implode(' ', $warnings);
+            }
+
             $redirect = redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('success', $successMsg)
                 ->with('employee_data_changed', true)
                 ->with('edited_employee_id', $employee->id)
                 ->with('edited_employee_data', $editedEmployeeData);
             if (! empty($warnings)) {
-                $redirect = $redirect->with('warnings', $warnings)->with('warning', implode(' ', $warnings));
+                $redirect = $redirect->with('warnings', $warnings);
             }
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
