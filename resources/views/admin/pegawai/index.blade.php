@@ -170,6 +170,9 @@
         status_aktif: '{{ $filters['status_aktif'] ?? '' }}',
     },
     searchTimer: null,
+    // Namespace cache per akun agar baris milik sendiri yang di-exclude
+    // tidak bocor antar akun atau antar simulasi role pada browser yang sama.
+    viewerKey: @js(auth()->user()?->employee_id ?? auth()->id() ?? 'guest'),
     skRequirementVersion: @js($skRequirementVersion),
     skRequirementStorageKey: 'simpeg:sk-requirements:version',
     skRequirementStorageListener: null,
@@ -272,7 +275,7 @@
 
     get cacheKey() {
         const f = this.filters;
-return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sa${f.status_aktif}_sort${this.sort}_dir${this.direction}`;
+return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sa${f.status_aktif}_sort${this.sort}_dir${this.direction}`;
     },
 
     clearCacheByPrefixes(prefixes) {

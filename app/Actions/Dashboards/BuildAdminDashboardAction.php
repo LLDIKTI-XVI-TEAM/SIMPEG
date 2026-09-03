@@ -6,6 +6,7 @@ use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Models\AuditLog;
 use App\Models\LeaveRequest;
 use App\Models\RankHistory;
+use App\Models\User;
 use App\Queries\Dashboards\ActiveEmployeeSummaryQuery;
 use App\Queries\Dashboards\EmployeeTrendQuery;
 
@@ -33,11 +34,11 @@ class BuildAdminDashboardAction
      *
      * @return array<string, mixed>
      */
-    public function execute(): array
+    public function execute(?User $viewer = null): array
     {
         $now = now();
         $ews = $this->ewsAlerts->preview(5);
-        $employees = $this->employeeSummary->execute();
+        $employees = $this->employeeSummary->execute($viewer);
 
         $daftarKenaikanPangkat = RankHistory::query()
             ->with(['employee.rankHistories.golongan', 'golongan'])

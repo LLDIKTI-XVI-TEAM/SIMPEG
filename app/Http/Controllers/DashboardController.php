@@ -30,6 +30,6 @@ class DashboardController extends Controller
             return view('pegawai.dashboard', $pegawaiDashboard->execute($user));
         }
 
-        return view('admin.dashboard', $adminDashboard->execute());
+        return view('admin.dashboard', $adminDashboard->execute($user));
     }
 }

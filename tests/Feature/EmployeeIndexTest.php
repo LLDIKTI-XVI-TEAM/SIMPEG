@@ -16,6 +16,7 @@ use App\Models\Role;
 use App\Models\SalaryHistory;
 use App\Models\SkRequirement;
 use App\Models\User;
+use App\Queries\Dashboards\ActiveEmployeeSummaryQuery;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Database\Seeders\SkRequirementSeeder;
@@ -78,6 +79,59 @@ class EmployeeIndexTest extends TestCase
         $response = $this->getJson(self::PEGAWAI_ENDPOINT);
 
         $response->assertForbidden();
+    }
+
+    public function test_daftar_mengecualikan_data_milik_sendiri_kecuali_super_admin(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Milik Sendiri Unik']);
+        Employee::factory()->create(['nama_lengkap' => 'Milik Orang Lain Unik']);
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => $self->id]);
+
+        $response = $this->actingAs($user)->getJson(self::PEGAWAI_ENDPOINT.'?search=Unik');
+
+        $response->assertOk();
+        $names = collect($response->json('employees.data'))->pluck('nama_lengkap')->all();
+        $this->assertNotContains('Milik Sendiri Unik', $names);
+        $this->assertContains('Milik Orang Lain Unik', $names);
+        $response->assertJsonPath('employees.total', 1);
+    }
+
+    public function test_super_admin_tetap_melihat_data_milik_sendiri_di_daftar(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Milik Sendiri Super Unik']);
+        Employee::factory()->create(['nama_lengkap' => 'Milik Orang Lain Super Unik']);
+        $user = User::factory()->superAdmin()->create(['employee_id' => $self->id]);
+
+        $response = $this->actingAs($user)->getJson(self::PEGAWAI_ENDPOINT.'?search=Super%20Unik');
+
+        $response->assertOk();
+        $response->assertJsonPath('employees.total', 2);
+    }
+
+    public function test_profil_saya_tetap_bisa_melihat_data_sendiri(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Profil Saya Unik']);
+        $user = User::factory()->pegawai()->create(['employee_id' => $self->id]);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/profil-saya');
+
+        $response->assertOk()
+            ->assertJsonPath('employee.id', $self->id)
+            ->assertJsonPath('employee.nama_lengkap', 'Profil Saya Unik');
+    }
+
+    public function test_dashboard_mengecualikan_data_milik_sendiri_kecuali_super_admin(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Dashboard Self Unik']);
+        $other = Employee::factory()->create(['nama_lengkap' => 'Dashboard Other Unik']);
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => $self->id]);
+
+        $summary = app(\App\Queries\Dashboards\ActiveEmployeeSummaryQuery::class)->execute($user);
+        $this->assertSame(1, $summary['total']);
+
+        $superAdmin = User::factory()->superAdmin()->create(['employee_id' => $other->id]);
+        $summarySuper = app(\App\Queries\Dashboards\ActiveEmployeeSummaryQuery::class)->execute($superAdmin);
+        $this->assertSame(2, $summarySuper['total']);
     }
 
     public function test_default_only_lists_active_employees(): void

@@ -3,6 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\EmployeeDocumentStatusService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -15,10 +16,15 @@ class ListEmployeesAction
     /**
      * Mengambil daftar pegawai dengan filter default hanya pegawai aktif.
      *
+     * Data milik sendiri (user.employee_id) selalu dikecualikan kecuali untuk
+     * Super Admin efektif — pengelolaan data sendiri wajib lewat Profil Saya
+     * (employees.read_self), bukan dari daftar. Diterapkan sebelum paginasi
+     * agar total/meta konsisten.
+     *
      * @param  array<string, mixed>  $validated
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    public function execute(array $validated): LengthAwarePaginator
+    public function execute(array $validated, ?User $viewer = null): LengthAwarePaginator
     {
         $sort = $validated['sort'] ?? 'nama_lengkap';
         $direction = $validated['direction'] ?? 'asc';
@@ -27,6 +33,13 @@ class ListEmployeesAction
         // Soft delete sudah dihapus (keputusan produk): parameter show_nonaktif/onlyTrashed
         // tidak lagi relevan — nonaktif kini status kepegawaian biasa.
         $employees = Employee::query();
+
+        if ($viewer !== null
+            && $viewer->getEffectiveRole() !== 'super_admin'
+            && is_string($viewer->employee_id)
+            && $viewer->employee_id !== '') {
+            $employees->whereKeyNot($viewer->employee_id);
+        }
         $paginator = $employees
             ->select([
                 'id',

@@ -29,7 +29,7 @@ class EmployeeController extends Controller
     {
         return response()->json([
             'message' => 'Daftar pegawai berhasil diambil.',
-            'employees' => $action->execute($request->validated()),
+            'employees' => $action->execute($request->validated(), $request->user()),
         ]);
     }
 

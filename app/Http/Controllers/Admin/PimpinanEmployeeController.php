@@ -45,7 +45,7 @@ class PimpinanEmployeeController extends Controller
             'per_page' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
-        ]));
+        ]), $request->user());
         $initialRows = $employees->items();
         $initialMeta = [
             'total' => $employees->total(),

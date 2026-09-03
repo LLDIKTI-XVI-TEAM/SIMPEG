@@ -20,7 +20,7 @@ class BuildPimpinanDashboardAction
 
     public function execute(User $user): array
     {
-        $employees = $this->employeeSummary->execute();
+        $employees = $this->employeeSummary->execute($user);
         $now = now();
         $pendingLeaves = $this->pendingLeaves($user->employee_id);
         $ews = $this->ewsAlerts->preview(5);

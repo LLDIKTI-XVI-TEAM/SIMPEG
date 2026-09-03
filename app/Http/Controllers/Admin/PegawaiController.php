@@ -200,7 +200,7 @@ class PegawaiController extends Controller
                 'sort' => $sort,
                 'direction' => $direction,
                 'per_page' => $perPage,
-            ]));
+            ]), $request->user());
             $initialRows = $initialPageData->items();
             $initialMeta = [
                 'total' => $initialPageData->total(),
