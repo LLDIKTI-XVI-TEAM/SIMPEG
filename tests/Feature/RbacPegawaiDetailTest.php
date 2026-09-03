@@ -98,11 +98,17 @@ class RbacPegawaiDetailTest extends TestCase
             'tanggal_berakhir' => null,
         ]);
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $kabag->id]);
-        Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
 
-        $this->actingAs($user)->get(route('rbac.pegawai.show', $bawahan))->assertOk();
+        // Tanpa employees.read → hanya bawahan via /kepala-bagian, /rbac 403
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $bawahan))->assertForbidden();
         $this->actingAs($user)->get(route('rbac.pegawai.show', $other))->assertForbidden();
-        $this->actingAs($user)->get(route('rbac.pegawai.show', $kabag))->assertForbidden(); // self not bawahan
+
+        // Dengan employees.read (A1, manual grant) → bypass bawahan-only, bisa semua via /rbac
+        Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
+        $user->refresh();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $bawahan))->assertOk();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $other))->assertOk();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $kabag))->assertOk();
     }
 
     public function test_rbac_detail_hides_histories_without_permission(): void

@@ -39,6 +39,15 @@ class EnsureEmployeeApiScope
         $targetEmployeeId = $target instanceof Employee ? $target->id : $target;
 
         if ($effectiveRole === 'kepala_bagian') {
+            // A1: jika di-grant employees.* via RBAC (manual), bypass bawahan-only untuk /rbac
+            if ($user->hasPermission('employees.read')
+                || $user->hasPermission('employees.create')
+                || $user->hasPermission('employees.update')
+                || $user->hasPermission('employees.deactivate')
+                || $user->hasPermission('employees.restore')) {
+                return $next($request);
+            }
+
             abort_unless(is_string($targetEmployeeId) && $targetEmployeeId !== '', 403);
 
             $scope = app(KepalaBagianScopeService::class);
