@@ -617,7 +617,7 @@ class EmployeeIndexTest extends TestCase
             $path = "appointments/sk/{$employee->id}-{$type}.pdf";
             Appointment::query()->create([
                 'employee_id' => $employee->id,
-                'jenis_pengangkatan' => strtolower($type),
+                'jenis_pengangkatan' => $type,
                 'tmt_pengangkatan' => '2024-01-01',
                 'no_sk' => "SK-{$type}-VALID",
                 'tanggal_sk' => '2023-12-20',
