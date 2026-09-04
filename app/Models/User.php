@@ -182,7 +182,6 @@ class User extends Authenticatable
     public const SWITCH_ROLE_ORIGIN_ROLES = [
         'super_admin',
         'admin_kepegawaian',
-        'pimpinan',
     ];
 
     /**
@@ -199,8 +198,10 @@ class User extends Authenticatable
      * Menentukan apakah role asli boleh memulai simulasi role.
      *
      * Switch Role adalah exception RBAC yang dibatasi oleh kontrak produk: hanya
-     * role asli Super Admin dengan permission users.switch_role yang boleh
-     * mensimulasikan role target. Permission fitur biasa tetap ditentukan dari
+     * role asli Super Admin dan Admin Kepegawaian dengan permission
+     * users.switch_role yang boleh mensimulasikan role target. Pimpinan,
+     * Kepala Bagian, dan Pegawai tetap fail-closed walaupun permission
+     * tersebut salah terpasang. Permission fitur biasa tetap ditentukan dari
      * effective role saat simulasi aktif.
      */
     public function canSwitchToRole(string $targetRole): bool
@@ -213,8 +214,8 @@ class User extends Authenticatable
     }
 
     /**
-     * Opsi role tujuan simulasi untuk Super Admin: seluruh role ber-rank lebih
-     * rendah dari role asli, dengan label tampilannya.
+     * Opsi role tujuan simulasi untuk role asal yang diizinkan: seluruh role
+     * ber-rank lebih rendah dari role asli, dengan label tampilannya.
      *
      * @return array<string, string>
      */

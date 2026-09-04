@@ -25,7 +25,7 @@ class SaveRolePermissionMatrixAction
      * Permission Switch Role hanya relevan untuk role asal yang dapat memulai
      * simulasi. Pembatasan ini wajib diselaraskan dengan User::canInitiateSwitchRole().
      */
-    public const SWITCH_ROLE_ASSIGNABLE_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
+    public const SWITCH_ROLE_ASSIGNABLE_ROLES = ['super_admin', 'admin_kepegawaian'];
 
     /**
      * Menyimpan matriks hak akses peran dan mencatat setiap peran yang berubah.
