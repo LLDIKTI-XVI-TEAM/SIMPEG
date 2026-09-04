@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Cuti;
 
-use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -16,7 +15,6 @@ class PreviewLeaveBalanceRequest extends FormRequest
         $actor = $this->user();
 
         return $actor?->employee !== null
-            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.create', (string) $actor->getEffectiveRole())
             && $actor->hasPermission('cuti.create');
     }
 

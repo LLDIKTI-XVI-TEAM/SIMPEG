@@ -9,7 +9,6 @@ use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\WorkdayCalculator;
-use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
@@ -29,9 +28,7 @@ class StoreLeaveRequestRequest extends FormRequest
         // Hanya pengguna dengan hak mengajukan cuti yang boleh menyimpan pengajuan.
         $actor = $this->user();
 
-        return $actor !== null
-            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.create', (string) $actor->getEffectiveRole())
-            && $actor->hasPermission('cuti.create');
+        return $actor !== null && $actor->hasPermission('cuti.create');
     }
 
     /**

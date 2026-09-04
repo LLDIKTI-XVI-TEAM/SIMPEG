@@ -14,7 +14,6 @@ use App\Queries\Cuti\LeaveUsageAdminQuery;
 use App\Queries\Cuti\ManualLeaveCaseOptionQuery;
 use App\Services\Cuti\AnnualLeaveBusinessClock;
 use App\Services\Cuti\LeaveBalanceService;
-use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
@@ -253,10 +252,8 @@ class ShowLeaveBalanceAdminAction
         }
 
         return [
-            CutiPermissionMatrixPolicy::isAssignableToRole('cuti.balance.reconcile', (string) $actor->getEffectiveRole())
-                && $actor->hasPermission('cuti.balance.reconcile'),
-            CutiPermissionMatrixPolicy::isAssignableToRole('cuti.manual.manage', (string) $actor->getEffectiveRole())
-                && $actor->hasPermission('cuti.manual.manage'),
+            $actor->hasPermission('cuti.balance.reconcile'),
+            $actor->hasPermission('cuti.manual.manage'),
         ];
     }
 

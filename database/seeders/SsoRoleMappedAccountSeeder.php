@@ -10,13 +10,10 @@ use Illuminate\Support\Str;
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Persona akun SSO UAT (HANYA local/testing): email dicocokkan dengan klaim
-     * terverifikasi dari Keycloak. Password autentikasi dikelola sepenuhnya oleh
-     * Keycloak dan tidak disimpan oleh seeder SIMPEG.
+     * Persona SSO sintetis (HANYA local/testing). Password autentikasi dikelola
+     * sepenuhnya oleh Keycloak dan tidak disimpan oleh seeder SIMPEG.
      *
-     * Akun-akun ini adalah evidence UAT Issue #6 — persona yang dipakai untuk
-     * browser smoke test dengan login Keycloak nyata. Auth callback TIDAK PERNAH
-     * membaca daftar ini sebagai otorisasi: role internal tetap ditentukan
+     * Auth callback TIDAK PERNAH membaca daftar ini sebagai otorisasi: role internal tetap ditentukan
      * aplikasi SIMPEG (role kosong pada pegawai valid → pegawai, role existing
      * tidak pernah dioverwrite).
      *
@@ -24,28 +21,28 @@ class SsoRoleMappedAccountSeeder extends Seeder
      */
     public const UAT_ACCOUNTS = [
         [
-            'email' => 'dayensite@gmail.com',
-            'username' => 'demo-klabat',
+            'email' => 'fixture-super-admin@example.test',
+            'username' => 'fixture-super-admin',
             'role' => 'super_admin',
         ],
         [
-            'email' => 'sitedayen@gmail.com',
-            'username' => 'demo-klabat-kepeg',
+            'email' => 'fixture-admin-kepegawaian@example.test',
+            'username' => 'fixture-admin-kepegawaian',
             'role' => 'admin_kepegawaian',
         ],
         [
-            'email' => 'dionkobi08@gmail.com',
-            'username' => 'demo-klabat-pimpinan',
+            'email' => 'fixture-pimpinan@example.test',
+            'username' => 'fixture-pimpinan',
             'role' => 'pimpinan',
         ],
         [
-            'email' => 'dayen6153@gmail.com',
-            'username' => 'demo-klabat-kabag',
+            'email' => 'fixture-kepala-bagian@example.test',
+            'username' => 'fixture-kepala-bagian',
             'role' => 'kepala_bagian',
         ],
         [
-            'email' => 'dionleonn05@gmail.com',
-            'username' => 'demo-klabat-pegawai',
+            'email' => 'fixture-pegawai@example.test',
+            'username' => 'fixture-pegawai',
             'role' => 'pegawai',
         ],
     ];
@@ -68,9 +65,8 @@ class SsoRoleMappedAccountSeeder extends Seeder
     }
 
     /**
-     * Menanam pegawai + user untuk setiap akun UAT SSO di atas, sehingga login
-     * SSO pertama akun tersebut langsung menemukan tepat satu pegawai dan
-     * preferred_username-nya tersedia sebagai atribut login tambahan.
+     * Menanam pegawai + user untuk setiap persona sintetis agar fixture autentikasi
+     * dan role lokal tersedia tanpa menyimpan identitas UAT nyata di repository.
      *
      * Seeder ini BUKAN sumber otorisasi: auth callback tidak pernah membaca
      * daftar ini; role internal ditentukan aplikasi SIMPEG.

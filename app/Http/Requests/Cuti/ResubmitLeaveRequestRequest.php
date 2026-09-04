@@ -7,7 +7,6 @@ use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
 use App\Services\Cuti\LeaveEligibilityService;
 use App\Services\WorkdayCalculator;
-use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Carbon;
@@ -27,7 +26,6 @@ class ResubmitLeaveRequestRequest extends FormRequest
 
         return $leaveRequest !== null
             && $actor !== null
-            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.create', (string) $actor->getEffectiveRole())
             && $actor->hasPermission('cuti.create')
             && $actor->employee_id === $leaveRequest->employee_id
             && in_array($leaveRequest->status, [

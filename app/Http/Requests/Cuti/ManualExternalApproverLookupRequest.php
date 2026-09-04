@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Cuti;
 
 use App\Models\User;
-use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class ManualExternalApproverLookupRequest extends FormRequest
@@ -14,7 +13,6 @@ final class ManualExternalApproverLookupRequest extends FormRequest
         $actor = $this->user();
 
         return $actor instanceof User
-            && CutiPermissionMatrixPolicy::isAssignableToRole('cuti.manual.manage', (string) $actor->getEffectiveRole())
             && $actor->hasPermission('cuti.manual.manage');
     }
 

@@ -5,7 +5,6 @@ namespace App\Actions\Rbac;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Services\AuditService;
-use App\Support\Rbac\CutiPermissionMatrixPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -58,7 +57,6 @@ class SaveRolePermissionMatrixAction
                         $permissionName = $namaPermission->get($permissionId);
 
                         return is_string($permissionName)
-                            && CutiPermissionMatrixPolicy::isAssignableToRole($permissionName, $role->name)
                             && $this->isAssignableToRole($permissionName, $role->name);
                     })
                     ->sort()

@@ -6,6 +6,8 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\User;
+use App\Services\Employees\KepalaBagianScopeService;
 use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -22,15 +24,43 @@ class ExportEmployeeAction
      */
     public function execute(Request $request): StreamedResponse
     {
+        $actor = $request->user();
+        abort_unless($actor instanceof User, 403);
+
+        $effectiveRole = $actor->getEffectiveRole();
+        abort_unless(in_array($effectiveRole, ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'], true), 403);
+
+        // Pimpinan menerima ekspor lengkap seluruh organisasi sebagai pengecualian
+        // stakeholder. Kepala Bagian dan Pegawai selalu memakai scope serta kolom aman.
+        $masked = in_array($effectiveRole, ['kepala_bagian', 'pegawai'], true);
         $requestedIds = collect($request->input('ids', []))
             ->filter(fn ($id) => is_string($id) && trim($id) !== '')
             ->map(fn (string $id) => trim($id))
             ->unique()
             ->values();
 
-        $query = Employee::query()->with(['jenisPegawai:id,nama', 'statusPegawai:id,nama', 'programStudi:id,nama']);
+        $query = Employee::query()->with([
+            'jenisPegawai:id,nama',
+            'statusPegawai:id,nama',
+            'programStudi:id,nama',
+            'positionHistories' => fn ($positionQuery) => $positionQuery
+                ->select(['id', 'employee_id', 'unit_kerja_id', 'is_latest', 'tmt_jabatan'])
+                ->where('is_latest', true)
+                ->with('unitKerja:id,nama'),
+        ]);
+
+        if ($effectiveRole === 'kepala_bagian') {
+            $query->whereIn('employees.id', app(KepalaBagianScopeService::class)->directReportIds($actor));
+        } elseif ($effectiveRole === 'pegawai') {
+            $query->whereKey($actor->employee_id ?? '');
+        }
 
         if ($requestedIds->isNotEmpty()) {
+            if ($masked) {
+                $scopedIds = (clone $query)->whereIn('employees.id', $requestedIds->all())->pluck('employees.id');
+                abort_unless($scopedIds->count() === $requestedIds->count(), 403);
+            }
+
             $query->whereIn('id', $requestedIds->all());
         } else {
             $search = mb_strtolower(trim((string) $request->query('search', '')));
@@ -102,7 +132,7 @@ class ExportEmployeeAction
                 ->values();
         }
 
-        $spreadsheet = $this->generateExcelSpreadsheet($pegawaiData);
+        $spreadsheet = $this->generateExcelSpreadsheet($pegawaiData, $masked);
 
         $filename = 'Data_Pegawai_SIMPEG_'.now()->format('Ymd').'.xlsx';
 
@@ -118,14 +148,22 @@ class ExportEmployeeAction
         ]);
     }
 
-    private function generateExcelSpreadsheet($pegawaiData): Spreadsheet
+    private function generateExcelSpreadsheet($pegawaiData, bool $masked): Spreadsheet
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Data Pegawai');
         $sheet->setShowGridlines(false);
 
-        $cols = [
+        $cols = $masked ? [
+            'A' => ['No', 5],
+            'B' => ['Nama Pegawai', 31],
+            'C' => ['Unit Kerja', 30],
+            'D' => ['Golongan', 12],
+            'E' => ['Jabatan', 34],
+            'F' => ['Jenis Pegawai', 20],
+            'G' => ['Status Pegawai', 20],
+        ] : [
             'A' => ['No', 5],
             'B' => ['Nama Pegawai', 31],
             'C' => ['Email Pegawai', 29],
@@ -149,13 +187,25 @@ class ExportEmployeeAction
             $sheet->setCellValue($col.'1', $label);
         }
         $sheet->getRowDimension(1)->setRowHeight(32);
-        ExcelStyleHelper::applyHeaderStyle($sheet, 'A1:P1');
+        $lastColumn = array_key_last($cols);
+        ExcelStyleHelper::applyHeaderStyle($sheet, 'A1:'.$lastColumn.'1');
 
         foreach ($pegawaiData as $i => $employee) {
             $r = $i + 2;
 
             $sheet->setCellValue('A'.$r, $i + 1);
             $sheet->setCellValue('B'.$r, $employee->nama_lengkap);
+
+            if ($masked) {
+                $sheet->setCellValue('C'.$r, $employee->positionHistories->first()?->unitKerja?->nama ?? '-');
+                $sheet->setCellValue('D'.$r, $employee->golongan_terakhir ?? '');
+                $sheet->setCellValue('E'.$r, $employee->jabatan_terakhir ?? '');
+                $sheet->setCellValue('F'.$r, $employee->jenisPegawai?->nama ?? '');
+                $sheet->setCellValue('G'.$r, $employee->statusPegawai?->nama ?? $employee->status_aktif ?? '');
+
+                continue;
+            }
+
             $sheet->setCellValue('C'.$r, $employee->email_pribadi ?? '');
             $sheet->setCellValue('D'.$r, $employee->golongan_terakhir ?? '');
             $sheet->setCellValue('E'.$r, $employee->jabatan_terakhir ?? '');
@@ -183,16 +233,18 @@ class ExportEmployeeAction
         $lastRow = $pegawaiData->count() + 1;
 
         if ($pegawaiData->isNotEmpty()) {
-            ExcelStyleHelper::applyRowStyle($sheet, 'A2:P'.$lastRow);
+            ExcelStyleHelper::applyRowStyle($sheet, 'A2:'.$lastColumn.$lastRow);
             $sheet->getStyle('A2:A'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('D2:D'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('F2:K'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('O2:P'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle('K2:K'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
-            $sheet->getStyle('P2:P'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            if (! $masked) {
+                $sheet->getStyle('D2:D'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('F2:K'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('O2:P'.$lastRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle('K2:K'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+                $sheet->getStyle('P2:P'.$lastRow)->getNumberFormat()->setFormatCode('mmmm d, yyyy');
+            }
         }
 
-        ExcelStyleHelper::applyGlobalSetup($sheet, 'A1:P'.$lastRow);
+        ExcelStyleHelper::applyGlobalSetup($sheet, 'A1:'.$lastColumn.$lastRow);
 
         return $spreadsheet;
     }

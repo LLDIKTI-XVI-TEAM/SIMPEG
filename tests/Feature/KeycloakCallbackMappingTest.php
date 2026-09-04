@@ -12,6 +12,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Tests\TestCase;
@@ -1296,6 +1297,57 @@ class KeycloakCallbackMappingTest extends TestCase
 
         // User pemenang sudah terikat sejak awal → tidak ada first binding baru.
         $this->assertSame(0, AuditLog::query()->where('event', 'SSO_BINDING')->count());
+    }
+
+    public function test_new_user_insert_collision_is_resolved_without_http_500(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Race insert User baru hanya direproduksi pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Collision Insert',
+            'email' => 'collision-insert@example.test',
+        ]);
+        $connection = config('database.connections.pgsql');
+        $injected = false;
+
+        DB::listen(function (QueryExecuted $query) use (&$injected, $connection): void {
+            if ($injected || ! str_contains((string) $query->sql, 'pg_advisory_xact_lock')) {
+                return;
+            }
+
+            $injected = true;
+            $pdo = new \PDO(
+                sprintf('pgsql:host=%s;port=%s;dbname=%s', $connection['host'], $connection['port'], $connection['database']),
+                $connection['username'],
+                $connection['password'],
+            );
+            $statement = $pdo->prepare('insert into users (id, name, email, password, role, created_at, updated_at) values (?, ?, ?, ?, ?, now(), now())');
+            $statement->execute([
+                (string) Str::uuid(),
+                'Collision Winner',
+                'collision-insert@example.test',
+                'collision-password',
+                'pegawai',
+            ]);
+        });
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-collision-insert',
+            'nickname' => 'collision-insert',
+            'name' => 'Collision Insert',
+            'email' => 'collision-insert@example.test',
+            'raw' => ['email' => 'collision-insert@example.test', 'email_verified' => true, 'preferred_username' => 'collision-insert'],
+        ]);
+
+        $this->get('/auth/keycloak/callback')->assertRedirect(route('dashboard'));
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseHas('users', [
+            'email' => 'collision-insert@example.test',
+            'employee_id' => $employee->id,
+            'keycloak_id' => 'kc-collision-insert',
+        ]);
     }
 
     /**

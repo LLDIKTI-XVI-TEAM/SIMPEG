@@ -68,9 +68,9 @@ return [
         'redirect' => env('KEYCLOAK_REDIRECT_URI'),
         'employee_match_field' => env('SSO_EMPLOYEE_MATCH_FIELD', 'email'),
         // Tidak ada mapping email/username → role di sini: Keycloak hanya autentikasi
-        // (K-MTG-02). Daftar akun uji SSO (email + username + password + role) hidup di
-        // SsoRoleMappedAccountSeeder (local/testing only) sebagai evidence UAT Issue #6,
-        // dan auth callback tidak pernah memberi role dari email/claim SSO.
+        // (K-MTG-02). Persona fixture SSO sintetis hidup di
+        // SsoRoleMappedAccountSeeder (local/testing only); evidence UAT Keycloak nyata
+        // dikelola di luar repository, dan callback tidak memberi role dari email/claim SSO.
     ],
 
     'simpeg' => [

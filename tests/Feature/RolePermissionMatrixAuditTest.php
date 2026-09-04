@@ -143,7 +143,7 @@ class RolePermissionMatrixAuditTest extends TestCase
         ]);
     }
 
-    public function test_matriks_memaksa_batas_penugasan_permission_cuti(): void
+    public function test_matriks_dapat_menugaskan_permission_cuti_generic_ke_role_mana_pun(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
         $pimpinan = Role::query()->where('name', 'pimpinan')->firstOrFail();
@@ -161,10 +161,10 @@ class RolePermissionMatrixAuditTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertFalse($pimpinan->fresh()->permissions->contains('id', $create->id));
+        $this->assertTrue($pimpinan->fresh()->permissions->contains('id', $create->id));
         $this->assertTrue($pimpinan->fresh()->permissions->contains('id', $manual->id));
         $this->assertTrue($pegawai->fresh()->permissions->contains('id', $proof->id));
-        $this->assertFalse($pegawai->fresh()->permissions->contains('id', $readAll->id));
+        $this->assertTrue($pegawai->fresh()->permissions->contains('id', $readAll->id));
     }
 
     public function test_matriks_menolak_switch_role_untuk_kepala_bagian_dan_pegawai(): void

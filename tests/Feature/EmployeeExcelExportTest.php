@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -110,5 +111,86 @@ class EmployeeExcelExportTest extends TestCase
         $this->actingAs($pimpinan)
             ->get(route('pegawai.export'))
             ->assertForbidden();
+    }
+
+    public function test_pimpinan_export_mengikuti_pengecualian_stakeholder_dengan_kolom_lengkap(): void
+    {
+        $this->seed(RbacSeeder::class);
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employees.export')->firstOrFail()->id,
+        ]);
+        $employee = Employee::factory()->create([
+            'email_pribadi' => 'pegawai@example.test',
+            'no_hp' => '08123456789',
+        ]);
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pegawai.export', ['ids' => [$employee->id]]));
+
+        $rows = $this->exportedRows($response);
+        $this->assertSame('Email Pegawai', $rows[0][2]);
+        $this->assertSame('Nomor Telepon', $rows[0][7]);
+        $this->assertSame('pegawai@example.test', $rows[1][2]);
+        $this->assertSame('08123456789', $rows[1][7]);
+    }
+
+    public function test_kepala_bagian_export_hanya_memuat_bawahan_langsung_dengan_kolom_aman(): void
+    {
+        $this->seed(RbacSeeder::class);
+        Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employees.export')->firstOrFail()->id,
+        ]);
+        $kabag = Employee::factory()->create();
+        $bawahan = Employee::factory()->create(['nama_lengkap' => 'Bawahan Export']);
+        $lainnya = Employee::factory()->create(['nama_lengkap' => 'Lain Export']);
+        SupervisorAssignment::create([
+            'employee_id' => $bawahan->id,
+            'kepala_bagian_id' => $kabag->id,
+            'supervisor_id' => $kabag->id,
+            'tanggal_mulai' => now()->subDay()->toDateString(),
+        ]);
+        $user = User::factory()->kepalaBagian()->create(['employee_id' => $kabag->id]);
+
+        $rows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export')));
+        $this->assertSame(['No', 'Nama Pegawai', 'Unit Kerja', 'Golongan', 'Jabatan', 'Jenis Pegawai', 'Status Pegawai'], $rows[0]);
+        $this->assertSame('Bawahan Export', $rows[1][1]);
+        $this->assertCount(2, $rows);
+
+        $this->actingAs($user)->get(route('pegawai.export', [
+            'ids' => [$bawahan->id, $lainnya->id],
+        ]))->assertForbidden();
+    }
+
+    public function test_pegawai_export_hanya_memuat_data_sendiri_dengan_kolom_aman(): void
+    {
+        $this->seed(RbacSeeder::class);
+        Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employees.export')->firstOrFail()->id,
+        ]);
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Sendiri']);
+        $lainnya = Employee::factory()->create(['nama_lengkap' => 'Pegawai Lain']);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $rows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export')));
+        $this->assertSame(['No', 'Nama Pegawai', 'Unit Kerja', 'Golongan', 'Jabatan', 'Jenis Pegawai', 'Status Pegawai'], $rows[0]);
+        $this->assertSame('Pegawai Sendiri', $rows[1][1]);
+        $this->assertCount(2, $rows);
+
+        $this->actingAs($user)->get(route('pegawai.export', ['ids' => [$lainnya->id]]))->assertForbidden();
+    }
+
+    /** @return array<int, array<int, mixed>> */
+    private function exportedRows($response): array
+    {
+        $temporaryFile = tempnam(sys_get_temp_dir(), 'simpeg-export-');
+        file_put_contents($temporaryFile, $response->streamedContent());
+        $spreadsheet = IOFactory::load($temporaryFile);
+
+        try {
+            return $spreadsheet->getActiveSheet()->toArray();
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+            @unlink($temporaryFile);
+        }
     }
 }

@@ -36,12 +36,12 @@ class DocumentAuthorizationTest extends TestCase
         $this->assertTrue(DocumentAuthorization::canManage($user));
     }
 
-    public function test_pimpinan_can_view_but_not_manage_documents(): void
+    public function test_pimpinan_cannot_view_central_archive_even_with_document_permission(): void
     {
         $user = User::factory()->create(['role' => 'pimpinan']);
 
-        // RbacSeeder memberi pimpinan dokumen_sk.read → boleh lihat arsip, tapi tanpa hak mutasi.
-        $this->assertTrue(DocumentAuthorization::canViewArchive($user));
+        // dokumen_sk.read tidak membuka arsip lintas pegawai yang memuat PII.
+        $this->assertFalse(DocumentAuthorization::canViewArchive($user));
         $this->assertFalse(DocumentAuthorization::canManage($user));
     }
 

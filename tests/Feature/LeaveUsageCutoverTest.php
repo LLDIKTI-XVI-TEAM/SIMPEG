@@ -970,8 +970,7 @@ class LeaveUsageCutoverTest extends TestCase
             $manualPermission->id,
         ]);
 
-        // Menu hanya ditampilkan saat role efektif memiliki salah satu permission workspace.
-        // Otorisasi ditegakkan di halaman (403 → "Tidak Mendapatkan Akses").
+        // Menu tanpa akses tetap terlihat dalam keadaan disabled; tautan tidak dirender.
         $this->actingAs(User::factory()->superAdmin()->create())
             ->get(route('dashboard'))
             ->assertOk()
@@ -982,7 +981,8 @@ class LeaveUsageCutoverTest extends TestCase
         $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Administrasi Pemakaian Cuti')
+            ->assertSee('Administrasi Pemakaian Cuti')
+            ->assertSee('aria-disabled="true"', false)
             ->assertDontSee('href="'.$administrationUrl.'"', false);
 
         $adminRole->permissions()->attach($manualPermission);

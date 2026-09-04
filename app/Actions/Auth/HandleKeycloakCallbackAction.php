@@ -128,19 +128,6 @@ class HandleKeycloakCallbackAction
                 // Lebih dari satu pegawai cocok → ambigu, fail-closed + audit.
                 $this->auditMappingRejected(null, 'employee_match_ambiguous', $matchedEmail, null, $request);
 
-            // Username Keycloak juga unik di SIMPEG. Periksa lebih dahulu agar benturan
-            // dengan akun lain tidak bocor sebagai error constraint database saat callback.
-            $usernameOwner = $username !== null && trim($username) !== ''
-                ? User::whereRaw('lower(keycloak_username) = ?', [mb_strtolower(trim($username))])->first()
-                : null;
-
-            if ($usernameOwner && ($user === null || $usernameOwner->id !== $user->id)) {
-                return view('auth.unregistered', [
-                    'message' => 'Username akun Keycloak sudah terhubung ke akun SIMPEG lain. Hubungi administrator untuk memperbaiki pemetaan akun.',
-                ]);
-            }
-
-            if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
                 return view('auth.unregistered', [
                     'message' => 'Akun Keycloak belum terdaftar sebagai pegawai SIMPEG.',
                 ]);
@@ -165,6 +152,18 @@ class HandleKeycloakCallbackAction
                 $user = $this->resolveUserForEmployee($employee, $keycloakId, $username, $keycloakUser->getName(), $matchedEmail, $request);
             } catch (SsoIdentityRejected $rejected) {
                 return view('auth.unregistered', ['message' => $rejected->userMessage]);
+            } catch (UniqueConstraintViolationException) {
+                // Binding manual dapat menang tepat saat user baru akan di-insert. Baca ulang
+                // state final agar constraint database tidak pernah berubah menjadi HTTP 500.
+                try {
+                    $user = $this->resolveUserForEmployee($employee, $keycloakId, $username, $keycloakUser->getName(), $matchedEmail, $request);
+                } catch (SsoIdentityRejected $rejected) {
+                    return view('auth.unregistered', ['message' => $rejected->userMessage]);
+                } catch (UniqueConstraintViolationException) {
+                    return view('auth.unregistered', [
+                        'message' => 'Terjadi konflik data login. Silakan coba lagi atau hubungi administrator.',
+                    ]);
+                }
             }
 
             try {
@@ -644,22 +643,5 @@ class HandleKeycloakCallbackAction
             ->whereKeyNot($user->getKey())
             ->whereRaw('lower(keycloak_username) = ?', [strtolower(trim($username))])
             ->exists();
-    }
-
-    /**
-     * Mengembalikan akun demo yang telah dipetakan bila username berada pada allowlist lokal.
-     * Tidak ada pembuatan akun maupun fallback ini di lingkungan selain local/testing.
-     */
-    private function allowedDevUser(?string $username): ?User
-    {
-        if ($username === null || trim($username) === '' || ! $this->isAllowedDevUsername($username)) {
-            return null;
-        }
-
-        return User::query()
-            ->whereRaw('lower(keycloak_username) = ?', [mb_strtolower(trim($username))])
-            ->whereNotNull('employee_id')
-            ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
-            ->first();
     }
 }
