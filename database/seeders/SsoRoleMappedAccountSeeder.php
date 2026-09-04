@@ -154,7 +154,23 @@ class SsoRoleMappedAccountSeeder extends Seeder
             // mapping sudah dimiliki user yang terhubung ke pegawai lain, mapping pasti
             // ditolak callback (konflik identitas). Membuat placeholder lebih dulu akan
             // meninggalkan employee palsu tanpa user pada setiap kasus konflik ini.
-            $userByEmail = User::whereRaw('lower(email) = ?', [strtolower($email)])->first();
+            //
+            // Lookup dibatasi 2 kandidat: 0 = tidak ada pemilik, 1 = dipakai,
+            // >1 = duplikat case-insensitive legacy → fail-closed (warn + skip),
+            // tidak pernah memilih arbitrer via first().
+            $userByEmailCandidates = User::whereRaw('lower(email) = ?', [strtolower($email)])
+                ->limit(2)
+                ->get();
+
+            if ($userByEmailCandidates->count() > 1) {
+                $this->command?->warn(
+                    "SSO UAT account '{$email}' dilewati: email dimiliki lebih dari satu user (duplikat case-insensitive legacy)."
+                );
+
+                continue;
+            }
+
+            $userByEmail = $userByEmailCandidates->first();
 
             if ($userByEmail && $userByEmail->employee_id !== null && (! $employee || $userByEmail->employee_id !== $employee->id)) {
                 $this->command?->warn(

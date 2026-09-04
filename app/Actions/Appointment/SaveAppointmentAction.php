@@ -63,7 +63,15 @@ class SaveAppointmentAction
                 $effectiveTmtBefore = $this->employmentStartDate->earliestAppointmentTmt($employee);
                 $annualLeaveCeilingsBefore = $this->annualLeaveCeilingSnapshot($employee);
 
-                $appointment = $employee->appointment;
+                // Selector kanonis deterministik "pengangkatan pertama": TMT paling awal,
+                // lalu id paling kecil. Tanpa ordering, record yang diubah bisa berbeda
+                // tergantung hasil DB bila pegawai memiliki >1 Appointment.
+                $appointment = Appointment::query()
+                    ->where('employee_id', $employee->id)
+                    ->orderBy('tmt_pengangkatan')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
                 if ($appointment) {
                     $oldValues = $appointment->toArray();
                     $replacedPath = $appointment->file_sk;

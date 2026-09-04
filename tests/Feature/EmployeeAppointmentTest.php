@@ -125,6 +125,48 @@ class EmployeeAppointmentTest extends TestCase
         ]);
     }
 
+    public function test_save_dan_upload_sk_selalu_mengenai_pengangkatan_pertama(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        // Sisipkan terbalik (TMT belakangan dulu) agar selector tanpa ordering bisa salah sasaran.
+        $later = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'no_sk' => 'SK-LATER',
+            'tanggal_sk' => '2024-06-01',
+            'tmt_pengangkatan' => '2024-07-01',
+        ]);
+        $earliest = Appointment::create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'CPNS',
+            'no_sk' => 'SK-EARLIEST',
+            'tanggal_sk' => '2020-01-01',
+            'tmt_pengangkatan' => '2020-02-01',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson("/api/v1/pegawai/{$employee->id}/pengangkatan", [
+                'jenis_pengangkatan' => 'CPNS',
+                'no_sk' => 'SK-EARLIEST-UPDATED',
+                'tanggal_sk' => '2020-01-15',
+                'tmt_pengangkatan' => '2020-02-01',
+            ])
+            ->assertOk();
+
+        $this->assertSame('SK-EARLIEST-UPDATED', $earliest->refresh()->no_sk);
+        $this->assertSame('SK-LATER', $later->refresh()->no_sk);
+
+        $this->actingAs($admin)
+            ->postJson("/api/v1/pegawai/{$employee->id}/pengangkatan/upload-sk", [
+                'file_sk' => UploadedFile::fake()->create('sk.pdf', 500, 'application/pdf'),
+            ])
+            ->assertOk();
+
+        $this->assertNotNull($earliest->refresh()->file_sk);
+        $this->assertNull($later->refresh()->file_sk);
+    }
+
     public function test_admin_can_upload_sk_for_existing_appointment(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

@@ -25,8 +25,12 @@ class UploadAppointmentSkAction
 
         try {
             $appointment = DB::transaction(function () use ($employee, $file, $request, &$storedPath, &$replacedPath): Appointment {
+                // Selector kanonis deterministik "pengangkatan pertama": TMT paling
+                // awal, lalu id paling kecil — sama seperti SaveAppointmentAction.
                 $appointment = Appointment::query()
                     ->where('employee_id', $employee->id)
+                    ->orderBy('tmt_pengangkatan')
+                    ->orderBy('id')
                     ->lockForUpdate()
                     ->first();
 
