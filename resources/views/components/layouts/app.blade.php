@@ -127,9 +127,9 @@
                         // RBAC: dikontrol dari Role & Permission admin (dokumen_sk.read)
                         ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open',
                          'permission' => 'dokumen_sk.read', 'capability' => 'document_archive'],
-                        // RBAC: dikontrol dari Role & Permission admin (employees.read)
+                        // RBAC: dikontrol dari Role & Permission admin (employees.export)
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
-                         'permission' => 'employees.read'],
+                         'permission' => 'employees.export'],
                         // RBAC: dikontrol dari Role & Permission admin (employee_histories.export)
                         ['label' => 'Riwayat Kepangkatan', 'route' => 'laporan.kepangkatan', 'icon' => 'document-chart-bar',
                          'permission' => 'employee_histories.export'],
@@ -616,6 +616,20 @@
                                         </form>
                                     </div>
                                 @endif
+                            @elseif(auth()->check() && auth()->user()->role === 'pimpinan' && ! auth()->user()->temporary_role)
+                                {{-- Pimpinan tidak boleh memulai simulasi: tampilkan disabled agar jelas bukan bug UI. --}}
+                                <div
+                                    class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-muted/60 font-sans font-medium cursor-not-allowed select-none"
+                                    title="Simulasi Role hanya tersedia untuk Super Admin dan Admin Kepegawaian"
+                                    aria-disabled="true"
+                                >
+                                    <div class="flex items-center gap-2.5">
+                                        <svg class="w-4 h-4 text-muted/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                                        </svg>
+                                        <span>Simulasi Role</span>
+                                    </div>
+                                </div>
                             @endif
                         </div>
                         <div class="border-t border-border p-1.5">

@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Actions\Laporan\ExportPegawaiPdfAction;
 use App\Models\Employee;
+use App\Models\Permission;
 use App\Models\PositionHistory;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\Laporan\EmployeeExportDataService;
 use Database\Seeders\RbacSeeder;
@@ -52,6 +54,12 @@ class EmployeeReportPdfExportTest extends TestCase
             'nama_lengkap' => 'Pegawai Unduh PDF',
             'nip' => '198503122010012001',
         ]);
+
+        // Pimpinan default tanpa employees.export → grant manual (diatur Super Admin via /rbac).
+        Role::where('name', 'pimpinan')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'employees.export')->firstOrFail()->id,
+            ]);
 
         foreach ([
             User::factory()->adminKepegawaian()->create(),

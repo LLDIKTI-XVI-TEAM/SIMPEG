@@ -49,11 +49,11 @@ class RbacPermissionMiddlewareTest extends TestCase
 
     public function test_permission_records_are_seeded_idempotently(): void
     {
-        // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
+        // Re-seed tidak boleh menduplikasi permission (updateOrCreate + sync).
+        $before = Permission::count();
         $this->seed(RbacSeeder::class);
 
-        // Seeder gabungan mencakup permission operasional, cuti, data referensi, dan simulasi role.
-        $this->assertSame(41, Permission::count());
+        $this->assertSame($before, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -299,9 +299,30 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertTrue($role->permissions()->where('name', 'discipline_records.create')->exists());
     }
 
-    public function test_discipline_delete_permission_is_not_seeded(): void
+    public function test_discipline_delete_permission_is_seeded_for_admin(): void
     {
-        $this->assertFalse(Permission::where('name', 'discipline_records.delete')->exists());
+        $this->assertTrue(Permission::where('name', 'discipline_records.delete')->exists());
+        $this->assertTrue(
+            Role::where('name', 'admin_kepegawaian')->firstOrFail()
+                ->permissions()->where('name', 'discipline_records.delete')->exists()
+        );
+    }
+
+    public function test_employees_export_permission_is_seeded_for_admin_only(): void
+    {
+        $this->assertTrue(Permission::where('name', 'employees.export')->exists());
+        $this->assertTrue(
+            Role::where('name', 'admin_kepegawaian')->firstOrFail()
+                ->permissions()->where('name', 'employees.export')->exists()
+        );
+
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $roleName) {
+            $this->assertFalse(
+                Role::where('name', $roleName)->firstOrFail()
+                    ->permissions()->where('name', 'employees.export')->exists(),
+                "Role {$roleName} tidak boleh memiliki employees.export secara default."
+            );
+        }
     }
 
     public function test_employee_family_permissions_exist_and_are_assigned_to_admin_kepegawaian(): void

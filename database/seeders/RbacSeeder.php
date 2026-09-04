@@ -27,6 +27,7 @@ class RbacSeeder extends Seeder
             'employees.import' => ['module' => 'employees', 'description' => 'Import data pegawai'],
             'employees.deactivate' => ['module' => 'employees', 'description' => 'Menonaktifkan data pegawai'],
             'employees.restore' => ['module' => 'employees', 'description' => 'Mengaktifkan kembali data pegawai nonaktif'],
+            'employees.export' => ['module' => 'employees', 'description' => 'Mengekspor data pegawai (Excel/PDF)'],
             'employees.read_self' => ['module' => 'employees', 'description' => 'Melihat detail data pegawai milik sendiri'],
             'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai (pangkat, jabatan, KGB, pendidikan, pengangkatan, status kepegawaian)'],
             'employee_histories.create' => ['module' => 'employee_histories', 'description' => 'Membuat entri riwayat pegawai'],
@@ -91,6 +92,7 @@ class RbacSeeder extends Seeder
                 'employees.create',
                 'employees.update',
                 'employees.import',
+                'employees.export',
                 'employees.deactivate',
                 // K-STATUS-04: reaktivasi boleh Super Admin ATAU Admin Kepegawaian
                 // selama role EFEKTIF memiliki employees.restore. Gate tetap memakai

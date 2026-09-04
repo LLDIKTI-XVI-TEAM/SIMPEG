@@ -17,6 +17,7 @@
         // (controller bisa mengoverride), bukan blanket role super_admin/admin_kepegawaian.
         $canCreateEmployee = $canCreateEmployee ?? (bool) auth()->user()?->hasPermission('employees.create');
         $canImportEmployees = $canImportEmployees ?? (bool) auth()->user()?->hasPermission('employees.import');
+        $canExportEmployees = $canExportEmployees ?? (bool) auth()->user()?->hasPermission('employees.export');
         $skRequirementMatrix = $skRequirementMatrix ?? ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $skRequirementVersion = $skRequirementVersion ?? 'unversioned';
     @endphp
@@ -752,7 +753,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </svg>
                     <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
                 </x-ui.button>
-                @if(!$isReadOnly)
+                @if(!$isReadOnly && ($canExportEmployees ?? false))
                 <x-ui.button type="button" variant="primary" onclick="exportFilteredData()" id="export-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
@@ -761,12 +762,14 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </svg>
                     Export Excel
                 </x-ui.button>
+                @if($canExportEmployees ?? false)
                 <x-ui.button type="button" variant="primary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Export PDF
                 </x-ui.button>
+                @endif
                 @if ($canManageSkRequirements)
                 <x-ui.button type="button" variant="primary" id="sk-requirement-btn" @click="openSkRequirementModal()"
                     aria-label="Atur SK Wajib per Jenis Pegawai">
@@ -815,6 +818,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                 </div>
                 @endif
                 @else
+                @if($canExportEmployees ?? false)
                 <a href="{{ route('laporan.pegawai') }}"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
                     <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -822,6 +826,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </svg>
                     Laporan Pegawai
                 </a>
+                @endif
                 @endif
             </div>
         </div>

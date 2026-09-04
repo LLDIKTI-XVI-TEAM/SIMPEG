@@ -64,13 +64,38 @@ class EmployeeExcelExportTest extends TestCase
         }
     }
 
-    public function test_pimpinan_dengan_employees_read_boleh_export(): void
+    public function test_employees_read_tanpa_export_tetap_dilarang_export(): void
     {
         $this->seed(RbacSeeder::class);
         $pimpinan = User::factory()->pimpinan()->create();
 
-        // RbacSeeder memberi pimpinan employees.read → export permission-driven, tanpa gate role.
+        // employees.read saja tidak cukup — export butuh employees.export (K-RBAC-01.7).
+        $this->assertTrue($pimpinan->hasPermission('employees.read'));
+        $this->assertFalse($pimpinan->hasPermission('employees.export'));
+
         $this->actingAs($pimpinan)
+            ->get(route('pegawai.export'))
+            ->assertForbidden();
+    }
+
+    public function test_dengan_employees_export_boleh_export_semua_role(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+            Role::where('name', $role)->firstOrFail()
+                ->permissions()->syncWithoutDetaching([
+                    Permission::where('name', 'employees.export')->firstOrFail()->id,
+                ]);
+        }
+
+        $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pegawai.export'))
+            ->assertOk();
+        $this->actingAs(User::factory()->kepalaBagian()->create())
+            ->get(route('pegawai.export'))
+            ->assertOk();
+        $this->actingAs(User::factory()->pegawai()->create())
             ->get(route('pegawai.export'))
             ->assertOk();
     }
