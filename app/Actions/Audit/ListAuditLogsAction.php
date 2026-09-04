@@ -48,7 +48,7 @@ class ListAuditLogsAction
             $query->where('auditable_type', $auditableType);
         }
 
-        $perPage = min((int) ($filters['per_page'] ?? 20), 100);
+        $perPage = min((int) ($filters['per_page'] ?? 10), 100);
 
         return $query->paginate($perPage);
     }

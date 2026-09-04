@@ -18,6 +18,7 @@ class KepalaBagianEwsController extends Controller
             $validated['event'] ?? null,
             $validated['status'] ?? null,
             trim((string) ($validated['search'] ?? '')),
+            (int) ($validated['per_page'] ?? 10),
         ));
     }
 }

@@ -45,7 +45,8 @@ class ShowLeaveBalanceAdminAction
         $status = $this->stringFilter($filters, 'status') ?? 'perlu_tindakan';
         $search = trim($this->stringFilter($filters, 'search') ?? '');
         $tab = $this->stringFilter($filters, 'tab') ?? 'pendaftaran';
-        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search);
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 10;
+        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search, $perPage);
         $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search);
 
         $workspace = $pegawaiId === null

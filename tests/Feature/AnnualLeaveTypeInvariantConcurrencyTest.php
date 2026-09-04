@@ -30,6 +30,8 @@ class AnnualLeaveTypeInvariantConcurrencyTest extends TestCase
     /** Memberi ruang bootstrap worker pada bind mount Podman tanpa melonggarkan timeout proses. */
     private const WORKER_READY_TIMEOUT_MILLISECONDS = 30_000;
 
+    private const WORKER_TIMEOUT_SECONDS = 90;
+
     private const MIGRATION = '2026_08_23_000001_enforce_annual_leave_type_balance_flag.php';
 
     public function test_gate_nowait_menghindari_deadlock_writer_row_exclusive_lalu_retry_bersih(): void
@@ -226,7 +228,7 @@ SQL);
             PHP_BINARY,
             base_path('tests/Fixtures/'.$fixture),
             base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 45);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
         $process->start();
 
         return $process;

@@ -685,7 +685,12 @@ class CutiContactSnapshotTest extends TestCase
         ]));
 
         $leave = LeaveRequest::with('steps')->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Tanggal harus diperbaiki.');
+        app(LeaveApprovalService::class)->requestChanges(
+            $leave,
+            $aktor['supervisor'],
+            $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'Tanggal harus diperbaiki.',
+        );
         $leave->refresh();
 
         return [$aktor, $leave];

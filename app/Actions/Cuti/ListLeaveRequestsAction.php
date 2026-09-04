@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\User;
+use App\Support\Cuti\ApprovalStepLabel;
 use App\Support\Cuti\CutiPeriodFilter;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -50,7 +51,7 @@ class ListLeaveRequestsAction
                 'employee',
                 'jenisCuti',
                 'steps' => fn ($steps) => $steps
-                    ->select(['id', 'leave_request_id', 'role_label', 'status', 'step_order'])
+                    ->select(['id', 'leave_request_id', 'step_type', 'role_label', 'status', 'step_order'])
                     ->where('status', 'active')
                     ->orderBy('step_order'),
             ])
@@ -192,7 +193,9 @@ class ListLeaveRequestsAction
             // Status runtime mentah dipertahankan agar Blade dapat memetakan lifecycle tanpa mengubah kontrak list.
             'status' => $r->status,
             // Label berasal dari snapshot agar perubahan konfigurasi tidak mengubah riwayat pengajuan.
-            'current_step_label' => $activeStep?->role_label,
+            'current_step_label' => $activeStep === null
+                ? null
+                : ApprovalStepLabel::display($activeStep->step_type, $activeStep->role_label),
             'periode' => optional($r->tanggal_mulai)->format('Y-m'),
         ];
     }

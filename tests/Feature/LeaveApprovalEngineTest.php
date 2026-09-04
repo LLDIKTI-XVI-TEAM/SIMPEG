@@ -138,24 +138,12 @@ class LeaveApprovalEngineTest extends TestCase
             'effective_from' => '2026-01-01',
         ]);
 
-        $latestOrderByApprover = collect($approvers)
-            ->mapWithKeys(fn (Employee $approver, int $index) => [$approver->id => $index + 1]);
-        $firstActiveAssigned = false;
-
         foreach ($approvers as $index => $approver) {
             $order = $index + 1;
             $isFinal = $order === count($approvers);
             $stepType = $isFinal ? 'pybmc' : 'kepala_bagian';
             $roleLabel = $isFinal ? 'PYBMC' : 'Kepala Bagian';
-            $isEarlierDuplicate = $latestOrderByApprover[$approver->id] !== $order;
-            $status = 'pending';
-
-            if ($isEarlierDuplicate) {
-                $status = 'skipped';
-            } elseif (! $firstActiveAssigned) {
-                $status = 'active';
-                $firstActiveAssigned = true;
-            }
+            $status = $order === 1 ? 'active' : 'pending';
 
             $chain->steps()->create([
                 'step_order' => $order,
@@ -173,7 +161,6 @@ class LeaveApprovalEngineTest extends TestCase
                 'approver_employee_id' => $approver->id,
                 'status' => $status,
                 'is_final' => $isFinal,
-                'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
             ]);
         }
 
@@ -195,17 +182,41 @@ class LeaveApprovalEngineTest extends TestCase
 
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 3);
 
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
         $this->assertSame('menunggu_approval', $cuti->fresh()->status);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 1, 'status' => 'approved']);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
 
-        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], null, $pemohon['pybmc_user']);
+        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], $this->activeStepId($cuti), null, $pemohon['pybmc_user']);
         $this->assertSame('disetujui', $cuti->fresh()->status);
 
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->first();
         $this->assertSame(3, $balance->terpakai);
         $this->assertSame(9, $balance->sisa);
+    }
+
+    public function test_perubahan_dengan_token_tahap_lama_ditolak_tanpa_menyentuh_tahap_berikutnya(): void
+    {
+        $pemohon = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['kepala_bagian']], 2);
+        $stepPertamaId = $cuti->steps()->where('step_order', 1)->value('id');
+
+        $this->service()->approve($cuti, $pemohon['kepala_bagian'], $stepPertamaId, null, $pemohon['kepala_bagian_user']);
+        $jumlahApproval = $cuti->approvals()->count();
+
+        try {
+            $this->service()->requestChanges($cuti->fresh(), $pemohon['kepala_bagian'], $stepPertamaId, 'Token lama tidak boleh memutus tahap berikutnya.');
+            $this->fail('Keputusan dengan token tahap lama wajib ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                ['Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.'],
+                $exception->errors()['active_step_id'] ?? null,
+            );
+        }
+
+        $this->assertSame($jumlahApproval, $cuti->approvals()->count());
+        $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
     }
 
     public function test_final_approval_mencatat_fact_dan_mereplay_bucket_tanpa_double_debit(): void
@@ -228,8 +239,8 @@ class LeaveApprovalEngineTest extends TestCase
 
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 8);
 
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
-        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], null, $pemohon['pybmc_user']);
+        $this->service()->approve($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], $this->activeStepId($cuti), null, $pemohon['pybmc_user']);
 
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->firstOrFail();
         $this->assertSame(8, $balance->terpakai);
@@ -267,7 +278,7 @@ class LeaveApprovalEngineTest extends TestCase
         ]);
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 3);
 
-        $this->service()->postpone($cuti, $pemohon['kepala_bagian'], 'Menunggu pengganti tugas.');
+        $this->service()->postpone($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), 'Menunggu pengganti tugas.');
 
         $this->assertSame('ditangguhkan', $cuti->fresh()->status);
         $this->assertDatabaseCount('leave_balance_ledger', 0);
@@ -276,85 +287,13 @@ class LeaveApprovalEngineTest extends TestCase
         $this->assertSame(12, $balance->sisa);
     }
 
-    public function test_approver_duplikat_dilewati_otomatis_pada_snapshot(): void
-    {
-        $pemohon = $this->makePemohon();
-        $jenis = $this->jenisCuti('Cuti Sakit');
-        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
-
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
-
-        $this->assertDatabaseHas('leave_request_steps', [
-            'leave_request_id' => $cuti->id,
-            'step_order' => 1,
-            'status' => 'skipped',
-            'skipped_reason' => 'duplicate_approver',
-        ]);
-        $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'approved']);
-        $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 3, 'status' => 'active']);
-    }
-
-    public function test_duplikat_kepala_bagian_dan_pybmc_mempertahankan_step_final(): void
-    {
-        $pemohon = $this->makePemohon();
-        $jenis = $this->jenisCuti('Cuti Sakit');
-        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['pybmc'], $pemohon['pybmc']], 2);
-
-        $this->assertDatabaseHas('leave_request_steps', [
-            'leave_request_id' => $cuti->id,
-            'step_order' => 1,
-            'status' => 'skipped',
-            'skipped_reason' => 'duplicate_approver',
-            'is_final' => false,
-        ]);
-        $this->assertDatabaseHas('leave_request_steps', [
-            'leave_request_id' => $cuti->id,
-            'step_order' => 2,
-            'status' => 'active',
-            'is_final' => true,
-        ]);
-
-        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], null, $pemohon['pybmc_user']);
-
-        $this->assertSame('disetujui', $cuti->fresh()->status);
-        $this->assertDatabaseHas('leave_approvals', [
-            'leave_request_id' => $cuti->id,
-            'stage' => 2,
-            'action' => 'APPROVE',
-        ]);
-    }
-
-    public function test_duplikat_verifikator_dan_pybmc_mempertahankan_step_final(): void
-    {
-        $pemohon = $this->makePemohon();
-        $jenis = $this->jenisCuti('Cuti Sakit');
-        $verifikatorFinal = Employee::factory()->create();
-        $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $verifikatorFinal, $verifikatorFinal], 2);
-
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
-
-        $this->assertDatabaseHas('leave_request_steps', [
-            'leave_request_id' => $cuti->id,
-            'step_order' => 2,
-            'status' => 'skipped',
-            'skipped_reason' => 'duplicate_approver',
-            'is_final' => false,
-        ]);
-        $this->assertDatabaseHas('leave_request_steps', [
-            'leave_request_id' => $cuti->id,
-            'step_order' => 3,
-            'status' => 'active',
-            'is_final' => true,
-        ]);
-    }
-
     public function test_perlu_perubahan_mengembalikan_pengajuan_ke_pemohon(): void
     {
         $pemohon = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit');
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
-        $this->service()->requestChanges($cuti, $pemohon['kepala_bagian'], 'Tanggal cuti perlu diperbaiki.');
+        $this->service()->requestChanges($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), 'Tanggal cuti perlu diperbaiki.');
 
         $this->assertSame('perlu_perubahan', $cuti->fresh()->status);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 1, 'status' => 'active']);
@@ -367,10 +306,10 @@ class LeaveApprovalEngineTest extends TestCase
         $jenis = $this->jenisCuti('Cuti Sakit');
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
-        $this->service()->requestChanges($cuti, $pemohon['kepala_bagian'], 'Tanggal cuti perlu diperbaiki.');
+        $this->service()->requestChanges($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), 'Tanggal cuti perlu diperbaiki.');
 
         $this->expectException(ValidationException::class);
-        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
     }
 
     public function test_tidak_disetujui_menutup_pengajuan_tanpa_memotong_saldo(): void
@@ -387,7 +326,7 @@ class LeaveApprovalEngineTest extends TestCase
         ]);
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
-        $this->service()->decline($cuti, $pemohon['kepala_bagian'], 'Dokumen pendukung tidak sesuai.');
+        $this->service()->decline($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), 'Dokumen pendukung tidak sesuai.');
 
         $this->assertSame('tidak_disetujui', $cuti->fresh()->status);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 1, 'status' => 'tidak_disetujui']);
@@ -411,7 +350,7 @@ class LeaveApprovalEngineTest extends TestCase
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
         $this->expectException(AuthorizationException::class);
-        $this->service()->decline($cuti, $pemohon['pybmc'], 'Dokumen pendukung tidak sesuai.');
+        $this->service()->decline($cuti, $pemohon['pybmc'], $this->activeStepId($cuti), 'Dokumen pendukung tidak sesuai.');
     }
 
     public function test_penundaan_lalu_disetujui_kembali_oleh_approver_yang_sama(): void
@@ -420,11 +359,11 @@ class LeaveApprovalEngineTest extends TestCase
         $jenis = $this->jenisCuti('Cuti Sakit');
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
-        $this->service()->postpone($cuti, $pemohon['kepala_bagian'], 'Menunggu pengganti tugas.');
+        $this->service()->postpone($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), 'Menunggu pengganti tugas.');
         $this->assertSame('ditangguhkan', $cuti->fresh()->status);
         $this->assertSame(1, $this->service()->pendingStage($cuti->fresh()));
 
-        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
         $this->assertDatabaseHas('leave_request_steps', ['leave_request_id' => $cuti->id, 'step_order' => 2, 'status' => 'active']);
     }
 
@@ -469,6 +408,7 @@ class LeaveApprovalEngineTest extends TestCase
         app(PostponeLeaveAction::class)->execute(
             $cuti,
             $pemohon['kepala_bagian'],
+            $activeStep->id,
             'Menunggu pengganti tugas.',
             Request::create('/cuti/test', 'POST'),
         );
@@ -486,7 +426,7 @@ class LeaveApprovalEngineTest extends TestCase
             'type' => 'cuti.ditunda',
         ]);
 
-        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti->fresh(), $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
         $this->assertDatabaseHas('leave_request_steps', [
             'leave_request_id' => $cuti->id,
             'step_order' => 2,
@@ -517,7 +457,7 @@ class LeaveApprovalEngineTest extends TestCase
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
         $this->expectException(AuthorizationException::class);
-        $this->service()->approve($cuti, $pemohon['pybmc'], null, $pemohon['pybmc_user']);
+        $this->service()->approve($cuti, $pemohon['pybmc'], $this->activeStepId($cuti), null, $pemohon['pybmc_user']);
     }
 
     public function test_cuti_non_tahunan_tidak_memotong_saldo(): void
@@ -535,8 +475,8 @@ class LeaveApprovalEngineTest extends TestCase
 
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 2);
 
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
-        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], null, $pemohon['pybmc_user']);
+        $this->service()->approve($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], $this->activeStepId($cuti), null, $pemohon['pybmc_user']);
         $this->assertSame('disetujui', $cuti->fresh()->status);
 
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->first();
@@ -564,10 +504,10 @@ class LeaveApprovalEngineTest extends TestCase
         );
 
         $cuti = $this->makeRequest($pemohon['employee'], $jenis, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 3);
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
 
         try {
-            $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], null, $pemohon['pybmc_user']);
+            $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], $this->activeStepId($cuti), null, $pemohon['pybmc_user']);
             $this->fail('Persetujuan final seharusnya gagal karena saldo tidak cukup.');
         } catch (ValidationException $e) {
             $this->assertSame('menunggu_approval', $cuti->fresh()->status);
@@ -614,10 +554,10 @@ class LeaveApprovalEngineTest extends TestCase
         );
         $cuti = $this->makeRequest($pemohon['employee'], $jenisBesar, [$pemohon['kepala_bagian'], $pemohon['pybmc']], 20);
 
-        $this->service()->approve($cuti, $pemohon['kepala_bagian'], null, $pemohon['kepala_bagian_user']);
+        $this->service()->approve($cuti, $pemohon['kepala_bagian'], $this->activeStepId($cuti), null, $pemohon['kepala_bagian_user']);
 
         try {
-            $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], null, $pemohon['pybmc_user']);
+            $this->service()->approve($cuti->fresh(), $pemohon['pybmc'], $this->activeStepId($cuti), null, $pemohon['pybmc_user']);
             $this->fail('Persetujuan final cuti besar seharusnya gagal setelah cuti tahunan dipakai di tahun yang sama.');
         } catch (ValidationException $e) {
             $this->assertArrayHasKey('status', $e->errors());
@@ -640,10 +580,15 @@ class LeaveApprovalEngineTest extends TestCase
         $otherUser = User::factory()->create(['employee_id' => $otherApprover->id]);
 
         try {
-            $this->service()->approve($cuti, $otherApprover, null, $otherUser);
+            $this->service()->approve($cuti, $otherApprover, '00000000-0000-4000-8000-000000000001', null, $otherUser);
             $this->fail('Persetujuan seharusnya gagal karena pengajuan belum memiliki step aktif.');
         } catch (ValidationException $e) {
             $this->assertStringContainsString('Pengajuan cuti ini belum memiliki step approval aktif', $e->getMessage());
         }
+    }
+
+    private function activeStepId(LeaveRequest $leaveRequest): string
+    {
+        return $leaveRequest->steps()->where('status', 'active')->valueOrFail('id');
     }
 }

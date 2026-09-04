@@ -45,7 +45,7 @@ class AssignSupervisorAction
     ): Employee {
         if ($kepalaBagianId === $employee->id) {
             throw ValidationException::withMessages([
-                'kepala_bagian_id' => 'Pegawai tidak bisa menjadi kepala bagian untuk diri sendiri.',
+                'kepala_bagian_id' => 'Pegawai tidak bisa menjadi atasan untuk diri sendiri.',
             ]);
         }
 
@@ -128,7 +128,7 @@ class AssignSupervisorAction
 
             if ($todaySupervisorId !== $projectedTodaySupervisorId) {
                 throw ValidationException::withMessages([
-                    'effective_date' => 'Penugasan Kepala Bagian berubah saat diproses. Silakan ulangi.',
+                    'effective_date' => 'Penugasan atasan berubah saat diproses. Silakan ulangi.',
                 ]);
             }
 
@@ -323,7 +323,7 @@ class AssignSupervisorAction
 
         if ($stepId === null) {
             throw ValidationException::withMessages([
-                'kepala_bagian_id' => 'Rantai approval aktif tidak memiliki langkah Kepala Bagian.',
+                'kepala_bagian_id' => 'Rantai approval aktif tidak memiliki tahap penugasan atasan.',
             ]);
         }
 
@@ -334,7 +334,7 @@ class AssignSupervisorAction
 
         if ($updated !== 1) {
             throw ValidationException::withMessages([
-                'kepala_bagian_id' => 'Langkah Kepala Bagian pada rantai approval aktif tidak ditemukan.',
+                'kepala_bagian_id' => 'Tahap penugasan atasan pada rantai approval aktif tidak ditemukan.',
             ]);
         }
     }

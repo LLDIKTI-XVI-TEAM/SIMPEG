@@ -83,10 +83,6 @@
                     @foreach($tabs as $key => $label)
                     <x-ui.tab variant="sidebar-soft" active="activeTab === '{{ $key }}'" click="activeTab = '{{ $key }}'">
                         {{ $label }}
-                        <svg x-show="activeTab === '{{ $key }}'" class="w-4 h-4 ml-auto text-ink" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
                     </x-ui.tab>
                     @endforeach
                 </x-ui.tabs>
@@ -153,7 +149,7 @@
                         <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi jenis-jenis
                             cuti dan aturannya.</p>
                     </div>
-                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
+                    <x-ui.button @click="openModal('tambah')" variant="secondary" class="shrink-0">
                         Tambah
                     </x-ui.button>
                 </div>
@@ -214,7 +210,7 @@
                         <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi agama resmi.
                         </p>
                     </div>
-                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
+                    <x-ui.button @click="openModal('tambah')" variant="secondary" class="shrink-0">
                         Tambah
                     </x-ui.button>
                 </div>
@@ -264,7 +260,7 @@
                         <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi jenis kelamin.
                         </p>
                     </div>
-                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
+                    <x-ui.button @click="openModal('tambah')" variant="secondary" class="shrink-0">
                         Tambah
                     </x-ui.button>
                 </div>
@@ -317,7 +313,7 @@
                         <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi status
                             perkawinan.</p>
                     </div>
-                    <x-ui.button @click="openModal('tambah')" variant="primary" class="shrink-0">
+                    <x-ui.button @click="openModal('tambah')" variant="secondary" class="shrink-0">
                         Tambah
                     </x-ui.button>
                 </div>

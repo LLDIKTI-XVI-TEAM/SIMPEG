@@ -257,11 +257,10 @@ class ApplyChainTemplateToUnitAction
      * Langkah Kepala Bagian diisi atasan pegawai tujuan, bukan atasan pegawai sumber, karena rantai
      * milik pegawai wajib menunjuk atasannya sendiri.
      *
-     * Langkah yang berulang tidak dibuang di sini. Snapshot pengajuan mempertahankan seluruh langkah
-     * lalu menandai kemunculan lebih awal sebagai dilewati, sehingga kemunculan terakhir yang menjadi
-     * otoritas efektif; membuang duplikat saat menyalin akan mengubah label dan peran yang dipakai
-     * snapshot serta audit keputusan. Approver yang sama dengan pegawai tujuan pada langkah opsional
-     * juga dibiarkan karena mesin snapshot menolak pemohon dari daftar approvernya sendiri.
+     * Duplikasi pegawai pada peran Verifikator sudah ditolak ketika template sumber divalidasi.
+     * Pegawai yang sama tetap boleh mengisi peran berbeda karena setiap peran memerlukan tindakan
+     * tersendiri. Approver yang sama dengan pegawai tujuan pada langkah opsional tetap dibiarkan
+     * karena mesin snapshot menolak pemohon dari daftar approvernya sendiri.
      *
      * Mengembalikan null hanya bila pegawai tujuan menjadi approver pada langkah wajib, yaitu langkah
      * final atau Kepala Bagian, karena membuang langkah seperti itu akan memindahkan keputusan akhir

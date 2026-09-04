@@ -55,6 +55,7 @@ class DutyPostponementWorkflowTest extends TestCase
 
         $this->actingAs($fixture['actingUser'])
             ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), [
+                'active_step_id' => $fixture['activeStep']->id,
                 'alasan' => self::REASON,
                 'employee_id' => Employee::factory()->create()->id,
                 'source_year' => 2030,
@@ -94,7 +95,10 @@ class DutyPostponementWorkflowTest extends TestCase
 
             $this->actingAs($fixture['actingUser'])
                 ->from(route('cuti.approval'))
-                ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), ['alasan' => $reason])
+                ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), [
+                    'active_step_id' => $fixture['activeStep']->id,
+                    'alasan' => $reason,
+                ])
                 ->assertRedirect(route('cuti.approval'))
                 ->assertSessionHasErrorsIn('dutyPostponement', ['alasan' => $message]);
 
@@ -117,7 +121,10 @@ class DutyPostponementWorkflowTest extends TestCase
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $other->id]);
 
         $this->actingAs($user)
-            ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), ['alasan' => self::REASON])
+            ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), [
+                'active_step_id' => $fixture['activeStep']->id,
+                'alasan' => self::REASON,
+            ])
             ->assertForbidden();
 
         $this->assertSame($before, $this->workflowState($fixture['request']->id, $fixture['balance']->fresh()));
@@ -179,6 +186,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -187,7 +195,7 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder([
                 'Alur Persetujuan Cuti',
-                'Ditangguhkan karena Tugas Dinas oleh Kepala Bagian',
+                'Ditangguhkan karena Tugas Dinas oleh Atasan Langsung',
                 $fixture['actor']->nama_lengkap,
                 'Dilewati: PYBMC',
                 $fixture['laterStep']->approver->nama_lengkap,
@@ -195,7 +203,7 @@ class DutyPostponementWorkflowTest extends TestCase
                 'Riwayat Tindakan Approval',
                 'Ditangguhkan karena Tugas Dinas',
                 $fixture['actor']->nama_lengkap,
-                'Tahap 1 (Kepala Bagian)',
+                'Tahap 1 (Atasan Langsung)',
             ])
             ->assertDontSee('ditangguhkan_tugas_dinas')
             ->assertDontSee('duty_postponement_terminal')
@@ -209,6 +217,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -235,7 +244,7 @@ class DutyPostponementWorkflowTest extends TestCase
         $fixture = $this->makeWorkflowFixture();
         $fixture['activeStep']->forceFill([
             'status' => 'skipped',
-            'skipped_reason' => 'duplicate_approver',
+            'skipped_reason' => 'workflow_closed',
         ])->save();
         $fixture['laterStep']->forceFill([
             'status' => 'skipped',
@@ -248,12 +257,12 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder([
                 'Alur Persetujuan Cuti',
-                'Dilewati: Kepala Bagian',
-                'Dilewati karena approver yang sama sudah tercakup pada tahap lain.',
+                'Dilewati: Atasan Langsung',
+                'Dilewati karena alur persetujuan telah ditutup.',
                 'Dilewati: PYBMC',
                 'Dilewati karena pengajuan telah diputus tidak disetujui.',
             ])
-            ->assertDontSee('duplicate_approver')
+            ->assertDontSee('workflow_closed')
             ->assertDontSee('request_not_approved');
     }
 
@@ -264,7 +273,10 @@ class DutyPostponementWorkflowTest extends TestCase
         $this->actingAs($fixture['actingUser'])
             ->from(route('cuti.show', $fixture['request']))
             ->followingRedirects()
-            ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), ['alasan' => 'abcd'])
+            ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), [
+                'active_step_id' => $fixture['activeStep']->id,
+                'alasan' => 'abcd',
+            ])
             ->assertOk()
             ->assertSee('decisionForm: &#039;dutyPostponement&#039;', false)
             ->assertSee('Alasan tugas dinas minimal berisi 5 karakter.')
@@ -273,6 +285,26 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertSee("x-init=\"\$nextTick(() => document.getElementById('alasan-duty-postponement')?.focus())\"", false)
             ->assertDontSee("const field = document.getElementById('alasan-duty-postponement'); field?.focus(); field?.scrollIntoView", false)
             ->assertDontSee("decisionForm: 'postpone'", false);
+    }
+
+    public function test_duty_postponement_admin_stale_token_reopens_dedicated_form_with_error(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        $message = 'Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.';
+
+        $this->actingAs($fixture['actingUser'])
+            ->from(route('cuti.show', $fixture['request']))
+            ->post(route('cuti.penangguhan-tugas-dinas', $fixture['request']), [
+                'active_step_id' => '00000000-0000-4000-8000-000000000034',
+                'alasan' => self::REASON,
+            ])
+            ->assertRedirect(route('cuti.show', $fixture['request']))
+            ->assertSessionHasErrorsIn('dutyPostponement', ['active_step_id' => $message]);
+
+        $this->get(route('cuti.show', $fixture['request']))
+            ->assertOk()
+            ->assertSee('decisionForm: &#039;dutyPostponement&#039;', false)
+            ->assertSee($message);
     }
 
     public function test_duty_postponement_admin_default_error_bag_does_not_open_dedicated_form(): void
@@ -317,7 +349,7 @@ class DutyPostponementWorkflowTest extends TestCase
                 'Riwayat Tindakan Approval',
                 'Tindakan tidak dikenal',
                 $fixture['actor']->nama_lengkap,
-                'Tahap 1 (Kepala Bagian)',
+                'Tahap 1 (Atasan Langsung)',
             ])
             ->assertDontSee('step_rahasia_admin')
             ->assertDontSee('ACTION_RAHASIA_ADMIN');
@@ -333,6 +365,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -427,7 +460,7 @@ class DutyPostponementWorkflowTest extends TestCase
 
         $this->assertRejectedWithoutEffect(
             $fixture,
-            fn () => $this->action()->execute($fixture['request'], $otherActor, $otherUser, self::REASON),
+            fn () => $this->action()->execute($fixture['request'], $otherActor, $otherUser, $fixture['activeStep']->id, self::REASON),
             AuthorizationException::class,
         );
     }
@@ -439,7 +472,7 @@ class DutyPostponementWorkflowTest extends TestCase
 
         $this->assertRejectedWithoutEffect(
             $fixture,
-            fn () => $this->action()->execute($fixture['request'], $fixture['actor'], $wrongUser, self::REASON),
+            fn () => $this->action()->execute($fixture['request'], $fixture['actor'], $wrongUser, $fixture['activeStep']->id, self::REASON),
             AuthorizationException::class,
         );
     }
@@ -580,7 +613,7 @@ class DutyPostponementWorkflowTest extends TestCase
 
         $this->assertRejectedWithoutEffect(
             $fixture,
-            fn () => $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], " \n\t "),
+            fn () => $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, " \n\t "),
             ValidationException::class,
         );
     }
@@ -590,7 +623,7 @@ class DutyPostponementWorkflowTest extends TestCase
         $method = new ReflectionMethod(RecordDutyPostponementAction::class, 'execute');
 
         $this->assertSame(
-            ['leaveRequest', 'actor', 'actingUser', 'reason'],
+            ['leaveRequest', 'actor', 'actingUser', 'expectedActiveStepId', 'reason'],
             collect($method->getParameters())->map->getName()->all(),
         );
         $returnType = $method->getReturnType();
@@ -612,6 +645,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -625,10 +659,10 @@ class DutyPostponementWorkflowTest extends TestCase
     public function test_same_actor_retry_is_idempotent(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $first = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $first = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $counts = $this->effectCounts($first->id);
 
-        $second = $this->action()->execute($first, $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $second = $this->action()->execute($first, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
 
         $this->assertTrue($first->is($second));
         $this->assertSame(LeaveRequest::STATUS_DUTY_POSTPONED, $second->status);
@@ -636,10 +670,37 @@ class DutyPostponementWorkflowTest extends TestCase
         $this->assertSame([1, 1, 1, 1, 1], array_values($counts));
     }
 
+    public function test_terminal_retry_with_different_step_token_is_rejected_without_new_effect(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        $terminal = $this->action()->execute(
+            $fixture['request'],
+            $fixture['actor'],
+            $fixture['actingUser'],
+            $fixture['activeStep']->id,
+            self::REASON,
+        );
+        $counts = $this->effectCounts($terminal->id);
+
+        try {
+            $this->action()->execute(
+                $terminal,
+                $fixture['actor'],
+                $fixture['actingUser'],
+                '00000000-0000-4000-8000-000000000001',
+                self::REASON,
+            );
+            $this->fail('Retry terminal dengan token step berbeda wajib ditolak.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('active_step_id', $exception->errors());
+            $this->assertSame($counts, $this->effectCounts($terminal->id));
+        }
+    }
+
     public function test_same_actor_retry_accepts_legacy_terminal_notification_without_approval_id(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $first = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $first = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $counts = $this->effectCounts($first->id);
         $notification = SimpegNotification::query()
             ->where('user_id', $fixture['applicant']->id)
@@ -649,7 +710,7 @@ class DutyPostponementWorkflowTest extends TestCase
         unset($legacyData['leave_approval_id']);
         $notification->forceFill(['data' => $legacyData])->save();
 
-        $second = $this->action()->execute($first, $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $second = $this->action()->execute($first, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
 
         $this->assertTrue($first->is($second));
         $this->assertSame($counts, $this->effectCounts($first->id));
@@ -716,6 +777,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $resubmitted,
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -730,6 +792,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $terminal,
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -753,6 +816,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -766,6 +830,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $terminal,
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
 
@@ -781,12 +846,13 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
         $counts = $this->effectCounts($terminal->id);
 
         $this->setDutyPostponementChannelPolicy('in_app', false);
-        $retried = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $retried = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
 
         $this->assertTrue($terminal->is($retried));
         $this->assertSame([1, 1, 1, 1, 1], array_values($counts));
@@ -801,12 +867,13 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
         $counts = $this->effectCounts($terminal->id);
 
         $this->setDutyPostponementChannelPolicy('in_app', true);
-        $retried = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $retried = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
 
         $this->assertTrue($terminal->is($retried));
         $this->assertSame([1, 1, 1, 1, 0], array_values($counts));
@@ -821,6 +888,7 @@ class DutyPostponementWorkflowTest extends TestCase
                 $fixture['request'],
                 $fixture['actor'],
                 $fixture['actingUser'],
+                $fixture['activeStep']->id,
                 self::REASON,
             );
             $before = $this->workflowState($terminal->id, $fixture['balance']);
@@ -828,10 +896,10 @@ class DutyPostponementWorkflowTest extends TestCase
             try {
                 $service = app(LeaveApprovalService::class);
                 match ($decision) {
-                    'approve' => $service->approve($terminal, $fixture['actor'], null, $fixture['actingUser']),
-                    'postpone' => $service->postpone($terminal, $fixture['actor'], 'Keputusan lanjutan tidak sah.'),
-                    'requestChanges' => $service->requestChanges($terminal, $fixture['actor'], 'Keputusan lanjutan tidak sah.'),
-                    'decline' => $service->decline($terminal, $fixture['actor'], 'Keputusan lanjutan tidak sah.'),
+                    'approve' => $service->approve($terminal, $fixture['actor'], $fixture['activeStep']->id, null, $fixture['actingUser']),
+                    'postpone' => $service->postpone($terminal, $fixture['actor'], $fixture['activeStep']->id, 'Keputusan lanjutan tidak sah.'),
+                    'requestChanges' => $service->requestChanges($terminal, $fixture['actor'], $fixture['activeStep']->id, 'Keputusan lanjutan tidak sah.'),
+                    'decline' => $service->decline($terminal, $fixture['actor'], $fixture['activeStep']->id, 'Keputusan lanjutan tidak sah.'),
                 };
                 $this->fail("Keputusan {$decision} pada workflow terminal wajib ditolak.");
             } catch (ValidationException) {
@@ -843,13 +911,13 @@ class DutyPostponementWorkflowTest extends TestCase
     public function test_different_actor_retry_is_rejected_without_new_effect(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $counts = $this->effectCounts($terminal->id);
         $differentActor = Employee::factory()->create();
         $differentUser = User::factory()->kepalaBagian()->create(['employee_id' => $differentActor->id]);
 
         try {
-            $this->action()->execute($terminal, $differentActor, $differentUser, self::REASON);
+            $this->action()->execute($terminal, $differentActor, $differentUser, $fixture['activeStep']->id, self::REASON);
             $this->fail('Retry oleh aktor berbeda wajib ditolak.');
         } catch (AuthorizationException) {
             $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -863,12 +931,12 @@ class DutyPostponementWorkflowTest extends TestCase
         // diuji terpisah pada test duplikasi di bawah.
         foreach (['ledger', 'release', 'approval', 'notification'] as $missing) {
             $fixture = $this->makeWorkflowFixture();
-            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $this->deleteTerminalEffect($terminal->id, $missing);
             $counts = $this->effectCounts($terminal->id);
 
             try {
-                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
                 $this->fail("Retry terminal dengan efek {$missing} hilang wajib ditolak.");
             } catch (ValidationException) {
                 $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -881,12 +949,12 @@ class DutyPostponementWorkflowTest extends TestCase
         // Payload audit tidak ikut dirusak karena basis data menolak pembaruannya.
         foreach (['ledger', 'release', 'approval', 'notification'] as $mismatched) {
             $fixture = $this->makeWorkflowFixture();
-            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $this->corruptTerminalEffect($terminal->id, $mismatched);
             $counts = $this->effectCounts($terminal->id);
 
             try {
-                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
                 $this->fail("Retry terminal dengan efek {$mismatched} tidak cocok wajib ditolak.");
             } catch (ValidationException) {
                 $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -897,7 +965,7 @@ class DutyPostponementWorkflowTest extends TestCase
     public function test_terminal_retry_fails_closed_when_audit_row_is_duplicated(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $asli = AuditLog::query()
             ->where('auditable_type', 'LeaveRequest')
             ->where('auditable_id', $terminal->id)
@@ -920,7 +988,7 @@ class DutyPostponementWorkflowTest extends TestCase
         $counts = $this->effectCounts($terminal->id);
 
         try {
-            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $this->fail('Retry terminal dengan baris audit berlebih wajib ditolak.');
         } catch (ValidationException) {
             $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -930,13 +998,13 @@ class DutyPostponementWorkflowTest extends TestCase
     public function test_terminal_retry_fails_closed_when_reason_differs_from_audit_snapshot(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $counts = $this->effectCounts($terminal->id);
 
         // Alasan yang berbeda dari snapshot audit menandakan permintaan ulang bukan pengulangan
         // keputusan yang sama, sehingga kontrak terminal wajib menolaknya.
         try {
-            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], 'Alasan yang berbeda dari catatan audit.');
+            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, 'Alasan yang berbeda dari catatan audit.');
             $this->fail('Retry terminal dengan alasan berbeda wajib ditolak.');
         } catch (ValidationException) {
             $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -947,7 +1015,7 @@ class DutyPostponementWorkflowTest extends TestCase
     {
         foreach (['source_request_workdays' => 99, 'source_status' => 'disetujui'] as $fact => $corruptedValue) {
             $fixture = $this->makeWorkflowFixture();
-            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $ledger = LeaveBalanceLedger::query()
                 ->where('leave_request_id', $terminal->id)
                 ->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)
@@ -962,7 +1030,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $counts = $this->effectCounts($terminal->id);
 
             try {
-                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
                 $this->fail("Retry terminal dengan metadata {$fact} rusak wajib ditolak.");
             } catch (ValidationException) {
                 $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -974,7 +1042,7 @@ class DutyPostponementWorkflowTest extends TestCase
     {
         foreach (['body', 'data'] as $field) {
             $fixture = $this->makeWorkflowFixture();
-            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $notification = SimpegNotification::query()
                 ->where('data->leave_request_id', $terminal->id)
                 ->where('type', 'cuti.ditangguhkan_tugas_dinas')
@@ -986,7 +1054,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $counts = $this->effectCounts($terminal->id);
 
             try {
-                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+                $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
                 $this->fail("Retry terminal dengan notification {$field} rusak wajib ditolak.");
             } catch (ValidationException) {
                 $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -1005,11 +1073,11 @@ class DutyPostponementWorkflowTest extends TestCase
     {
         $this->setDutyPostponementChannelPolicy('in_app', false);
         $fixture = $this->makeWorkflowFixture();
-        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $counts = $this->effectCounts($terminal->id);
         $this->assertSame(0, $counts['notification']);
 
-        $diulang = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $diulang = $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
 
         $this->assertSame($terminal->id, $diulang->id);
         $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -1018,7 +1086,7 @@ class DutyPostponementWorkflowTest extends TestCase
     public function test_terminal_retry_fails_closed_when_ledger_source_status_does_not_match_audit_snapshot(): void
     {
         $fixture = $this->makeWorkflowFixture();
-        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+        $terminal = $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
         $ledger = LeaveBalanceLedger::query()
             ->where('leave_request_id', $terminal->id)
             ->where('event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED)
@@ -1035,7 +1103,7 @@ class DutyPostponementWorkflowTest extends TestCase
         $counts = $this->effectCounts($terminal->id);
 
         try {
-            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $this->action()->execute($terminal, $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $this->fail('Retry terminal dengan status pra-terminal non-actionable wajib ditolak.');
         } catch (ValidationException) {
             $this->assertSame($counts, $this->effectCounts($terminal->id));
@@ -1052,7 +1120,7 @@ class DutyPostponementWorkflowTest extends TestCase
         DB::statement("ALTER TABLE audit_logs ADD CONSTRAINT test_duty_postponement_audit_failure CHECK (event <> 'DUTY_POSTPONEMENT')");
 
         try {
-            $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $this->fail('Constraint audit PostgreSQL seharusnya menggagalkan transaksi.');
         } catch (Throwable $exception) {
             $this->assertStringContainsString('test_duty_postponement_audit_failure', $exception->getMessage());
@@ -1072,7 +1140,7 @@ class DutyPostponementWorkflowTest extends TestCase
         DB::statement("ALTER TABLE notifications ADD CONSTRAINT test_duty_postponement_notification_failure CHECK (type <> 'cuti.ditangguhkan_tugas_dinas')");
 
         try {
-            $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], self::REASON);
+            $this->action()->execute($fixture['request'], $fixture['actor'], $fixture['actingUser'], $fixture['activeStep']->id, self::REASON);
             $this->fail('Constraint notifikasi PostgreSQL seharusnya menggagalkan transaksi.');
         } catch (Throwable $exception) {
             $this->assertStringContainsString('test_duty_postponement_notification_failure', $exception->getMessage());
@@ -1094,6 +1162,7 @@ class DutyPostponementWorkflowTest extends TestCase
             $fixture['request'],
             $fixture['actor'],
             $fixture['actingUser'],
+            $fixture['activeStep']->id,
             self::REASON,
         );
     }

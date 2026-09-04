@@ -17,6 +17,7 @@ if (! is_array($payload)) {
 
 $mode = (string) ($payload['mode'] ?? '');
 $result = (string) ($payload['result'] ?? '');
+$holdTimeoutSeconds = max(30, (int) ($payload['hold_timeout_seconds'] ?? 120));
 
 try {
     DB::statement("SET lock_timeout TO '5s'");
@@ -38,7 +39,9 @@ try {
     File::put((string) $payload['ready'], json_encode([
         'pid' => (int) DB::selectOne('SELECT pg_backend_pid() AS pid')->pid,
     ], JSON_THROW_ON_ERROR));
-    $deadline = microtime(true) + 30;
+    // Satu holder tetap hidup sampai parent menyelesaikan retry gate dan, bila
+    // diperlukan, mem-bootstrap worker lain pada bind mount Podman.
+    $deadline = microtime(true) + $holdTimeoutSeconds;
 
     if ($mode === 'interleave') {
         $attempt = (string) $payload['attempt'];

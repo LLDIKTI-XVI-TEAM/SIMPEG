@@ -1,6 +1,6 @@
 @props([
     'variant' => 'muted',
-    'size' => 'sm',
+    'size' => 'md',
     'dot' => false,
     'pill' => false,
     'uppercase' => false,
@@ -53,8 +53,10 @@
     ];
 
     $sizes = [
-        'xs' => 'px-1.5 py-0.5 text-[9px]',
-        'sm' => 'px-2 py-0.5 text-[10px]',
+        // Semua badge yang memuat teks status mengikuti kontrak tipografi text-xs.
+        // Ukuran hanya membedakan kepadatan ruang, bukan keterbacaan teks.
+        'xs' => 'px-1.5 py-0.5 text-xs',
+        'sm' => 'px-2 py-0.5 text-xs',
         'md' => 'px-2.5 py-1 text-xs',
     ];
 
@@ -62,8 +64,8 @@
 @endphp
 
 <span {{ $attributes->class([
-    'inline-flex items-center gap-1.5 font-medium font-sans leading-none',
-    $sizes[$size] ?? $sizes['sm'],
+    'inline-flex items-center gap-1.5 font-semibold font-sans leading-none whitespace-nowrap',
+    $sizes[$size] ?? $sizes['md'],
     $current['box'],
     'rounded-full' => filter_var($pill, FILTER_VALIDATE_BOOL),
     'rounded-md' => ! filter_var($pill, FILTER_VALIDATE_BOOL),

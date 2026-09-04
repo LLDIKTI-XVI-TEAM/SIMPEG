@@ -30,6 +30,11 @@ use Tests\TestCase;
 #[Group('serial')]
 class EwsRetirementConcurrencyTest extends TestCase
 {
+    /** Worker PHP pada bind mount Podman memerlukan waktu bootstrap yang lebih longgar dari handshake lock. */
+    private const WORKER_READY_TIMEOUT_MILLISECONDS = 45_000;
+
+    private const WORKER_TIMEOUT_SECONDS = 90;
+
     use DatabaseMigrations;
 
     private const MIGRATION = '2026_08_28_000002_add_ews_source_to_employee_status_transitions.php';
@@ -742,8 +747,8 @@ class EwsRetirementConcurrencyTest extends TestCase
         try {
             $first->start();
             $second->start();
-            $this->assertTrue($this->waitForFile($firstPaths['ready'], 5_000), 'Engine pertama tidak melihat alert kosong.');
-            $this->assertTrue($this->waitForFile($secondPaths['ready'], 5_000), 'Engine kedua tidak mencapai snapshot alert kosong yang sama.');
+            $this->assertTrue($this->waitForFile($firstPaths['ready']), 'Engine pertama tidak melihat alert kosong.');
+            $this->assertTrue($this->waitForFile($secondPaths['ready']), 'Engine kedua tidak mencapai snapshot alert kosong yang sama.');
 
             File::put($sharedRelease, 'continue');
             $first->wait();
@@ -880,10 +885,10 @@ class EwsRetirementConcurrencyTest extends TestCase
             PHP_BINARY,
             base_path('tests/Fixtures/'.$fixture),
             base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 60);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
     }
 
-    private function waitForFile(string $path, int $timeoutMilliseconds = 30_000): bool
+    private function waitForFile(string $path, int $timeoutMilliseconds = self::WORKER_READY_TIMEOUT_MILLISECONDS): bool
     {
         $deadline = microtime(true) + ($timeoutMilliseconds / 1000);
 

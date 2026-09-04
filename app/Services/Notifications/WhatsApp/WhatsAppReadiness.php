@@ -17,16 +17,23 @@ class WhatsAppReadiness
      */
     public function isReady(): bool
     {
+        $killSwitch = config('services.whatsapp', []);
+
+        // Kill-switch hanya berasal dari environment. Saat salah satunya mati,
+        // hindari membaca setting provider untuk setiap reminder EWS.
+        if (($killSwitch['enabled'] ?? false) !== true
+            || ($killSwitch['sandbox_verified'] ?? false) !== true
+            || ($killSwitch['recipient_source_verified'] ?? false) !== true) {
+            return false;
+        }
+
         $snapshot = $this->runtime->providerSnapshot();
         $config = $snapshot['config'];
 
-        if (($config['enabled'] ?? false) !== true
-            || ($config['sandbox_verified'] ?? false) !== true
-            || ($config['recipient_source_verified'] ?? false) !== true
-            || ! QontakWhatsAppProviderContract::supports(
-                $config['provider'] ?? null,
-                $config['base_url'] ?? null,
-            )
+        if (! QontakWhatsAppProviderContract::supports(
+            $config['provider'] ?? null,
+            $config['base_url'] ?? null,
+        )
             || blank($snapshot['access_token'])
             || blank($snapshot['channel_integration_id'])
             || blank($config['template_configuration'] ?? null)

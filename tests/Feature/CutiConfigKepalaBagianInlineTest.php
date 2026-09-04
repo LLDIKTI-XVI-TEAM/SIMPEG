@@ -11,7 +11,7 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * Memastikan widget penetapan Kepala Bagian pada halaman Konfigurasi Approval Cuti
+ * Memastikan widget penetapan Atasan Langsung pada halaman Konfigurasi Approval Cuti
  * memakai endpoint penetapan yang sudah ada dan mengembalikan pengguna ke halaman asal
  * hanya untuk nilai redirect yang di-whitelist.
  */
@@ -45,12 +45,12 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
         $response = $this->actingAs($actor)->get(route('cuti.config', ['employee_id' => $pegawai->id]));
 
         $response->assertOk()
-            ->assertSee('Penetapan Kepala Bagian')
+            ->assertSee('Penetapan Atasan Langsung')
             ->assertSee(route('pegawai.assign-atasan', $pegawai->id), false)
             ->assertSee('name="redirect_to" value="cuti-config"', false)
-            // Form chain belum menawarkan tahap Kepala Bagian sampai penugasan efektif tersedia.
+            // Form chain belum menawarkan tahap Atasan Langsung sampai penugasan efektif tersedia.
             ->assertDontSee(':name="`steps[${verifiers.length}][approver_employee_id]`"', false)
-            ->assertSee('Pegawai belum memiliki Kepala Bagian efektif. Tetapkan struktur pegawai sebelum menyimpan chain.');
+            ->assertSee('Atasan Langsung belum ditetapkan untuk pegawai. Tetapkan penugasan Atasan Langsung sebelum menyimpan chain.');
     }
 
     public function test_penetapan_dari_halaman_konfigurasi_kembali_ke_halaman_konfigurasi(): void
@@ -66,7 +66,10 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
         ]);
 
         $response->assertRedirect(route('cuti.config', ['employee_id' => $pegawai->id]));
-        $response->assertSessionHas('success');
+        $response->assertSessionHas(
+            'success',
+            'Atasan Langsung untuk '.$pegawai->nama_lengkap.' berhasil diperbarui.',
+        );
         $this->assertDatabaseHas('supervisor_assignments', [
             'employee_id' => $pegawai->id,
             'kepala_bagian_id' => $kabag->id,
@@ -76,7 +79,7 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
             'kepala_bagian_id' => $kabag->id,
         ]);
 
-        // Setelah kembali, tahap Kepala Bagian mengikuti seluruh verifikator dan terisi dari penugasan efektif baru.
+        // Setelah kembali, tahap Atasan Langsung mengikuti seluruh verifikator dan terisi dari penugasan efektif baru.
         $this->actingAs($actor)
             ->get(route('cuti.config', ['employee_id' => $pegawai->id]))
             ->assertOk()
@@ -130,7 +133,29 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
         ]);
 
         $response->assertRedirect(route('cuti.config', ['employee_id' => $pegawai->id]));
-        $response->assertSessionHasErrors('kepala_bagian_id');
+        $response->assertSessionHasErrors([
+            'kepala_bagian_id' => 'Pegawai tidak bisa menjadi atasan untuk diri sendiri.',
+        ]);
+        $this->assertDatabaseCount('supervisor_assignments', 0);
+    }
+
+    public function test_validasi_http_inline_memakai_label_atasan_langsung(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $pegawai = Employee::factory()->create();
+
+        $response = $this->actingAs($actor)->postWithCsrf(route('pegawai.assign-atasan', $pegawai->id), [
+            'kepala_bagian_id' => 'bukan-uuid',
+            'effective_date' => '27/07/2026',
+            'redirect_to' => 'cuti-config',
+        ]);
+
+        $response->assertSessionHasErrors(['kepala_bagian_id', 'effective_date']);
+
+        $errors = session('errors');
+        $this->assertStringContainsString('Atasan Langsung', $errors->first('kepala_bagian_id'));
+        $this->assertStringNotContainsString('Kepala Bagian', $errors->first('kepala_bagian_id'));
+        $this->assertStringContainsString('Tanggal Mulai Penugasan Atasan Langsung', $errors->first('effective_date'));
         $this->assertDatabaseCount('supervisor_assignments', 0);
     }
 

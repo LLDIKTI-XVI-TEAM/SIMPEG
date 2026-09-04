@@ -24,7 +24,7 @@ class BackfillApprovalChainsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'backfill_reason' => ['required', 'string', 'min:5', 'max:500'],
+            'backfill_reason' => ['nullable', 'string', 'min:5', 'max:500'],
         ];
     }
 
@@ -32,7 +32,6 @@ class BackfillApprovalChainsRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'backfill_reason.required' => 'Alasan backfill wajib diisi.',
             'backfill_reason.min' => 'Alasan backfill minimal berisi 5 karakter.',
             'backfill_reason.max' => 'Alasan backfill maksimal 500 karakter.',
         ];

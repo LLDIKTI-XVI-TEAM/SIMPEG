@@ -174,6 +174,52 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             ->count());
     }
 
+    public function test_dua_persetujuan_paralel_aktor_lintas_peran_tidak_melompati_tahap_berikutnya(): void
+    {
+        $fixture = $this->makeCommittedCrossRoleApprovalFixture();
+
+        $outcomes = $this->runRace($fixture);
+
+        $diagnostic = $outcomes->toJson();
+        $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
+        $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
+        $winner = $outcomes->firstWhere('ok', true);
+        $loser = $outcomes->firstWhere('ok', false);
+        $this->assertSame('menunggu_approval', $winner['status'] ?? null, $diagnostic);
+        $this->assertSame(ValidationException::class, $loser['class'] ?? null, $diagnostic);
+        $this->assertSame(
+            ['Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.'],
+            $loser['errors']['active_step_id'] ?? null,
+            $diagnostic,
+        );
+
+        $this->assertSame('menunggu_approval', $fixture['request']->fresh()->status);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'id' => $fixture['first_step']->id,
+            'status' => 'approved',
+            'step_type' => 'kepala_bagian',
+        ]);
+        $this->assertDatabaseHas('leave_request_steps', [
+            'id' => $fixture['second_step']->id,
+            'status' => 'active',
+            'step_type' => 'pybmc',
+        ]);
+        $this->assertSame(1, LeaveApproval::query()
+            ->where('leave_request_id', $fixture['request']->id)
+            ->where('action', 'APPROVE')
+            ->count());
+        $this->assertSame(0, LeaveRequestStep::query()
+            ->where('leave_request_id', $fixture['request']->id)
+            ->where('status', 'skipped')
+            ->count());
+        $this->assertSame(0, LeaveUsageRecord::query()
+            ->where('leave_request_id', $fixture['request']->id)
+            ->count());
+        $this->assertSame(0, LeaveProof::query()
+            ->where('leave_request_id', $fixture['request']->id)
+            ->count());
+    }
+
     public function test_persetujuan_final_dan_penangguhan_tugas_dinas_paralel_tidak_deadlock_atau_mencampur_efek_terminal(): void
     {
         $fixture = $this->makeCommittedFinalApprovalFixture();
@@ -313,6 +359,72 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
     }
 
     /**
+     * @return array{
+     *     request: LeaveRequest,
+     *     approver: Employee,
+     *     approver_user: User,
+     *     first_step: LeaveRequestStep,
+     *     second_step: LeaveRequestStep
+     * }
+     */
+    private function makeCommittedCrossRoleApprovalFixture(): array
+    {
+        $leaveType = RefJenisCuti::query()->create([
+            'nama' => 'Cuti Race Lintas Peran',
+            'code' => 'race_lintas_peran',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $pemohon = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Race Lintas Peran',
+            'email' => 'pemohon-race-lintas-peran-'.Str::uuid().'@example.test',
+        ]);
+        $approver = Employee::factory()->create(['nama_lengkap' => 'Approver Race Lintas Peran']);
+        $approverUser = User::factory()->create([
+            'name' => 'User Race Lintas Peran',
+            'role' => 'pimpinan',
+            'employee_id' => $approver->id,
+        ]);
+        $request = LeaveRequest::query()->create([
+            'employee_id' => $pemohon->id,
+            'jenis_cuti_id' => $leaveType->id,
+            'tanggal_mulai' => '2026-08-20',
+            'tanggal_selesai' => '2026-08-20',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Pengajuan race lintas peran.',
+            'alamat_selama_cuti' => 'Alamat privat race lintas peran.',
+            'nomor_telepon' => '081234000001',
+            'status' => 'menunggu_approval',
+        ]);
+        $firstStep = LeaveRequestStep::query()->create([
+            'leave_request_id' => $request->id,
+            'step_order' => 1,
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Atasan Langsung',
+            'approver_employee_id' => $approver->id,
+            'status' => 'active',
+            'is_final' => false,
+        ]);
+        $secondStep = LeaveRequestStep::query()->create([
+            'leave_request_id' => $request->id,
+            'step_order' => 2,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => $approver->id,
+            'status' => 'pending',
+            'is_final' => true,
+        ]);
+
+        return [
+            'request' => $request->fresh(),
+            'approver' => $approver,
+            'approver_user' => $approverUser,
+            'first_step' => $firstStep,
+            'second_step' => $secondStep,
+        ];
+    }
+
+    /**
      * @param  array{request: LeaveRequest, approver: Employee, approver_user: User}  $fixture
      * @return Collection<int, array<string, mixed>>
      */
@@ -337,6 +449,7 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
                         'leave_request_id' => $fixture['request']->id,
                         'approver_employee_id' => $fixture['approver']->id,
                         'actor_user_id' => $fixture['approver_user']->id,
+                        'active_step_id' => $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'),
                         'operation' => $operation,
                         'ready' => $ready,
                         'barrier' => $barrier,

@@ -233,7 +233,7 @@ class CutiRekapExportTest extends TestCase
         $response->assertDontSee('/laporan/export-cuti', false);
     }
 
-    public function test_preview_memakai_filter_dan_urutan_query_bersama_dengan_paginasi_15_baris(): void
+    public function test_preview_memakai_filter_dan_urutan_query_bersama_dengan_paginasi_10_baris(): void
     {
         $user = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create(['jabatan_terakhir' => 'Bagian Laporan']);
@@ -250,14 +250,14 @@ class CutiRekapExportTest extends TestCase
         $this->createLeaveRequest($pegawaiLain, $jenis, '2026-06-20');
 
         $filters = ['periode' => '2026-06', 'unit' => $unit->id, 'pegawai' => $pegawai->id, 'jenis' => $jenis->id];
-        $expectedIds = app(CutiRekapQuery::class)->detailRows($filters)->limit(15)->pluck('id')->all();
+        $expectedIds = app(CutiRekapQuery::class)->detailRows($filters)->limit(10)->pluck('id')->all();
 
         $response = $this->actingAs($user)->get(route('cuti.laporan', $filters));
 
         $response->assertOk()->assertViewIs('admin.cuti.laporan');
         $response->assertViewHas('filters', $filters);
         $response->assertViewHas('rows', function ($rows) use ($expectedIds): bool {
-            return $rows->perPage() === 15
+            return $rows->perPage() === 10
                 && $rows->total() === 16
                 && $rows->getCollection()->pluck('id')->all() === $expectedIds;
         });
@@ -696,10 +696,15 @@ class CutiRekapExportTest extends TestCase
         ] as $routeName => $expectation) {
             $response = $this->actingAs($user)->get(route($routeName, $filters))->assertOk();
             $html = (string) $response->getContent();
+            $sectionPattern = sprintf(
+                '/<section\\b(?=[^>]*\\baria-label="%s")[^>]*>.*?<\\/section>/s',
+                preg_quote($expectation['label'], '/'),
+            );
+            $this->assertSame(1, preg_match($sectionPattern, $html, $sectionMatches));
             $document = new \DOMDocument;
 
             libxml_use_internal_errors(true);
-            $document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+            $document->loadHTML('<?xml encoding="utf-8" ?>'.$sectionMatches[0]);
             libxml_clear_errors();
 
             $xpath = new \DOMXPath($document);
@@ -977,29 +982,31 @@ class CutiRekapExportTest extends TestCase
 
     #[DataProvider('rekapWaitingStatusProvider')]
     public function test_rekap_menampilkan_label_tahap_persetujuan_aktif(
+        string $stepType,
         ?string $roleLabel,
         string $expected,
     ): void {
         $user = User::factory()->superAdmin()->create();
         $pegawai = Employee::factory()->create();
-        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahap Rekap '.$expected]);
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Tahap Rekap']);
         $leaveRequest = $this->createLeaveRequest($pegawai, $jenis, '2026-06-15', 'menunggu_approval');
 
         if ($roleLabel !== null) {
             LeaveRequestStep::create([
                 'leave_request_id' => $leaveRequest->id,
                 'step_order' => 1,
-                'step_type' => 'verifikator',
+                'step_type' => $stepType,
                 'role_label' => $roleLabel,
                 'status' => 'active',
                 'is_final' => false,
             ]);
         }
 
-        $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]))
-            ->assertOk()
-            ->assertSee($expected)
-            ->assertDontSee('menunggu_approval', false);
+        $response = $this->actingAs($user)->get(route('cuti.rekap', ['pegawai' => $pegawai->id]));
+        $row = collect($response->viewData('usageRows')->items())->firstWhere('id', $leaveRequest->id);
+
+        $response->assertOk()->assertDontSee('menunggu_approval', false);
+        $this->assertSame($expected, $row->statusLabel);
     }
 
     public function test_tahap_aktif_memilih_step_order_terawal_dan_mengabaikan_future_pending_tanpa_duplikasi(): void
@@ -1053,12 +1060,13 @@ class CutiRekapExportTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{string|null, string}> */
+    /** @return array<string, array{string, string|null, string}> */
     public static function rekapWaitingStatusProvider(): array
     {
         return [
-            'tahap aktif' => ['Verifikator', 'Menunggu Verifikator'],
-            'fallback approver' => [null, 'Menunggu Approver'],
+            'tahap aktif' => ['verifier', 'Verifikator', 'Menunggu Verifikator'],
+            'label lama atasan langsung' => ['kepala_bagian', 'Kepala Bagian', 'Menunggu Atasan Langsung'],
+            'fallback approver' => ['verifier', null, 'Menunggu Approver'],
         ];
     }
 

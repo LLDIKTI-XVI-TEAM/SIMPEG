@@ -13,7 +13,7 @@ use JsonException;
 
 class ShowNotificationChannelConfigAction
 {
-    private const CHANNELS_PER_PAGE = 12;
+    private const CHANNELS_PER_PAGE = 10;
 
     /** @var list<string> */
     private const CORE_CHANNEL_CODES = ['in_app', 'email', 'whatsapp_business'];

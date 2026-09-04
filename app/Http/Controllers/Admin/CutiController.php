@@ -179,7 +179,8 @@ class CutiController extends Controller
         // Pengguna tanpa data pegawai (mis. akun sistem) tidak dapat menjadi approver; tolak dengan jelas.
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menyetujui cuti.');
 
-        $action->execute($leaveRequest, $actor, $request->validated()['komentar'] ?? null, $request);
+        $payload = $request->validated();
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'] ?? null, $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti berhasil disetujui.');
@@ -196,7 +197,8 @@ class CutiController extends Controller
         // Pengguna tanpa data pegawai (mis. akun sistem) tidak dapat menjadi approver; tolak dengan jelas.
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menunda cuti.');
 
-        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+        $payload = $request->validated();
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'], $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti ditunda dan pemohon telah diberi tahu.');
@@ -210,7 +212,8 @@ class CutiController extends Controller
 
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat meminta perubahan cuti.');
 
-        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+        $payload = $request->validated();
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'], $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti dikembalikan untuk perbaikan.');
@@ -224,7 +227,8 @@ class CutiController extends Controller
 
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
 
-        $action->execute($leaveRequest, $actor, $request->validated()['komentar'], $request);
+        $payload = $request->validated();
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'], $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
@@ -240,7 +244,8 @@ class CutiController extends Controller
         $actor = $user?->employee;
         abort_if($user === null || $actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menangguhkan cuti.');
 
-        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+        $payload = $request->validated();
+        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['alasan']);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');

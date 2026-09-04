@@ -374,19 +374,12 @@
                             {{-- Golongan --}}
                             <div class="space-y-1">
                                 <label for="pangkat_golongan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="pangkat_golongan_id" name="pangkat_golongan_id"  x-model="pangkatForm.golongan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Golongan</option>
-                                        @foreach($golonganRefOptions as $gol)
-                                            <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="pangkat_golongan_id" name="pangkat_golongan_id"  x-model="pangkatForm.golongan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Golongan</option>
+                                    @foreach($golonganRefOptions as $gol)
+                                        <option value="{{ $gol->id }}">{{ $gol->kode }} - {{ $gol->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Nomor SK Pangkat --}}
@@ -450,37 +443,23 @@
                             {{-- Jabatan --}}
                             <div class="space-y-1">
                                 <label for="jabatan_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="jabatan_jabatan_id" name="jabatan_jabatan_id"  x-model="jabatanForm.jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Jabatan</option>
-                                        @foreach($jabatanOptions->where('is_active', true) as $jabatan)
-                                            <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_jabatan_id" name="jabatan_jabatan_id"  x-model="jabatanForm.jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Jabatan</option>
+                                    @foreach($jabatanOptions->where('is_active', true) as $jabatan)
+                                        <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Jenis Jabatan --}}
                             <div class="space-y-1">
                                 <label for="jabatan_jenis_jabatan_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
-                                <div class="relative">
-                                    <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id" x-model="jabatanForm.jenis_jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Jenis Jabatan</option>
-                                        @foreach($jenisJabatanOptions as $jj)
-                                            <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_jenis_jabatan_id" name="jabatan_jenis_jabatan_id" x-model="jabatanForm.jenis_jabatan_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Jenis Jabatan</option>
+                                    @foreach($jenisJabatanOptions as $jj)
+                                        <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Kelas Jabatan --}}
@@ -492,37 +471,23 @@
                             {{-- Eselon --}}
                             <div class="space-y-1">
                                 <label for="jabatan_eselon_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
-                                <div class="relative">
-                                    <select id="jabatan_eselon_id" name="jabatan_eselon_id" x-model="jabatanForm.eselon_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="">-- Pilih --</option>
-                                        @foreach($eselonOptions as $esl)
-                                            <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_eselon_id" name="jabatan_eselon_id" x-model="jabatanForm.eselon_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="">-- Pilih --</option>
+                                    @foreach($eselonOptions as $esl)
+                                        <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Unit Kerja --}}
                             <div class="space-y-1">
                                 <label for="jabatan_unit_kerja_id" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id"  x-model="jabatanForm.unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Unit Kerja</option>
-                                        @foreach($unitKerja as $unit)
-                                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="jabatan_unit_kerja_id" name="jabatan_unit_kerja_id"  x-model="jabatanForm.unit_kerja_id" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Unit Kerja</option>
+                                    @foreach($unitKerja as $unit)
+                                        <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
+                                    @endforeach
+                                </select>
                             </div>
 
                             {{-- Nomor SK Jabatan --}}
@@ -538,7 +503,7 @@
                             </div>
 
                             {{-- TMT Jabatan --}}
-                            <div class="space-y-1 sm:col-span-2">
+                            <div class="space-y-1">
                                 <label for="jabatan_tmt_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan <span class="text-danger">*</span></label>
                                 <input id="jabatan_tmt_jabatan" name="jabatan_tmt_jabatan" type="date"  class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="jabatanForm.tmt_jabatan">
                             </div>
@@ -639,19 +604,12 @@
                             {{-- Jenis Pengangkatan --}}
                             <div class="space-y-1">
                                 <label for="pengangkatan_jenis_pengangkatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"  class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled >Pilih Jenis Pengangkatan</option>
-                                        <option value="CPNS" >CPNS</option>
-                                        <option value="PNS" >PNS</option>
-                                        <option value="PPPK" >PPPK</option>
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"  class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled >Pilih Jenis Pengangkatan</option>
+                                    <option value="CPNS" >CPNS</option>
+                                    <option value="PNS" >PNS</option>
+                                    <option value="PPPK" >PPPK</option>
+                                </select>
                             </div>
 
                             {{-- TMT Pengangkatan --}}
@@ -709,19 +667,12 @@
                             {{-- Jenis Berkas --}}
                             <div class="space-y-1">
                                 <label for="berkas_lainnya_jenis" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Berkas <span class="text-danger">*</span></label>
-                                <div class="relative">
-                                    <select id="berkas_lainnya_jenis" name="berkas_lainnya_jenis" x-model="berkasLainnyaForm.jenis" @change="generateNomorDokumen()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="" disabled>Pilih Jenis Berkas</option>
-                                        <option value="KTP">KTP</option>
-                                        <option value="KK">Kartu Keluarga (KK)</option>
-                                        <option value="Lainnya">Lainnya...</option>
-                                    </select>
-                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                        </svg>
-                                    </div>
-                                </div>
+                                <select id="berkas_lainnya_jenis" name="berkas_lainnya_jenis" x-model="berkasLainnyaForm.jenis" @change="generateNomorDokumen()" class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
+                                    <option value="" disabled>Pilih Jenis Berkas</option>
+                                    <option value="KTP">KTP</option>
+                                    <option value="KK">Kartu Keluarga (KK)</option>
+                                    <option value="Lainnya">Lainnya...</option>
+                                </select>
                             </div>
 
                             {{-- Input Manual Jenis Berkas Lainnya --}}

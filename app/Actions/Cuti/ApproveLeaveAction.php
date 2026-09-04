@@ -17,7 +17,7 @@ use Throwable;
 
 /**
  * Mengoordinasikan tindakan menyetujui pengajuan cuti.
- * Logika transisi snapshot, skip duplikat, dan pemotongan saldo berada di LeaveApprovalService.
+ * Logika transisi snapshot dan pemotongan saldo berada di LeaveApprovalService.
  * Action ini menangani orkestrasi tepian: pencatatan audit dan notifikasi pihak terkait setelah transisi.
  */
 class ApproveLeaveAction
@@ -34,7 +34,7 @@ class ApproveLeaveAction
      * Menyetujui pengajuan dengan aktor manusia eksplisit dan transaksi fail-closed.
      * File PDF baru dikompensasi bila transaksi database atau notifikasi gagal.
      */
-    public function execute(LeaveRequest $leaveRequest, Employee $actor, ?string $komentar, Request $request): LeaveRequest
+    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, ?string $komentar, Request $request): LeaveRequest
     {
         $requestUser = $request->user();
 
@@ -52,6 +52,7 @@ class ApproveLeaveAction
                 $komentar,
                 $request,
                 $requestUser,
+                $expectedActiveStepId,
                 &$newDocumentPath,
                 &$newDocumentRecoveryTaskId,
             ): LeaveRequest {
@@ -71,6 +72,7 @@ class ApproveLeaveAction
                 $leaveRequest = $this->approvals->approve(
                     $lockedBefore,
                     $actor,
+                    $expectedActiveStepId,
                     $komentar,
                     $requestUser,
                     $request,

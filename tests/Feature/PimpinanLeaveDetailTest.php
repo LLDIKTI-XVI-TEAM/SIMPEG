@@ -81,10 +81,10 @@ class PimpinanLeaveDetailTest extends TestCase
         LeaveRequestStep::create([
             'leave_request_id' => $leave->id,
             'step_order' => 1,
-            'step_type' => 'pybmc',
-            'role_label' => 'PYBMC',
+            'step_type' => 'kepala_bagian',
+            'role_label' => 'Kepala Bagian',
             'status' => 'pending',
-            'is_final' => true,
+            'is_final' => false,
         ]);
         LeaveRequestStep::create([
             'leave_request_id' => $leave->id,
@@ -98,7 +98,7 @@ class PimpinanLeaveDetailTest extends TestCase
         $this->actingAs($this->pimpinan())
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
-            ->assertSeeInOrder(['Tahap 1 · PYBMC', 'Menunggu PYBMC'])
+            ->assertSeeInOrder(['Tahap 1 · Atasan Langsung', 'Menunggu Atasan Langsung'])
             ->assertSeeInOrder(['Tahap 2 · Role Rahasia', 'Status tidak tersedia'])
             ->assertDontSee('status_rahasia');
     }

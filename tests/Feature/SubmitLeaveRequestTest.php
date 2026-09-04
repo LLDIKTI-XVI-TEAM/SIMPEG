@@ -1035,7 +1035,7 @@ class SubmitLeaveRequestTest extends TestCase
         $this->post(route(self::ROUTE), $this->payload($jenis));
 
         $leave = LeaveRequest::firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Tanggal harus diperbaiki.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal harus diperbaiki.');
 
         $response = $this->patchJson(route('cuti.resubmit', $leave), [
             'tanggal_mulai' => '2026-12-30',
@@ -1241,7 +1241,7 @@ class SubmitLeaveRequestTest extends TestCase
         $this->post(route(self::ROUTE), $this->payload($jenis));
 
         $leave = LeaveRequest::with('steps')->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Tanggal harus diperbaiki.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal harus diperbaiki.');
         $stepIdsBefore = $leave->steps()->orderBy('step_order')->pluck('id')->all();
 
         $response = $this->patch(route('cuti.resubmit', $leave), [
@@ -1443,7 +1443,7 @@ class SubmitLeaveRequestTest extends TestCase
             'lampiran' => UploadedFile::fake()->create('lama.pdf', 100, 'application/pdf'),
         ]));
         $leave = LeaveRequest::firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perlu revisi.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Perlu revisi.');
         $oldPath = $leave->fresh()->lampiran_path;
         $oldValues = $leave->fresh()->only(['tanggal_mulai', 'tanggal_selesai', 'alasan', 'status', 'lampiran_path']);
         LeaveRequest::saving(function (LeaveRequest $saving): void {
@@ -1481,7 +1481,7 @@ class SubmitLeaveRequestTest extends TestCase
             'lampiran' => $this->pdfUpload('lama.pdf'),
         ]));
         $leave = LeaveRequest::firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Ganti lampiran.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti lampiran.');
         $oldPath = $leave->fresh()->lampiran_path;
 
         $response = $this->patch(route('cuti.resubmit', $leave), [
@@ -1547,7 +1547,7 @@ class SubmitLeaveRequestTest extends TestCase
             'lampiran' => $this->pdfUpload('lama-simulasi.pdf'),
         ]))->assertRedirect(route('cuti'));
         $leave = LeaveRequest::query()->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Ganti lampiran simulasi.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti lampiran simulasi.');
         $before = $leave->fresh();
         $oldPath = (string) $before->lampiran_path;
         $this->assertTrue(Storage::disk(LeaveRequest::ATTACHMENT_STORAGE_DISK)->exists($oldPath));
@@ -1595,7 +1595,7 @@ class SubmitLeaveRequestTest extends TestCase
             'lampiran' => UploadedFile::fake()->create('stale.pdf', 100, 'application/pdf'),
         ]));
         $leave = LeaveRequest::query()->sole();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perbarui lampiran.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Perbarui lampiran.');
         $stale = $leave->fresh();
         $stalePath = (string) $stale->lampiran_path;
         $lockedPath = 'cuti/lampiran/'.$aktor['employee']->id.'/00000000-0000-4000-8000-000000000871.pdf';
@@ -1634,8 +1634,8 @@ class SubmitLeaveRequestTest extends TestCase
         ]));
         $second = LeaveRequest::query()->whereKeyNot($first->id)->sole();
         $second->forceFill(['lampiran_path' => $sharedPath])->save();
-        app(LeaveApprovalService::class)->requestChanges($first, $aktor['supervisor'], 'Ganti lampiran pertama.');
-        app(LeaveApprovalService::class)->requestChanges($second, $aktor['supervisor'], 'Ganti lampiran kedua.');
+        app(LeaveApprovalService::class)->requestChanges($first, $aktor['supervisor'], $first->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti lampiran pertama.');
+        app(LeaveApprovalService::class)->requestChanges($second, $aktor['supervisor'], $second->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti lampiran kedua.');
 
         $this->actingAs($aktor['user'])->patch(route('cuti.resubmit', $first), [
             'tanggal_mulai' => '2026-07-13', 'tanggal_selesai' => '2026-07-15',
@@ -1658,7 +1658,7 @@ class SubmitLeaveRequestTest extends TestCase
         $jenis = $this->jenisCuti('Cuti Sakit Legacy Public Tunggal');
         $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis));
         $leave = LeaveRequest::query()->sole();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Ganti lampiran legacy.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti lampiran legacy.');
         $legacyPath = 'cuti/legacy-tunggal.pdf';
         Storage::disk('public')->put($legacyPath, "%PDF-1.4\nlegacy\n%%EOF\n");
         $leave->forceFill(['lampiran_path' => $legacyPath])->save();
@@ -1686,8 +1686,8 @@ class SubmitLeaveRequestTest extends TestCase
         Storage::disk('public')->put($legacyPath, "%PDF-1.4\nshared legacy\n%%EOF\n");
         $first->forceFill(['lampiran_path' => $legacyPath])->save();
         $second->forceFill(['lampiran_path' => $legacyPath])->save();
-        app(LeaveApprovalService::class)->requestChanges($first, $aktor['supervisor'], 'Ganti legacy pertama.');
-        app(LeaveApprovalService::class)->requestChanges($second, $aktor['supervisor'], 'Ganti legacy kedua.');
+        app(LeaveApprovalService::class)->requestChanges($first, $aktor['supervisor'], $first->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti legacy pertama.');
+        app(LeaveApprovalService::class)->requestChanges($second, $aktor['supervisor'], $second->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti legacy kedua.');
 
         $this->actingAs($aktor['user'])->patch(route('cuti.resubmit', $first), [
             'tanggal_mulai' => '2026-07-13', 'tanggal_selesai' => '2026-07-15',
@@ -1710,7 +1710,7 @@ class SubmitLeaveRequestTest extends TestCase
         $jenis = $this->jenisCuti('Cuti Sakit Legacy Nested Tidak Aman');
         $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis));
         $leave = LeaveRequest::query()->sole();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Ganti lampiran legacy tidak aman.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Ganti lampiran legacy tidak aman.');
         $unsafePath = 'cuti/nested/legacy-tidak-aman.pdf';
         Storage::disk('public')->put($unsafePath, "%PDF-1.4\nlegacy nested\n%%EOF\n");
         $leave->forceFill(['lampiran_path' => $unsafePath])->save();
@@ -1749,7 +1749,7 @@ class SubmitLeaveRequestTest extends TestCase
             'lampiran' => UploadedFile::fake()->create('lama-audit.pdf', 100, 'application/pdf'),
         ]));
         $leave = LeaveRequest::firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perlu perbaikan sebelum audit gagal.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Perlu perbaikan sebelum audit gagal.');
         $oldPath = $leave->fresh()->lampiran_path;
         $before = $this->rollbackSnapshot($leave->fresh());
 
@@ -1790,7 +1790,7 @@ class SubmitLeaveRequestTest extends TestCase
             'lampiran' => UploadedFile::fake()->create('lama-cleanup.pdf', 100, 'application/pdf'),
         ]));
         $leave = LeaveRequest::query()->sole();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perbarui lampiran.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Perbarui lampiran.');
         $foreign = Employee::factory()->create();
         $foreignPath = 'cuti/lampiran/'.$foreign->id.'/00000000-0000-4000-8000-000000000666.pdf';
         Storage::disk('local')->put($foreignPath, 'milik pegawai lain');
@@ -1840,7 +1840,7 @@ class SubmitLeaveRequestTest extends TestCase
         $jenis = $this->jenisCuti('Cuti Sakit Resubmit Kepala Lembaga');
         $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis));
         $leave = LeaveRequest::with('steps')->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], 'Perlu revisi.');
+        app(LeaveApprovalService::class)->requestChanges($leave, $aktor['supervisor'], $leave->steps()->where('status', 'active')->valueOrFail('id'), 'Perlu revisi.');
         $aktor['employee']->forceFill(['is_kepala_lembaga' => true])->save();
         $before = $leave->fresh();
         $beforeValues = [
@@ -2028,7 +2028,7 @@ class SubmitLeaveRequestTest extends TestCase
 
         $response->assertUnprocessable()->assertJsonValidationErrors(['jenis_cuti_id']);
         $this->assertSame(
-            ['Semua Verifikator harus ditempatkan sebelum Kepala Bagian.'],
+            ['Semua Verifikator harus ditempatkan sebelum Atasan Langsung.'],
             $response->json('errors.jenis_cuti_id'),
         );
         $this->assertDatabaseCount('leave_requests', 0);
@@ -2145,7 +2145,8 @@ class SubmitLeaveRequestTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('chainReady', true);
-        $response->assertSee('Kepala Bagian');
+        $response->assertViewHas('chainRoleLabels', ['Atasan Langsung', 'PYBMC']);
+        $response->assertSee('Atasan Langsung');
         $response->assertSee('PYBMC');
         // Label tetap lama tidak boleh tersisa setelah panduan menjadi dinamis dari chain.
         $response->assertDontSee('Verifikator / Kabag');

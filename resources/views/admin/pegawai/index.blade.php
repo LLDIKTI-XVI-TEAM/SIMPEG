@@ -199,19 +199,19 @@
 
     docBadgeClass(state, withHover = false) {
         const base = {
-            lengkap: 'bg-success/10 text-success',
-            belum_lengkap: 'bg-warning/10 text-warning',
-            perlu_perbaikan: 'bg-danger/10 text-danger',
-            belum_ada: 'bg-muted/20 text-muted',
-            tidak_dinilai: 'bg-transparent text-muted',
-        }[state] ?? 'bg-muted/20 text-muted';
+            lengkap: 'bg-success/10 text-success border border-success/20',
+            belum_lengkap: 'bg-warning/10 text-warning border border-warning/20',
+            perlu_perbaikan: 'bg-danger/10 text-danger border border-danger/20',
+            belum_ada: 'bg-muted/15 text-muted border border-border',
+            tidak_dinilai: 'bg-soft text-muted border border-border shadow-xs',
+        }[state] ?? 'bg-soft text-muted border border-border';
         const hover = {
-            lengkap: 'hover:bg-success/15',
-            belum_lengkap: 'hover:bg-warning/15',
-            perlu_perbaikan: 'hover:bg-danger/15',
-            belum_ada: 'hover:bg-muted/30',
-            tidak_dinilai: 'hover:bg-soft/50',
-        }[state] ?? 'hover:bg-muted/30';
+            lengkap: 'hover:bg-success/20',
+            belum_lengkap: 'hover:bg-warning/20',
+            perlu_perbaikan: 'hover:bg-danger/20',
+            belum_ada: 'hover:bg-muted/25',
+            tidak_dinilai: 'hover:bg-muted/20',
+        }[state] ?? 'hover:bg-muted/25';
 
         return withHover ? `${base} ${hover}` : base;
     },
@@ -222,7 +222,7 @@
             belum_lengkap: 'bg-warning',
             perlu_perbaikan: 'bg-danger',
             belum_ada: 'bg-muted',
-            tidak_dinilai: 'bg-muted/50',
+            tidak_dinilai: 'bg-muted',
         }[state] ?? 'bg-muted';
     },
 
@@ -737,31 +737,38 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
     ]" />
             </div>
             <div class="flex shrink-0 items-center gap-3">
-                <x-ui.button type="button" variant="secondary" @click="clearCache(); fetchPage(meta.current_page);">
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    aria-label="Refresh data pegawai"
+                    x-bind:disabled="isLoading"
+                    x-bind:aria-busy="isLoading"
+                    @click="clearCache(); fetchPage(meta.current_page);"
+                >
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                         stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    Refresh
+                    <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
                 </x-ui.button>
                 @if(!$isReadOnly)
-                <x-ui.button type="button" variant="secondary" onclick="exportFilteredData()" id="export-btn">
-                    <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor"
+                <x-ui.button type="button" variant="primary" onclick="exportFilteredData()" id="export-btn">
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                     </svg>
                     Export Excel
                 </x-ui.button>
-                <x-ui.button type="button" variant="secondary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
+                <x-ui.button type="button" variant="primary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Export PDF
                 </x-ui.button>
                 @if ($canManageSkRequirements)
-                <x-ui.button type="button" variant="secondary" id="sk-requirement-btn" @click="openSkRequirementModal()"
+                <x-ui.button type="button" variant="primary" id="sk-requirement-btn" @click="openSkRequirementModal()"
                     aria-label="Atur SK Wajib per Jenis Pegawai">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
@@ -841,7 +848,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" emptyTitle="Tidak ada data pegawai yang sesuai."
-            emptyIcon="search" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null"
+            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null"
             filterClass="lg:grid-cols-6" searchCols="col-span-1 sm:col-span-2 lg:col-span-2">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
@@ -978,7 +985,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                             @if ($isReadOnly)
                             <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
                                 :class="docBadgeClass(p.is_lengkap)" title="Status kelengkapan dokumen">
-                                <span x-show="p.dokumen_is_dinilai" class="h-1.5 w-1.5 rounded-full"
+                                <span class="h-1.5 w-1.5 rounded-full shrink-0"
                                     :class="docDotClass(p.is_lengkap)"></span>
                                 <span x-text="docStatusWithCount(p)"></span>
                             </span>
@@ -986,7 +993,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                             <button type="button" @click="openDocumentStatus(p)"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 :class="docBadgeClass(p.is_lengkap, true)" title="Klik untuk melihat rincian status dokumen">
-                                <span x-show="p.dokumen_is_dinilai" class="h-1.5 w-1.5 rounded-full"
+                                <span class="h-1.5 w-1.5 rounded-full shrink-0"
                                     :class="docDotClass(p.is_lengkap)"></span>
                                 <span x-text="docStatusWithCount(p)"></span>
                                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -1125,7 +1132,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </div>
                     <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
                         :class="docBadgeClass(documentStatus.status_kelengkapan)">
-                        <span x-show="documentStatus.is_dinilai" class="h-1.5 w-1.5 rounded-full"
+                        <span class="h-1.5 w-1.5 rounded-full shrink-0"
                             :class="docDotClass(documentStatus.status_kelengkapan)"></span>
                         <span x-text="docStatusLabel(documentStatus.status_kelengkapan)"></span>
                     </span>

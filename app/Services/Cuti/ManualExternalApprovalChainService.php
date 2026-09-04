@@ -141,7 +141,7 @@ final class ManualExternalApprovalChainService
             $this->addError($errors, 'approval_steps', 'Jumlah Verifikator maksimal delapan tahap.');
         }
         if (count($kepalaIndexes) !== 1) {
-            $this->addError($errors, 'approval_steps', 'Riwayat persetujuan wajib memiliki tepat satu Kepala Bagian.');
+            $this->addError($errors, 'approval_steps', 'Riwayat persetujuan wajib memiliki tepat satu Atasan Langsung.');
         }
         if (count($pybmcIndexes) !== 1) {
             $this->addError($errors, 'approval_steps', 'Riwayat persetujuan wajib memiliki tepat satu PYBMC.');
@@ -153,7 +153,7 @@ final class ManualExternalApprovalChainService
         if (count($kepalaIndexes) === 1) {
             foreach ($types as $index => $type) {
                 if ($type === LeaveUsageExternalApprovalStep::TYPE_VERIFIER && $index > $kepalaIndexes[0]) {
-                    $this->addError($errors, "approval_steps.{$index}.step_type", 'Seluruh Verifikator wajib berada sebelum Kepala Bagian.');
+                    $this->addError($errors, "approval_steps.{$index}.step_type", 'Seluruh Verifikator wajib berada sebelum Atasan Langsung.');
                 }
             }
         }

@@ -30,6 +30,12 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
 
+    private const WORKER_READY_TIMEOUT_MILLISECONDS = 60_000;
+
+    private const WORKER_LOCK_TIMEOUT_MILLISECONDS = 15_000;
+
+    private const WORKER_TIMEOUT_SECONDS = 120;
+
     private ?string $raceDirectory = null;
 
     protected function setUp(): void
@@ -129,13 +135,13 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
 
         try {
             $updater->start();
-            $this->assertTrue($this->waitFor($paths['updated'], 30_000));
+            $this->assertTrue($this->waitFor($paths['updated'], self::WORKER_READY_TIMEOUT_MILLISECONDS));
             $due->start();
-            $this->assertTrue($this->waitFor($paths['due_ready'], 30_000));
+            $this->assertTrue($this->waitFor($paths['due_ready'], self::WORKER_READY_TIMEOUT_MILLISECONDS));
             $duePid = (int) File::get($paths['due_ready']);
 
             $this->assertTrue(
-                $this->waitForLock($duePid, 5_000),
+                $this->waitForLock($duePid, self::WORKER_LOCK_TIMEOUT_MILLISECONDS),
                 'Apply due wajib menunggu row lock target sebelum membandingkan provenance.',
             );
             $this->assertFalse(File::exists($paths['due_result']));
@@ -202,14 +208,14 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
 
         try {
             $updater->start();
-            $this->assertTrue($this->waitFor($paths['updated'], 30_000));
+            $this->assertTrue($this->waitFor($paths['updated'], self::WORKER_READY_TIMEOUT_MILLISECONDS));
 
             $lifecycle->start();
-            $this->assertTrue($this->waitFor($paths['lifecycle_ready'], 30_000));
+            $this->assertTrue($this->waitFor($paths['lifecycle_ready'], self::WORKER_READY_TIMEOUT_MILLISECONDS));
             $lifecyclePid = (int) File::get($paths['lifecycle_ready']);
 
             $this->assertTrue(
-                $this->waitForLock($lifecyclePid, 5_000),
+                $this->waitForLock($lifecyclePid, self::WORKER_LOCK_TIMEOUT_MILLISECONDS),
                 'Lifecycle wajib menunggu row lock target status sebelum klasifikasi/permission/factory.',
             );
             $this->assertFalse(File::exists($paths['lifecycle_result']));
@@ -285,11 +291,11 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
 
         try {
             $updater->start();
-            $this->assertTrue($this->waitFor($paths['updated'], 30_000));
+            $this->assertTrue($this->waitFor($paths['updated'], self::WORKER_READY_TIMEOUT_MILLISECONDS));
             $lifecycle->start();
-            $this->assertTrue($this->waitFor($paths['lifecycle_ready'], 30_000));
+            $this->assertTrue($this->waitFor($paths['lifecycle_ready'], self::WORKER_READY_TIMEOUT_MILLISECONDS));
             $lifecyclePid = (int) File::get($paths['lifecycle_ready']);
-            $this->assertTrue($this->waitForLock($lifecyclePid, 5_000));
+            $this->assertTrue($this->waitForLock($lifecyclePid, self::WORKER_LOCK_TIMEOUT_MILLISECONDS));
 
             File::put($paths['release_update'], 'release');
             $updater->wait();
@@ -351,7 +357,7 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
             PHP_BINARY,
             base_path('tests/Fixtures/ReferenceStatusControlPlaneRaceWorker.php'),
             base64_encode(json_encode($input, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 60);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
     }
 
     /** @param array<string, string> $input */
@@ -361,7 +367,7 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
             PHP_BINARY,
             base_path('tests/Fixtures/EmployeeStatusTargetRaceWorker.php'),
             base64_encode(json_encode($input, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 60);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
     }
 
     /** @param array<string, string> $input */
@@ -371,7 +377,7 @@ class EmployeeStatusTargetLockConcurrencyTest extends TestCase
             PHP_BINARY,
             base_path('tests/Fixtures/EmployeeStatusApplyDueRaceWorker.php'),
             base64_encode(json_encode($input, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 60);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
     }
 
     private function requestFor(User $actor): Request

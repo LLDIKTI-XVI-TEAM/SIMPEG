@@ -10,7 +10,7 @@
             <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi status kepegawaian.
                 Baris bertanda "Data sistem" dipakai langsung oleh EWS dan proses import.</p>
         </div>
-        <x-ui.button type="button" @click="showTambah = !showTambah" variant="primary" class="shrink-0">
+        <x-ui.button type="button" @click="showTambah = !showTambah" variant="secondary" class="shrink-0">
             Tambah
         </x-ui.button>
     </div>
@@ -51,23 +51,19 @@
                             <span class="inline-flex items-center gap-1.5">
                                 {{ $item->kode }}
                                 @if ($proteksi !== null)
-                                    <span title="{{ $proteksi }}"
-                                        class="inline-flex items-center rounded-full bg-info/10 px-2 py-0.5 text-[10px] font-semibold text-info">Data sistem</span>
+                                    <x-ui.badge variant="info" size="sm" pill title="{{ $proteksi }}">Data sistem</x-ui.badge>
                                 @endif
                                 @if ($item->is_default)
-                                    <span title="Status default pegawai baru dan hasil import"
-                                        class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Default</span>
+                                    <x-ui.badge variant="primary" size="sm" pill title="Status default pegawai baru dan hasil import">Default</x-ui.badge>
                                 @endif
                             </span>
                         </x-ui.table-td>
                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item->nama }}</x-ui.table-td>
                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item->kelompok }}</x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm">
-                            @if ($item->is_active)
-                                <span class="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">Aktif</span>
-                            @else
-                                <span class="inline-flex items-center rounded-full bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">Nonaktif</span>
-                            @endif
+                            <x-ui.badge :variant="$item->is_active ? 'success' : 'danger'" size="sm" pill>
+                                {{ $item->is_active ? 'Aktif' : 'Nonaktif' }}
+                            </x-ui.badge>
                         </x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm" class="text-sm text-muted">{{ $dipakai }} pemakai</x-ui.table-td>
                         <x-ui.table-td padding="sm" class="whitespace-nowrap">

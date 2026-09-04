@@ -133,6 +133,7 @@
 
                     @foreach ($cuti->steps->sortBy('step_order') as $step)
                         @php
+                            $stepRoleLabel = \App\Support\Cuti\ApprovalStepLabel::display($step->step_type, $step->role_label);
                             $stepVariant = match ($step->status) {
                                 'approved' => 'success',
                                 'tidak_disetujui' => 'danger',
@@ -142,17 +143,16 @@
                                 default => 'muted',
                             };
                             $stepTitle = match ($step->status) {
-                                'approved' => "Disetujui oleh {$step->role_label}",
-                                'tidak_disetujui' => "Tidak Disetujui oleh {$step->role_label}",
-                                 'ditangguhkan_tugas_dinas' => "Ditangguhkan karena Tugas Dinas oleh {$step->role_label}",
-                                 'active' => $status === 'ditangguhkan' ? "Ditangguhkan oleh {$step->role_label}" : "Menunggu {$step->role_label}",
-                                 'pending' => "Menunggu {$step->role_label}",
-                                 'skipped' => "Dilewati: {$step->role_label}",
+                                'approved' => "Disetujui oleh {$stepRoleLabel}",
+                                'tidak_disetujui' => "Tidak Disetujui oleh {$stepRoleLabel}",
+                                 'ditangguhkan_tugas_dinas' => "Ditangguhkan karena Tugas Dinas oleh {$stepRoleLabel}",
+                                 'active' => $status === 'ditangguhkan' ? "Ditangguhkan oleh {$stepRoleLabel}" : "Menunggu {$stepRoleLabel}",
+                                 'pending' => "Menunggu {$stepRoleLabel}",
+                                 'skipped' => "Dilewati: {$stepRoleLabel}",
                                 default => 'Status tidak tersedia',
                             };
                             $skippedReason = match ($step->skipped_reason) {
                                 'duty_postponement_terminal' => 'Dilewati karena penangguhan tugas dinas menutup pengajuan.',
-                                'duplicate_approver' => 'Dilewati karena approver yang sama sudah tercakup pada tahap lain.',
                                 'request_not_approved' => 'Dilewati karena pengajuan telah diputus tidak disetujui.',
                                 null => null,
                                 default => 'Dilewati karena alur persetujuan telah ditutup.',
@@ -212,7 +212,8 @@
                                 <div class="flex-1">
                                     <p class="text-xs font-semibold text-ink font-sans">
                                         {{ $approval->approver?->nama_lengkap ?? 'Approver' }}
-                                        <span class="text-muted font-normal">- Tahap {{ $approval->stage }} ({{ $stepLabels[$approval->stage]?->role_label ?? '-' }})</span>
+                                        @php($approvalStep = $stepLabels[$approval->stage] ?? null)
+                                        <span class="text-muted font-normal">- Tahap {{ $approval->stage }} ({{ $approvalStep === null ? '-' : \App\Support\Cuti\ApprovalStepLabel::display($approvalStep->step_type, $approvalStep->role_label) }})</span>
                                     </p>
                                     <p class="text-xs text-muted">{{ $approval->acted_at?->translatedFormat('d M Y, H:i') }}</p>
                                     @if ($approval->komentar)
@@ -225,7 +226,7 @@
                 </div>
             @endif
             <div class="border-t border-border pt-6 space-y-4"
-                   x-data="{ decisionForm: {{ $errors->dutyPostponement->has('alasan') ? "'dutyPostponement'" : 'null' }}, lastTrigger: null,
+                   x-data="{ decisionForm: {{ $errors->dutyPostponement->hasAny(['alasan', 'active_step_id']) ? "'dutyPostponement'" : 'null' }}, lastTrigger: null,
                      open(key, ev) { this.lastTrigger = ev?.currentTarget ?? null; this.decisionForm = key; this.$nextTick(() => document.getElementById(key === 'dutyPostponement' ? 'alasan-duty-postponement' : `komentar-${key}`)?.focus()); },
                      close() { this.decisionForm = null; this.$nextTick(() => this.lastTrigger?.focus()); } }"
                  @if ($errors->dutyPostponement->has('alasan')) x-init="$nextTick(() => document.getElementById('alasan-duty-postponement')?.focus())" @endif
@@ -233,6 +234,9 @@
                 @if (session('success'))
                     <x-ui.alert variant="success" size="sm">{{ session('success') }}</x-ui.alert>
                 @endif
+                @error('active_step_id')
+                    <x-ui.alert variant="danger" size="sm">{{ $message }}</x-ui.alert>
+                @enderror
                 @error('komentar')
                     <x-ui.alert variant="danger" size="sm">{{ $message }}</x-ui.alert>
                 @enderror
@@ -366,6 +370,7 @@
                         <h4 id="decision-title-{{ $formKey }}" class="mb-2 text-sm font-semibold text-ink">{{ $form['title'] }}</h4>
                         <form action="{{ route($form['route'], $cuti->id) }}" method="POST" class="space-y-3">
                             @csrf
+                            <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                             <x-form.textarea
                                 name="komentar"
                                 label="{{ $form['label'] }}"
@@ -389,6 +394,10 @@
                             <p id="decision-description-duty-postponement" class="text-sm text-ink">Tindakan ini bersifat terminal: pengajuan lama ditutup, reservasi dilepas, hak dilindungi paling lama satu tahun, dan pegawai membuat pengajuan baru pada tahun berikutnya.</p>
                             <form action="{{ route('cuti.penangguhan-tugas-dinas', $cuti->id) }}" method="POST" class="mt-4 space-y-4">
                                 @csrf
+                                <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
+                                @error('active_step_id', 'dutyPostponement')
+                                    <p class="text-sm text-danger" role="alert">{{ $message }}</p>
+                                @enderror
                                 <div>
                                     <label for="alasan-duty-postponement" class="block text-xs font-bold uppercase tracking-wider text-ink">Alasan Tugas Dinas <span class="text-danger">*</span></label>
                                     <textarea id="alasan-duty-postponement" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-modal-initial-focus="true" aria-describedby="decision-description-duty-postponement alasan-duty-postponement-help @error('alasan', 'dutyPostponement') alasan-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
@@ -439,6 +448,7 @@
                         <x-ui.button type="button" variant="danger-solid" @click="open('decline', $event)">Tidak Setujui</x-ui.button>
                         <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
                             @csrf
+                            <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                             <x-ui.button type="submit" variant="success-solid">Setujui</x-ui.button>
                         </form>
                     @endif

@@ -430,7 +430,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             [
                 'step_order' => 1,
                 'step_type' => 'kepala_bagian',
-                'role_label' => 'Kepala Bagian',
+                'role_label' => 'Atasan Langsung',
                 'approver_role_key' => 'kepala_bagian',
                 'approver_employee_id' => $approver->id,
                 'is_final' => false,
@@ -523,7 +523,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         $validSteps = [
             $this->approvalChainStep(1, 'verifier', 'Verifikator', $verifier, false),
-            $this->approvalChainStep(2, 'kepala_bagian', 'Kepala Bagian', $approver, false),
+            $this->approvalChainStep(2, 'kepala_bagian', 'Atasan Langsung', $approver, false),
             $this->approvalChainStep(3, 'pybmc', 'PYBMC', $finalApprover, true),
         ];
         $this->createPreviewChain(
@@ -538,7 +538,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             $invalidEmployee,
             'QA Fase 7 Chain Approver Nonaktif',
             [
-                $this->approvalChainStep(1, 'kepala_bagian', 'Kepala Bagian', $inactiveApprover, false),
+                $this->approvalChainStep(1, 'kepala_bagian', 'Atasan Langsung', $inactiveApprover, false),
                 $this->approvalChainStep(2, 'pybmc', 'PYBMC', $finalApprover, true),
             ],
             $admin,
@@ -826,7 +826,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         $firstStep = [
             'step_order' => 1,
             'step_type' => 'kepala_bagian',
-            'role_label' => 'Kepala Bagian',
+            'role_label' => 'Atasan Langsung',
             'approver_employee_id' => $approver->id,
             'status' => 'active',
             'is_final' => false,

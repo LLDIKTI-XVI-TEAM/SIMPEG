@@ -43,7 +43,16 @@ class BuildKepalaBagianDashboardAction
             ->get();
 
         $pendingLeaves = LeaveRequest::query()
-            ->with(['employee:id,nama_lengkap,nip', 'jenisCuti:id,nama'])
+            ->with([
+                'employee:id,nama_lengkap,nip',
+                'jenisCuti:id,nama',
+                'steps' => fn ($steps) => $steps
+                    ->select('id', 'leave_request_id')
+                    ->where('status', 'active')
+                    ->where('approver_employee_id', $user->employee_id)
+                    ->orderBy('step_order')
+                    ->limit(1),
+            ])
             ->whereIn('employee_id', $reportIds)
             ->whereIn('status', ['menunggu_approval', 'ditangguhkan'])
             ->whereHas('steps', fn ($steps) => $steps

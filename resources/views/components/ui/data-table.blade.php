@@ -12,7 +12,7 @@
     'searchModel' => null,
     'searchPlaceholder' => 'Cari...',
     'emptyTitle' => 'Tidak ada data',
-    'emptyIcon' => 'search',
+    'emptyIcon' => 'none',
     'caption' => null,
     'colspanCount' => null,
     'checkAllId' => null,   // Jika diisi, kolom dengan key='check' akan menampilkan checkbox select-all
@@ -158,6 +158,10 @@
                     Menampilkan <span class="font-medium text-ink" x-text="{{ $meta }}.from || 0"></span>
                     - <span class="font-medium text-ink" x-text="{{ $meta }}.to || 0"></span>
                     dari <span class="font-medium text-ink" x-text="{{ $meta }}.total || 0"></span>
+                </div>
+                <div class="hidden md:block ml-2 border-l border-border pl-4" x-show="!{{ $meta }} || {{ $meta }}.total === 0">
+                    Menampilkan <span class="font-medium text-ink">0 - 0</span>
+                    dari <span class="font-medium text-ink">0</span>
                 </div>
             </div>
 

@@ -6,6 +6,7 @@ use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
+use App\Support\Cuti\ApprovalStepLabel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -110,7 +111,7 @@ class DownloadOfficialLeavePdfAction
             'jenisCuti',
             'proof',
             'steps' => fn (HasMany $query) => $query->orderBy('step_order'),
-            'steps.approver',
+            'steps.approver:id,nama_lengkap,jabatan_terakhir',
         ]);
 
         $issuedAt = $this->issuedAt($leaveRequest->proof);
@@ -150,8 +151,9 @@ class DownloadOfficialLeavePdfAction
             'balanceN' => $isAnnual && $balance !== null ? $balance->sisa_tahun_berjalan : '-',
             'steps' => $leaveRequest->steps->map(fn ($step): array => [
                 'order' => $step->step_order,
-                'role' => $this->value($step->role_label),
+                'role' => $this->value(ApprovalStepLabel::display($step->step_type, $step->role_label)),
                 'approver' => $this->value($step->approver?->nama_lengkap),
+                'position' => $this->value($step->approver?->jabatan_terakhir),
                 'statusLabel' => match ($step->status) {
                     'approved' => 'Disetujui',
                     'skipped' => 'Dilewati',
@@ -161,7 +163,10 @@ class DownloadOfficialLeavePdfAction
                 'actedAtLabel' => $step->acted_at === null ? '-' : $this->dateTimeLabel($step->acted_at),
             ])->all(),
             'finalApproverName' => $this->value($finalStep?->approver?->nama_lengkap),
-            'finalApproverRole' => $this->value($finalStep?->role_label),
+            'finalApproverPosition' => $this->value($finalStep?->approver?->jabatan_terakhir),
+            'finalApproverRole' => $this->value($finalStep === null
+                ? null
+                : ApprovalStepLabel::display($finalStep->step_type, $finalStep->role_label)),
             'finalDecisionLabel' => $finalStep === null ? '-' : 'Disetujui',
             'finalActedAtLabel' => $finalStep?->acted_at === null ? '-' : $this->dateTimeLabel($finalStep->acted_at),
             'verificationUrl' => $verificationUrl,

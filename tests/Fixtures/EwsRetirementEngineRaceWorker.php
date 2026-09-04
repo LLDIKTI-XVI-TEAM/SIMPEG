@@ -14,6 +14,8 @@ require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
+const BARRIER_TIMEOUT_SECONDS = 45;
+
 $payload = json_decode(base64_decode((string) ($argv[1] ?? ''), true), true, flags: JSON_THROW_ON_ERROR);
 
 if (! is_array($payload)) {
@@ -57,7 +59,7 @@ if (in_array(($payload['barrier_stage'] ?? 'before_create'), ['after_first_lock'
         ], JSON_THROW_ON_ERROR));
 
         $release = (string) $payload['release'];
-        $deadline = microtime(true) + 30;
+        $deadline = microtime(true) + BARRIER_TIMEOUT_SECONDS;
         while (! File::exists($release) && microtime(true) < $deadline) {
             usleep(10_000);
         }
@@ -98,7 +100,7 @@ $service = new class(app(NotificationService::class), $payload) extends EwsEngin
             ], JSON_THROW_ON_ERROR));
 
             $release = (string) $this->payload['release'];
-            $deadline = microtime(true) + 30;
+            $deadline = microtime(true) + BARRIER_TIMEOUT_SECONDS;
             while (! File::exists($release) && microtime(true) < $deadline) {
                 usleep(10_000);
             }

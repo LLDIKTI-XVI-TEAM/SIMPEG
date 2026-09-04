@@ -8,7 +8,7 @@
         * { box-sizing: border-box; }
         body { color: #000; font-family: Times, serif; font-size: 7.5pt; line-height: 1.1; }
         h1, h2, p { margin: 0; }
-        .document-header { margin-bottom: 5pt; min-height: 40pt; position: relative; }
+        .document-header { margin-bottom: 5pt; min-height: 50pt; position: relative; }
         .document-header h1, .document-header h2 { padding-right: 53%; text-align: center; }
         .document-header h1 { font-size: 11pt; line-height: 1.25; text-transform: uppercase; }
         .document-header h2 { font-size: 10pt; line-height: 1.25; text-transform: uppercase; }
@@ -26,11 +26,12 @@
         .check-cell { width: 33.333%; }
         .balance-label { width: 70%; }
         .approval-table th { font-weight: bold; text-align: center; }
-        .approval-table .order { width: 6%; text-align: center; }
-        .approval-table .role { width: 18%; }
-        .approval-table .decision { width: 14%; }
-        .approval-table .note { width: 27%; }
-        .approval-table .time { width: 20%; }
+        .approval-table .order { width: 5%; text-align: center; }
+        .approval-table .position { width: 19%; }
+        .approval-table .role { width: 13%; }
+        .approval-table .decision { width: 12%; }
+        .approval-table .note { width: 20%; }
+        .approval-table .time { width: 14%; }
         .form-table tr, .approval-table tr { page-break-inside: avoid; }
         .official-block { border: 0.7pt solid #000; margin-top: 3pt; page-break-inside: avoid; padding: 3pt; }
         .official-block td { vertical-align: middle; }
@@ -75,14 +76,14 @@
         <h2 class="section-title">II. JENIS CUTI YANG DIAMBIL</h2>
         <table class="form-table">
             <tr>
-                <td class="check-cell">@if ($leaveTypeCode === 'tahunan')&#9745;@else&#9744;@endif Cuti Tahunan</td>
-                <td class="check-cell">@if ($leaveTypeCode === 'besar')&#9745;@else&#9744;@endif Cuti Besar</td>
-                <td class="check-cell">@if ($leaveTypeCode === 'sakit')&#9745;@else&#9744;@endif Cuti Sakit</td>
+                <td class="check-cell">@if ($leaveTypeCode === 'tahunan')[x]@else[ ]@endif Cuti Tahunan</td>
+                <td class="check-cell">@if ($leaveTypeCode === 'besar')[x]@else[ ]@endif Cuti Besar</td>
+                <td class="check-cell">@if ($leaveTypeCode === 'sakit')[x]@else[ ]@endif Cuti Sakit</td>
             </tr>
             <tr>
-                <td class="check-cell">@if ($leaveTypeCode === 'melahirkan')&#9745;@else&#9744;@endif Cuti Melahirkan</td>
-                <td class="check-cell">@if ($leaveTypeCode === 'alasan_penting')&#9745;@else&#9744;@endif Cuti Karena Alasan Penting</td>
-                <td class="check-cell">@if ($leaveTypeCode === 'cltn')&#9745;@else&#9744;@endif Cuti di Luar Tanggungan Negara</td>
+                <td class="check-cell">@if ($leaveTypeCode === 'melahirkan')[x]@else[ ]@endif Cuti Melahirkan</td>
+                <td class="check-cell">@if ($leaveTypeCode === 'alasan_penting')[x]@else[ ]@endif Cuti Karena Alasan Penting</td>
+                <td class="check-cell">@if ($leaveTypeCode === 'cltn')[x]@else[ ]@endif Cuti di Luar Tanggungan Negara</td>
             </tr>
         </table>
     </section>
@@ -123,14 +124,15 @@
         <h2 class="section-title">VII. PERTIMBANGAN ATASAN LANGSUNG DAN KEPUTUSAN PEJABAT BERWENANG</h2>
         <table class="approval-table">
             <thead>
-                <tr><th class="order">No.</th><th class="role">Peran</th><th>Pejabat</th><th class="decision">Keputusan</th><th class="note">Catatan</th><th class="time">Waktu</th></tr>
+                <tr><th class="order">No.</th><th>Nama</th><th class="position">Jabatan</th><th class="role">Peran</th><th class="decision">Keputusan</th><th class="note">Catatan</th><th class="time">Waktu</th></tr>
             </thead>
             <tbody>
                 @foreach ($steps as $step)
                     <tr>
                         <td class="order">{{ $step['order'] }}</td>
-                        <td>{{ $step['role'] }}</td>
                         <td>{{ $step['approver'] }}</td>
+                        <td>{{ $step['position'] }}</td>
+                        <td>{{ $step['role'] }}</td>
                         <td>{{ $step['statusLabel'] }}</td>
                         <td>{{ $step['note'] }}</td>
                         <td>{{ $step['actedAtLabel'] }}</td>
@@ -145,7 +147,8 @@
                     <td class="official-details">
                         <p><strong>Keputusan Pejabat Berwenang:</strong> {{ $finalDecisionLabel }}</p>
                         <p>Nama: {{ $finalApproverName }}</p>
-                        <p>Jabatan/Peran: {{ $finalApproverRole }}</p>
+                        <p>Jabatan: {{ $finalApproverPosition }}</p>
+                        <p>Peran: {{ $finalApproverRole }}</p>
                         <p>Waktu keputusan: {{ $finalActedAtLabel }}</p>
                         <p>Dokumen diterbitkan: {{ $issueDateTimeLabel }}</p>
                         <p class="verification-url">URL verifikasi: {{ $verificationUrl }}</p>

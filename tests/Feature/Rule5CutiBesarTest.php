@@ -219,6 +219,7 @@ class Rule5CutiBesarTest extends TestCase
         return app(ApproveLeaveAction::class)->execute(
             $large,
             $actor,
+            $large->steps()->where('status', 'active')->valueOrFail('id'),
             null,
             $request,
         );

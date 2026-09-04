@@ -5,6 +5,7 @@ namespace App\Actions\Cuti\Concerns;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Support\Cuti\ApprovalStepLabel;
 
 trait BuildsLeaveDecisionAuditPayload
 {
@@ -30,7 +31,9 @@ trait BuildsLeaveDecisionAuditPayload
             ->first();
 
         $stepOrder = $step?->step_order;
-        $stepLabel = $step?->role_label;
+        $stepLabel = $step === null
+            ? null
+            : ApprovalStepLabel::display($step->step_type, $step->role_label);
 
         return [
             'old' => [

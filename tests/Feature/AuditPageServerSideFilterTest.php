@@ -27,7 +27,7 @@ class AuditPageServerSideFilterTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_halaman_audit_memotong_data_pada_dua_puluh_lima_baris_per_halaman(): void
+    public function test_halaman_audit_memotong_data_pada_sepuluh_baris_per_halaman(): void
     {
         foreach (range(1, 30) as $urutan) {
             $this->auditLog(['user_name' => 'Operator '.$urutan]);
@@ -38,9 +38,10 @@ class AuditPageServerSideFilterTest extends TestCase
         $response->assertOk();
         $paginator = $response->viewData('auditLogs');
         $this->assertInstanceOf(LengthAwarePaginator::class, $paginator);
-        $this->assertSame(25, $paginator->perPage());
-        $this->assertCount(25, $paginator->items());
+        $this->assertSame(10, $paginator->perPage());
+        $this->assertCount(10, $paginator->items());
         $this->assertSame(30, $paginator->total());
+        $response->assertSee('name="per_page" value="10"', false);
     }
 
     public function test_halaman_audit_mencari_berdasarkan_nama_operator(): void
@@ -166,7 +167,7 @@ class AuditPageServerSideFilterTest extends TestCase
         $response = $this->actingAs($this->admin())->get('/dashboard/audit?'.http_build_query(['per_page' => '0']));
 
         $response->assertOk();
-        $this->assertSame(25, $response->viewData('auditLogs')->perPage());
+        $this->assertSame(10, $response->viewData('auditLogs')->perPage());
 
         $response = $this->actingAs($this->admin())->get('/dashboard/audit?'.http_build_query(['per_page' => '999']));
 

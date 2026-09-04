@@ -23,7 +23,7 @@ class BackfillEmployeeApprovalChainsAction
     /**
      * @return array{created_employee_ids:list<string>, skipped_employee_ids:list<string>, missing_kepala_bagian_employee_ids:list<string>, missing_final_approver_employee_ids:list<string>}
      */
-    public function execute(User $actor, string $reason, ?Request $request = null): array
+    public function execute(User $actor, ?string $reason, ?Request $request = null): array
     {
         // Instance Action dapat dipakai ulang oleh container; cache harus selalu mengikuti status
         // pegawai terbaru pada setiap eksekusi backfill administratif.
@@ -69,7 +69,7 @@ class BackfillEmployeeApprovalChainsAction
                     // tidak dipakai sebagai fallback agar backfill tidak mengabadikan atasan lama.
                     $steps[] = [
                         'step_type' => 'kepala_bagian',
-                        'role_label' => 'Kepala Bagian',
+                        'role_label' => 'Atasan Langsung',
                         'approver_employee_id' => $kepalaBagianId,
                         'is_final' => false,
                     ];

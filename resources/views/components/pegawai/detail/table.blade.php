@@ -17,7 +17,7 @@
                 @endforeach
 
                 @if($showActions)
-                    <th class="px-4 py-3 text-right">Aksi</th>
+                    <th class="px-4 py-3 text-left">Aksi</th>
                 @endif
             </tr>
         </thead>

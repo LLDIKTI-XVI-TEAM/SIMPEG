@@ -11,12 +11,14 @@
             <ol class="mt-2 list-decimal space-y-1 pl-4">
                 @foreach ($usageRow->externalApprovalSteps as $approvalStep)
                     <li class="break-words">
-                        <span class="font-semibold text-ink">{{ match ($approvalStep->step_type) {
-                            'verifier' => 'Verifikator',
-                            'kepala_bagian' => 'Kepala Bagian',
-                            'pybmc' => 'PYBMC',
-                            default => 'Tahap persetujuan',
-                        } }}:</span>
+                        <span class="font-semibold text-ink">{{ \App\Support\Cuti\ApprovalStepLabel::display(
+                            $approvalStep->step_type,
+                            match ($approvalStep->step_type) {
+                                'verifier' => 'Verifikator',
+                                'pybmc' => 'PYBMC',
+                                default => 'Tahap persetujuan',
+                            },
+                        ) }}:</span>
                         {{ $approvalStep->approver_name_snapshot }}@if ($approvalStep->approver_nip_snapshot) (NIP {{ $approvalStep->approver_nip_snapshot }})@endif;
                         {{ $approvalStep->acted_on->format('d/m/Y') }},
                         {{ match ($approvalStep->result_code) {

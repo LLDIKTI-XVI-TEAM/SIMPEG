@@ -112,7 +112,7 @@
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-bold uppercase tracking-wider font-sans {{ $isUnread ? 'text-primary' : 'text-muted' }}">{{ $subText }}</span>
                                 @if($isUnread)
-                                    <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary font-sans">Belum Dibaca</span>
+                                    <x-ui.badge variant="primary" size="sm" pill>Belum Dibaca</x-ui.badge>
                                 @endif
                             </div>
                             <span class="text-[10px] text-muted font-sans shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>

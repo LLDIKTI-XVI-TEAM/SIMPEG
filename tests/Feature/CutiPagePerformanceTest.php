@@ -9,6 +9,8 @@ use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use DOMDocument;
+use DOMXPath;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -92,6 +94,24 @@ class CutiPagePerformanceTest extends TestCase
             $fullBalanceQueries->isEmpty(),
             'Rekap cuti harus memakai agregat database, bukan mengambil seluruh leave_balances untuk summary.',
         );
+    }
+
+    public function test_kontrol_per_page_rekap_mereset_kedua_halaman_tabel(): void
+    {
+        $response = $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('cuti.rekap', [
+                'page_saldo' => 3,
+                'page_usage' => 3,
+                'per_page' => 10,
+            ]));
+
+        $response->assertOk();
+        $document = new DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new DOMXPath($document);
+
+        $this->assertSame(0, $xpath->query('//*[@id="per_page_saldo"]/ancestor::form[1]//input[@name="page_usage"]')->length);
+        $this->assertSame(0, $xpath->query('//*[@id="per_page_usage"]/ancestor::form[1]//input[@name="page_saldo"]')->length);
     }
 
     public function test_detail_rekap_union_memakai_limit_database_dan_query_count_tetap_bounded(): void

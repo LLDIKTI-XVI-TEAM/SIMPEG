@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Memvalidasi penetapan Kepala Bagian beserta tanggal mulai penugasannya.
+ * Memvalidasi penetapan atasan beserta tanggal mulai penugasannya.
  */
 class AssignSupervisorRequest extends FormRequest
 {
@@ -39,10 +39,15 @@ class AssignSupervisorRequest extends FormRequest
     /** @return array<string, string> */
     public function attributes(): array
     {
+        // FormRequest dipakai dua surface; konfigurasi cuti wajib memakai nama peran bisnis.
+        $supervisorLabel = $this->input('redirect_to') === 'cuti-config'
+            ? 'Atasan Langsung'
+            : 'Kepala Bagian';
+
         return [
-            'kepala_bagian_id' => 'Kepala Bagian',
-            'supervisor_id' => 'Kepala Bagian',
-            'effective_date' => 'Tanggal Mulai Penugasan Kepala Bagian',
+            'kepala_bagian_id' => $supervisorLabel,
+            'supervisor_id' => $supervisorLabel,
+            'effective_date' => 'Tanggal Mulai Penugasan '.$supervisorLabel,
         ];
     }
 }

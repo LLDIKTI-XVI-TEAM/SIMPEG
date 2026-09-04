@@ -123,7 +123,7 @@ class EwsQueryPerformanceTest extends TestCase
         $this->assertLessThanOrEqual($smallPimpinanQueries + 3, $largePimpinanQueries);
     }
 
-    /** Caller pegawai tidak boleh menurunkan total global dari preview 25 row. */
+    /** Caller pegawai tidak boleh menurunkan total global dari preview terbatas. */
     public function test_surface_pegawai_memakai_total_global_preview_dan_pagination_bounded(): void
     {
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Banyak EWS']);
@@ -165,8 +165,8 @@ class EwsQueryPerformanceTest extends TestCase
         $alerts = $page->viewData('alerts');
         $this->assertInstanceOf(LengthAwarePaginator::class, $alerts);
         $this->assertSame(30, $alerts->total());
-        $this->assertSame(25, $alerts->perPage());
-        $this->assertCount(25, $alerts->items());
+        $this->assertSame(10, $alerts->perPage());
+        $this->assertCount(10, $alerts->items());
         $this->assertLessThanOrEqual($smallDashboardQueries + 3, $largeDashboardQueries);
         $this->assertLessThanOrEqual($smallProfileQueries + 3, $largeProfileQueries);
         $this->assertLessThanOrEqual($smallPageQueries + 3, $largePageQueries);
@@ -196,7 +196,7 @@ class EwsQueryPerformanceTest extends TestCase
         $this->createAlertForEmployee($outside, 15, 999);
 
         [$page, $largePageQueries] = $this->measureQueries(
-            fn () => $this->actingAs($user)->get(route('kepala-bagian.ews.index')),
+            fn () => $this->actingAs($user)->get(route('kepala-bagian.ews.index', ['per_page' => 25])),
         );
         [$dashboard, $largeDashboardQueries] = $this->measureQueries(
             fn () => app(BuildKepalaBagianDashboardAction::class)->execute($user),
@@ -211,8 +211,8 @@ class EwsQueryPerformanceTest extends TestCase
         $alerts = $page->viewData('alerts');
         $this->assertInstanceOf(LengthAwarePaginator::class, $alerts);
         $this->assertSame(30, $alerts->total());
-        $this->assertSame(10, $alerts->perPage());
-        $this->assertCount(10, $alerts->items());
+        $this->assertSame(25, $alerts->perPage());
+        $this->assertCount(25, $alerts->items());
         $this->assertSame(['total' => 30, 'urgent' => 10, 'warning' => 10, 'info' => 10], $page->viewData('summary'));
         $this->assertCount(5, $dashboard['ewsBawahan']);
         $this->assertNotContains('Bawahan Performa 029 Luar Scope', collect($dashboard['ewsBawahan'])->pluck('nama')->all());
@@ -235,6 +235,10 @@ class EwsQueryPerformanceTest extends TestCase
         $this->assertLessThanOrEqual($smallPageQueries + 3, $largePageQueries);
         $this->assertLessThanOrEqual($smallDashboardQueries + 3, $largeDashboardQueries);
         $this->assertLessThanOrEqual($smallSearchQueries + 3, $largeSearchQueries);
+
+        $fiftyRows = $this->actingAs($user)->get(route('kepala-bagian.ews.index', ['per_page' => 50]));
+        $fiftyRows->assertOk();
+        $this->assertSame(50, $fiftyRows->viewData('alerts')->perPage());
     }
 
     /** @return array{0: mixed, 1: int} */

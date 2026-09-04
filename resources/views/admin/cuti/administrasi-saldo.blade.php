@@ -38,6 +38,7 @@
             'status' => $status,
             'search' => $search,
             'page_pegawai' => request('page_pegawai'),
+            'per_page' => request('per_page'),
         ], static fn ($value) => $value !== null && $value !== ''));
         $requestedTab = old('tab', $tab);
         $hasActiveReconciliation = (bool) $balanceReconciliation['reconciled'];
@@ -60,6 +61,7 @@
             'search' => $search,
             'tab' => 'manual',
             'page_pegawai' => request('page_pegawai'),
+            'per_page' => request('per_page'),
         ], static fn ($value) => $value !== null && $value !== ''));
         $manualTabHref = $canManageManual ? $manualTabUrl : null;
         $manualTabClick = $canManageManual ? null : "selectTab('manual')";
@@ -105,23 +107,35 @@
     >
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h1 class="text-2xl font-semibold text-ink font-sans">Administrasi Pemakaian Cuti</h1>
-                <x-ui.breadcrumb :items="[
-                    ['label' => 'Dashboard', 'url' => route('dashboard')],
-                    ['label' => 'Monitoring Cuti', 'url' => route('cuti')],
-                    ['label' => 'Administrasi Pemakaian Cuti'],
-                ]" />
-                <p class="mt-2 max-w-2xl text-xs leading-relaxed text-muted">
-                    Saldo merupakan hasil perhitungan baca-saja berdasarkan fakta pemakaian. Perbaiki data pemakaian tahunan atau entri cuti manual bila sumber datanya berubah.
-                </p>
+                <h2 class="text-2xl font-semibold text-ink font-sans">Administrasi Pemakaian Cuti</h2>
+                <x-ui.breadcrumb :items="array_merge(
+                    [
+                        ['label' => 'Dashboard', 'url' => route('dashboard')],
+                        ['label' => 'Administrasi Pemakaian Cuti', 'url' => $selectedEmployee ? $queueUrl : null],
+                    ],
+                    $selectedEmployee ? [['label' => $selectedEmployee->nama_lengkap]] : []
+                )" />
             </div>
-            <div class="flex shrink-0 items-center gap-2">
-                <a href="{{ route('cuti.rekap', array_filter(['pegawai' => $pegawaiId])) }}"
-                    class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2">
-                    Lihat Rekap Cuti
-                </a>
-            </div>
+
+            @if ($selectedEmployee)
+                <div class="flex shrink-0 items-center gap-3">
+                    <x-ui.button
+                        as="a"
+                        href="{{ $queueUrl }}"
+                        variant="secondary"
+                    >
+                        <svg class="h-4 w-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                        </svg>
+                        Kembali
+                    </x-ui.button>
+                </div>
+            @endif
         </div>
+
+        <x-ui.alert variant="info">
+            Saldo merupakan hasil perhitungan baca-saja berdasarkan fakta pemakaian. Perbaiki data pemakaian tahunan atau entri cuti manual bila sumber datanya berubah.
+        </x-ui.alert>
 
         @if (session('success'))
             <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>
@@ -143,70 +157,32 @@
         @endif
 
         @if (! $selectedEmployee)
-        <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-labelledby="filter-antrian-title">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <h3 id="filter-antrian-title" class="text-sm font-semibold text-ink">Cari pegawai</h3>
-                    <p class="mt-1 text-xs text-muted">Kelola saldo cuti tahun {{ $tahunAcuan }}. Cari pegawai berdasarkan nama atau NIP.</p>
+        <form method="GET" action="{{ route('cuti.saldo.administrasi') }}" class="mb-4">
+            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
+            <x-ui.filter-bar
+                searchId="search-pegawai"
+                searchName="search"
+                :searchValue="$search"
+                searchPlaceholder="Cari nama atau NIP"
+                gridClass="grid-cols-1 sm:grid-cols-2"
+                searchCols="col-span-1"
+            >
+                {{-- Filter Status Antrian --}}
+                <div class="relative">
+                    <x-form.select id="filter-status" name="status" onchange="this.form.submit()" size="md" aria-label="Filter status antrian">
+                        <option value="semua_pegawai" @selected($status === 'semua_pegawai')>Semua Pegawai ({{ $statusCounts['semua_pegawai'] }})</option>
+                        <option value="perlu_tindakan" @selected($status === 'perlu_tindakan')>Perlu Tindakan ({{ $statusCounts['perlu_tindakan'] }})</option>
+                        <option value="sudah_terdaftar" @selected($status === 'sudah_terdaftar')>Sudah Terdaftar ({{ $statusCounts['sudah_terdaftar'] }})</option>
+                    </x-form.select>
                 </div>
-                <form
-                    method="GET"
-                    action="{{ route('cuti.saldo.administrasi') }}"
-                    class="grid w-full gap-3 sm:grid-cols-[minmax(14rem,1fr)_auto] sm:items-end lg:max-w-3xl"
-                >
-                    <input type="hidden" name="status" value="{{ $status }}">
-                    <x-form.input
-                        name="search"
-                        label="Cari pegawai"
-                        type="search"
-                        maxlength="150"
-                        :value="$search"
-                        placeholder="Masukkan nama atau NIP"
-                    />
-                    <div class="flex items-center gap-2">
-                        <x-ui.button type="submit" class="min-h-11">Cari</x-ui.button>
-                        @if ($search !== '')
-                            <a href="{{ route('cuti.saldo.administrasi', array_filter(['status' => $status])) }}"
-                                class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
-                                Reset pencarian
-                            </a>
-                        @endif
-                    </div>
-                </form>
-            </div>
-        </section>
+            </x-ui.filter-bar>
+        </form>
 
         <section aria-labelledby="antrian-pegawai-title">
             <x-ui.card padding="none" class="overflow-hidden">
                 <div class="border-b border-border px-5 py-4">
-                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <h3 id="antrian-pegawai-title" class="text-sm font-semibold text-ink">Antrian Administrasi Pemakaian</h3>
-                            <p class="mt-1 text-xs text-muted">Pilih satu pegawai untuk membuka workspace administrasi.</p>
-                        </div>
-                        <nav class="flex flex-wrap gap-2" aria-label="Status antrian pegawai">
-                            @foreach ([
-                                'perlu_tindakan' => 'Perlu Tindakan',
-                                'sudah_terdaftar' => 'Sudah Terdaftar',
-                                'semua_pegawai' => 'Semua Pegawai',
-                            ] as $statusValue => $statusLabel)
-                                <a
-                                    href="{{ route('cuti.saldo.administrasi', array_filter([
-                                        'status' => $statusValue,
-                                        'search' => $search,
-                                    ])) }}"
-                                    @if ($status === $statusValue) aria-current="page" @endif
-                                    @class([
-                                        'inline-flex min-h-11 items-center justify-center rounded-xl border px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary/20',
-                                        'border-primary bg-primary text-white' => $status === $statusValue,
-                                        'border-border bg-surface text-muted hover:bg-soft hover:text-ink' => $status !== $statusValue,
-                                    ])
-                                >
-                                    {{ $statusLabel }} ({{ $statusCounts[$statusValue] }})
-                                </a>
-                            @endforeach
-                        </nav>
-                    </div>
+                    <h3 id="antrian-pegawai-title" class="text-sm font-semibold text-ink">Antrian Administrasi Pemakaian</h3>
+                    <p class="mt-1 text-xs text-muted">Pilih satu pegawai untuk membuka workspace administrasi.</p>
                 </div>
 
                 <div class="hidden overflow-x-auto md:block">
@@ -216,11 +192,30 @@
                                 <x-ui.table-th padding="sm">Pegawai</x-ui.table-th>
                                 <x-ui.table-th padding="sm">NIP</x-ui.table-th>
                                 <x-ui.table-th padding="sm">Status</x-ui.table-th>
-                                <x-ui.table-th padding="sm" align="right">Tindakan</x-ui.table-th>
+                                <x-ui.table-th padding="sm">Aksi</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
                         <x-ui.table-body>
                             @forelse ($employeeRows as $row)
+                                @php
+                                    $workspaceTab = $row['status_code'] === 'rekonsiliasi_aktif' ? $tab : 'pendaftaran';
+                                    $workspaceUrl = route('cuti.saldo.administrasi', array_filter([
+                                        'status' => $status,
+                                        'search' => $search,
+                                        'pegawai' => $row['employee_id'],
+                                        'tab' => $workspaceTab,
+                                        'page_pegawai' => request('page_pegawai'),
+                                        'per_page' => request('per_page'),
+                                    ]));
+                                    $manualUsageUrl = route('cuti.saldo.administrasi', array_filter([
+                                        'status' => $status,
+                                        'search' => $search,
+                                        'pegawai' => $row['employee_id'],
+                                        'tab' => 'manual',
+                                        'page_pegawai' => request('page_pegawai'),
+                                        'per_page' => request('per_page'),
+                                    ]));
+                                @endphp
                                 <x-ui.table-row>
                                     <x-ui.table-td padding="sm" class="text-sm font-semibold text-ink">
                                         {{ $row['nama_lengkap'] }}
@@ -231,41 +226,50 @@
                                     <x-ui.table-td padding="sm">
                                         <span class="text-xs font-semibold text-ink">{{ $statusLabels[$row['status_code']] }}</span>
                                     </x-ui.table-td>
-                                    <x-ui.table-td padding="sm" align="right">
-                                        <div class="flex flex-wrap items-center justify-end gap-1">
-                                            <a
-                                                href="{{ route('cuti.saldo.administrasi', array_filter([
-                                                    'status' => $status,
-                                                    'search' => $search,
-                                                    'pegawai' => $row['employee_id'],
-                                                    'tab' => $row['status_code'] === 'rekonsiliasi_aktif' ? $tab : 'pendaftaran',
-                                                    'page_pegawai' => request('page_pegawai'),
-                                                ])) }}"
-                                                x-bind:href="withActiveTab($el.getAttribute('href'), @js($row['status_code'] === 'rekonsiliasi_aktif' ? null : 'pendaftaran') ?? activeTab)"
-                                                class="inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    <x-ui.table-td padding="sm">
+                                        <div class="flex items-center justify-start gap-1.5">
+                                            <x-ui.button
+                                                as="a"
+                                                :href="$workspaceUrl"
+                                                x-bind:href="withActiveTab(@js($workspaceUrl), @js($row['status_code'] === 'rekonsiliasi_aktif' ? null : 'pendaftaran') ?? activeTab)"
+                                                variant="secondary"
+                                                size="icon"
+                                                tooltip-position="top-end"
+                                                :title="$row['status_code'] === 'rekonsiliasi_aktif' ? 'Lihat data pemakaian' : 'Catat pemakaian tahunan'"
+                                                :aria-label="$row['status_code'] === 'rekonsiliasi_aktif' ? 'Lihat data pemakaian' : 'Catat pemakaian tahunan'"
                                             >
-                                                {{ $row['status_code'] === 'rekonsiliasi_aktif' ? 'Lihat data pemakaian' : 'Catat pemakaian tahunan' }}
-                                            </a>
+                                                @if ($row['status_code'] === 'rekonsiliasi_aktif')
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                                    </svg>
+                                                @else
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                                    </svg>
+                                                @endif
+                                            </x-ui.button>
                                             @if ($canManageManual)
-                                                <a
-                                                    href="{{ route('cuti.saldo.administrasi', array_filter([
-                                                        'status' => $status,
-                                                        'search' => $search,
-                                                        'pegawai' => $row['employee_id'],
-                                                        'tab' => 'manual',
-                                                        'page_pegawai' => request('page_pegawai'),
-                                                    ])) }}"
-                                                    class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-3 py-2 text-xs font-semibold text-ink transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                <x-ui.button
+                                                    as="a"
+                                                    :href="$manualUsageUrl"
+                                                    variant="secondary"
+                                                    size="icon"
+                                                    tooltip-position="top-end"
+                                                    title="Catat cuti eksternal"
+                                                    aria-label="Catat cuti eksternal"
                                                 >
-                                                    Catat cuti eksternal
-                                                </a>
+                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                                    </svg>
+                                                </x-ui.button>
                                             @endif
                                         </div>
                                     </x-ui.table-td>
                                 </x-ui.table-row>
                             @empty
                                 <x-ui.table-row>
-                                    <x-ui.table-td colspan="4" class="py-8 text-center text-sm text-muted">
+                                    <x-ui.table-td colspan="4" align="center" padding="comfortable" class="py-8 text-muted">
                                         Tidak ada pegawai yang cocok dengan filter ini.
                                     </x-ui.table-td>
                                 </x-ui.table-row>
@@ -292,6 +296,7 @@
                                         'pegawai' => $row['employee_id'],
                                         'tab' => $row['status_code'] === 'rekonsiliasi_aktif' ? $tab : 'pendaftaran',
                                         'page_pegawai' => request('page_pegawai'),
+                                        'per_page' => request('per_page'),
                                     ])) }}"
                                     x-bind:href="withActiveTab($el.getAttribute('href'), @js($row['status_code'] === 'rekonsiliasi_aktif' ? null : 'pendaftaran') ?? activeTab)"
                                     class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-center text-sm font-semibold text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -306,6 +311,7 @@
                                             'pegawai' => $row['employee_id'],
                                             'tab' => 'manual',
                                             'page_pegawai' => request('page_pegawai'),
+                                            'per_page' => request('per_page'),
                                         ])) }}"
                                         class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-center text-sm font-semibold text-ink transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
                                     >
@@ -319,18 +325,47 @@
                     @endforelse
                 </div>
 
-                @if ($employeeRows->hasPages())
-                    <div class="border-t border-border px-5 py-3">
-                        {{ $employeeRows->onEachSide(1)->links('vendor.pagination.simpeg') }}
+                {{-- TABLE FOOTER --}}
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                    <div class="flex items-center gap-3 text-sm text-muted">
+                        <form method="GET" action="{{ route('cuti.saldo.administrasi') }}" class="flex items-center gap-2">
+                            @if($search)
+                                <input type="hidden" name="search" value="{{ $search }}">
+                            @endif
+                            @if($status)
+                                <input type="hidden" name="status" value="{{ $status }}">
+                            @endif
+
+                            <span class="whitespace-nowrap">Tampilkan</span>
+                            <label for="per_page" class="sr-only">Jumlah baris per halaman</label>
+                            <select
+                                id="per_page"
+                                name="per_page"
+                                onchange="this.form.submit()"
+                                class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
+                            >
+                                @foreach ([10, 25, 50] as $opsi)
+                                    <option value="{{ $opsi }}" @selected((int) request('per_page', 10) === $opsi)>{{ $opsi }}</option>
+                                @endforeach
+                            </select>
+                            <span class="hidden sm:inline">data</span>
+                        </form>
+
+                        {{-- Meta Info --}}
+                        <div class="hidden md:block ml-2 border-l border-border pl-4">
+                            Menampilkan <span class="font-medium text-ink">{{ $employeeRows->firstItem() ?? 0 }}</span>
+                            - <span class="font-medium text-ink">{{ $employeeRows->lastItem() ?? 0 }}</span>
+                            dari <span class="font-medium text-ink">{{ $employeeRows->total() }}</span>
+                        </div>
                     </div>
-                @endif
+
+                    <div class="flex items-center gap-1.5">
+                        {{ $employeeRows->appends(request()->query())->links('vendor.pagination.simpeg') }}
+                    </div>
+                </div>
             </x-ui.card>
         </section>
         @else
-        <a href="{{ $queueUrl }}"
-            class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
-            Kembali ke antrian pegawai
-        </a>
         <div class="flex flex-col gap-6 lg:flex-row">
             <aside class="w-full shrink-0 lg:w-64">
                 <x-ui.card padding="sm" class="space-y-1">
@@ -919,6 +954,7 @@
                                 <input type="hidden" name="search" value="{{ $search }}">
                                 <input type="hidden" name="tab" value="{{ $tab }}">
                                 <input type="hidden" name="page_pegawai" value="{{ request('page_pegawai') }}">
+                                <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
 
                                 <div>
                                     <label for="usage-source-filter" class="mb-1 block text-xs font-semibold text-muted">Sumber fakta</label>

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalance;
@@ -136,6 +137,7 @@ class CutiEndToEndApprovalTest extends TestCase
         // === Tahap 2: Kepala Bagian menyetujui lewat endpoint halaman kabag ===
         $this->actingAs($kabagUser)
             ->post(route('kepala-bagian.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
                 'keputusan' => 'DISETUJUI',
             ])
             ->assertRedirect(route('kepala-bagian.cuti.show', $leave))
@@ -165,6 +167,7 @@ class CutiEndToEndApprovalTest extends TestCase
         // === Tahap 3: PYBMC menyetujui final lewat endpoint halaman pimpinan ===
         $this->actingAs($pimpinanUser)
             ->post(route('pimpinan.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
@@ -333,6 +336,7 @@ class CutiEndToEndApprovalTest extends TestCase
 
             $this->actingAs($user)
                 ->post(route('cuti.approve', $leave->id), [
+                    'active_step_id' => $step->id,
                     'komentar' => "Menyetujui tahap {$step->step_order}.",
                 ])
                 ->assertRedirect(route('cuti.approval'));
@@ -368,12 +372,14 @@ class CutiEndToEndApprovalTest extends TestCase
     {
         return [
             'verifier juga Kepala Bagian' => ['verifier_kepala_bagian'],
+            'verifier juga PYBMC' => ['verifier_pybmc'],
             'Kepala Bagian juga PYBMC' => ['kepala_bagian_pybmc'],
+            'verifier, Kepala Bagian, dan PYBMC' => ['semua_peran'],
         ];
     }
 
     #[DataProvider('duplicateApproverProvider')]
-    public function test_submit_mempertahankan_duplikat_dan_hanya_meminta_actor_terakhir_bertindak(string $skenario): void
+    public function test_submit_mempertahankan_approver_lintas_peran_dan_meminta_satu_tindakan_per_tahap(string $skenario): void
     {
         $jenisPegawai = RefJenisPegawai::firstOrCreate(['nama' => 'PNS']);
         $actorDuplikat = Employee::factory()->create(['nama_lengkap' => 'Actor Duplikat E2E']);
@@ -405,18 +411,28 @@ class CutiEndToEndApprovalTest extends TestCase
             'effective_from' => '2026-01-01',
             'change_reason' => 'Fixture duplicate last occurrence.',
         ]);
-        $stepDefinitions = $skenario === 'verifier_kepala_bagian'
-            ? [
+        $stepDefinitions = match ($skenario) {
+            'verifier_kepala_bagian' => [
                 ['step_type' => 'verifier', 'role_label' => 'Verifikator Duplikat', 'approver' => $actorDuplikat, 'is_final' => false],
-                ['step_type' => 'verifier', 'role_label' => 'Verifikator Efektif', 'approver' => $verifierEfektif, 'is_final' => false],
                 ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver' => $actorDuplikat, 'is_final' => false],
                 ['step_type' => 'pybmc', 'role_label' => 'PYBMC', 'approver' => $pybmcLain, 'is_final' => true],
-            ]
-            : [
+            ],
+            'verifier_pybmc' => [
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator Efektif', 'approver' => $verifierEfektif, 'is_final' => false],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian', 'approver' => $pybmcLain, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC Duplikat', 'approver' => $verifierEfektif, 'is_final' => true],
+            ],
+            'kepala_bagian_pybmc' => [
                 ['step_type' => 'verifier', 'role_label' => 'Verifikator Efektif', 'approver' => $verifierEfektif, 'is_final' => false],
                 ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian Duplikat', 'approver' => $actorDuplikat, 'is_final' => false],
                 ['step_type' => 'pybmc', 'role_label' => 'PYBMC Duplikat', 'approver' => $actorDuplikat, 'is_final' => true],
-            ];
+            ],
+            'semua_peran' => [
+                ['step_type' => 'verifier', 'role_label' => 'Verifikator Duplikat', 'approver' => $actorDuplikat, 'is_final' => false],
+                ['step_type' => 'kepala_bagian', 'role_label' => 'Kepala Bagian Duplikat', 'approver' => $actorDuplikat, 'is_final' => false],
+                ['step_type' => 'pybmc', 'role_label' => 'PYBMC Duplikat', 'approver' => $actorDuplikat, 'is_final' => true],
+            ],
+        };
         $chain->steps()->createMany(collect($stepDefinitions)->map(
             fn (array $definition, int $index): array => [
                 'step_order' => $index + 1,
@@ -429,6 +445,7 @@ class CutiEndToEndApprovalTest extends TestCase
 
         $pemohonUser = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
         $approverUsers = collect([$actorDuplikat, $verifierEfektif, $pybmcLain])
+            ->unique('id')
             ->mapWithKeys(fn (Employee $approver): array => [
                 $approver->id => User::factory()->pegawai()->create(['employee_id' => $approver->id]),
             ]);
@@ -452,47 +469,51 @@ class CutiEndToEndApprovalTest extends TestCase
 
         $leave = LeaveRequest::query()->sole();
         $steps = $leave->steps()->orderBy('step_order')->get();
-        $latestOrderByActor = collect($stepDefinitions)
-            ->mapWithKeys(fn (array $definition, int $index): array => [$definition['approver']->id => $index + 1]);
-        $expectedStatuses = collect($stepDefinitions)->map(function (array $definition, int $index) use ($latestOrderByActor): string {
-            if ($latestOrderByActor[$definition['approver']->id] !== $index + 1) {
-                return 'skipped';
-            }
+        $this->assertSame(['active', ...array_fill(0, count($steps) - 1, 'pending')], $steps->pluck('status')->all());
+        $this->assertFalse($steps->contains(fn ($step): bool => $step->skipped_reason === 'duplicate_approver'));
 
-            return $latestOrderByActor->filter(fn (int $order): bool => $order < $index + 1)->isEmpty()
-                ? 'active'
-                : 'pending';
-        })->all();
-        $this->assertSame($expectedStatuses, $steps->pluck('status')->all());
-
-        foreach ($steps->where('status', 'skipped') as $skippedStep) {
-            $this->assertSame('duplicate_approver', $skippedStep->skipped_reason);
-        }
-
-        $effectiveSteps = $steps->where('status', '!=', 'skipped')->values();
-        $firstEffective = $effectiveSteps->firstOrFail();
+        $firstEffective = $steps->firstOrFail();
         $initialNotification = SimpegNotification::query()
             ->where('user_id', $firstEffective->approver_employee_id)
             ->where('type', 'cuti.pengajuan_baru')
             ->sole();
         $this->assertSame($firstEffective->id, $initialNotification->data['leave_request_step_id'] ?? null);
 
-        foreach ($effectiveSteps as $step) {
+        foreach ($steps as $step) {
             $user = $approverUsers->get($step->approver_employee_id);
             $this->assertInstanceOf(User::class, $user);
             $this->actingAs($user)
-                ->post(route('cuti.approve', $leave->id), ['komentar' => 'Satu tindakan per actor efektif.'])
+                ->post(route('cuti.approve', $leave->id), [
+                    'active_step_id' => $step->id,
+                    'komentar' => 'Satu tindakan per tahap approval.',
+                ])
                 ->assertRedirect(route('cuti.approval'));
         }
 
         $this->assertSame('disetujui', $leave->refresh()->status);
-        foreach ($effectiveSteps->pluck('approver_employee_id')->unique() as $approverId) {
-            $this->assertSame(1, $leave->approvals()->where('approver_id', $approverId)->count());
-        }
+        $approvedSteps = $leave->steps()->orderBy('step_order')->get();
+        $approvalTimeline = $leave->approvals()->orderBy('stage')->get();
+        $this->assertSame(array_fill(0, $steps->count(), 'approved'), $approvedSteps->pluck('status')->all());
+        $this->assertSame(range(1, $steps->count()), $approvalTimeline->pluck('stage')->all());
+        $this->assertSame(0, $leave->approvals()->where('action', 'SKIP')->count());
         $this->assertSame(
-            $effectiveSteps->count(),
-            $leave->approvals()->where('action', 'APPROVE')->count(),
+            $steps->count(),
+            $approvalTimeline->where('action', 'APPROVE')->count(),
         );
+
+        if ($skenario === 'semua_peran') {
+            $this->assertSame([$actorDuplikat->id, $actorDuplikat->id, $actorDuplikat->id], $approvalTimeline->pluck('approver_id')->all());
+            $auditEventsByStage = AuditLog::query()
+                ->where('auditable_type', 'LeaveRequest')
+                ->where('auditable_id', $leave->id)
+                ->whereIn('event', ['VERIFY', 'DECIDE'])
+                ->get()
+                ->mapWithKeys(fn (AuditLog $audit): array => [(int) ($audit->new_values['step_order'] ?? 0) => $audit->event])
+                ->all();
+            ksort($auditEventsByStage);
+
+            $this->assertSame([1 => 'VERIFY', 2 => 'VERIFY', 3 => 'DECIDE'], $auditEventsByStage);
+        }
     }
 
     private function actorRequest(User $actor): Request

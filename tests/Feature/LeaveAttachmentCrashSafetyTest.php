@@ -166,6 +166,7 @@ SQL);
         app(LeaveApprovalService::class)->requestChanges(
             $leaveRequest,
             $actor['supervisor'],
+            $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'),
             'Lampiran perlu diganti.',
         );
 

@@ -62,7 +62,10 @@ class KepalaBagianRouteGateTest extends TestCase
 
         foreach ($users as $user) {
             $this->actingAs($user)
-                ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $leave), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+                ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $leave), [
+                    'active_step_id' => '00000000-0000-4000-8000-000000000001',
+                    'alasan' => 'Penugasan mendesak mewakili instansi.',
+                ])
                 ->assertForbidden();
             $this->assertSame('menunggu_approval', $leave->fresh()->status);
         }

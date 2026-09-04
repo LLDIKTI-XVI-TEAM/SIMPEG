@@ -38,6 +38,7 @@ class RecordDutyPostponementAction
         LeaveRequest $leaveRequest,
         Employee $actor,
         User $actingUser,
+        string $expectedActiveStepId,
         string $reason,
     ): LeaveRequest {
         // Identitas akun dan approver snapshot harus sama sebelum transaksi agar akun lain tidak dapat meminjam otoritas pegawai.
@@ -53,7 +54,7 @@ class RecordDutyPostponementAction
             ]);
         }
 
-        return DB::transaction(function () use ($leaveRequest, $actor, $actingUser, $reason): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $actingUser, $expectedActiveStepId, $reason): LeaveRequest {
             $locked = LeaveRequest::query()
                 ->whereKey($leaveRequest->id)
                 ->lockForUpdate()
@@ -61,7 +62,7 @@ class RecordDutyPostponementAction
             $locked->load(['jenisCuti', 'employee']);
 
             if ($locked->status === LeaveRequest::STATUS_DUTY_POSTPONED) {
-                $this->assertExistingTerminalContract($locked, $actor, $actingUser, $reason);
+                $this->assertExistingTerminalContract($locked, $actor, $actingUser, $expectedActiveStepId, $reason);
 
                 return $locked->refresh();
             }
@@ -87,6 +88,8 @@ class RecordDutyPostponementAction
             if ($activeStep->approver_employee_id !== $actor->id) {
                 throw new AuthorizationException('Anda bukan approver snapshot yang berwenang untuk penangguhan tugas dinas ini.');
             }
+
+            $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
 
             $statusBefore = $locked->status;
             $actedAt = Carbon::now();
@@ -180,6 +183,7 @@ class RecordDutyPostponementAction
         LeaveRequest $request,
         Employee $actor,
         User $actingUser,
+        string $expectedActiveStepId,
         string $reason,
     ): void {
         $terminalSteps = $request->steps()
@@ -235,6 +239,12 @@ class RecordDutyPostponementAction
         }
 
         $step = $terminalSteps->first();
+
+        if ($step->approver_employee_id !== $actor->id) {
+            throw new AuthorizationException('Anda bukan approver snapshot yang berwenang untuk penangguhan tugas dinas ini.');
+        }
+
+        $this->assertExpectedActiveStep($step, $expectedActiveStepId);
         $ledger = $ledgerRows->first();
         $release = $releaseRows->first();
         $approval = $approvalRows->first();
@@ -330,5 +340,15 @@ class RecordDutyPostponementAction
         throw ValidationException::withMessages([
             'leave_request' => 'Bukti penangguhan tugas dinas terminal tidak lengkap atau tidak konsisten.',
         ]);
+    }
+
+    /** Token form hanya sah untuk step snapshot yang telah dikunci dan lolos otorisasi aktor. */
+    private function assertExpectedActiveStep(LeaveRequestStep $step, string $expectedActiveStepId): void
+    {
+        if (strtolower($step->id) !== strtolower($expectedActiveStepId)) {
+            throw ValidationException::withMessages([
+                'active_step_id' => 'Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.',
+            ])->errorBag('dutyPostponement');
+        }
     }
 }

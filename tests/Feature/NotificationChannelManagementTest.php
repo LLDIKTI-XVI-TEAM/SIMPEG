@@ -180,7 +180,10 @@ class NotificationChannelManagementTest extends TestCase
     public function test_channel_tanpa_adapter_runtime_tidak_dapat_diaktifkan(): void
     {
         $admin = User::factory()->superAdmin()->create();
-        $channel = RefNotificationChannel::query()->where('code', 'whatsapp_business')->firstOrFail();
+        $channel = RefNotificationChannel::create([
+            'code' => 'sms_gateway',
+            'name' => 'SMS Gateway',
+        ]);
 
         $this->actingAs($admin)
             ->postWithCsrf("/data-master/channel-notifikasi/{$channel->id}/status", ['is_enabled' => true])

@@ -477,7 +477,7 @@ class CutiFormulirPdfTest extends TestCase
             'institution', 'issuePlace', 'issueDateLabel', 'issueDateTimeLabel', 'employeeName', 'employeeNip',
             'employeePosition', 'employeeServiceLength', 'employeeUnit', 'leaveTypeCode', 'leaveTypeName', 'reason',
             'startDateLabel', 'endDateLabel', 'workdayCount', 'addressDuringLeave', 'phoneDuringLeave', 'balanceN2',
-            'balanceN1', 'balanceN', 'steps', 'finalApproverName', 'finalApproverRole', 'finalDecisionLabel',
+            'balanceN1', 'balanceN', 'steps', 'finalApproverName', 'finalApproverPosition', 'finalApproverRole', 'finalDecisionLabel',
             'finalActedAtLabel', 'verificationUrl', 'qrDataUri',
         ], array_keys($data));
         $this->assertArrayNotHasKey('leaveRequest', $data);
@@ -504,8 +504,9 @@ class CutiFormulirPdfTest extends TestCase
         $this->assertSame([
             [
                 'order' => 1,
-                'role' => 'Kepala Bagian',
+                'role' => 'Atasan Langsung',
                 'approver' => 'Penyetuju Historis',
+                'position' => 'Kepala Subbagian Kepegawaian',
                 'statusLabel' => 'Dilewati',
                 'note' => '<catatan>&',
                 'actedAtLabel' => '14 Juli 2026 16:30 WITA',
@@ -514,12 +515,14 @@ class CutiFormulirPdfTest extends TestCase
                 'order' => 2,
                 'role' => 'PYBMC',
                 'approver' => 'Penyetuju Final',
+                'position' => 'Kepala LLDIKTI Wilayah XVI',
                 'statusLabel' => 'Disetujui',
                 'note' => 'Final disetujui',
                 'actedAtLabel' => '15 Juli 2026 15:30 WITA',
             ],
         ], $data['steps']);
         $this->assertSame('Penyetuju Final', $data['finalApproverName']);
+        $this->assertSame('Kepala LLDIKTI Wilayah XVI', $data['finalApproverPosition']);
         $this->assertSame('PYBMC', $data['finalApproverRole']);
         $this->assertSame('Disetujui', $data['finalDecisionLabel']);
         $this->assertSame('15 Juli 2026 15:30 WITA', $data['finalActedAtLabel']);
@@ -537,6 +540,20 @@ class CutiFormulirPdfTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    public function test_official_form_uses_dash_for_missing_approver_name_and_position(): void
+    {
+        $fixture = $this->makeOfficialFormFixture();
+        $fixture['leave_request']->steps()->where('step_order', 1)->update([
+            'approver_employee_id' => null,
+        ]);
+
+        $data = $this->viewDataFor($fixture['leave_request']->fresh());
+
+        $this->assertSame('Atasan Langsung', $data['steps'][0]['role']);
+        $this->assertSame('-', $data['steps'][0]['approver']);
+        $this->assertSame('-', $data['steps'][0]['position']);
     }
 
     public function test_legacy_proof_without_issuance_timestamp_keeps_authorized_form_available_with_fallbacks(): void
@@ -814,8 +831,14 @@ class CutiFormulirPdfTest extends TestCase
             'status' => 'disetujui',
         ]);
 
-        $historicalApprover = Employee::factory()->create(['nama_lengkap' => 'Penyetuju Historis']);
-        $finalApprover = Employee::factory()->create(['nama_lengkap' => 'Penyetuju Final']);
+        $historicalApprover = Employee::factory()->create([
+            'nama_lengkap' => 'Penyetuju Historis',
+            'jabatan_terakhir' => 'Kepala Subbagian Kepegawaian',
+        ]);
+        $finalApprover = Employee::factory()->create([
+            'nama_lengkap' => 'Penyetuju Final',
+            'jabatan_terakhir' => 'Kepala LLDIKTI Wilayah XVI',
+        ]);
         $leaveRequest->steps()->create([
             'step_order' => 1,
             'step_type' => 'kepala_bagian',
@@ -935,6 +958,7 @@ class CutiFormulirPdfTest extends TestCase
             'N-1',
             'N',
             'Penyetuju Final',
+            'Kepala LLDIKTI Wilayah XVI',
             'PYBMC',
             'Disetujui',
             '15 Juli 2026 15:30 WITA',
@@ -944,7 +968,7 @@ class CutiFormulirPdfTest extends TestCase
             $this->assertStringContainsString($expected, $html);
         }
 
-        $this->assertStringContainsString('&#9745; Cuti Tahunan', $html);
+        $this->assertStringContainsString('[x] Cuti Tahunan', $html);
         foreach ([
             'Cuti Besar',
             'Cuti Sakit',
@@ -952,16 +976,23 @@ class CutiFormulirPdfTest extends TestCase
             'Cuti Karena Alasan Penting',
             'Cuti di Luar Tanggungan Negara',
         ] as $unselectedType) {
-            $this->assertStringContainsString('&#9744; '.$unselectedType, $html);
-            $this->assertStringNotContainsString('&#9745; '.$unselectedType, $html);
+            $this->assertStringContainsString('[ ] '.$unselectedType, $html);
+            $this->assertStringNotContainsString('[x] '.$unselectedType, $html);
         }
 
         $this->assertStringContainsString('<img', $html);
         $this->assertStringContainsString('src="'.$data['qrDataUri'].'"', $html);
         $this->assertStringContainsString($data['verificationUrl'], $html);
+        $this->assertStringContainsString('<th>Nama</th>', $html);
+        $this->assertStringContainsString('<th class="position">Jabatan</th>', $html);
+        $this->assertStringContainsString('<th class="role">Peran</th>', $html);
+        $this->assertStringContainsString('Nama: Penyetuju Final', $html);
+        $this->assertStringContainsString('Jabatan: Kepala LLDIKTI Wilayah XVI', $html);
+        $this->assertStringContainsString('Peran: PYBMC', $html);
+        $this->assertStringNotContainsString('Jabatan/Peran:', $html);
         $this->assertStringNotContainsString('Ditolak', $html);
         $this->assertStringNotContainsString('bukan pengganti tanda tangan basah', $html);
-        $this->assertSame(1, substr_count($html, '&#9745;'));
+        $this->assertSame(1, substr_count($html, '[x]'));
     }
 
     public function test_official_template_has_required_qr_dimensions_and_leave_balance_notes(): void
@@ -1004,8 +1035,8 @@ class CutiFormulirPdfTest extends TestCase
 
             $html = $this->renderFormHtml($this->viewDataFor($fixture['leave_request']));
 
-            $this->assertSame(1, substr_count($html, '&#9745;'), $leaveTypeCode);
-            $this->assertStringContainsString('&#9745; '.$selectedLabel, $html, $leaveTypeCode);
+            $this->assertSame(1, substr_count($html, '[x]'), $leaveTypeCode);
+            $this->assertStringContainsString('[x] '.$selectedLabel, $html, $leaveTypeCode);
         }
     }
 

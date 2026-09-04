@@ -19,7 +19,11 @@
 
         @if ($errors->any())
             <x-ui.alert variant="danger" title="Keputusan belum dapat disimpan" class="mb-6">
-                Periksa kembali data keputusan di bawah ini.
+                @error('active_step_id')
+                    {{ $message }}
+                @else
+                    Periksa kembali data keputusan di bawah ini.
+                @enderror
             </x-ui.alert>
         @endif
 
@@ -167,7 +171,7 @@
                         <div x-data="{ 
                             decision: '{{ old('keputusan', 'DISETUJUI') }}', 
                             confirmOpen: false,
-                            dutyPostponementOpen: {{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }},
+                            dutyPostponementOpen: {{ $errors->dutyPostponement->hasAny(['alasan', 'active_step_id']) ? 'true' : 'false' }},
                             dutyPostponementTrigger: null,
                             submitting: false,
                             openDutyPostponement(event) {
@@ -191,6 +195,7 @@
                                 action="{{ route('kepala-bagian.cuti.decision', $leave) }}" class="space-y-4"
                                 @submit="submitting = true">
                                 @csrf
+                                <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                                 <fieldset aria-describedby="{{ $errors->has('keputusan') ? 'kabag-decision-help kabag-decision-error' : 'kabag-decision-help' }}">
                                     <legend
                                         class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-ink font-sans">Keputusan
@@ -280,6 +285,10 @@
                                     <p id="kabag-duty-postponement-description" class="text-sm text-ink">Tindakan ini bersifat terminal: pengajuan lama ditutup, reservasi dilepas, hak dilindungi paling lama satu tahun, dan pegawai membuat pengajuan baru pada tahun berikutnya.</p>
                                     <form method="POST" action="{{ route('kepala-bagian.cuti.penangguhan-tugas-dinas', $leave) }}" class="mt-4 space-y-4">
                                         @csrf
+                                        <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
+                                        @error('active_step_id', 'dutyPostponement')
+                                            <p class="text-sm text-danger" role="alert">{{ $message }}</p>
+                                        @enderror
                                         <div>
                                             <label for="kabag-duty-postponement-reason" class="block text-xs font-bold uppercase tracking-wider text-ink">Alasan Tugas Dinas <span class="text-danger">*</span></label>
                                             <textarea id="kabag-duty-postponement-reason" name="alasan" rows="3" required minlength="5" maxlength="500" aria-invalid="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-error-autofocus="{{ $errors->dutyPostponement->has('alasan') ? 'true' : 'false' }}" data-modal-initial-focus="true" aria-describedby="kabag-duty-postponement-description kabag-duty-postponement-help @error('alasan', 'dutyPostponement') kabag-duty-postponement-error @enderror" class="mt-1 w-full resize-y rounded-lg border border-border bg-surface p-3 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary @error('alasan', 'dutyPostponement') border-danger @enderror">{{ old('alasan') }}</textarea>
@@ -305,6 +314,7 @@
                                     <form method="POST" action="{{ route('kepala-bagian.cuti.decision', $leave) }}"
                                         @submit="submitting = true">
                                         @csrf
+                                        <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                                         <input type="hidden" name="keputusan" value="DISETUJUI">
                                         <x-ui.button type="submit" x-bind:disabled="submitting" variant="success">
                                             <span x-show="!submitting">Ya, Setujui</span>
@@ -329,18 +339,18 @@
                     <x-ui.timeline>
                         @forelse($leave->steps->sortBy('step_order') as $step)
                             @php
+                                $stepRoleLabel = \App\Support\Cuti\ApprovalStepLabel::display($step->step_type, $step->role_label);
                                 $stepStatus = match ($step->status) {
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
                                     'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                      'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
                                      'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
-                                     'pending' => ['label' => "Menunggu {$step->role_label}", 'variant' => 'muted'],
+                                     'pending' => ['label' => "Menunggu {$stepRoleLabel}", 'variant' => 'muted'],
                                      'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
                                     default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],
                                 };
                                 $skippedReason = match ($step->skipped_reason) {
                                     'duty_postponement_terminal' => 'Dilewati karena penangguhan tugas dinas menutup pengajuan.',
-                                    'duplicate_approver' => 'Dilewati karena approver yang sama sudah tercakup pada tahap lain.',
                                     'request_not_approved' => 'Dilewati karena pengajuan telah diputus tidak disetujui.',
                                     null => null,
                                     default => 'Dilewati karena alur persetujuan telah ditutup.',
@@ -348,7 +358,7 @@
                             @endphp
                             <x-ui.timeline-item
                                 variant="{{ $stepStatus['variant'] }}"
-                                title="Tahap {{ $step->step_order }} · {{ $step->role_label }}"
+                                title="Tahap {{ $step->step_order }} · {{ $stepRoleLabel }}"
                                 description="{{ $step->approver?->nama_lengkap ?? 'Approver tidak tersedia' }}"
                                 pulse="{{ $step->status == 'active' }}">
 

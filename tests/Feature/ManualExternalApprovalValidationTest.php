@@ -112,6 +112,20 @@ class ManualExternalApprovalValidationTest extends TestCase
         ];
     }
 
+    public function test_validasi_struktur_memakai_label_atasan_langsung(): void
+    {
+        $errors = app(ManualExternalApprovalChainService::class)->violations([
+            self::externalStep('verifier'),
+            self::externalStep('pybmc'),
+        ]);
+
+        $this->assertContains(
+            'Riwayat persetujuan wajib memiliki tepat satu Atasan Langsung.',
+            $errors['approval_steps'],
+        );
+        $this->assertStringNotContainsString('Kepala Bagian', implode(' ', $errors['approval_steps']));
+    }
+
     public function test_tanggal_tahap_yang_sama_tetap_diterima(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();

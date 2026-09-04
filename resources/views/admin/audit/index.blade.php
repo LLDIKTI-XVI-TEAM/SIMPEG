@@ -95,7 +95,7 @@
         <form method="GET" action="{{ route('audit-log') }}">
             <input type="hidden" name="sort" value="{{ $activeFilters['sort'] }}">
             <input type="hidden" name="direction" value="{{ $activeFilters['direction'] }}">
-            <input type="hidden" name="per_page" value="{{ request('per_page', 25) }}">
+            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
 
             <x-ui.filter-bar
                 class="sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 items-end"

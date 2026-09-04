@@ -8,6 +8,7 @@ use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\User;
+use App\Support\Cuti\ApprovalStepLabel;
 use App\Support\Cuti\CutiInstitution;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -501,7 +502,9 @@ class LeaveProofService
     {
         return [
             'name' => $finalStep?->approver?->nama_lengkap,
-            'role' => $finalStep?->role_label,
+            'role' => $finalStep === null
+                ? null
+                : ApprovalStepLabel::display($finalStep->step_type, $finalStep->role_label),
             'acted_at' => $finalStep?->acted_at?->toIso8601String(),
         ];
     }
@@ -517,7 +520,7 @@ class LeaveProofService
             ->sortBy('step_order')
             ->map(fn (LeaveRequestStep $step): array => [
                 'order' => (int) $step->step_order,
-                'role' => $step->role_label,
+                'role' => ApprovalStepLabel::display($step->step_type, $step->role_label),
                 'approver_name' => $step->approver?->nama_lengkap,
                 'status' => $step->status,
                 'acted_at' => $step->acted_at?->toIso8601String(),
