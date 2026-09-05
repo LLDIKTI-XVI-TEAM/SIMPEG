@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\DataMasterUnitKerjaController;
 use App\Http\Controllers\Admin\DokumenController;
 use App\Http\Controllers\Admin\EmployeeHistoryAttachmentController;
 use App\Http\Controllers\Admin\EmployeeImportController;
+use App\Http\Controllers\Admin\EmployeeStatisticsController;
 use App\Http\Controllers\Admin\EmployeeSupervisorLookupController;
 use App\Http\Controllers\Admin\EwsConfigController;
 use App\Http\Controllers\Admin\EwsController;
@@ -191,6 +192,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         return view('dummy', ['title' => 'Laporan / Export']);
     })->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('laporan');
+
+    Route::get('/reporting-statistik-kepegawaian', [EmployeeStatisticsController::class, 'index'])
+        ->middleware('permission:employees.read')
+        ->name('reporting.employee-statistics');
 
     Route::get('/user-management', [UserMappingController::class, 'index'])
         ->middleware(['role:super_admin'])
