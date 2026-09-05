@@ -375,9 +375,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['permission:cuti.read_all'])
         ->name('cuti.rekap');
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:cuti.balance.reconcile,cuti.manual.manage'])
+        ->middleware(['permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
-    Route::middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.balance.reconcile'])
+    Route::middleware(['permission:cuti.balance.reconcile'])
         ->prefix('cuti/rekonsiliasi-tahunan')
         ->name('cuti.reconciliation.')
         ->group(function (): void {
@@ -392,7 +392,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('document')
                 ->name('document.download');
         });
-    Route::middleware(['role:super_admin,admin_kepegawaian,pimpinan', 'permission:cuti.manual.manage'])
+    Route::middleware(['permission:cuti.manual.manage'])
         ->prefix('cuti/pemakaian-manual')
         ->name('cuti.manual.')
         ->group(function (): void {

@@ -19,7 +19,7 @@ final class DownloadLeaveUsageReconciliationDocumentAction
         private readonly LeaveUsageDocumentService $documents,
     ) {}
 
-    /** Unduhan bukti koreksi dibatasi Admin Kepegawaian sebelum lookup metadata atau file. */
+    /** Unduhan bukti koreksi dibatasi pemegang permission rekonsiliasi sebelum lookup metadata atau file. */
     public function execute(string $reconciliationId, string $documentId, User $actor): StreamedResponse
     {
         $this->authorization->assertCanReconcile($actor);
