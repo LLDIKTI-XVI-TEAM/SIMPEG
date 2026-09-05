@@ -30,8 +30,6 @@ class LeaveApprovalService
 
     private const STATUS_DITANGGUHKAN = 'ditangguhkan';
 
-    private const STATUS_PERLU_PERUBAHAN = 'perlu_perubahan';
-
     private const STATUS_TIDAK_DISETUJUI = 'tidak_disetujui';
 
     /**
@@ -68,6 +66,7 @@ class LeaveApprovalService
         LeaveRequest $leaveRequest,
         Employee $actor,
         string $expectedActiveStepId,
+        int $expectedRevisionVersion,
         ?string $komentar = null,
         ?User $actingUser = null,
         ?Request $httpRequest = null,
@@ -77,7 +76,7 @@ class LeaveApprovalService
             throw new AuthorizationException('Akun Anda tidak cocok dengan approver yang berwenang untuk tahap persetujuan ini.');
         }
 
-        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar, $actingUser, $httpRequest): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $expectedRevisionVersion, $komentar, $actingUser, $httpRequest): LeaveRequest {
             // Mutasi request existing selalu mengunci request lebih dahulu, lalu employee,
             // agar approval, penangguhan dinas, rollover, dan resubmit tidak membentuk siklus lock.
             $locked = LeaveRequest::query()
@@ -93,6 +92,7 @@ class LeaveApprovalService
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
             $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
+            $this->assertExpectedRevisionVersion($locked, $expectedRevisionVersion);
 
             $activeStep->forceFill([
                 'status' => 'approved',
@@ -146,14 +146,15 @@ class LeaveApprovalService
      * Menangguhkan pengajuan pada step aktif tanpa mengubah approver aktif.
      * Approver yang sama dapat melanjutkan dengan approve pada step yang sama.
      */
-    public function postpone(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar): LeaveRequest
+    public function postpone(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, int $expectedRevisionVersion, string $komentar): LeaveRequest
     {
-        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $expectedRevisionVersion, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
             $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
+            $this->assertExpectedRevisionVersion($locked, $expectedRevisionVersion);
 
             $activeStep->forceFill(['decision_note' => $komentar])->save();
             $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'POSTPONE', $komentar);
@@ -166,40 +167,18 @@ class LeaveApprovalService
     }
 
     /**
-     * Mengembalikan pengajuan ke pemohon untuk diperbaiki tanpa memindahkan step aktif.
-     * Catatan wajib menjadi dasar pemohon memperbaiki data sebelum mengirim ulang.
-     */
-    public function requestChanges(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar): LeaveRequest
-    {
-        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar): LeaveRequest {
-            $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
-            $this->assertApprovalActionable($locked);
-            $activeStep = $this->activeStepOrFail($locked);
-            $this->assertActorMatchesStep($activeStep, $actor);
-            $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
-
-            $activeStep->forceFill(['decision_note' => $komentar])->save();
-            $recordedApproval = $this->recordApproval($locked, $actor, $activeStep->step_order, 'REQUEST_CHANGES', $komentar);
-
-            $locked->forceFill(['status' => self::STATUS_PERLU_PERUBAHAN])->save();
-            $locked->setRelation('lastRecordedApproval', $recordedApproval);
-
-            return $locked;
-        });
-    }
-
-    /**
      * Menutup pengajuan sebagai Tidak Disetujui tanpa memotong saldo.
      * Step aktif dan seluruh step lanjutan ditutup agar pengajuan tidak kembali muncul di antrean.
      */
-    public function decline(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar): LeaveRequest
+    public function decline(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, int $expectedRevisionVersion, string $komentar): LeaveRequest
     {
-        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $expectedRevisionVersion, $komentar): LeaveRequest {
             $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
             $this->assertApprovalActionable($locked);
             $activeStep = $this->activeStepOrFail($locked);
             $this->assertActorMatchesStep($activeStep, $actor);
             $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
+            $this->assertExpectedRevisionVersion($locked, $expectedRevisionVersion);
 
             $activeStep->forceFill([
                 'status' => self::STATUS_TIDAK_DISETUJUI,
@@ -280,6 +259,16 @@ class LeaveApprovalService
         if (strtolower($step->id) !== strtolower($expectedActiveStepId)) {
             throw ValidationException::withMessages([
                 'active_step_id' => 'Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.',
+            ]);
+        }
+    }
+
+    /** Counter monotonic membedakan keputusan dari formulir lama meski timestamp sama. */
+    private function assertExpectedRevisionVersion(LeaveRequest $leaveRequest, int $expectedRevisionVersion): void
+    {
+        if ($leaveRequest->revision_version !== $expectedRevisionVersion) {
+            throw ValidationException::withMessages([
+                'revision_version' => 'Pengajuan cuti telah diperbarui. Muat ulang halaman sebelum mengirim keputusan.',
             ]);
         }
     }

@@ -2,9 +2,11 @@
 
 namespace Tests\Fixtures;
 
+use App\Actions\Cuti\DecideLeaveCancellationAction;
 use App\Actions\Cuti\RolloverLeaveBalanceAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Models\Employee;
+use App\Models\LeaveCancellationRequest;
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Request;
@@ -39,8 +41,26 @@ final class LeaveBalanceRolloverRaceWorker
 
         try {
             if ($input['operation'] === 'rollover') {
-                app(RolloverLeaveBalanceAction::class)->execute((int) $input['source_year']);
-                $result = ['ok' => true, 'operation' => 'rollover'];
+                $summary = app(RolloverLeaveBalanceAction::class)->execute((int) $input['source_year']);
+                $result = ['ok' => true, 'operation' => 'rollover', 'summary' => $summary];
+            } elseif ($input['operation'] === 'reject_cancellation') {
+                $actor = User::query()->findOrFail($input['actor_user_id']);
+                $cancellation = LeaveCancellationRequest::query()->findOrFail($input['cancellation_id']);
+                $request = Request::create('/cuti/pembatalan/'.$cancellation->id.'/keputusan', 'PATCH');
+                $request->setUserResolver(fn (): User => $actor);
+                file_put_contents($input['result'].'.started', 'started');
+                $decided = app(DecideLeaveCancellationAction::class)->execute(
+                    $cancellation,
+                    $actor,
+                    'DITOLAK',
+                    $request,
+                );
+                $result = [
+                    'ok' => true,
+                    'operation' => 'reject_cancellation',
+                    'cancellation_id' => $decided->id,
+                    'status' => $decided->status,
+                ];
             } elseif ($input['operation'] === 'status') {
                 DB::transaction(function () use ($input): void {
                     // Writer lifecycle mengunci pegawai sebelum mengganti klasifikasi status.

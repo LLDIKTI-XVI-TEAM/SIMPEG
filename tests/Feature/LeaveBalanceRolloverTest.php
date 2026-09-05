@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
@@ -166,7 +167,7 @@ class LeaveBalanceRolloverTest extends TestCase
     {
         $employee = $this->reconciledEmployee();
         $first = $this->annualRequest($employee, 'menunggu_approval', 2, '2026-12-21');
-        $second = $this->annualRequest($employee, 'perlu_perubahan', 3, '2026-12-22');
+        $second = $this->annualRequest($employee, 'ditangguhkan', 3, '2026-12-22');
         $this->reserve($first, 2);
         $this->reserve($second, 3);
 
@@ -216,6 +217,42 @@ class LeaveBalanceRolloverTest extends TestCase
         $beforeRetry = $this->effectCounts($employee);
         $action->execute(2026);
         $this->assertSame($beforeRetry, $this->effectCounts($employee));
+    }
+
+    public function test_rollover_gagal_tertutup_tanpa_marker_saat_pembatalan_masih_pending(): void
+    {
+        $employee = $this->reconciledEmployee();
+        $request = $this->annualRequest(
+            $employee,
+            LeaveRequest::STATUS_CANCELLATION_PENDING,
+            3,
+            '2026-12-21',
+        );
+        $this->reserve($request, 3);
+        LeaveCancellationRequest::query()->create([
+            'leave_request_id' => $request->id,
+            'requested_by' => $this->reconciliationActor->id,
+            'reason' => 'Pembatalan masih menunggu keputusan saat rollover.',
+            'status' => LeaveCancellationRequest::STATUS_PENDING,
+            'resume_status' => 'menunggu_approval',
+        ]);
+
+        $result = app(RolloverLeaveBalanceAction::class)->execute(2026);
+
+        $this->assertSame(1, $result['attempted']);
+        $this->assertSame(0, $result['processed']);
+        $this->assertSame(1, $result['failed']);
+        $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $request->fresh()->status);
+        $this->assertDatabaseMissing('leave_balance_ledger', [
+            'dedup_key' => "{$employee->id}:2027:rollover_applied",
+        ]);
+        $this->assertDatabaseMissing('leave_balances', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+        ]);
+        $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
+            ->where('leave_request_id', $request->id)
+            ->sum('amount'));
     }
 
     public function test_rollover_processes_more_than_one_lazy_chunk(): void
@@ -538,7 +575,6 @@ class LeaveBalanceRolloverTest extends TestCase
         return [
             'menunggu approval' => ['menunggu_approval'],
             'ditangguhkan' => ['ditangguhkan'],
-            'perlu perubahan' => ['perlu_perubahan'],
         ];
     }
 

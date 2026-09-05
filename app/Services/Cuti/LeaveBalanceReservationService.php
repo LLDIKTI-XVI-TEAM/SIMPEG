@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceReservationEvent;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -218,6 +219,61 @@ class LeaveBalanceReservationService
     public function releaseForNotApproved(LeaveRequest $leaveRequest, ?User $actor = null): void
     {
         $this->releaseReservation($leaveRequest, $actor, LeaveBalanceReservationEvent::EVENT_RELEASED);
+    }
+
+    /**
+     * Melepas reservasi pengajuan yang pembatalannya disetujui dengan kunci deduplikasi record pembatalan.
+     *
+     * Request utama dan record pembatalan sudah dikunci oleh Action pemutus sebelum pegawai/saldo dikunci di sini.
+     */
+    public function releaseForApprovedCancellation(
+        LeaveRequest $leaveRequest,
+        LeaveCancellationRequest $cancellation,
+        User $actor,
+        ?Request $httpRequest = null,
+    ): void {
+        $this->loadLeaveRelations($leaveRequest);
+
+        if (! $this->isAnnualLeave($leaveRequest)) {
+            return;
+        }
+
+        $employee = $this->lockEmployee($leaveRequest->employee_id);
+        $reservedByYear = $this->reservedByYearForRequest($leaveRequest->id);
+        $datesByYear = collect(array_keys($reservedByYear))
+            ->mapWithKeys(fn (int|string $year): array => [(int) $year => Carbon::create((int) $year, 1, 1)->startOfDay()])
+            ->all();
+        $balances = $this->lockBalances($employee, $datesByYear);
+
+        foreach ($reservedByYear as $tahun => $reserved) {
+            $tahun = (int) $tahun;
+            if ($reserved <= 0) {
+                continue;
+            }
+
+            $dedupKey = "leave_reservation:{$leaveRequest->id}:released:approved_cancellation:{$cancellation->id}:{$tahun}";
+            if (LeaveBalanceReservationEvent::query()->where('dedup_key', $dedupKey)->exists()) {
+                continue;
+            }
+
+            $this->appendEvent(
+                leaveRequest: $leaveRequest,
+                balance: $balances[$tahun] ?? null,
+                tahun: $tahun,
+                eventType: LeaveBalanceReservationEvent::EVENT_RELEASED,
+                amount: -$reserved,
+                reservationBefore: $reserved,
+                reservationAfter: 0,
+                actor: $actor,
+                dedupKey: $dedupKey,
+                reason: 'Reservasi cuti tahunan dilepas karena pembatalan pengajuan disetujui.',
+                metadata: [
+                    'release_context' => 'approved_cancellation',
+                    'leave_cancellation_request_id' => $cancellation->id,
+                ],
+                httpRequest: $httpRequest,
+            );
+        }
     }
 
     /**

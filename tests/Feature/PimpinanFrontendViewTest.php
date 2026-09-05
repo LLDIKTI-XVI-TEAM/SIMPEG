@@ -56,12 +56,14 @@ class PimpinanFrontendViewTest extends TestCase
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
             ->assertSee('Pegawai Cuti Tampilan')
-            ->assertSee('Perubahan')
             ->assertDontSee('Disetujui dengan Perubahan')
-            ->assertSee('Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui...')
+            ->assertDontSee('value="PERUBAHAN"', false)
+            ->assertDontSee('Minta Perubahan')
+            ->assertDontSee('memilih Perubahan')
+            ->assertSee('Wajib diisi jika memilih Ditangguhkan atau Tidak Disetujui…')
             ->assertDontSee('Tunda Sementara')
-            ->assertDontSee('aria-describedby="decision-note-help keputusan-error"', false)
-            ->assertDontSee('aria-describedby="decision-note-help catatan-error"', false)
+            ->assertSee('aria-describedby="pimpinan-decision-help"', false)
+            ->assertSee('aria-describedby="pimpinan-decision-note-help"', false)
             ->assertSee('aria-describedby="pimpinan-approval-confirmation-description"', false)
             ->assertSee('id="pimpinan-approval-confirmation-description"', false)
             ->assertSee('@keydown.escape.window="if (confirmOpen) { confirmOpen = false }"', false)
@@ -166,6 +168,47 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertOk()
             ->assertViewHas('menungguTindakanSaya', 0)
             ->assertDontSee('Pegawai Counter Rollover');
+    }
+
+    public function test_leave_index_filters_and_labels_cancellation_lifecycle_without_making_it_actionable(): void
+    {
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Status Pembatalan Pimpinan',
+            'code' => 'status-pembatalan-pimpinan',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        foreach ([
+            LeaveRequest::STATUS_CANCELLATION_PENDING => 'Pegawai Hold Pimpinan',
+            LeaveRequest::STATUS_CANCELLED => 'Pegawai Batal Pimpinan',
+        ] as $status => $nama) {
+            LeaveRequest::create([
+                'employee_id' => Employee::factory()->create(['nama_lengkap' => $nama])->id,
+                'jenis_cuti_id' => $jenis->id,
+                'tanggal_mulai' => '2026-09-10',
+                'tanggal_selesai' => '2026-09-10',
+                'jumlah_hari_kerja' => 1,
+                'alasan' => 'Uji tampilan status pembatalan.',
+                'status' => $status,
+            ]);
+        }
+        $user = $this->pimpinan();
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.index', ['status' => LeaveRequest::STATUS_CANCELLATION_PENDING]))
+            ->assertOk()
+            ->assertSee('Pegawai Hold Pimpinan')
+            ->assertSee('Menunggu Keputusan Pembatalan')
+            ->assertDontSee('Pegawai Batal Pimpinan')
+            ->assertViewHas('menungguTindakanSaya', 0);
+
+        $this->actingAs($user)
+            ->get(route('pimpinan.cuti.index', ['status' => LeaveRequest::STATUS_CANCELLED]))
+            ->assertOk()
+            ->assertSee('Pegawai Batal Pimpinan')
+            ->assertSee('Dibatalkan')
+            ->assertDontSee('Pegawai Hold Pimpinan')
+            ->assertViewHas('menungguTindakanSaya', 0);
     }
 
     public function test_employee_detail_exposes_an_accessible_info_tab_without_a_dummy_export_submission(): void

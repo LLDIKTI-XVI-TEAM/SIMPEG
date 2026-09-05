@@ -31,6 +31,7 @@ use App\Http\Controllers\Admin\KepalaBagianSearchController;
 use App\Http\Controllers\Admin\KepalaLembagaSupportingDocumentController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
+use App\Http\Controllers\Admin\LeaveCancellationController;
 use App\Http\Controllers\Admin\LeaveUsageController;
 use App\Http\Controllers\Admin\ManualLeaveUsageController;
 use App\Http\Controllers\Admin\NotificationChannelController;
@@ -302,6 +303,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
         ->middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
+    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.cancellation.manage'])
+        ->prefix('cuti/pembatalan')
+        ->name('cuti.cancellations.')
+        ->group(function (): void {
+            Route::get('/', [LeaveCancellationController::class, 'index'])->name('index');
+            Route::patch('/{cancellation}/keputusan', [LeaveCancellationController::class, 'decide'])
+                ->whereUuid('cancellation')
+                ->name('decide');
+        });
     Route::middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile'])
         ->prefix('cuti/rekonsiliasi-tahunan')
         ->name('cuti.reconciliation.')
@@ -496,6 +506,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
         ->middleware('permission:cuti.create')
         ->name('cuti.store');
+    Route::post('/dashboard/cuti/{leaveRequest}/pembatalan', [LeaveCancellationController::class, 'store'])
+        ->middleware('permission:cuti.create')
+        ->name('cuti.cancellations.store')
+        ->whereUuid('leaveRequest');
     Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
         ->middleware('permission:cuti.create')
         ->name('cuti.resubmit')
@@ -518,10 +532,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::post('/cuti/{id}/postpone', [CutiController::class, 'postpone'])
         ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
         ->name('cuti.postpone')
-        ->whereUuid('id');
-    Route::post('/cuti/{id}/request-changes', [CutiController::class, 'requestChanges'])
-        ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])
-        ->name('cuti.request-changes')
         ->whereUuid('id');
     Route::post('/cuti/{id}/decline', [CutiController::class, 'decline'])
         ->middleware(['role:super_admin,pimpinan,kepala_bagian,admin_kepegawaian,pegawai'])

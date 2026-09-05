@@ -76,6 +76,8 @@ class ListLeaveRequestsAction
             'ditangguhkan' => ['ditangguhkan'],
             'ditangguhkan_tugas_dinas' => ['ditangguhkan_tugas_dinas'],
             LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => [LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER],
+            LeaveRequest::STATUS_CANCELLATION_PENDING => [LeaveRequest::STATUS_CANCELLATION_PENDING],
+            LeaveRequest::STATUS_CANCELLED => [LeaveRequest::STATUS_CANCELLED],
             'perlu_perubahan' => ['perlu_perubahan'],
             'tidak_disetujui' => ['tidak_disetujui'],
         ];

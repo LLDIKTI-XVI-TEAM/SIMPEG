@@ -119,6 +119,24 @@ class PegawaiDashboardTest extends TestCase
         LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => $leaveType->id,
+            'tanggal_mulai' => now()->addDays(14)->toDateString(),
+            'tanggal_selesai' => now()->addDays(16)->toDateString(),
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan sedang menunggu keputusan pembatalan.',
+            'status' => LeaveRequest::STATUS_CANCELLATION_PENDING,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $leaveType->id,
+            'tanggal_mulai' => now()->subDays(14)->toDateString(),
+            'tanggal_selesai' => now()->subDays(12)->toDateString(),
+            'jumlah_hari_kerja' => 3,
+            'alasan' => 'Pengajuan yang sudah dibatalkan.',
+            'status' => LeaveRequest::STATUS_CANCELLED,
+        ]);
+        LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $leaveType->id,
             'tanggal_mulai' => now()->subDays(30)->toDateString(),
             'tanggal_selesai' => now()->subDays(28)->toDateString(),
             'jumlah_hari_kerja' => 3,
@@ -130,8 +148,13 @@ class PegawaiDashboardTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk();
 
-        $response->assertViewHas('cutiAktif', fn ($cuti): bool => $cuti->count() === 1
-            && $cuti->first()->status === 'menunggu_approval');
+        $response->assertViewHas('cutiAktif', fn ($cuti): bool => $cuti->count() === 2
+            && $cuti->pluck('status')->sort()->values()->all() === [
+                'menunggu_approval',
+                LeaveRequest::STATUS_CANCELLATION_PENDING,
+            ])
+            ->assertSee('Menunggu Keputusan Pembatalan')
+            ->assertDontSee('Pengajuan yang sudah dibatalkan.');
     }
 
     public function test_dashboard_pegawai_tanpa_mapping_employee_dialihkan_ke_status_akun(): void

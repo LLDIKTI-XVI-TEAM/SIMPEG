@@ -465,10 +465,10 @@ class LeaveBalanceReservationTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal perlu diperbaiki.');
 
         $this->actingAs($aktor['user'])
             ->patch(route('cuti.resubmit', $leaveRequest), [
+                'revision_version' => $leaveRequest->fresh()->revision_version,
                 'tanggal_mulai' => '2026-07-13',
                 'tanggal_selesai' => '2026-07-15',
                 'alasan' => 'Tanggal telah disesuaikan.',
@@ -508,7 +508,6 @@ class LeaveBalanceReservationTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal perlu dipindahkan ke tahun berikutnya.');
         LeaveBalance::create([
             'employee_id' => $aktor['employee']->id,
             'tahun' => 2027,
@@ -525,6 +524,7 @@ class LeaveBalanceReservationTest extends TestCase
 
         $this->actingAs($aktor['user'])
             ->patch(route('cuti.resubmit', $leaveRequest), [
+                'revision_version' => $leaveRequest->fresh()->revision_version,
                 'tanggal_mulai' => '2027-02-01',
                 'tanggal_selesai' => '2027-02-03',
                 'alasan' => 'Jadwal telah dipindahkan ke tahun berikutnya.',
@@ -566,8 +566,8 @@ class LeaveBalanceReservationTest extends TestCase
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
         $approval = app(LeaveApprovalService::class);
-        $approval->approve($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), null, $aktor['supervisor_user']);
-        $approval->approve($leaveRequest->fresh(), $aktor['pybmc'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), null, $aktor['pybmc_user']);
+        $approval->approve($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), (int) $leaveRequest->fresh()->revision_version, null, $aktor['supervisor_user']);
+        $approval->approve($leaveRequest->fresh(), $aktor['pybmc'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), (int) $leaveRequest->fresh()->revision_version, null, $aktor['pybmc_user']);
 
         $this->assertSame('disetujui', $leaveRequest->fresh()->status);
         $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
@@ -632,10 +632,10 @@ class LeaveBalanceReservationTest extends TestCase
         ]);
 
         $approval = app(LeaveApprovalService::class);
-        $approval->approve($annual, $aktor['supervisor'], $annual->steps()->where('status', 'active')->valueOrFail('id'), null, $aktor['supervisor_user']);
+        $approval->approve($annual, $aktor['supervisor'], $annual->steps()->where('status', 'active')->valueOrFail('id'), (int) $annual->fresh()->revision_version, null, $aktor['supervisor_user']);
 
         try {
-            $approval->approve($annual->fresh(), $aktor['pybmc'], $annual->steps()->where('status', 'active')->valueOrFail('id'), null, $aktor['pybmc_user']);
+            $approval->approve($annual->fresh(), $aktor['pybmc'], $annual->steps()->where('status', 'active')->valueOrFail('id'), (int) $annual->fresh()->revision_version, null, $aktor['pybmc_user']);
             $this->fail('Persetujuan final tahunan harus ditolak setelah Cuti Besar final.');
         } catch (ValidationException $exception) {
             $this->assertSame(
@@ -691,7 +691,7 @@ class LeaveBalanceReservationTest extends TestCase
             ->value('sisa'));
     }
 
-    public function test_submit_tahunan_tetap_diizinkan_saat_cuti_besar_belum_final(): void
+    public function test_submit_tahunan_ditolak_saat_cuti_besar_masih_memiliki_workflow_aktif(): void
     {
         $aktor = $this->makePemohon();
         $annual = $this->annualLeaveType();
@@ -713,17 +713,11 @@ class LeaveBalanceReservationTest extends TestCase
 
         $this->actingAs($aktor['user'])
             ->post(route('cuti.store'), $this->payload($annual, '2026-09-01', '2026-09-03'))
-            ->assertRedirect(route('cuti'));
+            ->assertSessionHasErrors('tanggal_mulai');
 
-        $annualRequest = LeaveRequest::query()
-            ->where('employee_id', $aktor['employee']->id)
-            ->where('jenis_cuti_id', $annual->id)
-            ->firstOrFail();
-        $this->assertDatabaseHas('leave_balance_reservation_events', [
-            'leave_request_id' => $annualRequest->id,
-            'event_type' => LeaveBalanceReservationEvent::EVENT_RESERVED,
-            'amount' => 3,
-            'tahun' => 2026,
+        $this->assertDatabaseMissing('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $annual->id,
         ]);
     }
 
@@ -737,13 +731,13 @@ class LeaveBalanceReservationTest extends TestCase
             'Cuti Besar Rule 5 Resubmit',
         );
         $request = $this->makeReservedRequest(jenis: $annual, actors: $aktor)['request'];
-        $request->forceFill(['status' => 'perlu_perubahan'])->save();
         $beforeReservation = (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
             ->sum('amount');
 
         $this->actingAs($aktor['user'])
             ->patchJson(route('cuti.resubmit', $request), [
+                'revision_version' => $request->fresh()->revision_version,
                 'tanggal_mulai' => '2026-09-01',
                 'tanggal_selesai' => '2026-09-03',
                 'alasan' => 'Revisi tetap pada tahun Rule 5.',
@@ -757,7 +751,7 @@ class LeaveBalanceReservationTest extends TestCase
             );
 
         $request->refresh();
-        $this->assertSame('perlu_perubahan', $request->status);
+        $this->assertSame('menunggu_approval', $request->status);
         $this->assertSame('2026-07-06', $request->tanggal_mulai->toDateString());
         $this->assertSame($beforeReservation, (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
@@ -837,7 +831,7 @@ class LeaveBalanceReservationTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
-        app(LeaveApprovalService::class)->decline($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Belum dapat disetujui.');
+        app(LeaveApprovalService::class)->decline($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), (int) $leaveRequest->fresh()->revision_version, 'Belum dapat disetujui.');
 
         $this->assertSame('tidak_disetujui', $leaveRequest->fresh()->status);
         $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
@@ -862,7 +856,7 @@ class LeaveBalanceReservationTest extends TestCase
         ]);
     }
 
-    public function test_postpone_and_change_request_keep_reservation_active(): void
+    public function test_postpone_keeps_reservation_active(): void
     {
         $aktor = $this->makePemohon();
         $jenis = $this->annualLeaveType();
@@ -873,16 +867,9 @@ class LeaveBalanceReservationTest extends TestCase
 
         $leaveRequest = LeaveRequest::query()->firstOrFail();
         $approval = app(LeaveApprovalService::class);
-        $approval->postpone($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Menunggu penyesuaian tugas.');
+        $approval->postpone($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), (int) $leaveRequest->fresh()->revision_version, 'Menunggu penyesuaian tugas.');
 
         $this->assertSame('ditangguhkan', $leaveRequest->fresh()->status);
-        $this->assertSame(5, (int) LeaveBalanceReservationEvent::query()
-            ->where('leave_request_id', $leaveRequest->id)
-            ->sum('amount'));
-
-        $approval->requestChanges($leaveRequest->fresh(), $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Mohon perbaiki rincian pengajuan.');
-
-        $this->assertSame('perlu_perubahan', $leaveRequest->fresh()->status);
         $this->assertSame(5, (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $leaveRequest->id)
             ->sum('amount'));

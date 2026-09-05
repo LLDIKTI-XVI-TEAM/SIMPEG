@@ -269,33 +269,23 @@ podman compose exec app php artisan test
 
 ### Pengujian Otomatis
 
-Test unit dan feature menggunakan PHPUnit. Konfigurasi lokal default memakai SQLite in-memory, sedangkan CI menjalankan suite yang sama terhadap PostgreSQL 17.
+Test unit dan feature menggunakan PHPUnit dengan PostgreSQL 17. `phpunit.xml` secara eksplisit memaksa `APP_ENV=testing`, `DB_CONNECTION=pgsql`, dan `DB_DATABASE=simpeg_test`; koneksi normal `simpeg` tidak boleh menjadi target test. Host, port, username, dan password tetap mengikuti `.env` atau environment CI agar perintah dijalankan dari container `app` maupun CI tanpa menduplikasi credential.
+
+Pastikan database disposable `simpeg_test` telah disiapkan operator sebelum menjalankan suite pertama. Jalankan perintah melalui container `app`, sehingga `DB_HOST=db` dari konfigurasi default tetap dapat dijangkau:
 
 ```bash
 # Seluruh test unit dan feature
-composer test
+podman compose exec app composer test
 
 # Seluruh quality gate: Pint, PHPStan, dan test
-composer qa
+podman compose exec app composer qa
 ```
 
-Laravel Dusk tersedia untuk browser test. Jalankan perintah berikut dari host yang mempunyai Google Chrome/Chromium, dengan aplikasi telah tersedia pada `APP_URL` (default `http://localhost:8000`):
+CI tetap membagi suite yang sama: lane paralel membuat worker database dari `simpeg_test`, lane serial memakai `simpeg_test`, lalu test migration destruktif berjalan terakhir hanya dengan `SIMPEG_ALLOW_DESTRUCTIVE_MIGRATION_TESTS=true`. Guard test menolak driver, environment, atau nama database selain target tersebut. Jangan mengarahkan perintah test ke `simpeg`, dan jangan menjalankan lane destruktif bersamaan dengan proses test lain.
 
-```bash
-# Unduh ChromeDriver yang cocok dengan versi Chrome lokal (cukup saat versi Chrome berubah)
-php artisan dusk:chrome-driver --detect
+Laravel Dusk tersedia untuk browser test, tetapi memakai konfigurasi terpisah (`phpunit.dusk.xml`) dan tidak dipanggil oleh `composer qa`. Resep eksekusi Dusk yang menjamin isolasi runner dan server aplikasi belum tersedia pada panduan ini; jangan menjalankan `composer test:browser` sebelum isolasi tersebut disiapkan dan diverifikasi.
 
-# Terminal 1: jalankan aplikasi lokal
-php artisan serve
-
-# Terminal 2: jalankan browser test dalam mode headless
-composer test:browser
-
-# Opsional: tampilkan jendela browser ketika mendiagnosis kegagalan
-php artisan dusk --browse
-```
-
-Browser test tidak dipanggil oleh `composer qa` karena memerlukan browser dan ChromeDriver. Jalankan browser test sebelum mengubah alur UI utama atau ketika perubahan memerlukan verifikasi end-to-end.
+> **Penting:** Beberapa browser test menjalankan `migrate:fresh`. Runner Dusk dan server `APP_URL` harus sama-sama memakai database testing disposable yang terisolasi, bukan `.env` normal/database `simpeg`. Jalankan Dusk sendiri, tidak bersamaan dengan lane PHPUnit paralel, serial, atau destruktif. Verifikasi end-to-end pada browser tetap diperlukan saat mengubah alur UI utama; hasil automated test bukan pengganti UAT.
 
 ### Masuk ke Shell Container
 

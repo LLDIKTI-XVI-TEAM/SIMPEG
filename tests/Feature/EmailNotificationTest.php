@@ -8,6 +8,7 @@ use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\NotificationEventChannel;
 use App\Models\RefJenisCuti;
@@ -382,18 +383,34 @@ class EmailNotificationTest extends TestCase
         Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
     }
 
-    public function test_cuti_revision_request_queues_email_to_primary_recipient(): void
+    public function test_cuti_cancellation_request_queues_email_to_primary_recipient(): void
     {
-        Queue::fake();
-        $this->enableEventChannels('cuti.perlu_perubahan');
+        $queue = Queue::fake();
+        Mail::fake();
+        $this->enableEventChannels('cuti.pembatalan_diajukan');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $leave = $this->makeLeaveRequestWithSteps(Employee::factory()->create(), [$employee]);
+        $requester = User::factory()->create(['employee_id' => $leave->employee_id]);
+        $admin = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
+        $leave->update(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING]);
+        $cancellation = LeaveCancellationRequest::create([
+            'leave_request_id' => $leave->id,
+            'requested_by' => $requester->id,
+            'reason' => 'Jadwal berubah.',
+            'status' => LeaveCancellationRequest::STATUS_PENDING,
+            'resume_status' => 'menunggu_approval',
+        ]);
 
         app(NotificationService::class)->createForEmployee(
             employee: $employee,
-            type: 'cuti.perlu_perubahan',
-            title: 'Pengajuan Cuti Perlu Perubahan',
-            body: 'Lengkapi data pengajuan cuti.',
-            data: ['url' => '/dashboard/cuti'],
+            type: 'cuti.pembatalan_diajukan',
+            title: 'Permohonan Pembatalan Cuti Baru',
+            body: 'Terdapat permohonan pembatalan cuti yang menunggu keputusan Anda.',
+            data: [
+                'url' => route('cuti.cancellations.index', [], false),
+                'leave_request_id' => $leave->id,
+                'leave_cancellation_request_id' => $cancellation->id,
+            ],
         );
 
         Queue::assertPushed(SendSimpegNotificationEmailJob::class, 1);
@@ -401,6 +418,16 @@ class EmailNotificationTest extends TestCase
             SendSimpegNotificationEmailJob::class,
             fn (SendSimpegNotificationEmailJob $job): bool => $job->employeeId === $employee->id
         );
+
+        $job = $queue->pushed(SendSimpegNotificationEmailJob::class)->sole();
+        app()->call([$job, 'handle']);
+        Mail::assertSent(SimpegNotificationMail::class, fn (SimpegNotificationMail $mail): bool => $mail->hasTo('pegawai@example.test'));
+
+        $cancellation->update(['status' => LeaveCancellationRequest::STATUS_REJECTED, 'decided_by' => $admin->id, 'decided_at' => now()]);
+        $leave->update(['status' => 'menunggu_approval']);
+        Mail::fake();
+        app()->call([$job, 'handle']);
+        Mail::assertNothingSent();
     }
 
     public function test_cuti_decline_queues_email_to_primary_recipient(): void
@@ -565,6 +592,7 @@ class EmailNotificationTest extends TestCase
             $leave,
             $pybmc,
             $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            (int) $leave->fresh()->revision_version,
             null,
             $this->actorRequest($pybmcUser),
         );
@@ -668,6 +696,7 @@ class EmailNotificationTest extends TestCase
             $leave,
             $approver,
             $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            (int) $leave->fresh()->revision_version,
             'Dokumen pendukung tidak sesuai.',
             Request::create('/'),
         );
@@ -684,7 +713,8 @@ class EmailNotificationTest extends TestCase
 
     public function test_intermediate_approval_notifies_next_approver_with_internal_approval_url(): void
     {
-        Queue::fake();
+        $queue = Queue::fake();
+        Mail::fake();
         $this->enableEventChannels('cuti.menunggu_persetujuan');
         $employee = Employee::factory()->create();
         $kepalaBagian = Employee::factory()->create(['email' => 'kabag@example.test']);
@@ -696,6 +726,7 @@ class EmailNotificationTest extends TestCase
             $leave,
             $kepalaBagian,
             $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            (int) $leave->fresh()->revision_version,
             null,
             $this->actorRequest($kepalaBagianUser),
         );
@@ -707,7 +738,52 @@ class EmailNotificationTest extends TestCase
 
         // Approver tahap berikutnya diarahkan ke antrean approval lewat path internal relatif tanpa parameter.
         $this->assertSame($leave->id, $notification->data['leave_request_id']);
+        $this->assertSame((string) $leave->fresh()->revision_version, $notification->data['leave_request_version']);
         $this->assertSame('/cuti/approval', $notification->data['url']);
+
+        $job = $queue->pushed(SendSimpegNotificationEmailJob::class)->sole();
+        app()->call([$job, 'handle']);
+        Mail::assertSent(SimpegNotificationMail::class, fn (SimpegNotificationMail $mail): bool => $mail->hasTo('pybmc@example.test'));
+    }
+
+    public function test_email_approval_yang_sudah_antre_dilewati_saat_pengajuan_ditahan_pembatalan(): void
+    {
+        Mail::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
+        $approver = Employee::factory()->create(['email' => 'approver@example.test']);
+        $leave = $this->makeLeaveRequestWithSteps(Employee::factory()->create(), [$approver]);
+        $job = new SendSimpegNotificationEmailJob($approver->id, 'cuti.pengajuan_baru', 'Pengajuan Cuti Baru', 'Ada pengajuan cuti.', [
+            'leave_request_id' => $leave->id,
+            'leave_request_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'leave_request_version' => (string) $leave->fresh()->revision_version,
+        ]);
+
+        $leave->update(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING]);
+        app()->call([$job, 'handle']);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_email_approval_hanya_mengirim_versi_pengajuan_terbaru(): void
+    {
+        Mail::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
+        $approver = Employee::factory()->create(['email' => 'approver@example.test']);
+        $leave = $this->makeLeaveRequestWithSteps(Employee::factory()->create(), [$approver]);
+        $data = [
+            'leave_request_id' => $leave->id,
+            'leave_request_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'leave_request_version' => '1',
+        ];
+        $oldJob = new SendSimpegNotificationEmailJob($approver->id, 'cuti.pengajuan_baru', 'Pengajuan Awal', 'Ada pengajuan cuti.', $data);
+
+        $leave->forceFill(['revision_version' => 2])->save();
+        app()->call([$oldJob, 'handle']);
+        Mail::assertNothingSent();
+
+        $currentJob = new SendSimpegNotificationEmailJob($approver->id, 'cuti.pengajuan_baru', 'Pengajuan Diperbarui', 'Ada revisi cuti.', [...$data, 'leave_request_version' => '2']);
+        app()->call([$currentJob, 'handle']);
+        Mail::assertSent(SimpegNotificationMail::class, fn (SimpegNotificationMail $mail): bool => $mail->hasTo('approver@example.test'));
     }
 
     public function test_email_cta_renders_internal_leave_detail_url(): void

@@ -104,6 +104,8 @@
                                             'ditangguhkan' => 'warning',
                                             'ditangguhkan_tugas_dinas' => 'warning',
                                             'dikembalikan_karena_rollover' => 'warning',
+                                            'menunggu_pembatalan' => 'warning',
+                                            'dibatalkan' => 'danger',
                                             'perlu_perubahan', 'tidak_disetujui' => 'danger',
                                             default => 'primary',
                                         }"
@@ -115,6 +117,8 @@
                                             'ditangguhkan' => 'Ditangguhkan',
                                             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
                                             'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
+                                            'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
+                                            'dibatalkan' => 'Dibatalkan',
                                             'perlu_perubahan' => 'Perubahan',
                                             'disetujui' => 'Disetujui',
                                             'tidak_disetujui' => 'Tidak Disetujui',

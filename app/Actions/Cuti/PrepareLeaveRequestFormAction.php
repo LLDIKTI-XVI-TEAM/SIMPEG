@@ -3,6 +3,7 @@
 namespace App\Actions\Cuti;
 
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\RefJenisCuti;
 use App\Services\Cuti\ApprovalChainResolver;
@@ -45,6 +46,7 @@ class PrepareLeaveRequestFormAction
      *     leaveTypeCodes: array<string, string>,
      *     saldoCuti: array<string, mixed>,
      *     isKepalaLembaga: bool,
+     *     hasActiveLeaveWorkflow: bool,
      *     chainReady: bool,
      *     chainRoleLabels: array<int, string>,
      *     continuationLeaveCases: array<int, array{id: string, jenis_cuti_code: string, label: string}>,
@@ -58,6 +60,15 @@ class PrepareLeaveRequestFormAction
         // Preview awal memakai tanggal hari ini. Saat Pegawai memilih tanggal mulai lain,
         // JavaScript memanggil endpoint yang sama dengan tanggal acuan baru.
         $saldoCuti = $this->balancePreview->execute($employee, Carbon::now());
+        $hasActiveLeaveWorkflow = LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', [
+                'menunggu_approval',
+                'ditangguhkan',
+                LeaveRequest::STATUS_CANCELLATION_PENDING,
+                LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+            ])
+            ->exists();
 
         // Metadata khusus_pns adalah sumber yang sama dengan validasi submit, bukan tebakan dari nama tampilan.
         $jenisCutiQuery = RefJenisCuti::query()
@@ -137,6 +148,7 @@ class PrepareLeaveRequestFormAction
             'leaveTypeCodes' => $leaveTypeCodes,
             'saldoCuti' => $saldoCuti,
             'isKepalaLembaga' => (bool) $employee->is_kepala_lembaga,
+            'hasActiveLeaveWorkflow' => $hasActiveLeaveWorkflow,
             'chainReady' => $chainReady,
             'chainRoleLabels' => $chainRoleLabels,
             'continuationLeaveCases' => $continuationLeaveCases,

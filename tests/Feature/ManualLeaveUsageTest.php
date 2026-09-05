@@ -858,7 +858,7 @@ SQL))->pluck('confdeltype', 'conname');
         $statuses = [
             'menunggu_approval',
             'ditangguhkan',
-            'perlu_perubahan',
+            LeaveRequest::STATUS_CANCELLATION_PENDING,
             'ditangguhkan_tugas_dinas',
             'dikembalikan_karena_rollover',
             'disetujui',
@@ -986,13 +986,14 @@ SQL);
             $type,
             '2026-02-02',
             '2026-02-03',
-            'perlu_perubahan',
+            'menunggu_approval',
         );
         $actor = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
         $request = $this->requestFor($actor);
 
         try {
             app(ResubmitLeaveRequestAction::class)->execute($leaveRequest, [
+                'revision_version' => (int) $leaveRequest->fresh()->revision_version,
                 'tanggal_mulai' => '2026-01-07',
                 'tanggal_selesai' => '2026-01-09',
                 'alasan' => 'Resubmit yang berbenturan manual.',
@@ -1004,7 +1005,7 @@ SQL);
             $this->assertArrayHasKey('tanggal_mulai', $exception->errors());
         }
 
-        $this->assertSame('perlu_perubahan', $leaveRequest->fresh()->status);
+        $this->assertSame('menunggu_approval', $leaveRequest->fresh()->status);
         $this->assertSame('2026-02-02', $leaveRequest->fresh()->tanggal_mulai->toDateString());
     }
 
@@ -1017,7 +1018,7 @@ SQL);
             $type,
             '2026-02-02',
             '2026-02-03',
-            'perlu_perubahan',
+            'menunggu_approval',
         );
         $actor = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
         $lockOrder = [];
@@ -1036,6 +1037,7 @@ SQL);
         });
 
         $updated = app(ResubmitLeaveRequestAction::class)->execute($leaveRequest, [
+            'revision_version' => (int) $leaveRequest->fresh()->revision_version,
             'tanggal_mulai' => '2026-02-02',
             'tanggal_selesai' => '2026-02-04',
             'alasan' => 'Resubmit valid tanpa overlap lain.',

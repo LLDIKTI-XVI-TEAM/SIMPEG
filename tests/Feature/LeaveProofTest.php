@@ -340,6 +340,7 @@ class LeaveProofTest extends TestCase
             $fixture['request'],
             $fixture['kepala_bagian'],
             $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'),
+            (int) $fixture['request']->fresh()->revision_version,
             null,
             $fixture['kepala_bagian_user'],
         );
@@ -361,8 +362,8 @@ class LeaveProofTest extends TestCase
         $fixture = $this->makePendingApproval('Cuti Tahunan', createBalance: true);
         $service = app(LeaveApprovalService::class);
 
-        $service->approve($fixture['request'], $fixture['kepala_bagian'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), null, $fixture['kepala_bagian_user']);
-        $final = $service->approve($fixture['request']->fresh(), $fixture['pybmc_employee'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), null, $fixture['pybmc_user']);
+        $service->approve($fixture['request'], $fixture['kepala_bagian'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), (int) $fixture['request']->fresh()->revision_version, null, $fixture['kepala_bagian_user']);
+        $final = $service->approve($fixture['request']->fresh(), $fixture['pybmc_employee'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), (int) $fixture['request']->fresh()->revision_version, null, $fixture['pybmc_user']);
 
         $this->assertSame('disetujui', $final->status);
 
@@ -393,8 +394,8 @@ class LeaveProofTest extends TestCase
         $fixture = $this->makePendingApproval('Cuti Sakit', createBalance: false);
         $service = app(LeaveApprovalService::class);
 
-        $service->approve($fixture['request'], $fixture['kepala_bagian'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), null, $fixture['kepala_bagian_user']);
-        $final = $service->approve($fixture['request']->fresh(), $fixture['pybmc_employee'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), null, $fixture['pybmc_user']);
+        $service->approve($fixture['request'], $fixture['kepala_bagian'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), (int) $fixture['request']->fresh()->revision_version, null, $fixture['kepala_bagian_user']);
+        $final = $service->approve($fixture['request']->fresh(), $fixture['pybmc_employee'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), (int) $fixture['request']->fresh()->revision_version, null, $fixture['pybmc_user']);
 
         $this->assertSame('disetujui', $final->status);
         $this->assertSame(1, LeaveProof::query()->where('leave_request_id', $fixture['request']->id)->count());
@@ -423,7 +424,7 @@ class LeaveProofTest extends TestCase
         $service = app(LeaveApprovalService::class);
 
         // Tahap pertama sukses dan commit terpisah: pengajuan berpindah ke step final aktif.
-        $service->approve($fixture['request'], $fixture['kepala_bagian'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), null, $fixture['kepala_bagian_user']);
+        $service->approve($fixture['request'], $fixture['kepala_bagian'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), (int) $fixture['request']->fresh()->revision_version, null, $fixture['kepala_bagian_user']);
 
         // Paksa hanya insert audit penerbitan bukti yang gagal, membuktikan audit bukti bersifat fail-closed
         // dan seluruh transaksi persetujuan final (status, saldo, ledger, bukti) wajib di-rollback bersama.
@@ -434,7 +435,7 @@ class LeaveProofTest extends TestCase
         });
 
         try {
-            $service->approve($fixture['request']->fresh(), $fixture['pybmc_employee'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), null, $fixture['pybmc_user']);
+            $service->approve($fixture['request']->fresh(), $fixture['pybmc_employee'], $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'), (int) $fixture['request']->fresh()->revision_version, null, $fixture['pybmc_user']);
             $this->fail('Persetujuan final seharusnya gagal karena audit bukti tidak dapat ditulis.');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('Simulasi kegagalan insert audit bukti cuti', $e->getMessage());
@@ -479,6 +480,7 @@ class LeaveProofTest extends TestCase
                 $fixture['request'],
                 $fixture['kepala_bagian'],
                 $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'),
+                (int) $fixture['request']->fresh()->revision_version,
                 null,
                 $penyusupUser,
             );

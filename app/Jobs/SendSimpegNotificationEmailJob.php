@@ -4,10 +4,14 @@ namespace App\Jobs;
 
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
+use App\Models\LeaveCancellationRequest;
+use App\Models\LeaveRequest;
+use App\Services\LeaveApprovalService;
 use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationEventCatalog;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -44,6 +48,30 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
         // Job tertunda harus menghormati kill-switch terbaru, bukan snapshot kebijakan saat enqueue.
         if (! $catalog->supportsChannel($this->eventKey, 'email')
             || ! $channels->isEnabledForEvent($this->eventKey, 'email')) {
+            return;
+        }
+
+        // Status dapat tetap sama setelah revisi; hanya versi dan tahap milik approver aktif yang boleh meminta tindakan.
+        if (in_array($this->eventKey, ['cuti.pengajuan_baru', 'cuti.menunggu_persetujuan'], true)
+            && ! LeaveRequest::query()
+                ->whereKey($this->data['leave_request_id'] ?? null)
+                ->where('revision_version', $this->data['leave_request_version'] ?? null)
+                ->whereIn('status', LeaveApprovalService::ACTIONABLE_STATUSES)
+                ->whereHas('steps', fn (Builder $query) => $query
+                    ->whereKey($this->data['leave_request_step_id'] ?? null)
+                    ->where('status', 'active')
+                    ->where('approver_employee_id', $this->employeeId))
+                ->exists()) {
+            return;
+        }
+
+        // Admin lain mungkin sudah memutus permohonan sebelum email dalam antrean sempat dikirim.
+        if ($this->eventKey === 'cuti.pembatalan_diajukan'
+            && ! LeaveCancellationRequest::query()
+                ->whereKey($this->data['leave_cancellation_request_id'] ?? null)
+                ->where('leave_request_id', $this->data['leave_request_id'] ?? null)
+                ->where('status', LeaveCancellationRequest::STATUS_PENDING)
+                ->exists()) {
             return;
         }
 

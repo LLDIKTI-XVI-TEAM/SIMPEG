@@ -20,6 +20,7 @@ class RecordDutyPostponementRequest extends FormRequest
     {
         return [
             'active_step_id' => ['required', 'uuid'],
+            'revision_version' => ['required', 'integer', 'min:1'],
             'alasan' => ['required', 'string', 'min:5', 'max:500'],
         ];
     }

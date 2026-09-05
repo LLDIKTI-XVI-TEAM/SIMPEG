@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Mengirim ulang pengajuan yang dikembalikan untuk perubahan tanpa membuat snapshot approval baru.
+ * Memperbarui pengajuan sebelum tindakan approver atau setelah pengembalian rollover.
  */
 class ResubmitLeaveRequestAction
 {
@@ -70,6 +70,7 @@ class ResubmitLeaveRequestAction
 
                 $isRolloverReturn = $locked->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
                 $this->assertResubmissionStatusAndTargetYear($locked, $mulai);
+                $this->assertExpectedRevisionVersion($locked, (int) $data['revision_version']);
                 $this->overlap->assertNoOverlap($employee, $mulai, $selesai, null, $locked->id);
 
                 if ($request->hasFile('lampiran')) {
@@ -94,6 +95,7 @@ class ResubmitLeaveRequestAction
                     'nomor_telepon',
                     'lampiran_path',
                     'status',
+                    'revision_version',
                     'rollover_source_year',
                     'rollover_target_year',
                 ]);
@@ -115,6 +117,7 @@ class ResubmitLeaveRequestAction
                     'nomor_telepon' => $data['nomor_telepon'],
                     'lampiran_path' => $newLampiranPath ?? $locked->lampiran_path,
                     'status' => 'menunggu_approval',
+                    'revision_version' => $locked->revision_version + 1,
                     'rollover_source_year' => null,
                     'rollover_target_year' => null,
                 ])->save();
@@ -187,6 +190,7 @@ class ResubmitLeaveRequestAction
             'jumlah_hari_kerja' => $values['jumlah_hari_kerja'] ?? null,
             'alasan' => $values['alasan'] ?? null,
             'status' => $values['status'] ?? null,
+            'revision_version' => $values['revision_version'] ?? null,
             'rollover_source_year' => $values['rollover_source_year'] ?? null,
             'rollover_target_year' => $values['rollover_target_year'] ?? null,
             'alamat_selama_cuti_diisi' => filled($values['alamat_selama_cuti'] ?? null),
@@ -214,18 +218,17 @@ class ResubmitLeaveRequestAction
             $approver,
             'cuti.pengajuan_baru',
             'Pengajuan Cuti Menunggu Persetujuan',
-            "{$leaveRequest->employee?->nama_lengkap} mengajukan ulang cuti dan menunggu persetujuan Anda.",
+            "{$leaveRequest->employee?->nama_lengkap} memperbarui pengajuan cuti yang menunggu persetujuan Anda.",
             [
                 'leave_request_id' => $leaveRequest->id,
                 'leave_request_step_id' => $activeStep->id,
-                'leave_request_version' => $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z'),
-                // Versi persistent request sesudah resubmit membedakan siklus pengajuan
-                // baru dari delivery awal, tanpa mengubah snapshot approver yang dipakai.
+                'leave_request_version' => (string) $leaveRequest->revision_version,
+                // Counter revisi membedakan delivery meski beberapa resubmit terjadi pada detik yang sama.
                 'notification_cycle_id' => sprintf(
                     '%s-resubmit:%s:%s',
-                    $isRolloverReturn ? 'rollover' : 'perubahan',
+                    $isRolloverReturn ? 'rollover' : 'revision',
                     $leaveRequest->id,
-                    $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z'),
+                    $leaveRequest->revision_version,
                 ),
                 'url' => route('cuti.approval', [], false),
             ],
@@ -235,7 +238,10 @@ class ResubmitLeaveRequestAction
     /** Menjaga bypass FormRequest tidak dapat menulis file atau data di luar lifecycle resubmit. */
     private function assertResubmissionStatusAndTargetYear(LeaveRequest $leaveRequest, Carbon $startDate): void
     {
-        if (! in_array($leaveRequest->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)) {
+        $isInitialRevision = $leaveRequest->status === 'menunggu_approval'
+            && $leaveRequest->approvals()->doesntExist();
+
+        if (! $isInitialRevision && $leaveRequest->status !== LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER) {
             throw ValidationException::withMessages([
                 'status' => 'Pengajuan cuti ini tidak dapat dikirim ulang.',
             ]);
@@ -245,6 +251,16 @@ class ResubmitLeaveRequestAction
             && ($leaveRequest->rollover_target_year === null || $startDate->year !== $leaveRequest->rollover_target_year)) {
             throw ValidationException::withMessages([
                 'tanggal_mulai' => "Pengajuan yang dikembalikan saat rollover wajib diajukan pada tahun {$leaveRequest->rollover_target_year}.",
+            ]);
+        }
+    }
+
+    /** Menolak formulir revisi lama setelah request berubah, sebelum file baru ditulis. */
+    private function assertExpectedRevisionVersion(LeaveRequest $leaveRequest, int $expectedRevisionVersion): void
+    {
+        if ($leaveRequest->revision_version !== $expectedRevisionVersion) {
+            throw ValidationException::withMessages([
+                'revision_version' => 'Pengajuan cuti telah diperbarui. Muat ulang halaman sebelum menyimpan revisi.',
             ]);
         }
     }

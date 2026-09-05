@@ -73,6 +73,8 @@
             $canAdministerLeaveBalance = $activeRole === 'admin_kepegawaian'
                 && (($layoutCapabilities['cuti.balance.reconcile'] ?? false)
                     || ($layoutCapabilities['cuti.manual.manage'] ?? false));
+            $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
+                && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
 
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
@@ -151,6 +153,9 @@
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                         $canAdministerLeaveBalance
                             ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                            : null,
+                        $canManageLeaveCancellations
+                            ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
                             : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                         $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,

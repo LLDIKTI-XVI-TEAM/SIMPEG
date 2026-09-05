@@ -69,8 +69,10 @@ class NotificationEventChannelMigrationTest extends TestCase
             'cuti.disetujui',
             'cuti.ditunda',
             'cuti.menunggu_persetujuan',
+            'cuti.pembatalan_diajukan',
+            'cuti.pembatalan_disetujui',
+            'cuti.pembatalan_ditolak',
             'cuti.pengajuan_baru',
-            'cuti.perlu_perubahan',
             'cuti.tidak_disetujui',
             'ews.kenaikan_pangkat',
             'ews.kgb',
@@ -89,7 +91,7 @@ class NotificationEventChannelMigrationTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(24, $normalPolicies);
+        $this->assertCount(28, $normalPolicies);
         $this->assertTrue($normalPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
 
         foreach ($normalEvents as $eventKey) {
@@ -172,9 +174,9 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertTrue($followupPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
         $this->assertTrue($followupPolicies->every(fn (object $policy): bool => $policy->code === 'in_app'));
 
-        // Agregat 41 = 33 kebijakan existing + 6 baris dari 6 event ews.followup.* (in_app saja)
+        // Agregat 45 = 37 kebijakan existing + 6 baris dari 6 event ews.followup.* (in_app saja)
         // + 2 baris dari status_pegawai.dinonaktifkan (in_app + email).
-        $this->assertDatabaseCount('notification_event_channels', 41);
+        $this->assertDatabaseCount('notification_event_channels', 45);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
@@ -214,6 +216,28 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertSame(2, DB::table('notification_event_channels')
             ->where('event_key', 'cuti.dikembalikan_karena_rollover')
             ->count());
+    }
+
+    public function test_cancellation_rollback_restores_previous_notification_policy_defaults(): void
+    {
+        $migration = require database_path('migrations/2026_09_03_000002_add_leave_cancellation_access_and_notification_policies.php');
+        $this->invokeMigrationMethod($migration, 'down');
+
+        $policies = DB::table('notification_event_channels')
+            ->join('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
+            ->where('event_key', 'cuti.perlu_perubahan')
+            ->get(['notification_event_channels.is_enabled', 'ref_notification_channels.code']);
+
+        $this->assertSame(['email', 'in_app'], $policies->pluck('code')->sort()->values()->all());
+        $this->assertTrue($policies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
+
+        DB::table('notification_event_channels')->where('event_key', 'cuti.perlu_perubahan')->update(['is_enabled' => false]);
+        $this->invokeMigrationMethod($migration, 'down');
+        $this->assertSame(2, DB::table('notification_event_channels')
+            ->where('event_key', 'cuti.perlu_perubahan')->where('is_enabled', false)->count());
+
+        $this->invokeMigrationMethod($migration, 'up');
+        $this->assertDatabaseMissing('notification_event_channels', ['event_key' => 'cuti.perlu_perubahan']);
     }
 
     private function rolloverReturnMigration(): Migration

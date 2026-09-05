@@ -11,6 +11,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
@@ -47,6 +48,7 @@ class LeaveDecisionAuditTest extends TestCase
 
         $response = $this->actingAs($user)->post($url, [
             'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $cuti->fresh()->revision_version,
             'komentar' => $komentar,
         ]);
 
@@ -86,51 +88,10 @@ class LeaveDecisionAuditTest extends TestCase
         ], $audit->new_values);
     }
 
-    public function test_request_changes_menyimpan_audit_dengan_id_dan_status_sebelum_sesudah(): void
+    public function test_route_mutasi_perubahan_tidak_lagi_tersedia(): void
     {
-        [$user, $approver, $pemohon, $cuti] = $this->buatPengajuanMenungguApproval('cuti_sakit_reqchange_audit');
-
-        $komentar = 'Mohon perbaiki tanggal mulai dan lampirkan surat keterangan.';
-
-        $response = $this->actingAs($user)->post(route('cuti.request-changes', ['id' => $cuti->id]), [
-            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
-            'komentar' => $komentar,
-        ]);
-
-        $response->assertRedirect(route('cuti.approval'));
-        $this->assertSame('perlu_perubahan', $cuti->fresh()->status);
-
-        $audit = AuditLog::query()
-            ->where('auditable_type', 'LeaveRequest')
-            ->where('auditable_id', $cuti->id)
-            ->where('event', 'CHANGE_REQUESTED')
-            ->firstOrFail();
-
-        $this->assertSame([
-            'leave_request_id' => $cuti->id,
-            'employee_id' => $pemohon->id,
-            'status' => 'menunggu_approval',
-            'step_order' => 1,
-            'step_label' => 'Verifikator',
-            'approver_id' => $approver->id,
-        ], $audit->old_values);
-
-        // acted_at wajib terisi setelah keputusan tercatat; strict assert di bawah mengambil nilainya
-        // dari payload sehingga null tidak akan tertangkap tanpa pemeriksaan eksplisit ini.
-        $this->assertNotNull($audit->new_values['acted_at']);
-
-        $this->assertSame([
-            'leave_request_id' => $cuti->id,
-            'employee_id' => $pemohon->id,
-            'status' => 'perlu_perubahan',
-            'decision' => 'CHANGE_REQUESTED',
-            'step_order' => 1,
-            'step_label' => 'Verifikator',
-            'approver_id' => $approver->id,
-            'acted_at' => $audit->new_values['acted_at'],
-            'komentar' => $komentar,
-            '_effective_role' => 'pegawai',
-        ], $audit->new_values);
+        $this->assertFalse(Route::has('cuti.request-changes'));
+        $this->assertDatabaseMissing('audit_logs', ['event' => 'CHANGE_REQUESTED']);
     }
 
     public function test_persetujuan_tahap_non_final_tercatat_sebagai_verifikasi(): void
@@ -139,6 +100,7 @@ class LeaveDecisionAuditTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('cuti.approve', ['id' => $cuti->id]), [
             'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $cuti->fresh()->revision_version,
             'komentar' => 'Diteruskan ke tahap berikutnya.',
         ]);
 
@@ -158,6 +120,7 @@ class LeaveDecisionAuditTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('cuti.approve', ['id' => $cuti->id]), [
             'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $cuti->fresh()->revision_version,
             'komentar' => 'Disetujui.',
         ]);
 
@@ -175,6 +138,7 @@ class LeaveDecisionAuditTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('cuti.postpone', ['id' => $cuti->id]), [
             'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $cuti->fresh()->revision_version,
             'komentar' => 'Ditangguhkan karena kebutuhan unit kerja.',
         ]);
 
@@ -185,29 +149,19 @@ class LeaveDecisionAuditTest extends TestCase
         $this->assertSame('DEFER', $audit->new_values['decision']);
     }
 
-    public function test_perubahan_dan_tidak_disetujui_terpisah_lewat_filter_event(): void
+    public function test_tidak_disetujui_tidak_menghasilkan_event_perubahan(): void
     {
-        [$userPerubahan, , , $cutiPerubahan] = $this->buatPengajuanMenungguApproval('cuti_sakit_filter_ubah');
-        $this->actingAs($userPerubahan)->post(route('cuti.request-changes', ['id' => $cutiPerubahan->id]), [
-            'active_step_id' => $cutiPerubahan->steps()->where('status', 'active')->valueOrFail('id'),
-            'komentar' => 'Mohon perbaiki tanggal pengajuan.',
-        ]);
-
         [$userTolak, , , $cutiTolak] = $this->buatPengajuanMenungguApproval('cuti_sakit_filter_tolak');
         $this->actingAs($userTolak)->post(route('cuti.decline', ['id' => $cutiTolak->id]), [
             'active_step_id' => $cutiTolak->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $cutiTolak->fresh()->revision_version,
             'komentar' => 'Kuota unit kerja tidak memungkinkan.',
         ]);
 
-        // Kedua keputusan wajib memakai kosakata berbeda supaya penyaringan audit tidak mencampur
-        // permintaan perubahan dengan penolakan.
-        $idPerubahan = AuditLog::query()->where('event', 'CHANGE_REQUESTED')->pluck('auditable_id');
         $idTolak = AuditLog::query()->where('event', 'NOT_APPROVED')->pluck('auditable_id');
 
-        $this->assertTrue($idPerubahan->contains($cutiPerubahan->id));
-        $this->assertFalse($idPerubahan->contains($cutiTolak->id));
         $this->assertTrue($idTolak->contains($cutiTolak->id));
-        $this->assertFalse($idTolak->contains($cutiPerubahan->id));
+        $this->assertDatabaseMissing('audit_logs', ['event' => 'CHANGE_REQUESTED']);
     }
 
     private function auditKeputusan(string $leaveRequestId, string $event): AuditLog

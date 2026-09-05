@@ -43,6 +43,7 @@ class AdminKepegawaianAccessTest extends TestCase
             'data-pegawai',
             'dokumen',
             'cuti.rekap',
+            'cuti.cancellations.index',
             'ews',
             'laporan.pegawai',
             'cuti.laporan',
@@ -78,6 +79,7 @@ class AdminKepegawaianAccessTest extends TestCase
 
         $dashboard->assertOk();
         $dashboard->assertDontSee('Pengaturan Sistem');
+        $dashboard->assertDontSee('href="'.route('cuti.cancellations.index').'"', false);
 
         foreach ([
             'user-management',
