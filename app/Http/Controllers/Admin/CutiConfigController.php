@@ -57,12 +57,12 @@ class CutiConfigController extends Controller
      */
     public function backfill(BackfillApprovalChainsRequest $request, BackfillEmployeeApprovalChainsAction $action): RedirectResponse
     {
-        $result = $action->execute($request->user(), (string) $request->validated('backfill_reason'), $request);
+        $result = $action->execute($request->user(), $request->validated('backfill_reason'), $request);
 
         return redirect()
             ->route('cuti.config')
             ->with('success', sprintf(
-                'Backfill chain approval selesai: %d dibuat, %d dilewati, %d tanpa Kepala Bagian.',
+                'Backfill chain approval selesai: %d dibuat, %d dilewati, %d tanpa penugasan Atasan Langsung efektif.',
                 count($result['created_employee_ids']),
                 count($result['skipped_employee_ids']),
                 count($result['missing_kepala_bagian_employee_ids']),
@@ -103,7 +103,7 @@ class CutiConfigController extends Controller
         return redirect()
             ->route('cuti.config')
             ->with('success', sprintf(
-                'Template chain diterapkan ke unit %s: %d dibuat, %d ditimpa, %d dilewati karena nonaktif, %d dilewati karena tanpa Kepala Bagian efektif, %d dilewati karena menjadi approver wajib pada template, %d pegawai aktif tidak terjangkau karena tanpa riwayat jabatan terkini.',
+                'Template chain diterapkan ke unit %s: %d dibuat, %d ditimpa, %d dilewati karena nonaktif, %d dilewati karena Atasan Langsung belum ditetapkan, %d dilewati karena menjadi approver wajib pada template, %d pegawai aktif tidak terjangkau karena tanpa riwayat jabatan terkini.',
                 $unitKerja->nama,
                 count($result['applied_employee_ids']),
                 count($result['overwritten_employee_ids']),
@@ -129,7 +129,7 @@ class CutiConfigController extends Controller
             ->values()
             ->all();
 
-        $action->execute($employee, $steps, $request->user(), (string) $request->validated('reason'), $request);
+        $action->execute($employee, $steps, $request->user(), $request->validated('reason'), $request);
 
         return redirect()
             ->route('cuti.config')

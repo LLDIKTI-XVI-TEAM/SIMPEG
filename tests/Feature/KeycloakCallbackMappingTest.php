@@ -496,6 +496,40 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseCount('users', 0);
     }
 
+    public function test_keycloak_username_owned_by_another_account_is_denied_without_database_error(): void
+    {
+        $employee = Employee::factory()->create([
+            'email' => 'pegawai-baru@example.com',
+        ]);
+        $existingEmployee = Employee::factory()->create();
+        $existingUser = User::factory()->create([
+            'email' => 'akun-lain@example.com',
+            'keycloak_username' => 'username-sudah-dipakai',
+            'employee_id' => $existingEmployee->id,
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-username-bentrok',
+            'nickname' => 'username-sudah-dipakai',
+            'name' => 'Pegawai Baru',
+            'email' => 'pegawai-baru@example.com',
+            'raw' => [
+                'email' => 'pegawai-baru@example.com',
+                'email_verified' => true,
+                'preferred_username' => 'username-sudah-dipakai',
+            ],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertOk();
+        $response->assertSee('Username akun Keycloak sudah terhubung ke akun SIMPEG lain.');
+        $this->assertGuest();
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseHas('users', ['id' => $existingUser->id]);
+        $this->assertDatabaseMissing('users', ['employee_id' => $employee->id]);
+    }
+
     public function test_invalid_employee_match_config_is_denied(): void
     {
         config()->set('services.keycloak.employee_match_field', 'role');
@@ -545,6 +579,44 @@ class KeycloakCallbackMappingTest extends TestCase
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'role' => 'pegawai',
+        ]);
+    }
+
+    public function test_allowed_local_demo_user_can_login_when_verified_keycloak_email_is_not_in_employee_data(): void
+    {
+        config()->set('services.keycloak.dev_usernames', ['demo-role']);
+
+        $employee = Employee::factory()->create([
+            'email' => 'fixture-demo@example.test',
+        ]);
+        $user = User::factory()->create([
+            'email' => 'fixture-demo@example.test',
+            'keycloak_username' => 'demo-role',
+            'employee_id' => $employee->id,
+            'role' => 'admin_kepegawaian',
+        ]);
+
+        $this->fakeKeycloakUser([
+            'id' => 'kc-demo-role',
+            'nickname' => 'demo-role',
+            'name' => 'Demo Role dari Keycloak',
+            'email' => 'alamat-idp-berbeda@example.test',
+            'raw' => [
+                'email' => 'alamat-idp-berbeda@example.test',
+                'email_verified' => true,
+                'preferred_username' => 'demo-role',
+            ],
+        ]);
+
+        $response = $this->get('/auth/keycloak/callback');
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($user->fresh());
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'keycloak_id' => 'kc-demo-role',
+            'keycloak_username' => 'demo-role',
+            'role' => 'admin_kepegawaian',
         ]);
     }
 

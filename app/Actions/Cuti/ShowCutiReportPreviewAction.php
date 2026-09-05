@@ -23,7 +23,8 @@ class ShowCutiReportPreviewAction
         $unit = $this->stringFilter($filters, 'unit');
         $pegawaiId = $this->stringFilter($filters, 'pegawai');
         $jenisId = $this->stringFilter($filters, 'jenis');
-        $rows = $this->rekapQuery->paginateDetailRows($filters, 15, 'page');
+        $perPage = isset($filters['per_page']) && (int) $filters['per_page'] > 0 ? (int) $filters['per_page'] : 10;
+        $rows = $this->rekapQuery->paginateDetailRows($filters, $perPage, 'page');
         $selectedEmployee = $pegawaiId === null
             ? null
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);

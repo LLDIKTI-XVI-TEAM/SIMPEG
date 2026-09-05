@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use App\Services\Cuti\ApprovalChainInvariantService;
+use App\Support\Cuti\ApprovalStepLabel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,11 +36,18 @@ class SaveEmployeeApprovalChainAction
      *     is_final:mixed
      * }>  $steps
      */
-    public function execute(Employee $employee, array $steps, User $actor, string $reason, ?Request $request = null): LeaveApprovalChain
+    public function execute(Employee $employee, array $steps, User $actor, ?string $reason, ?Request $request = null): LeaveApprovalChain
     {
         return DB::transaction(function () use ($employee, $steps, $actor, $reason, $request): LeaveApprovalChain {
             $this->configurationLock->acquire();
             $steps = $this->appendGlobalPybmcWhenNeeded($steps);
+            $steps = array_map(fn (array $step): array => [
+                ...$step,
+                'role_label' => ApprovalStepLabel::display(
+                    (string) ($step['step_type'] ?? ''),
+                    is_string($step['role_label'] ?? null) ? $step['role_label'] : null,
+                ),
+            ], $steps);
 
             // Kandidat wajib sah dan seluruh approver dikunci sebelum chain aktif lama disentuh,
             // supaya kegagalan konfigurasi tidak meninggalkan pergantian kewenangan secara parsial.

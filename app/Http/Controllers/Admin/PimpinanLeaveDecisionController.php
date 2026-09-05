@@ -27,10 +27,10 @@ class PimpinanLeaveDecisionController extends Controller
 
         $payload = $request->validated();
         match ($payload['keputusan']) {
-            'DISETUJUI' => $approve->execute($leave, $actor, $payload['catatan'] ?? null, $request),
-            'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['catatan'], $request),
-            'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['catatan'], $request),
-            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['catatan'], $request),
+            'DISETUJUI' => $approve->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'] ?? null, $request),
+            'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
+            'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
+            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
         };
         $message = match ($payload['keputusan']) {
             'DISETUJUI' => 'Pengajuan cuti berhasil disetujui.',
@@ -53,7 +53,8 @@ class PimpinanLeaveDecisionController extends Controller
         $actor = $user?->employee;
         abort_if($user === null || $actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
 
-        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+        $payload = $request->validated();
+        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['alasan']);
 
         return redirect()->route('pimpinan.cuti.show', $leave)
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');

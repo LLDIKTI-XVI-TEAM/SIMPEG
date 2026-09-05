@@ -26,15 +26,15 @@ class KepalaBagianLeaveDecisionController extends Controller
     ) {
         $user = $request->user();
         $actor = $user?->employee;
-        abort_if($actor === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        abort_if($actor === null, 403, 'Akun Atasan Langsung belum tertaut ke data pegawai.');
         abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
 
         $payload = $request->validated();
         match ($payload['keputusan']) {
-            'DISETUJUI' => $approve->execute($leave, $actor, $payload['catatan'] ?? null, $request),
-            'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['catatan'], $request),
-            'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['catatan'], $request),
-            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['catatan'], $request),
+            'DISETUJUI' => $approve->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'] ?? null, $request),
+            'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
+            'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
+            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
         };
 
         $message = match ($payload['keputusan']) {
@@ -56,10 +56,11 @@ class KepalaBagianLeaveDecisionController extends Controller
     ) {
         $user = $request->user();
         $actor = $user?->employee;
-        abort_if($user === null || $actor === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        abort_if($user === null || $actor === null, 403, 'Akun Atasan Langsung belum tertaut ke data pegawai.');
         abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
 
-        $action->execute($leave, $actor, $user, $request->validated()['alasan']);
+        $payload = $request->validated();
+        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['alasan']);
 
         return redirect()->route('kepala-bagian.cuti.show', $leave)
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');

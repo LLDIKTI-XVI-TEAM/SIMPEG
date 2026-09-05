@@ -953,20 +953,20 @@
             :dashboard-url="route('dashboard')"
             :employees-url="route('data-pegawai')"
         >
+                @if($canDeactivateEmployee)
+                <x-ui.button type="button" variant="danger" @click="showDeactivateModal = true">
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9 14.394 18m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                    </svg>
+                    Nonaktifkan
+                </x-ui.button>
+                @endif
                 @if($canUpdateEmployee)
                 <x-ui.button href="{{ route('pegawai.edit', $p->id) }}" wire:navigate aria-label="Edit Pegawai">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
                     Edit Pegawai
-                </x-ui.button>
-                @endif
-                @if($canDeactivateEmployee)
-                <x-ui.button type="button" variant="danger-solid" @click="showDeactivateModal = true">
-                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9 14.394 18m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                    </svg>
-                    Nonaktifkan
                 </x-ui.button>
                 @endif
         </x-pegawai.detail.page-header>
@@ -1128,84 +1128,86 @@
                     @if ($canAssignSupervisor)
                         <form id="assign-kepala-bagian-form" action="{{ route('pegawai.assign-atasan', $p->id) }}" method="POST" @submit="validateSupervisorSelection($event)" class="border-t border-border pt-4">
                             @csrf
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_13rem_auto] md:items-start">
-                                <div class="space-y-1">
-                                    <label for="kepala_bagian_lookup" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                        Ubah Kepala Bagian
-                                    </label>
-                                    <div class="relative">
-                                        <input type="hidden" name="kepala_bagian_id" :value="supervisorSelectedId">
-                                        <input
-                                            id="kepala_bagian_lookup"
-                                            x-model="supervisorQuery"
-                                            @input="searchSupervisor()"
-                                            @focus="supervisorQuery.trim().length >= 2 && (supervisorOpen = true)"
-                                            @blur="closeSupervisorLookup()"
-                                            @keydown.arrow-down.prevent="moveSupervisorActiveIndex(1)"
-                                            @keydown.arrow-up.prevent="moveSupervisorActiveIndex(-1)"
-                                            @keydown.enter.prevent="chooseActiveSupervisor()"
-                                            @keydown.escape.prevent="supervisorOpen = false"
-                                            type="search"
-                                            autocomplete="off"
-                                            role="combobox"
-                                            aria-autocomplete="list"
-                                            :aria-expanded="supervisorOpen.toString()"
-                                            aria-controls="kepala_bagian_lookup_results"
-                                            :aria-activedescendant="supervisorActiveIndex >= 0 ? `kepala_bagian_option_${supervisorActiveIndex}` : null"
-                                            aria-describedby="kepala_bagian_lookup_help kepala_bagian_lookup_selection_error {{ $errors->has('kepala_bagian_id') ? 'kepala_bagian_lookup_error' : '' }}"
-                                            :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
-                                            placeholder="Ketik minimal 2 karakter nama atau NIP"
-                                            class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
-                                        >
-                                        <div
-                                            id="kepala_bagian_lookup_results"
-                                            x-cloak
-                                            x-show="supervisorOpen"
-                                            role="listbox"
-                                            aria-label="Hasil pencarian Kepala Bagian"
-                                            class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
-                                        >
-                                            <div x-show="supervisorLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
-                                                <x-ui.loading size="sm" color="primary" />
-                                                Memuat kandidat.
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                                    <div class="space-y-1">
+                                        <label for="kepala_bagian_lookup" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
+                                            Ubah Kepala Bagian
+                                        </label>
+                                        <div class="relative">
+                                            <input type="hidden" name="kepala_bagian_id" :value="supervisorSelectedId">
+                                            <input
+                                                id="kepala_bagian_lookup"
+                                                x-model="supervisorQuery"
+                                                @input="searchSupervisor()"
+                                                @focus="supervisorQuery.trim().length >= 2 && (supervisorOpen = true)"
+                                                @blur="closeSupervisorLookup()"
+                                                @keydown.arrow-down.prevent="moveSupervisorActiveIndex(1)"
+                                                @keydown.arrow-up.prevent="moveSupervisorActiveIndex(-1)"
+                                                @keydown.enter.prevent="chooseActiveSupervisor()"
+                                                @keydown.escape.prevent="supervisorOpen = false"
+                                                type="search"
+                                                autocomplete="off"
+                                                role="combobox"
+                                                aria-autocomplete="list"
+                                                :aria-expanded="supervisorOpen.toString()"
+                                                aria-controls="kepala_bagian_lookup_results"
+                                                :aria-activedescendant="supervisorActiveIndex >= 0 ? `kepala_bagian_option_${supervisorActiveIndex}` : null"
+                                                aria-describedby="kepala_bagian_lookup_help kepala_bagian_lookup_selection_error {{ $errors->has('kepala_bagian_id') ? 'kepala_bagian_lookup_error' : '' }}"
+                                                :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
+                                                placeholder="Ketik minimal 2 karakter nama atau NIP"
+                                                class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                            >
+                                            <div
+                                                id="kepala_bagian_lookup_results"
+                                                x-cloak
+                                                x-show="supervisorOpen"
+                                                role="listbox"
+                                                aria-label="Hasil pencarian Kepala Bagian"
+                                                class="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-border bg-surface p-1 shadow-md"
+                                            >
+                                                <div x-show="supervisorLoading" class="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                                                    <x-ui.loading size="sm" color="primary" />
+                                                    Memuat kandidat.
+                                                </div>
+                                                <p x-show="!supervisorLoading && supervisorError" x-text="supervisorError" class="px-3 py-2 text-xs text-danger"></p>
+                                                <p x-show="!supervisorLoading && !supervisorError && supervisorResults.length === 0" class="px-3 py-2 text-xs text-muted">
+                                                    Tidak ada kandidat yang cocok.
+                                                </p>
+                                                <template x-for="(candidate, index) in supervisorResults" :key="candidate.id">
+                                                    <button
+                                                        type="button"
+                                                        :id="`kepala_bagian_option_${index}`"
+                                                        role="option"
+                                                        :aria-selected="supervisorActiveIndex === index"
+                                                        @mousedown.prevent="selectSupervisor(candidate)"
+                                                        @mouseenter="supervisorActiveIndex = index"
+                                                        :class="supervisorActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
+                                                        class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                    >
+                                                        <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
+                                                        <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
+                                                    </button>
+                                                </template>
                                             </div>
-                                            <p x-show="!supervisorLoading && supervisorError" x-text="supervisorError" class="px-3 py-2 text-xs text-danger"></p>
-                                            <p x-show="!supervisorLoading && !supervisorError && supervisorResults.length === 0" class="px-3 py-2 text-xs text-muted">
-                                                Tidak ada kandidat yang cocok.
-                                            </p>
-                                            <template x-for="(candidate, index) in supervisorResults" :key="candidate.id">
-                                                <button
-                                                    type="button"
-                                                    :id="`kepala_bagian_option_${index}`"
-                                                    role="option"
-                                                    :aria-selected="supervisorActiveIndex === index"
-                                                    @mousedown.prevent="selectSupervisor(candidate)"
-                                                    @mouseenter="supervisorActiveIndex = index"
-                                                    :class="supervisorActiveIndex === index ? 'bg-soft text-ink' : 'text-ink'"
-                                                    class="flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                                >
-                                                    <span x-text="candidate.nama_lengkap" class="text-sm font-semibold"></span>
-                                                    <span x-text="`NIP. ${candidate.nip}`" class="text-xs text-muted"></span>
-                                                </button>
-                                            </template>
                                         </div>
+                                        <p id="kepala_bagian_lookup_help" class="text-xs text-muted font-sans">Cari nama atau NIP, minimal 2 karakter. Penugasan lampau dan masa depan berlaku sesuai tanggal efektif.</p>
+                                        <p id="kepala_bagian_lookup_selection_error" x-show="supervisorSelectionError" x-cloak x-text="supervisorSelectionError" class="text-xs font-semibold text-danger font-sans" role="alert"></p>
+                                        @error('kepala_bagian_id')
+                                            <p id="kepala_bagian_lookup_error" class="text-[11px] font-semibold text-danger font-sans">{{ $message }}</p>
+                                        @enderror
+                                        <p x-show="supervisorSelectedName" class="text-xs text-muted">Dipilih: <span x-text="supervisorSelectedName" class="font-semibold text-ink"></span></p>
                                     </div>
-                                    <p id="kepala_bagian_lookup_help" class="text-xs text-muted font-sans">Cari nama atau NIP, minimal 2 karakter. Penugasan lampau dan masa depan berlaku sesuai tanggal efektif.</p>
-                                    <p id="kepala_bagian_lookup_selection_error" x-show="supervisorSelectionError" x-cloak x-text="supervisorSelectionError" class="text-xs font-semibold text-danger font-sans" role="alert"></p>
-                                    @error('kepala_bagian_id')
-                                        <p id="kepala_bagian_lookup_error" class="text-[11px] font-semibold text-danger font-sans">{{ $message }}</p>
-                                    @enderror
-                                    <p x-show="supervisorSelectedName" class="text-xs text-muted">Dipilih: <span x-text="supervisorSelectedName" class="font-semibold text-ink"></span></p>
+                                    <x-form.input
+                                        name="effective_date"
+                                        type="date"
+                                        label="Tanggal Mulai Penugasan Kepala Bagian"
+                                        :value="old('effective_date', now()->toDateString())"
+                                        required
+                                        help="Tanggal mulai berlakunya penugasan Kepala Bagian untuk pegawai ini."
+                                    />
                                 </div>
-                                <x-form.input
-                                    name="effective_date"
-                                    type="date"
-                                    label="Tanggal Mulai Penugasan Kepala Bagian"
-                                    :value="old('effective_date', now()->toDateString())"
-                                    required
-                                    help="Tanggal mulai berlakunya penugasan Kepala Bagian untuk pegawai ini."
-                                />
-                                <div class="flex flex-wrap gap-2 md:pt-6">
+                                <div class="flex flex-wrap items-center gap-2">
                                     <x-ui.button type="submit" size="sm">Simpan</x-ui.button>
                                     <x-ui.button type="button" variant="danger" size="sm" aria-label="Hapus penugasan Kepala Bagian dan simpan" @click="clearSupervisorAndSubmit()">Hapus Kepala Bagian lalu simpan</x-ui.button>
                                 </div>
@@ -1421,7 +1423,7 @@
                                     <td class="px-4 py-3">
                                         <span class="font-bold text-danger" x-text="d.jenis"></span>
                                         <template x-if="d.is_active">
-                                            <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold text-danger uppercase">Aktif</span>
+                                            <x-ui.badge variant="danger" size="xs" pill uppercase class="ml-1 !font-bold">Aktif</x-ui.badge>
                                         </template>
                                     </td>
                                     <td class="px-4 py-3" x-text="d.alasan"></td>

@@ -1,5 +1,11 @@
 <x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas bawahan hari ini.">
 
+    @error('active_step_id')
+        <x-ui.alert variant="danger" title="Keputusan belum dapat disimpan" class="mb-6">
+            {{ $message }}
+        </x-ui.alert>
+    @enderror
+
     {{-- ================================================================ --}}
     {{-- WELCOME BANNER --}}
     {{-- ================================================================ --}}
@@ -159,14 +165,16 @@
         <x-ui.card padding="none" class="overflow-hidden flex flex-col justify-between" x-data="{
             confirmOpen: false,
             selectedLeaveId: '',
+            selectedActiveStepId: '',
             selectedEmployeeName: '',
             decisionType: 'DISETUJUI',
             note: '',
             isSubmitting: false,
             urlTemplate: '{{ route('kepala-bagian.cuti.decision', ['leave' => '__LEAVE_ID__']) }}',
             actionUrl() { return this.urlTemplate.replace('__LEAVE_ID__', this.selectedLeaveId); },
-            openDecision(leaveId, empName, type) {
+            openDecision(leaveId, activeStepId, empName, type) {
                 this.selectedLeaveId = leaveId;
+                this.selectedActiveStepId = activeStepId;
                 this.selectedEmployeeName = empName;
                 this.decisionType = type;
                 this.note = '';
@@ -220,7 +228,7 @@
                                     <div class="flex items-center justify-end gap-1">
                                         {{-- 1. SETUJUI --}}
                                         <x-ui.tooltip text="Setujui" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DISETUJUI')" class="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success transition hover:bg-success/20 border border-success/20 focus:outline-none focus:ring-2 focus:ring-success/30" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DISETUJUI')" class="flex h-7 w-7 items-center justify-center rounded-md bg-success/10 text-success transition hover:bg-success/20 border border-success/20 focus:outline-none focus:ring-2 focus:ring-success/30" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                                 </svg>
@@ -229,7 +237,7 @@
 
                                         {{-- 2. PERUBAHAN --}}
                                         <x-ui.tooltip text="Minta Perubahan" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'PERUBAHAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-info/10 text-info transition hover:bg-info/20 border border-info/20 focus:outline-none focus:ring-2 focus:ring-info/30" aria-label="Minta perubahan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'PERUBAHAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-info/10 text-info transition hover:bg-info/20 border border-info/20 focus:outline-none focus:ring-2 focus:ring-info/30" aria-label="Minta perubahan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
                                                 </svg>
@@ -238,7 +246,7 @@
 
                                         {{-- 3. DITANGGUHKAN --}}
                                         <x-ui.tooltip text="Tangguhkan" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DITANGGUHKAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-warning/10 text-warning transition hover:bg-warning/20 border border-warning/20 focus:outline-none focus:ring-2 focus:ring-warning/30" aria-label="Tangguhkan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DITANGGUHKAN')" class="flex h-7 w-7 items-center justify-center rounded-md bg-warning/10 text-warning transition hover:bg-warning/20 border border-warning/20 focus:outline-none focus:ring-2 focus:ring-warning/30" aria-label="Tangguhkan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                                 </svg>
@@ -247,7 +255,7 @@
 
                                         {{-- 4. TIDAK DISETUJUI --}}
                                         <x-ui.tooltip text="Tidak Disetujui" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'TIDAK_DISETUJUI')" class="flex h-7 w-7 items-center justify-center rounded-md bg-danger/10 text-danger transition hover:bg-danger/20 border border-danger/20 focus:outline-none focus:ring-2 focus:ring-danger/30" aria-label="Tidak setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'TIDAK_DISETUJUI')" class="flex h-7 w-7 items-center justify-center rounded-md bg-danger/10 text-danger transition hover:bg-danger/20 border border-danger/20 focus:outline-none focus:ring-2 focus:ring-danger/30" aria-label="Tidak setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                                                 </svg>
@@ -286,6 +294,7 @@
 
                 <form method="POST" :action="actionUrl()" @submit="isSubmitting = true">
                     @csrf
+                    <input type="hidden" name="active_step_id" x-bind:value="selectedActiveStepId">
                     <input type="hidden" name="keputusan" :value="decisionType">
 
                     <div class="space-y-4">

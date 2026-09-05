@@ -472,18 +472,21 @@ class PegawaiController extends Controller
     }
 
     /**
-     * Menyimpan perubahan Kepala Bagian dan mempertahankan pilihan form bila aturan histori menolak perubahan.
+     * Menyimpan perubahan penugasan atasan dan mempertahankan pilihan form bila aturan histori menolak perubahan.
      */
     public function assignAtasan(AssignSupervisorRequest $request, $id, AssignSupervisorAction $action)
     {
         $employee = Employee::findOrFail($id);
         $data = $request->validated();
+        $isCutiConfig = ($data['redirect_to'] ?? null) === 'cuti-config';
 
         // Form penetapan juga tersedia inline di halaman Konfigurasi Approval Cuti; nilai redirect_to
         // sudah dibatasi whitelist pada FormRequest sehingga tidak dapat menjadi open redirect.
-        [$redirectRoute, $redirectParams] = ($data['redirect_to'] ?? null) === 'cuti-config'
+        [$redirectRoute, $redirectParams] = $isCutiConfig
             ? ['cuti.config', ['employee_id' => $id]]
             : ['pegawai.show', $id];
+        // Surface cuti memakai nama peran bisnis, sedangkan detail pegawai mempertahankan label struktural.
+        $assignmentLabel = $isCutiConfig ? 'Atasan Langsung' : 'Kepala Bagian';
 
         try {
             $action->execute(
@@ -494,7 +497,7 @@ class PegawaiController extends Controller
             );
 
             return redirect()->route($redirectRoute, $redirectParams)
-                ->with('success', 'Kepala bagian untuk '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('success', $assignmentLabel.' untuk '.$employee->nama_lengkap.' berhasil diperbarui.')
                 ->with('employee_data_changed', true);
         } catch (ValidationException $e) {
             return redirect()->route($redirectRoute, $redirectParams)
@@ -503,7 +506,7 @@ class PegawaiController extends Controller
         } catch (\Exception $e) {
             return redirect()->route($redirectRoute, $redirectParams)
                 ->withInput()
-                ->with('error', 'Gagal memperbarui kepala bagian: '.$e->getMessage());
+                ->with('error', 'Gagal memperbarui '.$assignmentLabel.': '.$e->getMessage());
         }
     }
 }

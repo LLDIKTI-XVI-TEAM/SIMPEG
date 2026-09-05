@@ -414,20 +414,25 @@ class NotificationChannelWhatsAppConfigTest extends TestCase
             "/data-master/channel-notifikasi/{$channel->id}/konfigurasi-whatsapp",
             ['channel_integration_id' => self::CHANNEL_INTEGRATION_ID],
         )->assertRedirect();
+        $auditAdded = AuditLog::query()->sole();
 
         $this->postWithCsrf(
             "/data-master/channel-notifikasi/{$channel->id}/konfigurasi-whatsapp",
             ['channel_integration_id' => '', 'canonical_url' => 'https://simpeg.example.test'],
         )->assertRedirect();
         $this->assertSame(self::CHANNEL_INTEGRATION_ID, $this->rawWhatsAppConfig($channel->id)['channel_integration_id']);
-        $this->assertSame('unchanged', AuditLog::query()->latest()->firstOrFail()->new_values['channel_integration_id_status']);
+        $auditUnchanged = AuditLog::query()->whereKeyNot($auditAdded->id)->sole();
+        $this->assertSame('unchanged', $auditUnchanged->new_values['channel_integration_id_status']);
 
         $this->postWithCsrf(
             "/data-master/channel-notifikasi/{$channel->id}/konfigurasi-whatsapp",
             ['channel_integration_id' => self::CHANNEL_INTEGRATION_ID_ROTATED],
         )->assertRedirect();
         $this->assertSame(self::CHANNEL_INTEGRATION_ID_ROTATED, $this->rawWhatsAppConfig($channel->id)['channel_integration_id']);
-        $this->assertSame('rotated', AuditLog::query()->latest()->firstOrFail()->new_values['channel_integration_id_status']);
+        $auditRotated = AuditLog::query()
+            ->whereNotIn('id', [$auditAdded->id, $auditUnchanged->id])
+            ->sole();
+        $this->assertSame('rotated', $auditRotated->new_values['channel_integration_id_status']);
 
         $this->postWithCsrf(
             "/data-master/channel-notifikasi/{$channel->id}/konfigurasi-whatsapp",
@@ -435,7 +440,10 @@ class NotificationChannelWhatsAppConfigTest extends TestCase
         )->assertRedirect();
         $this->assertArrayNotHasKey('channel_integration_id', $this->rawWhatsAppConfig($channel->id));
         $this->assertNull((new WhatsAppRuntimeConfig)->all()['channel_integration_id']);
-        $this->assertSame('cleared', AuditLog::query()->latest()->firstOrFail()->new_values['channel_integration_id_status']);
+        $auditCleared = AuditLog::query()
+            ->whereNotIn('id', [$auditAdded->id, $auditUnchanged->id, $auditRotated->id])
+            ->sole();
+        $this->assertSame('cleared', $auditCleared->new_values['channel_integration_id_status']);
     }
 
     public function test_channel_integration_id_invalid_atau_bersamaan_clear_ditolak_tanpa_mutasi(): void

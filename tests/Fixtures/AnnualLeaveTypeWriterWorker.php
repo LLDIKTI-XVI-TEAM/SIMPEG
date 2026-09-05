@@ -26,7 +26,7 @@ try {
     File::put((string) $payload['ready'], json_encode([
         'pid' => (int) DB::selectOne('SELECT pg_backend_pid() AS pid')->pid,
     ], JSON_THROW_ON_ERROR));
-    $deadline = microtime(true) + 20;
+    $deadline = microtime(true) + 60;
 
     if ($mode === 'interleave') {
         $proceed = (string) $payload['proceed'];

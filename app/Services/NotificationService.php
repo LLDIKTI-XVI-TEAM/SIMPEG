@@ -16,6 +16,11 @@ use Illuminate\Support\Facades\DB;
 
 class NotificationService
 {
+    /**
+     * @var array<string, bool>
+     */
+    private array $eventChannelState = [];
+
     public function __construct(
         private readonly NotificationRecipientResolver $recipients,
         private readonly NotificationChannelResolver $channels,
@@ -33,7 +38,7 @@ class NotificationService
         $notification = null;
         $additionalRecipients = $this->recipients->additionalRecipients($employee, $type, $data);
 
-        if ($this->channels->isEnabledForEvent($type, 'in_app')) {
+        if ($this->isChannelEnabledForEvent($type, 'in_app')) {
             // EWS rutin perlu terlihat oleh pegawai dan Admin Kepegawaian tanpa menggandakan pegawai yang juga berperan admin.
             $inAppRecipients = collect([$employee])
                 ->merge($additionalRecipients)
@@ -77,7 +82,7 @@ class NotificationService
         array $data,
         bool $createIfMissing = true,
     ): ?SimpegNotification {
-        $inAppEnabled = $this->channels->isEnabledForEvent($type, 'in_app');
+        $inAppEnabled = $this->isChannelEnabledForEvent($type, 'in_app');
         if (! $inAppEnabled) {
             // Menonaktifkan in_app sengaja ikut menghentikan email reminder karena
             // dedup reminder email berlabuh pada record in-app.
@@ -170,6 +175,20 @@ class NotificationService
         $this->dispatchWhatsApp($employee, $additionalRecipients, $type, $data);
 
         return $notification;
+    }
+
+    /**
+     * Memoisasi keputusan channel selama satu workflow layanan. Scheduler EWS dapat
+     * menerbitkan banyak reminder dengan tipe yang sama dalam satu run; membaca
+     * policy database untuk setiap reminder hanya menambah query tanpa mengubah
+     * hasil karena perubahan konfigurasi diproses pada request/transaction lain.
+     */
+    private function isChannelEnabledForEvent(string $eventKey, string $channelCode): bool
+    {
+        $cacheKey = $eventKey.'|'.$channelCode;
+
+        return $this->eventChannelState[$cacheKey]
+            ??= $this->channels->isEnabledForEvent($eventKey, $channelCode);
     }
 
     /**

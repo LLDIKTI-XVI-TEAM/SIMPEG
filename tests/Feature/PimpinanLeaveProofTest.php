@@ -36,6 +36,7 @@ class PimpinanLeaveProofTest extends TestCase
 
         $this->actingAs($pimpinan)
             ->post(route('pimpinan.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
@@ -59,6 +60,7 @@ class PimpinanLeaveProofTest extends TestCase
         ])->save();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ]);
@@ -71,7 +73,8 @@ class PimpinanLeaveProofTest extends TestCase
             ->assertSee('Cuti Sakit')
             ->assertSee('Disetujui')
             ->assertDontSee('7301010101010001')
-            ->assertDontSee('7301010101010002');
+            ->assertDontSee('7301010101010002')
+            ->assertDontSee('JABATAN-PRIVAT-PIMPINAN');
     }
 
     public function test_invalid_public_verification_token_returns_a_safe_not_found_page(): void
@@ -89,6 +92,7 @@ class PimpinanLeaveProofTest extends TestCase
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ]);
@@ -137,6 +141,7 @@ class PimpinanLeaveProofTest extends TestCase
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ])->assertRedirect();
@@ -173,6 +178,7 @@ class PimpinanLeaveProofTest extends TestCase
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ])->assertRedirect();
@@ -199,6 +205,7 @@ class PimpinanLeaveProofTest extends TestCase
         [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ]);
@@ -212,7 +219,10 @@ class PimpinanLeaveProofTest extends TestCase
     private function leaveAwaitingFinalApproval(): array
     {
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pemohon Cuti Final']);
-        $approver = Employee::factory()->create(['nama_lengkap' => 'Pimpinan Final']);
+        $approver = Employee::factory()->create([
+            'nama_lengkap' => 'Pimpinan Final',
+            'jabatan_terakhir' => 'JABATAN-PRIVAT-PIMPINAN',
+        ]);
         $leave = LeaveRequest::create([
             'employee_id' => $employee->id,
             'jenis_cuti_id' => RefJenisCuti::create([

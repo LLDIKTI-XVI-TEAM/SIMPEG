@@ -474,40 +474,51 @@ dikontrol oleh komponen dan mencerminkan keputusan yang telah disetujui.
 
 ### Badge Component
 
-Pola: `rounded-full bg-{STATUS}/10 text-{STATUS} px-3 py-1 text-xs font-semibold`
+Gunakan `<x-ui.badge>` untuk severity dan status. Secara default komponen memakai
+`rounded-md`, warna token `bg-{STATUS}/10 text-{STATUS}`, `text-xs font-semibold`,
+dan `leading-none` agar tinggi badge konsisten.
+
+| Ukuran | Pemakaian | Padding |
+| --- | --- | --- |
+| `md` (default) | Status utama pada detail, kartu, atau filter | `px-2.5 py-1` |
+| `sm` | Kolom status pada tabel yang padat | `px-2 py-0.5` |
+| `xs` | Ruang sangat terbatas | `px-1.5 py-0.5` |
+
+Ketiga ukuran tetap memakai `text-xs font-semibold`; ukuran hanya mengatur kepadatan,
+bukan mengecilkan teks status. Gunakan `pill` hanya saat bentuk pil memang dibutuhkan.
 
 ```html
 {{-- Success --}}
-<span class="rounded-full bg-success/10 text-success px-3 py-1 text-xs font-semibold">Aktif</span>
+<x-ui.badge variant="success">Aktif</x-ui.badge>
 
 {{-- Warning --}}
-<span class="rounded-full bg-warning/10 text-warning px-3 py-1 text-xs font-semibold">Menunggu</span>
+<x-ui.badge variant="warning">Menunggu</x-ui.badge>
 
 {{-- Danger --}}
-<span class="rounded-full bg-danger/10 text-danger px-3 py-1 text-xs font-semibold">Nonaktif</span>
+<x-ui.badge variant="danger">Nonaktif</x-ui.badge>
 
 {{-- Info --}}
-<span class="rounded-full bg-info/10 text-info px-3 py-1 text-xs font-semibold">Informasi</span>
+<x-ui.badge variant="info">Informasi</x-ui.badge>
 
 {{-- Secondary --}}
-<span class="rounded-full bg-secondary/10 text-secondary px-3 py-1 text-xs font-semibold">Lainnya</span>
+<x-ui.badge variant="muted">Lainnya</x-ui.badge>
 ```
 
 #### Pola Badge Dinamis — Static Mapping (WAJIB)
 
 ```blade
 @php
-$statusClasses = [
-    'aktif'     => 'bg-success/10 text-success',
-    'nonaktif'  => 'bg-danger/10 text-danger',
-    'menunggu'  => 'bg-warning/10 text-warning',
-    'info'      => 'bg-info/10 text-info',
+$statusVariants = [
+    'aktif'     => 'success',
+    'nonaktif'  => 'danger',
+    'menunggu'  => 'warning',
+    'info'      => 'info',
 ];
-$kelas = $statusClasses[$pegawai->status] ?? 'bg-soft text-muted';
+$variant = $statusVariants[$pegawai->status] ?? 'muted';
 @endphp
-<span class="rounded-full px-3 py-1 text-xs font-semibold {{ $kelas }}">
+<x-ui.badge :variant="$variant">
     {{ $pegawai->status }}
-</span>
+</x-ui.badge>
 ```
 
 > ⚠️ **JANGAN PERNAH** gunakan string interpolasi dinamis seperti `"bg-{{ $color }}-500"` — Tailwind tidak dapat mendeteksi kelas yang dibangun secara dinamis.

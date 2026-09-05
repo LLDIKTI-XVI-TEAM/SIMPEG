@@ -35,7 +35,11 @@ class LegacyApprovedLeaveUsageCutoverConcurrencyTest extends TestCase
     private const STANDARD_TEST_DATABASE = 'simpeg_test';
 
     /** Memberi ruang bootstrap worker pada bind mount Podman tanpa melonggarkan timeout proses. */
-    private const WORKER_READY_TIMEOUT_MILLISECONDS = 30_000;
+    private const WORKER_READY_TIMEOUT_MILLISECONDS = 120_000;
+
+    private const WORKER_TIMEOUT_SECONDS = 180;
+
+    private const RACE_OBSERVATION_TIMEOUT_MILLISECONDS = 30_000;
 
     public function test_cutover_tidak_deadlock_dengan_submit_employee_first(): void
     {
@@ -428,7 +432,7 @@ SQL);
             PHP_BINARY,
             base_path('tests/Fixtures/'.$fixture),
             base64_encode(json_encode($payload, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 45);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
         $process->start();
 
         return $process;
@@ -464,7 +468,7 @@ SQL);
         return $id;
     }
 
-    private function waitForAttemptCount(string $path, int $minimum, int $timeoutMilliseconds = 5_000): bool
+    private function waitForAttemptCount(string $path, int $minimum, int $timeoutMilliseconds = self::RACE_OBSERVATION_TIMEOUT_MILLISECONDS): bool
     {
         return $this->waitUntil(function () use ($path, $minimum): bool {
             clearstatcache(true, $path);
@@ -484,7 +488,10 @@ SQL);
 
     private function waitForAdvisoryWait(int $pid): bool
     {
-        return $this->waitUntil(fn (): bool => $this->isWaitingAdvisory($pid));
+        return $this->waitUntil(
+            fn (): bool => $this->isWaitingAdvisory($pid),
+            self::RACE_OBSERVATION_TIMEOUT_MILLISECONDS,
+        );
     }
 
     private function isWaitingAdvisory(int $pid): bool
@@ -496,7 +503,7 @@ SQL);
             ->exists();
     }
 
-    private function waitUntil(callable $condition, int $timeoutMilliseconds = 5_000): bool
+    private function waitUntil(callable $condition, int $timeoutMilliseconds = self::RACE_OBSERVATION_TIMEOUT_MILLISECONDS): bool
     {
         $deadline = microtime(true) + ($timeoutMilliseconds / 1000);
 

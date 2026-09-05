@@ -64,6 +64,17 @@ class HandleKeycloakCallbackAction
         if ($matchedEmail) {
             $employees = $this->matchedEmployees($employeeField, $matchedEmail);
 
+            // Akun demo lokal dapat memakai alamat email IdP yang berbeda dari data fixture.
+            // Fallback dibatasi ketat pada allowlist development/test dan hanya saat tidak ada
+            // pegawai yang cocok; benturan/duplikasi data pegawai tetap ditolak fail-closed.
+            if ($employees->isEmpty()) {
+                $devUser = $this->allowedDevUser($username);
+
+                if ($devUser !== null) {
+                    return $this->loginMappedUser($devUser, $keycloakId, $username, $keycloakUser->getName(), $request);
+                }
+            }
+
             if ($employees->count() !== 1) {
                 return view('auth.unregistered', [
                     'message' => 'Akun Keycloak belum terdaftar sebagai pegawai SIMPEG.',
@@ -72,6 +83,18 @@ class HandleKeycloakCallbackAction
 
             $employee = $employees->first();
             $user = User::whereRaw('lower(email) = ?', [$matchedEmail])->first();
+
+            // Username Keycloak juga unik di SIMPEG. Periksa lebih dahulu agar benturan
+            // dengan akun lain tidak bocor sebagai error constraint database saat callback.
+            $usernameOwner = $username !== null && trim($username) !== ''
+                ? User::whereRaw('lower(keycloak_username) = ?', [mb_strtolower(trim($username))])->first()
+                : null;
+
+            if ($usernameOwner && ($user === null || $usernameOwner->id !== $user->id)) {
+                return view('auth.unregistered', [
+                    'message' => 'Username akun Keycloak sudah terhubung ke akun SIMPEG lain. Hubungi administrator untuk memperbaiki pemetaan akun.',
+                ]);
+            }
 
             if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
                 return view('auth.unregistered', [
@@ -272,5 +295,22 @@ class HandleKeycloakCallbackAction
         );
 
         return in_array(strtolower(trim($username)), $allowedUsernames, true);
+    }
+
+    /**
+     * Mengembalikan akun demo yang telah dipetakan bila username berada pada allowlist lokal.
+     * Tidak ada pembuatan akun maupun fallback ini di lingkungan selain local/testing.
+     */
+    private function allowedDevUser(?string $username): ?User
+    {
+        if ($username === null || trim($username) === '' || ! $this->isAllowedDevUsername($username)) {
+            return null;
+        }
+
+        return User::query()
+            ->whereRaw('lower(keycloak_username) = ?', [mb_strtolower(trim($username))])
+            ->whereNotNull('employee_id')
+            ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
+            ->first();
     }
 }

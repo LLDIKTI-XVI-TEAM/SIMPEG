@@ -113,7 +113,7 @@ Badge status untuk menampilkan status pegawai, progres cuti, atau tingkat urgens
 
 **Props**:
 - `variant`: `'muted'` (default), `'primary'`, `'success'`, `'danger'`, `'warning'`, `'orange'`, `'info'`, `'ink'`, `'none'`.
-- `size`: `'xs'` (text-[9px]), `'sm'` (text-[10px], default), `'md'` (text-xs).
+- `size`: `'md'` (default, status utama: `px-2.5 py-1`), `'sm'` (status pada tabel padat: `px-2 py-0.5`), atau `'xs'` (ruang sangat terbatas: `px-1.5 py-0.5`). Semua varian teks memakai `text-xs font-semibold` agar tetap terbaca.
 - `dot`: (bool, default: `false`) Menampilkan titik indikator warna.
 - `pill`: (bool, default: `false`) Menjadikan rounded-full (default: rounded-md).
 - `uppercase`: (bool, default: `false`) Menjadikan teks kapital ber-tracking.
@@ -122,7 +122,7 @@ Badge status untuk menampilkan status pegawai, progres cuti, atau tingkat urgens
 ```blade
 <x-ui.badge variant="success" :dot="true">Aktif</x-ui.badge>
 <x-ui.badge variant="warning" :pill="true">Menunggu Persetujuan</x-ui.badge>
-<x-ui.badge variant="danger">Non-Aktif</x-ui.badge>
+<x-ui.badge variant="danger" size="sm">Non-Aktif</x-ui.badge>
 ```
 
 ---

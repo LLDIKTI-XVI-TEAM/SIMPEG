@@ -187,7 +187,9 @@ class CutiRbacTest extends TestCase
             'is_final' => true,
         ]);
 
-        $response = $this->actingAs($user)->post(route('cuti.approve', $cuti));
+        $response = $this->actingAs($user)->post(route('cuti.approve', $cuti), [
+            'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
+        ]);
 
         $response->assertRedirect(route('cuti.approval'));
         $this->assertSame('disetujui', $cuti->fresh()->status);

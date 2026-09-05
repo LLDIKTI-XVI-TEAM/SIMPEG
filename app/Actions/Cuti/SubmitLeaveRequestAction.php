@@ -15,6 +15,7 @@ use App\Services\Cuti\LeaveUsageOverlapService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\NotificationService;
 use App\Services\WorkdayCalculator;
+use App\Support\Cuti\ApprovalStepLabel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -160,32 +161,19 @@ class SubmitLeaveRequestAction
                     'status' => 'menunggu_approval',
                 ]);
 
-                $latestOrderByApprover = $steps
-                    ->groupBy('approver_employee_id')
-                    ->map(fn ($approverSteps) => $approverSteps->max('step_order'));
-                $firstActiveAssigned = false;
-
                 foreach ($steps as $index => $step) {
                     $stepOrder = $index + 1;
-                    $isEarlierDuplicate = $latestOrderByApprover[$step->approver_employee_id] !== $step->step_order;
-                    $status = 'pending';
-
-                    if ($isEarlierDuplicate) {
-                        $status = 'skipped';
-                    } elseif (! $firstActiveAssigned) {
-                        $status = 'active';
-                        $firstActiveAssigned = true;
-                    }
+                    // Setiap tahap snapshot tetap berjalan, termasuk bila approver yang sama
+                    // memegang peran berbeda. Invarian konfigurasi sudah menolak duplikasi peran.
+                    $status = $index === 0 ? 'active' : 'pending';
 
                     $leaveRequest->steps()->create([
                         'step_order' => $stepOrder,
                         'step_type' => $step->step_type,
-                        'role_label' => $step->role_label,
+                        'role_label' => ApprovalStepLabel::display($step->step_type, $step->role_label),
                         'approver_employee_id' => $step->approver_employee_id,
                         'status' => $status,
                         'is_final' => $index === $steps->count() - 1,
-                        'skipped_reason' => $isEarlierDuplicate ? 'duplicate_approver' : null,
-                        'decision_note' => $isEarlierDuplicate ? 'Dilewati otomatis karena approver muncul lagi pada step otoritas lebih akhir.' : null,
                     ]);
                 }
 

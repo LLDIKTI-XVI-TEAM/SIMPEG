@@ -57,7 +57,6 @@ class CutiDetailTimelineTest extends TestCase
         $leaveRequest->steps()->create([
             'step_order' => 2, 'step_type' => 'verifier', 'role_label' => 'Verifikator',
             'approver_employee_id' => $verifikator->id, 'status' => 'skipped', 'is_final' => false,
-            'skipped_reason' => 'duplicate_approver',
         ]);
         $leaveRequest->steps()->create([
             'step_order' => 3, 'step_type' => 'verifier', 'role_label' => 'Verifikator Kedua',
@@ -73,7 +72,8 @@ class CutiDetailTimelineTest extends TestCase
 
         $response->assertOk();
         // Approved step shows approver-based title.
-        $response->assertSee('Disetujui oleh Kepala Bagian', false);
+        $response->assertSee('Disetujui oleh Atasan Langsung', false);
+        $response->assertDontSee('Disetujui oleh Kepala Bagian', false);
         // Skipped step is surfaced (not hidden as a fixed stage).
         $response->assertSee('Dilewati: Verifikator', false);
         // Active step shows waiting on the dynamic role label.
@@ -106,7 +106,7 @@ class CutiDetailTimelineTest extends TestCase
             'alasan' => 'Uji dialog keputusan',
             'status' => 'menunggu_approval',
         ]);
-        $leaveRequest->steps()->create([
+        $activeStep = $leaveRequest->steps()->create([
             'step_order' => 1,
             'step_type' => 'kepala_bagian',
             'role_label' => 'Kepala Bagian',
@@ -116,13 +116,20 @@ class CutiDetailTimelineTest extends TestCase
         ]);
 
         $this->actingAs($approverUser)
-            ->get(route('cuti.show', $leaveRequest->id))
+            ->from(route('cuti.show', $leaveRequest->id))
+            ->followingRedirects()
+            ->post(route('cuti.approve', $leaveRequest->id), [
+                'active_step_id' => '00000000-0000-4000-8000-000000000034',
+            ])
             ->assertOk()
+            ->assertSee('Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.')
             ->assertSee('role="dialog"', false)
             ->assertSee('@keydown.escape.window="if (decisionForm !== null) close()"', false)
             ->assertDontSee('@keydown.escape.window="close()"', false)
             ->assertSee("@click=\"open('postpone', \$event)\"", false)
             ->assertSee("@click=\"open('decline', \$event)\"", false)
+            ->assertSee('name="active_step_id"', false)
+            ->assertSee('value="'.$activeStep->id.'"', false)
             ->assertDontSee("@click=\"open('reject', \$event)\"", false);
     }
 

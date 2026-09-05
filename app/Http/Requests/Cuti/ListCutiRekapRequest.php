@@ -27,6 +27,7 @@ class ListCutiRekapRequest extends FormRequest
             'page' => ['bail', 'nullable', 'integer', 'min:1'],
             'page_saldo' => ['bail', 'nullable', 'integer', 'min:1'],
             'page_usage' => ['bail', 'nullable', 'integer', 'min:1'],
+            'per_page' => ['bail', 'nullable', 'integer', 'min:1', 'max:100'],
         ];
     }
 

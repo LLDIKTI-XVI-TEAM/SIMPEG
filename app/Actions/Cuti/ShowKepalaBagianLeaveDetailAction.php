@@ -27,7 +27,7 @@ class ShowKepalaBagianLeaveDetailAction
     public function execute(?User $actor, LeaveRequest $leave): array
     {
         if (! $actor instanceof User || $actor->employee_id === null) {
-            abort(403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+            abort(403, 'Akun Atasan Langsung belum tertaut ke data pegawai.');
         }
 
         abort_unless($this->scope->hasDirectReport($actor, $leave->employee_id), 403);

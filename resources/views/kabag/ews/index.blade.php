@@ -64,6 +64,7 @@
     <div>
         <form method="GET" action="{{ route('kepala-bagian.ews.index') }}" class="mb-6">
             <input type="hidden" name="status" value="{{ request('status') }}">
+            <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
             <x-ui.filter-bar
                 searchId="kabag-ews-search"
                 searchName="search"
@@ -168,9 +169,9 @@
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div x-data="{ open: false }" class="max-w-[240px]">
                                         <div class="flex items-center gap-1.5 cursor-pointer w-max" @click="open = !open">
-                                            <span class="inline-flex rounded-full {{ $alert['is_eligible'] ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger' }} px-2.5 py-1 text-xs font-semibold">
+                                            <x-ui.badge :variant="$alert['is_eligible'] ? 'success' : 'danger'" size="md" pill>
                                                 {{ $alert['is_eligible'] ? 'Layak' : 'Tidak Layak' }}
-                                            </span>
+                                            </x-ui.badge>
                                             <button type="button" class="p-0.5 rounded-full hover:bg-black/5 focus:outline-none transition-colors {{ $alert['is_eligible'] ? 'text-success' : 'text-danger' }}" :aria-label="open ? 'Sembunyikan Detail' : 'Tampilkan Detail'">
                                                 <svg class="w-4 h-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -209,17 +210,47 @@
                 </x-ui.table>
             </div>
             
-            @if($alerts->hasPages())
-                <div class="border-t border-border bg-surface px-6 py-4">
-                    {{ $alerts->links() }}
+            {{-- TABLE FOOTER --}}
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
+                <div class="flex items-center gap-3 text-sm text-muted">
+                    <form method="GET" action="{{ route('kepala-bagian.ews.index') }}" class="flex items-center gap-2">
+                        @if(request('search'))
+                            <input type="hidden" name="search" value="{{ request('search') }}">
+                        @endif
+                        @if(request('event'))
+                            <input type="hidden" name="event" value="{{ request('event') }}">
+                        @endif
+                        @if(request('status'))
+                            <input type="hidden" name="status" value="{{ request('status') }}">
+                        @endif
+
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="per_page" class="sr-only">Jumlah baris per halaman</label>
+                        <select
+                            id="per_page"
+                            name="per_page"
+                            onchange="this.form.submit()"
+                            class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center"
+                        >
+                            @foreach ([10, 25, 50] as $opsi)
+                                <option value="{{ $opsi }}" @selected((int) request('per_page', 10) === $opsi)>{{ $opsi }}</option>
+                            @endforeach
+                        </select>
+                        <span class="hidden sm:inline">data</span>
+                    </form>
+
+                    {{-- Meta Info --}}
+                    <div class="hidden md:block ml-2 border-l border-border pl-4">
+                        Menampilkan <span class="font-medium text-ink">{{ $alerts->firstItem() ?? 0 }}</span>
+                        - <span class="font-medium text-ink">{{ $alerts->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium text-ink">{{ $alerts->total() }}</span>
+                    </div>
                 </div>
-            @elseif($alerts->total() > 0)
-                <div class="border-t border-border bg-surface px-6 py-3">
-                    <p class="text-sm text-muted font-sans">
-                        Menampilkan <span class="font-semibold text-ink">{{ $alerts->total() }}</span> peringatan EWS aktif untuk bawahan langsung Anda.
-                    </p>
+
+                <div class="flex items-center gap-1.5">
+                    {{ $alerts->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
-            @endif
+            </div>
         </x-ui.card>
     </div>
 </x-layouts.app>

@@ -67,7 +67,7 @@ class ApplyChainTemplateToUnitRequest extends FormRequest
             if ($rantai->steps->doesntContain(fn ($step): bool => $step->step_type === 'kepala_bagian')) {
                 $validator->errors()->add(
                     'source_employee_id',
-                    'Chain pegawai sumber tidak memiliki langkah Kepala Bagian. Perbaiki chain tersebut lebih dahulu.',
+                    'Chain pegawai sumber tidak memiliki langkah Atasan Langsung. Perbaiki chain tersebut lebih dahulu.',
                 );
 
                 return;

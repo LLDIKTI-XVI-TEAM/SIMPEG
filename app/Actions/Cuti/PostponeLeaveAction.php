@@ -28,7 +28,7 @@ class PostponeLeaveAction
     /**
      * Menunda pengajuan cuti atas nama approver yang bertindak; alasan penundaan wajib diberikan.
      */
-    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $komentar, Request $request): LeaveRequest
+    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, string $komentar, Request $request): LeaveRequest
     {
         $statusSebelum = $leaveRequest->status;
         $stepSebelum = $leaveRequest->steps()
@@ -39,8 +39,8 @@ class PostponeLeaveAction
         // Keputusan dan jejaknya disatukan dalam satu transaksi supaya pengajuan tidak pernah
         // berpindah status tanpa baris audit yang menerangkan siapa yang memutuskan. Notifikasi tetap
         // di luar transaksi agar kegagalan pengiriman tidak membatalkan penangguhan yang sah.
-        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $komentar, $request, $statusSebelum, $stepSebelum): LeaveRequest {
-            $leaveRequest = $this->approvals->postpone($leaveRequest, $actor, $komentar);
+        $leaveRequest = DB::transaction(function () use ($leaveRequest, $actor, $expectedActiveStepId, $komentar, $request, $statusSebelum, $stepSebelum): LeaveRequest {
+            $leaveRequest = $this->approvals->postpone($leaveRequest, $actor, $expectedActiveStepId, $komentar);
             $auditPayload = $this->decisionAuditPayload($statusSebelum, $leaveRequest, $stepSebelum, $actor, 'DEFER', $komentar);
 
             AuditService::logOrFail(

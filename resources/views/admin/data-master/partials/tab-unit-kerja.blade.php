@@ -22,7 +22,7 @@
         </div>
         <x-ui.button type="button" @click="showTambah = !showTambah"
             x-bind:aria-expanded="showTambah ? 'true' : 'false'" aria-controls="unit-kerja-form-tambah"
-            variant="primary" class="shrink-0">
+            variant="secondary" class="shrink-0">
             Tambah
         </x-ui.button>
     </div>
@@ -96,11 +96,9 @@
                             {{ $item->keterangan ?: '—' }}
                         </x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm">
-                            @if ($item->is_active)
-                                <span class="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">Aktif</span>
-                            @else
-                                <span class="inline-flex items-center rounded-full bg-danger/10 px-2 py-0.5 text-[11px] font-semibold text-danger">Nonaktif</span>
-                            @endif
+                            <x-ui.badge :variant="$item->is_active ? 'success' : 'danger'" size="sm" pill>
+                                {{ $item->is_active ? 'Aktif' : 'Nonaktif' }}
+                            </x-ui.badge>
                         </x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm" class="text-sm text-muted">{{ $dipakai }} pemakai</x-ui.table-td>
                         <x-ui.table-td padding="sm" class="whitespace-nowrap">

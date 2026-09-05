@@ -35,10 +35,11 @@ class ShowCutiRekapAction
             ['label' => 'Saldo Kritis', 'value' => (clone $balanceQuery)->where('sisa', '<=', 3)->count(), 'caption' => 'Sisa <= 3 hari', 'tone' => 'danger'],
         ];
 
-        $leaveBalances = (clone $balanceQuery)->paginate(10, ['*'], 'page_saldo')->withQueryString();
+        $perPage = isset($filters['per_page']) && is_numeric($filters['per_page']) ? (int) $filters['per_page'] : 10;
+        $leaveBalances = (clone $balanceQuery)->paginate($perPage, ['*'], 'page_saldo')->withQueryString();
         $leaveBalances->through(fn (LeaveBalance $balance): array => $this->mapBalance($balance));
 
-        $usageRows = $this->rekapQuery->paginateDetailRows($filters, 10, 'page_usage');
+        $usageRows = $this->rekapQuery->paginateDetailRows($filters, $perPage, 'page_usage');
 
         $selectedEmployee = $pegawaiId === null
             ? null

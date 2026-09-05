@@ -42,6 +42,8 @@ class KepalaBagianFrontendTest extends TestCase
             'kepala_bagian_id' => $kepalaBagian->id,
         ]);
         $otherEmployee = Employee::factory()->create(['nama_lengkap' => 'Bukan Bawahan']);
+        $pendingLeave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
+        $activeStepId = $pendingLeave->steps()->where('status', 'active')->sole()->id;
 
         $this->actingAs($user)
             ->get(route('dashboard'))
@@ -56,6 +58,9 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('aria-describedby="kabag-dashboard-decision-description"', false)
             ->assertSee('id="kabag-dashboard-decision-description"', false)
             ->assertSee('@keydown.escape.window="if (confirmOpen) { if (!isSubmitting) confirmOpen = false }"', false)
+            ->assertSee('name="active_step_id"', false)
+            ->assertSee('x-bind:value="selectedActiveStepId"', false)
+            ->assertSee($activeStepId, false)
             ->assertDontSee('@keydown.escape.window="if (!isSubmitting) confirmOpen = false"', false);
 
         $this->assertMatchesRegularExpression(
@@ -309,6 +314,7 @@ class KepalaBagianFrontendTest extends TestCase
         $otherEmployee = Employee::factory()->create(['nama_lengkap' => 'Pemohon Lain']);
         $visibleLeave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
         $hiddenLeave = $this->leaveWithActiveStep($otherEmployee, $kepalaBagian);
+        $activeStepId = $visibleLeave->steps()->where('status', 'active')->sole()->id;
 
         $this->actingAs($user)
             ->get(route('kepala-bagian.cuti.index'))
@@ -325,6 +331,8 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('aria-describedby="kabag-approval-confirmation-description"', false)
             ->assertSee('id="kabag-approval-confirmation-description"', false)
             ->assertSee('@keydown.escape.window="if (confirmOpen) { confirmOpen = false }"', false)
+            ->assertSee('name="active_step_id"', false)
+            ->assertSee('value="'.$activeStepId.'"', false)
             ->assertSee('required', false)
             ->assertDontSee('Simulasi');
 
@@ -548,12 +556,16 @@ class KepalaBagianFrontendTest extends TestCase
 
         $this->actingAs($user)
             ->from(route('kepala-bagian.cuti.show', $leave))
-            ->post(route('kepala-bagian.cuti.decision', $leave), ['keputusan' => 'PERUBAHAN'])
+            ->post(route('kepala-bagian.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'keputusan' => 'PERUBAHAN',
+            ])
             ->assertRedirect(route('kepala-bagian.cuti.show', $leave))
             ->assertSessionHasErrors('catatan');
 
         $this->actingAs($user)
             ->post(route('kepala-bagian.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Diteruskan ke tahapan berikutnya.',
             ])
@@ -601,6 +613,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->from(route('kepala-bagian.cuti.show', $leave))
             ->followingRedirects()
             ->post(route('kepala-bagian.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
                 'keputusan' => 'PERUBAHAN',
                 'catatan' => 'abcd',
             ])
@@ -616,7 +629,10 @@ class KepalaBagianFrontendTest extends TestCase
         $fixture = $this->dutyPostponementFixture();
 
         $this->actingAs($fixture['user'])
-            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
+                'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'alasan' => 'Penugasan mendesak mewakili instansi.',
+            ])
             ->assertRedirect(route('kepala-bagian.cuti.show', $fixture['leave']))
             ->assertSessionHas('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
 
@@ -644,7 +660,10 @@ class KepalaBagianFrontendTest extends TestCase
             $fixture = $this->dutyPostponementFixture();
             $this->actingAs($fixture['user'])
                 ->from(route('kepala-bagian.cuti.show', $fixture['leave']))
-                ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => $reason])
+                ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
+                    'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                    'alasan' => $reason,
+                ])
                 ->assertRedirect(route('kepala-bagian.cuti.show', $fixture['leave']))
                 ->assertSessionHasErrorsIn('dutyPostponement', ['alasan' => $message]);
             $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
@@ -668,7 +687,10 @@ class KepalaBagianFrontendTest extends TestCase
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $other->id]);
 
         $this->actingAs($user)
-            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
+                'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'alasan' => 'Penugasan mendesak mewakili instansi.',
+            ])
             ->assertForbidden();
         $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
     }
@@ -679,7 +701,10 @@ class KepalaBagianFrontendTest extends TestCase
         $fixture['leave']->employee->forceFill(['kepala_bagian_id' => Employee::factory()->create()->id])->save();
 
         $this->actingAs($fixture['user'])
-            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
+                'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'alasan' => 'Penugasan mendesak mewakili instansi.',
+            ])
             ->assertForbidden();
         $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
     }
@@ -740,7 +765,10 @@ class KepalaBagianFrontendTest extends TestCase
 
         $fixture['leave']->forceFill(['jenis_cuti_id' => $annualTypeId])->save();
         $this->actingAs($fixture['user'])
-            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'Penugasan mendesak mewakili instansi.']);
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
+                'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'alasan' => 'Penugasan mendesak mewakili instansi.',
+            ]);
 
         $persistedSteps = $fixture['leave']->steps()->with('approver')->orderBy('step_order')->get();
         $persistedSteps[0]->approver->forceFill(['nama_lengkap' => 'Approver Tugas Dinas Kepala Bagian'])->save();
@@ -754,7 +782,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSeeInOrder([
                 'Timeline',
                 'Persetujuan',
-                'Tahap 1 · Kepala Bagian',
+                'Tahap 1 · Atasan Langsung',
                 'Approver Tugas Dinas Kepala Bagian',
                 'Ditangguhkan karena Tugas Dinas',
             ])
@@ -780,7 +808,7 @@ class KepalaBagianFrontendTest extends TestCase
     {
         $fixture = $this->dutyPostponementFixture();
         $steps = $fixture['leave']->steps()->orderBy('step_order')->get();
-        $steps[0]->forceFill(['status' => 'skipped', 'skipped_reason' => 'duplicate_approver'])->save();
+        $steps[0]->forceFill(['status' => 'skipped', 'skipped_reason' => 'workflow_closed'])->save();
         $steps[1]->forceFill(['status' => 'skipped', 'skipped_reason' => 'request_not_approved'])->save();
         $fixture['leave']->forceFill(['status' => 'tidak_disetujui'])->save();
 
@@ -790,12 +818,12 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSeeInOrder([
                 'Timeline',
                 'Persetujuan',
-                'Tahap 1 · Kepala Bagian',
-                'Dilewati karena approver yang sama sudah tercakup pada tahap lain.',
+                'Tahap 1 · Atasan Langsung',
+                'Dilewati karena alur persetujuan telah ditutup.',
                 'Tahap 2 · PYBMC',
                 'Dilewati karena pengajuan telah diputus tidak disetujui.',
             ])
-            ->assertDontSee('duplicate_approver')
+            ->assertDontSee('workflow_closed')
             ->assertDontSee('request_not_approved');
     }
 
@@ -806,7 +834,10 @@ class KepalaBagianFrontendTest extends TestCase
         $this->actingAs($fixture['user'])
             ->from(route('kepala-bagian.cuti.show', $fixture['leave']))
             ->followingRedirects()
-            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), ['alasan' => 'abcd'])
+            ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
+                'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'alasan' => 'abcd',
+            ])
             ->assertOk()
             ->assertSee('dutyPostponementOpen: true', false)
             ->assertSee('Alasan tugas dinas minimal berisi 5 karakter.')
@@ -837,7 +868,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSeeInOrder([
                 'Timeline',
                 'Persetujuan',
-                'Tahap 1 · Kepala Bagian',
+                'Tahap 1 · Atasan Langsung',
                 'Status tidak tersedia',
             ])
             ->assertSeeInOrder([
@@ -873,7 +904,8 @@ class KepalaBagianFrontendTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeInOrder(['Kepala Bagian Baru', 'Tidak Disetujui'])
+            ->assertSeeInOrder(['Atasan Langsung', 'Tidak Disetujui'])
+            ->assertDontSee('Kepala Bagian Baru')
             ->assertDontSee('Kepala Bagian Legacy')
             ->assertDontSee('Ditolak')
             ->assertDontSee('Rejected');

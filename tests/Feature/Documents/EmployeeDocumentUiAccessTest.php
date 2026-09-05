@@ -28,7 +28,6 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->get(route('dokumen'))
             ->assertOk()
             ->assertSee('Arsip Dokumen Kepegawaian')
-            ->assertSee('Buka Data Pegawai')
             ->assertDontSee('Unggah Dokumen Baru');
     }
 

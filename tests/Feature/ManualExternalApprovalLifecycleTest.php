@@ -337,11 +337,22 @@ class ManualExternalApprovalLifecycleTest extends TestCase
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
+        $approverLintasPeran = Employee::factory()->create();
 
-        $record = $this->store($employee, $admin, $this->validSteps(), null);
+        $record = $this->store(
+            $employee,
+            $admin,
+            $this->internalSteps($approverLintasPeran, $approverLintasPeran),
+            null,
+        );
+        $steps = $record->externalApprovalSteps()->orderBy('step_order')->get();
 
         $this->assertDatabaseHas('leave_usage_records', ['id' => $record->id]);
-        $this->assertDatabaseCount('leave_usage_external_approval_steps', 2);
+        $this->assertSame(['kepala_bagian', 'pybmc'], $steps->pluck('step_type')->all());
+        $this->assertSame(
+            [$approverLintasPeran->id, $approverLintasPeran->id],
+            $steps->pluck('approver_employee_id')->all(),
+        );
         $this->assertDatabaseCount('leave_usage_documents', 0);
         $this->assertSame([], Storage::disk(LeaveUsageDocument::STORAGE_DISK)->allFiles('cuti/pemakaian'));
         $this->assertDatabaseCount('storage_recovery_tasks', 0);
@@ -436,6 +447,8 @@ class ManualExternalApprovalLifecycleTest extends TestCase
             ->assertSee('Pratinjau Rangkaian Saat Ini', false)
             ->assertSee('class="m-auto w-[min(42rem,calc(100%-2rem))]', false)
             ->assertSee('Gunakan Rangkaian Ini', false)
+            ->assertSee('<option value="kepala_bagian">Atasan Langsung</option>', false)
+            ->assertSee('tepat satu Atasan Langsung', false)
             ->assertSee('Tanggal keputusan <span class="text-danger" aria-hidden="true">*</span>', false)
             ->assertSee('type="date" required', false)
             ->assertSee(':key="step.clientKey"', false)
@@ -525,6 +538,7 @@ class ManualExternalApprovalLifecycleTest extends TestCase
         ]));
 
         $response->assertOk()
+            ->assertSee('Atasan Langsung:', false)
             ->assertSee('Kepala Bagian Tersimpan')
             ->assertSee('PYBMC Tersimpan')
             ->assertSee('Rangkaian persetujuan belum tersedia pada data sebelum revisi.')

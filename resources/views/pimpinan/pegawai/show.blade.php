@@ -193,7 +193,7 @@
                                 <td class="px-4 py-3">
                                     <span class="font-bold text-danger">{{ $discipline->jenis_hukuman ?: '-' }}</span>
                                     @if($discipline->is_active)
-                                        <span class="ml-1 inline-flex items-center rounded-full bg-danger/10 px-1.5 py-0.5 text-[8px] font-bold uppercase text-danger">Aktif</span>
+                                        <x-ui.badge variant="danger" size="xs" pill uppercase class="ml-1 !font-bold">Aktif</x-ui.badge>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3">{{ $discipline->deskripsi ?: '-' }}</td>

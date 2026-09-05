@@ -36,9 +36,9 @@
             @if($primaryBadgeLabel || isset($badges))
                 <div class="mt-1.5 flex flex-wrap items-center gap-2">
                     @if($primaryBadgeLabel)
-                        <span class="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-bold {{ $primaryBadgeClasses }}">
+                        <x-ui.badge variant="primary" size="md" class="{{ $primaryBadgeClasses }} !font-bold">
                             {{ $primaryBadgeLabel }}
-                        </span>
+                        </x-ui.badge>
                     @endif
 
                     @isset($badges)

@@ -18,6 +18,7 @@ if (! is_array($payload)) {
 $mode = (string) ($payload['mode'] ?? '');
 $employeeId = (string) ($payload['employee_id'] ?? '');
 $result = (string) ($payload['result'] ?? '');
+$holdTimeoutSeconds = max(30, (int) ($payload['hold_timeout_seconds'] ?? 120));
 
 try {
     if ($mode === 'hold') {
@@ -26,7 +27,10 @@ try {
         File::put((string) $payload['ready'], json_encode([
             'pid' => (int) DB::selectOne('SELECT pg_backend_pid() AS pid')->pid,
         ], JSON_THROW_ON_ERROR));
-        $deadline = microtime(true) + 30;
+        // Parent dapat menjalankan retry gate dan worker probe setelah lock terbentuk.
+        // Jangan hentikan holder lebih awal hanya karena bootstrap worker lain pada
+        // bind mount Podman lebih lambat dari urutan domain yang sedang diuji.
+        $deadline = microtime(true) + $holdTimeoutSeconds;
 
         while (! File::exists((string) $payload['release']) && microtime(true) < $deadline) {
             usleep(10_000);

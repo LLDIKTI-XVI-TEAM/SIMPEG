@@ -49,7 +49,8 @@ class EwsController extends Controller
 
         abort_unless($employeeId, 404, 'Data pegawai untuk akun ini belum terhubung.');
 
-        $data = $action->paginate(null, null, null, 25, (string) $employeeId);
+        $perPage = max(1, min((int) $request->query('per_page', 10), 100));
+        $data = $action->paginate(null, null, null, $perPage, (string) $employeeId);
 
         return view('admin.ews.saya', [
             'alerts' => $data['alerts'],

@@ -9,6 +9,7 @@ use App\Services\Notifications\WhatsApp\WhatsAppRuntimeConfiguration;
 use App\Services\Notifications\WhatsApp\WhatsAppTemplateAdapter;
 use App\Services\Rbac\UiPermissionCapabilityService;
 use App\Services\TransactionSideEffectManager;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\View;
@@ -48,6 +49,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Paginator::defaultView('vendor.pagination.simpeg');
+
         Event::listen(
             SocialiteWasCalled::class,
             KeycloakExtendSocialite::class.'@handle',

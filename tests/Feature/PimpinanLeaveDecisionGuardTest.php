@@ -27,7 +27,10 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
         $leave = $this->leaveWithActiveStep(Employee::factory()->create());
 
         $this->actingAs(User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]))
-            ->post(route('pimpinan.cuti.decision', $leave), ['keputusan' => 'DISETUJUI'])
+            ->post(route('pimpinan.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'keputusan' => 'DISETUJUI',
+            ])
             ->assertForbidden();
     }
 
@@ -40,7 +43,10 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
         foreach (['PERUBAHAN', 'DITANGGUHKAN', 'TIDAK_DISETUJUI'] as $decision) {
             $this->actingAs($user)
                 ->from(route('pimpinan.cuti.show', $leave))
-                ->post(route('pimpinan.cuti.decision', $leave), ['keputusan' => $decision])
+                ->post(route('pimpinan.cuti.decision', $leave), [
+                    'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                    'keputusan' => $decision,
+                ])
                 ->assertRedirect(route('pimpinan.cuti.show', $leave))
                 ->assertSessionHasErrors('catatan');
         }
@@ -53,7 +59,10 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
 
         $this->actingAs(User::factory()->pimpinan()->create(['employee_id' => $approver->id]))
             ->from(route('pimpinan.cuti.show', $leave))
-            ->post(route('pimpinan.cuti.decision', $leave), ['keputusan' => 'DISETUJUI'])
+            ->post(route('pimpinan.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'keputusan' => 'DISETUJUI',
+            ])
             ->assertRedirect(route('pimpinan.cuti.show', $leave))
             ->assertSessionHasErrors('status');
     }

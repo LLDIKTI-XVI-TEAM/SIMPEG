@@ -61,6 +61,7 @@ class CutiApprovalQueueTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('pending');
+        $response->assertSee('Atasan Langsung');
         $pending = $response->viewData('pending');
 
         // Database pagination: default 10 per page, only this approver's requests count.
@@ -86,7 +87,7 @@ class CutiApprovalQueueTest extends TestCase
         $sameTimestamp = now()->subDay();
         $ids = [];
         foreach (range(1, 15) as $i) {
-            $ids[] = $this->makeWaitingRequest($jenis, $approverEmployee, "Antre {$i}", $sameTimestamp);
+            $ids[] = $this->makeWaitingRequest($jenis, $approverEmployee, "Antre {$i}", $sameTimestamp)->id;
         }
 
         $this->actingAs($approverUser);
@@ -116,7 +117,8 @@ class CutiApprovalQueueTest extends TestCase
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
-        $this->makeWaitingRequest($jenis, $approverEmployee, 'Konfirmasi setuju');
+        $leave = $this->makeWaitingRequest($jenis, $approverEmployee, 'Konfirmasi setuju');
+        $activeStepId = $leave->steps()->where('status', 'active')->sole()->id;
 
         $this->actingAs($approverUser)
             ->get(route('cuti.approval'))
@@ -127,7 +129,32 @@ class CutiApprovalQueueTest extends TestCase
             ->assertSee('@click="open($event)"', false)
             ->assertSee('$refs.confirmApprove?.focus()', false)
             ->assertSee('lastTrigger: null', false)
-            ->assertSee('this.lastTrigger?.focus()', false);
+            ->assertSee('this.lastTrigger?.focus()', false)
+            ->assertSee('name="active_step_id"', false)
+            ->assertSee('value="'.$activeStepId.'"', false);
+    }
+
+    public function test_approval_queue_menampilkan_error_saat_token_tahap_sudah_berubah(): void
+    {
+        $approverEmployee = Employee::factory()->create();
+        $approverUser = User::factory()->superAdmin()->create(['employee_id' => $approverEmployee->id]);
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit',
+            'code' => 'sakit_stale_queue',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leave = $this->makeWaitingRequest($jenis, $approverEmployee, 'Token antrean stale');
+
+        $this->actingAs($approverUser)
+            ->from(route('cuti.approval'))
+            ->followingRedirects()
+            ->post(route('cuti.approve', $leave->id), [
+                'active_step_id' => '00000000-0000-4000-8000-000000000034',
+            ])
+            ->assertOk()
+            ->assertSee('Keputusan belum dapat disimpan')
+            ->assertSee('Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.');
     }
 
     public function test_pengajuan_sendiri_tidak_masuk_antrean_approval_pemohon(): void
@@ -187,7 +214,7 @@ class CutiApprovalQueueTest extends TestCase
         $this->assertSame(0, $response->viewData('pending')->total());
     }
 
-    private function makeWaitingRequest(RefJenisCuti $jenis, Employee $approver, string $alasan, ?Carbon $createdAt = null): string
+    private function makeWaitingRequest(RefJenisCuti $jenis, Employee $approver, string $alasan, ?Carbon $createdAt = null): LeaveRequest
     {
         $employee = Employee::factory()->create();
         $leaveRequest = LeaveRequest::create([
@@ -212,6 +239,6 @@ class CutiApprovalQueueTest extends TestCase
             'is_final' => false,
         ]);
 
-        return $leaveRequest->id;
+        return $leaveRequest;
     }
 }

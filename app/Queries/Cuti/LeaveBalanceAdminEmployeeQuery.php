@@ -190,7 +190,7 @@ class LeaveBalanceAdminEmployeeQuery
      *     has_active_reconciliation: bool
      * }>
      */
-    public function employeeRows(int $periode, string $status, string $search): LengthAwarePaginator
+    public function employeeRows(int $periode, string $status, string $search, int $perPage = 10): LengthAwarePaginator
     {
         $query = $this->rowsQuery($periode, trim($search));
         $this->applyStatus($query, $status, $periode);
@@ -198,7 +198,7 @@ class LeaveBalanceAdminEmployeeQuery
         return $query
             ->orderBy('employees.nama_lengkap')
             ->orderBy('employees.id')
-            ->paginate(10, ['*'], 'page_pegawai')
+            ->paginate($perPage, ['*'], 'page_pegawai')
             ->withQueryString()
             ->through(function (Employee $employee) use ($periode): array {
                 $hasActiveReconciliation = (bool) $employee->getAttribute('has_active_reconciliation');

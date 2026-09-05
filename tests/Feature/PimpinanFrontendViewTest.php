@@ -42,7 +42,7 @@ class PimpinanFrontendViewTest extends TestCase
             'alasan' => 'Keperluan keluarga.',
             'status' => 'menunggu_approval',
         ]);
-        LeaveRequestStep::create([
+        $activeStep = LeaveRequestStep::create([
             'leave_request_id' => $leave->id,
             'step_order' => 1,
             'step_type' => 'pybmc',
@@ -65,6 +65,8 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('aria-describedby="pimpinan-approval-confirmation-description"', false)
             ->assertSee('id="pimpinan-approval-confirmation-description"', false)
             ->assertSee('@keydown.escape.window="if (confirmOpen) { confirmOpen = false }"', false)
+            ->assertSee('name="active_step_id"', false)
+            ->assertSee('value="'.$activeStep->id.'"', false)
             ->assertSee(route('pimpinan.cuti.decision', $leave), false);
 
         $this->assertMatchesRegularExpression(

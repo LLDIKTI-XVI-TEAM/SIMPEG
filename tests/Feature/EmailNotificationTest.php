@@ -561,7 +561,13 @@ class EmailNotificationTest extends TestCase
         $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
         $leave = $this->makeLeaveRequestWithSteps($employee, [$pybmc]);
 
-        app(ApproveLeaveAction::class)->execute($leave, $pybmc, null, $this->actorRequest($pybmcUser));
+        app(ApproveLeaveAction::class)->execute(
+            $leave,
+            $pybmc,
+            $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            null,
+            $this->actorRequest($pybmcUser),
+        );
 
         $this->assertSame('disetujui', $leave->fresh()->status);
         $this->assertDatabaseHas('notifications', [
@@ -658,7 +664,13 @@ class EmailNotificationTest extends TestCase
         $approver = Employee::factory()->create();
         $leave = $this->makeLeaveRequestWithSteps($employee, [$approver]);
 
-        app(DeclineLeaveAction::class)->execute($leave, $approver, 'Dokumen pendukung tidak sesuai.', Request::create('/'));
+        app(DeclineLeaveAction::class)->execute(
+            $leave,
+            $approver,
+            $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'Dokumen pendukung tidak sesuai.',
+            Request::create('/'),
+        );
 
         $notification = SimpegNotification::query()
             ->where('user_id', $employee->id)
@@ -683,6 +695,7 @@ class EmailNotificationTest extends TestCase
         app(ApproveLeaveAction::class)->execute(
             $leave,
             $kepalaBagian,
+            $leave->steps()->where('status', 'active')->valueOrFail('id'),
             null,
             $this->actorRequest($kepalaBagianUser),
         );

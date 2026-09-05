@@ -15,7 +15,7 @@ class KepalaBagianLeaveController extends Controller
 {
     public function index(KepalaBagianLeaveFilterRequest $request, ShowKepalaBagianLeaveIndexAction $action)
     {
-        abort_if($request->user()?->employee_id === null, 403, 'Akun Kepala Bagian belum tertaut ke data pegawai.');
+        abort_if($request->user()?->employee_id === null, 403, 'Akun Atasan Langsung belum tertaut ke data pegawai.');
 
         /** @var User $actor */
         $actor = $request->user();

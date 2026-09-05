@@ -240,12 +240,19 @@
                 ]" />
             </div>
             <div class="flex items-center gap-3">
-                <x-ui.button type="button" variant="secondary" @click="clearCache(); fetchPage(meta.current_page);"
-                    title="Refresh Data">
-                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    aria-label="Refresh data mapping user"
+                    x-bind:disabled="isLoading"
+                    x-bind:aria-busy="isLoading"
+                    @click="clearCache(); fetchPage(meta.current_page);"
+                >
+                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    Refresh
+                    <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
                 </x-ui.button>
             </div>
         </div>
@@ -295,7 +302,7 @@
             searchPlaceholder="Cari nama, NIP, atau email pegawai..."
             searchCols="col-span-1 sm:col-span-2 lg:col-span-4"
             emptyTitle="Tidak ada pegawai yang sesuai filter"
-            emptyIcon="search"
+            emptyIcon="none"
             :colspanCount="count($tableColumns)"
             filterClass="lg:grid-cols-12"
         >
@@ -380,22 +387,23 @@
 
                         {{-- ROLE --}}
                         <x-ui.table-td class="whitespace-nowrap">
-                            <span
+                            <x-ui.badge
+                                variant="none"
+                                size="sm"
+                                pill
+                                uppercase
                                 x-text="emp.role_label"
-                                :class="emp.role_class"
-                                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                            ></span>
+                                x-bind:class="emp.role_class"
+                                class="!font-bold"
+                            ></x-ui.badge>
                         </x-ui.table-td>
 
                         {{-- STATUS SSO --}}
                         <x-ui.table-td class="whitespace-nowrap">
-                            <span
-                                :class="emp.mapping_status_class"
-                                class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                            >
+                            <x-ui.badge variant="none" size="sm" pill x-bind:class="emp.mapping_status_class">
                                 <span class="inline-block h-1.5 w-1.5 rounded-full" :class="emp.mapping_status_class.replace('text-', 'bg-').replace('/10', '')"></span>
                                 <span x-text="emp.mapping_status_label"></span>
-                            </span>
+                            </x-ui.badge>
                         </x-ui.table-td>
 
                         {{-- AKSI --}}

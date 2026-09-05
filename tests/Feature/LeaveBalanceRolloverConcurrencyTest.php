@@ -32,6 +32,17 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
 
+    // Worker CLI mem-bootstrap framework lengkap melalui bind mount Podman. Pada
+    // Windows, tahap ini dapat lebih lambat dari worker domain setelah ia siap,
+    // sehingga gunakan batas bootstrap terpisah tanpa mengubah batas lock aplikasi.
+    private const WORKER_READY_TIMEOUT_MILLISECONDS = 120_000;
+
+    private const WORKER_LOCK_TIMEOUT_MILLISECONDS = 15_000;
+
+    private const WORKER_RESULT_TIMEOUT_MILLISECONDS = 30_000;
+
+    private const WORKER_TIMEOUT_SECONDS = 180;
+
     private const MARKER_LOCK = 82620262;
 
     private const NOTIFICATION_LOCK = 82620261;
@@ -81,12 +92,12 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
 
             $submit = $this->startWorker('submit-a', 'submit', $fixture);
             $processes[] = $submit['process'];
-            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_a', 30_000));
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_a', self::WORKER_READY_TIMEOUT_MILLISECONDS));
             $this->assertSame(0, LeaveRequest::query()->where('employee_id', $fixture['employee']->id)->count());
 
             $rollover = $this->startWorker('rollover-a', 'rollover', $fixture);
             $processes[] = $rollover['process'];
-            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_rollover_a', 30_000));
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_rollover_a', self::WORKER_READY_TIMEOUT_MILLISECONDS));
 
             DB::statement('SELECT pg_advisory_unlock(?)', [self::NOTIFICATION_LOCK]);
             $outcomes = collect([
@@ -135,11 +146,11 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
 
             $rollover = $this->startWorker('rollover-b', 'rollover', $fixture);
             $processes[] = $rollover['process'];
-            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_rollover_b', 30_000));
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_rollover_b', self::WORKER_READY_TIMEOUT_MILLISECONDS));
 
             $submit = $this->startWorker('submit-b', 'submit', $fixture);
             $processes[] = $submit['process'];
-            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_b', 30_000));
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_b', self::WORKER_READY_TIMEOUT_MILLISECONDS));
 
             DB::statement('SELECT pg_advisory_unlock(?)', [self::MARKER_LOCK]);
             $outcomes = collect([
@@ -193,7 +204,7 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
 
             $submit = $this->startWorker('submit-approver-lock', 'submit', $fixture);
             $processes[] = $submit['process'];
-            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_approver_lock', 30_000));
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_submit_approver_lock', self::WORKER_READY_TIMEOUT_MILLISECONDS));
 
             $status = $this->startWorker('status-approver-lock', 'status', $fixture, [
                 'target_employee_id' => $fixture['kepala_bagian']->id,
@@ -202,7 +213,7 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
             $processes[] = $status['process'];
 
             $this->assertTrue(
-                $this->waitForDatabaseLock('simpeg_rollover_status_approver_lock', 5_000),
+                $this->waitForDatabaseLock('simpeg_rollover_status_approver_lock', self::WORKER_LOCK_TIMEOUT_MILLISECONDS),
                 'Writer lifecycle wajib menunggu lock approver sampai snapshot pengajuan selesai dibentuk.',
             );
             $this->assertFalse(File::exists($status['result']));
@@ -321,9 +332,9 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
                 'barrier' => $barrier,
                 'result' => $result,
             ], $extra), JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 60);
+        ], base_path(), timeout: self::WORKER_TIMEOUT_SECONDS);
         $process->start();
-        $this->assertTrue($this->waitForFile($ready, 30_000));
+        $this->assertTrue($this->waitForFile($ready, self::WORKER_READY_TIMEOUT_MILLISECONDS));
         File::put($barrier, 'go');
 
         return compact('process', 'result');
@@ -334,7 +345,7 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
     {
         $worker['process']->wait();
         $this->assertTrue($worker['process']->isSuccessful(), $worker['process']->getErrorOutput());
-        $this->assertTrue($this->waitForFile($worker['result'], 5_000));
+        $this->assertTrue($this->waitForFile($worker['result'], self::WORKER_RESULT_TIMEOUT_MILLISECONDS));
 
         return json_decode(File::get($worker['result']), true, flags: JSON_THROW_ON_ERROR);
     }

@@ -217,7 +217,7 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
         $this->assertFalse($outcome['ok']);
         $this->assertSame(\RuntimeException::class, $outcome['class']);
         $this->assertSame(
-            'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
+            'Approver tahap Atasan Langsung harus sesuai penugasan Atasan Langsung efektif pegawai.',
             $outcome['message'],
         );
         $this->assertSame(1, LeaveApprovalChain::query()->where('employee_id', $fixture['employee']->id)->count());

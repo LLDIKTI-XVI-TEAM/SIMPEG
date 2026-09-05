@@ -85,7 +85,7 @@ class EmployeeApprovalChainRequest extends FormRequest
                 Rule::exists('employees', 'id')
                     ->where(fn ($query) => $query->whereIn('id', Employee::query()->whereActiveStatus()->select('id'))),
             ],
-            'reason' => ['required', 'string', 'min:5', 'max:500'],
+            'reason' => ['nullable', 'string', 'min:5', 'max:500'],
         ];
     }
 
@@ -98,7 +98,7 @@ class EmployeeApprovalChainRequest extends FormRequest
     }
 
     /**
-     * Menegakkan urutan Verifikator, Kepala Bagian efektif, lalu PYBMC final pada boundary HTTP.
+     * Menegakkan urutan Verifikator, Atasan Langsung efektif, lalu PYBMC final pada boundary HTTP.
      */
     public function withValidator(Validator $validator): void
     {
@@ -131,7 +131,7 @@ class EmployeeApprovalChainRequest extends FormRequest
                 ->values();
 
             if ($kepalaBagianIndexes->count() !== 1) {
-                $validator->errors()->add('steps', 'Chain pegawai wajib memiliki tepat satu Kepala Bagian.');
+                $validator->errors()->add('steps', 'Chain pegawai wajib memiliki tepat satu Atasan Langsung.');
 
                 return;
             }
@@ -141,7 +141,7 @@ class EmployeeApprovalChainRequest extends FormRequest
             if ($verifierIndexes->contains(fn (int $index): bool => $index > $kepalaBagianIndex)) {
                 $validator->errors()->add(
                     'steps',
-                    'Semua Verifikator harus ditempatkan sebelum Kepala Bagian. Pindahkan Verifikator yang berada setelah Kepala Bagian.',
+                    'Semua Verifikator harus ditempatkan sebelum Atasan Langsung. Pindahkan Verifikator yang berada setelah Atasan Langsung.',
                 );
 
                 return;
@@ -152,7 +152,7 @@ class EmployeeApprovalChainRequest extends FormRequest
             if ($kepalaBagianId === null) {
                 $validator->errors()->add(
                     "steps.{$kepalaBagianIndex}.approver_employee_id",
-                    'Pegawai belum memiliki Kepala Bagian efektif. Tetapkan penugasan Kepala Bagian terlebih dahulu.',
+                    'Atasan Langsung belum ditetapkan untuk pegawai. Tetapkan penugasan Atasan Langsung terlebih dahulu.',
                 );
 
                 return;
@@ -163,7 +163,7 @@ class EmployeeApprovalChainRequest extends FormRequest
             if (($kepalaBagianStep['approver_employee_id'] ?? null) !== $kepalaBagianId) {
                 $validator->errors()->add(
                     "steps.{$kepalaBagianIndex}.approver_employee_id",
-                    'Approver pada tahap Kepala Bagian harus sama dengan Kepala Bagian efektif pegawai.',
+                    'Approver tahap Atasan Langsung harus sesuai penugasan Atasan Langsung efektif pegawai.',
                 );
             }
 
