@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\EducationHistory;
@@ -25,10 +24,12 @@ use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 class ProfileTest extends TestCase
 {
+    use RecordsHistoricalAnnualLeaveUsage;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -129,17 +130,12 @@ class ProfileTest extends TestCase
             ],
         );
         $admin = User::factory()->adminKepegawaian()->create();
-        app(ReconcileAnnualLeaveUsageAction::class)->execute(
-            $employee->id,
-            [
-                'balance_year' => now()->year,
-                'usage_n2' => $usageN2,
-                'usage_n1' => $usageN1,
-                'usage_current' => $usageCurrent,
-                'administrative_note' => 'Rekonsiliasi fixture profil pegawai.',
-            ],
+        $year = now()->year;
+        $this->recordHistoricalAnnualUsage(
+            $employee,
+            [$year - 2 => $usageN2, $year - 1 => $usageN1, $year => $usageCurrent],
             $admin,
-            $this->actorRequest($admin),
+            'Fakta pemakaian eksternal fixture profil pegawai.',
         );
     }
 

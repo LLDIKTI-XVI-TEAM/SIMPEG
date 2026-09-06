@@ -7,20 +7,17 @@ use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveRequest;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\Cuti\LeaveUsageRecordService;
 use App\Support\Cuti\CutiInstitution;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 
 class PhaseSevenBrowserQaSeeder extends Seeder
 {
@@ -34,19 +31,9 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private const INACTIVE_APPROVER_EMAIL = 'qa-phase7-approver-nonaktif@example.test';
 
-    /**
-     * Persona browser QA kini memakai AKUN UJI SSO TERPETAKAN (fixture
-     * SsoRoleMappedAccountSeeder) sehingga seluruh skenario dapat diuji lewat
-     * login Keycloak nyata — jalur dev-login sudah dihapus dan tidak ada lagi
-     * akun dengan password lokal yang bisa dipakai login.
-     *
-     * @see SsoRoleMappedAccountSeeder::ROLE_MAPPING
-     */
-    private const SSO_ADMIN_ROLE = 'admin_kepegawaian';
+    private const DEMO_APPROVER_USERNAME = 'demo-klabat-kabag';
 
-    private const SSO_APPROVER_ROLE = 'kepala_bagian';
-
-    private const SSO_PEGAWAI_ROLE = 'pegawai';
+    private const DEMO_PEGAWAI_USERNAME = 'demo-klabat-pegawai';
 
     private const CHAIN_ID = '70000000-0000-4000-8000-000000000001';
 
@@ -58,18 +45,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private const BALANCE_YEAR = 2026;
 
-    private const RECONCILIATION_NOTE = '[QA Phase 7 Browser] Catatan pemakaian tahunan fixture.';
-
-    private const RECONCILIATION_CORRECTION_REASON = 'Selaraskan ulang fakta pemakaian fixture browser QA.';
-
     private const MANUAL_USAGE_NOTE = '[QA Phase 7 Browser] Cuti manual dengan snapshot persetujuan.';
-
-    /** @var array<int, int> */
-    private const RECONCILIATION_USAGE = [
-        2024 => 12,
-        2025 => 12,
-        2026 => 2,
-    ];
 
     /** @var array<string, string> */
     private const REQUEST_IDS = [
@@ -93,7 +69,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         $applicationYear = CarbonImmutable::now(config('app.timezone'))->year;
 
         if ($applicationYear !== self::BALANCE_YEAR) {
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 'PhaseSevenBrowserQaSeeder hanya mendukung tahun saldo 2026; tahun aplikasi saat ini '.$applicationYear.'.'
             );
         }
@@ -108,7 +84,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             $jenisCutiTahunan = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
             $jenisCutiSakit = RefJenisCuti::query()->where('code', 'sakit')->firstOrFail();
 
-            $admin = $this->upsertAdminSession();
+            $admin = $this->upsertAdminSession($jenisPegawaiId, $statusAktifId);
             $kepalaLembaga = $this->upsertEmployee(
                 self::KEPALA_LEMBAGA_EMAIL,
                 '198001012026000002',
@@ -118,8 +94,8 @@ class PhaseSevenBrowserQaSeeder extends Seeder
                 $statusAktifId,
                 ['is_kepala_lembaga' => true]
             );
-            $approver = $this->resolveDemoApprover();
-            $normalEmployee = $this->resolveDemoPegawai($approver);
+            $approver = $this->resolveDemoApprover($jenisPegawaiId, $statusAktifId);
+            $normalEmployee = $this->resolveDemoPegawai($jenisPegawaiId, $statusAktifId, $approver);
             $manualEmployee = $this->upsertEmployee(
                 self::MANUAL_EMPLOYEE_EMAIL,
                 '198001012026000005',
@@ -177,68 +153,10 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         $this->command?->line('QA_KEPALA_LEMBAGA_ID='.$kepalaLembaga->id);
         $this->command?->line('QA_PENDING_CUTI_ID='.$pendingRequest->id);
-        $this->command?->line('QA_ADMIN_EMAIL='.$this->ssoEmailForRole(self::SSO_ADMIN_ROLE));
-        $this->command?->line('QA_APPROVER_EMAIL='.$this->ssoEmailForRole(self::SSO_APPROVER_ROLE));
-        $this->command?->line('QA_PEGAWAI_EMAIL='.$this->ssoEmailForRole(self::SSO_PEGAWAI_ROLE));
+        $this->command?->line('QA_APPROVER_USERNAME='.self::DEMO_APPROVER_USERNAME);
         $this->command?->line('QA_MANUAL_EMPLOYEE_ID='.$manualEmployee->id);
         $this->command?->line('QA_MANUAL_USAGE_ID='.$manualUsage->id);
         $this->command?->line('QA_INVALID_CHAIN_EMPLOYEE_ID='.$invalidEmployee->id);
-    }
-
-    /**
-     * Email akun uji SSO untuk role persona QA — satu-satunya sumber adalah fixture
-     * SsoRoleMappedAccountSeeder agar tidak ada duplikasi daftar akun uji di source.
-     */
-    private function ssoEmailForRole(string $role): string
-    {
-        $email = array_search($role, SsoRoleMappedAccountSeeder::roleMapping(), true);
-
-        if ($email === false) {
-            throw new RuntimeException("Fixture SSO untuk role '{$role}' tidak ditemukan di SsoRoleMappedAccountSeeder::roleMapping().");
-        }
-
-        return $email;
-    }
-
-    /**
-     * User akun uji SSO untuk role persona QA, di-resolve dengan kontrak kanonis
-     * Issue #6: pegawai dicari via email kanonis (case-insensitive, kolom legacy +
-     * email_pribadi), lalu user diambil via employee_id. Lookup email eksak pada user
-     * tidak cukup karena SsoRoleMappedAccountSeeder mendukung user existing dengan
-     * email internal berbeda dari email mapping.
-     */
-    private function ssoUserForRole(string $role): User
-    {
-        $email = strtolower($this->ssoEmailForRole($role));
-
-        // Sama seperti resolver SSO utama: kandidat diambil hingga 2 dan dihitung —
-        // pencocokan ambigu (email_pribadi pegawai A = kolom legacy email pegawai B)
-        // tidak boleh dipilih arbitrer; persona QA wajib menunjuk tepat satu pegawai.
-        $candidates = Employee::query()
-            ->where(function ($query) use ($email): void {
-                $query
-                    ->whereRaw('lower(email) = ?', [$email])
-                    ->orWhereRaw('lower(email_pribadi) = ?', [$email]);
-            })
-            ->limit(2)
-            ->get()
-            ->unique('id');
-
-        if ($candidates->count() > 1) {
-            throw new RuntimeException("Persona QA untuk role '{$role}' mencocokkan lebih dari satu pegawai — perbaiki data email kanonis sebelum menjalankan seeder.");
-        }
-
-        $employee = $candidates->first();
-
-        $user = $employee !== null
-            ? User::query()->where('employee_id', $employee->id)->first()
-            : User::query()->whereRaw('lower(email) = ?', [$email])->first();
-
-        if ($user === null) {
-            throw new RuntimeException("Akun SSO untuk role '{$role}' belum tersedia. Jalankan SsoRoleMappedAccountSeeder terlebih dahulu.");
-        }
-
-        return $user;
     }
 
     /** Menjaga fixture saldo QA memenuhi masa kerja satu tahun sebelum tahun fakta pertama. */
@@ -253,29 +171,39 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         );
     }
 
-    private function upsertAdminSession(): User
+    private function upsertAdminSession(?string $jenisPegawaiId, ?string $statusAktifId): User
     {
-        // Sesi admin QA memakai akun uji SSO terpetakan (admin_kepegawaian) — akun
-        // sudah ditanam SsoRoleMappedAccountSeeder beserta pegawai aktifnya. Seeder
-        // memvalidasi state yang disiapkan, bukan memperbaikinya secara diam-diam.
-        $user = $this->ssoUserForRole(self::SSO_ADMIN_ROLE);
+        $email = 'demo-klabat-kepeg@example.test';
+        $user = User::query()
+            ->where('keycloak_username', 'demo-klabat-kepeg')
+            ->orWhere('email', $email)
+            ->first() ?? new User;
 
-        if ($user->employee_id === null) {
-            throw new RuntimeException('Persona QA admin kepegawaian belum terhubung ke pegawai. Petakan akun melalui jalur administratif SIMPEG (UpdateUserMappingAction) lalu jalankan ulang seeder.');
+        $employee = $user->employee_id !== null
+            ? Employee::query()->find($user->employee_id)
+            : Employee::query()->where('email', $email)->first();
+
+        if ($employee === null) {
+            $employee = $this->upsertEmployee(
+                $email,
+                '198001012026000004',
+                'Demo Klabat (Admin Kepegawaian)',
+                'admin_kepegawaian',
+                $jenisPegawaiId,
+                $statusAktifId,
+            );
         }
 
-        if ($user->role !== self::SSO_ADMIN_ROLE) {
-            throw new RuntimeException("Persona QA admin kepegawaian ber-role '{$user->role}', expected '".self::SSO_ADMIN_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
-        }
-
-        // Persona admin wajib memegang pegawai AKTIF: sesi admin QA yang gagal melewati
-        // EnsureActiveEmployeeAccount membuat skenario browser QA tidak dapat dijalankan.
-        $employee = Employee::query()->find($user->employee_id);
-
-        if ($employee === null || ! $employee->isActive()) {
-            $status = $employee?->status_aktif ?? 'tidak diketahui';
-            throw new RuntimeException("Persona QA admin kepegawaian memegang pegawai berstatus '{$status}', expected aktif. Perbaiki status melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
-        }
+        $user->fill([
+            'name' => 'Demo Klabat (Admin Kepegawaian)',
+            'email' => $email,
+            'keycloak_username' => 'demo-klabat-kepeg',
+            'role' => 'admin_kepegawaian',
+            'employee_id' => $employee->id,
+            'email_verified_at' => $user->email_verified_at ?? now(),
+            'password' => $user->password ?? 'demo-klabat-kepeg',
+        ]);
+        $user->save();
 
         return $user;
     }
@@ -315,63 +243,69 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         return $employee;
     }
 
-    private function resolveDemoApprover(): Employee
+    private function resolveDemoApprover(?string $jenisPegawaiId, ?string $statusAktifId): Employee
     {
-        $user = $this->ssoUserForRole(self::SSO_APPROVER_ROLE);
+        $user = User::query()
+            ->where('keycloak_username', self::DEMO_APPROVER_USERNAME)
+            ->firstOrFail();
 
         $employee = $user->employee_id !== null
             ? Employee::query()->find($user->employee_id)
-            : null;
+            : Employee::query()->where('email', $user->email)->first();
 
         if ($employee === null) {
-            throw new RuntimeException('Persona QA kepala bagian belum terhubung ke pegawai. Petakan akun melalui jalur administratif SIMPEG (UpdateUserMappingAction) lalu jalankan ulang seeder.');
+            throw new \RuntimeException('Employee untuk demo-klabat-kabag belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
         }
 
-        // Persona SSO existing tidak boleh di-fix secara diam-diam: validasi state
-        // yang disiapkan (aktif + role sesuai) dan gagal dengan pesan actionable agar
-        // misconfiguration UAT tetap terlihat, bukan disembunyikan oleh seeder.
-        if (! $employee->isActive()) {
-            throw new RuntimeException("Persona QA kepala bagian ('{$employee->nama_lengkap}') berstatus '{$employee->status_aktif}', expected aktif. Perbaiki status melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
-        }
+        $employee->fill([
+            'nama_lengkap' => 'Demo Klabat (Kepala Bagian)',
+            'status_pegawai_id' => $statusAktifId,
+            'status_aktif' => 'Aktif',
+            'jenis_pegawai_id' => $jenisPegawaiId,
+            'jabatan_terakhir' => 'Kepala Bagian',
+            'role' => 'kepala_bagian',
+        ]);
+        $employee->save();
 
-        if ($user->role !== self::SSO_APPROVER_ROLE || $employee->role !== self::SSO_APPROVER_ROLE) {
-            throw new RuntimeException("Persona QA kepala bagian ber-role user '{$user->role}' / employee '{$employee->role}', expected '".self::SSO_APPROVER_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
-        }
+        $user->fill([
+            'name' => 'Demo Klabat (Kepala Bagian)',
+            'role' => 'kepala_bagian',
+            'employee_id' => $employee->id,
+        ]);
+        $user->save();
 
         return $employee;
     }
 
     /**
-     * Memakai akun uji SSO terpetakan (pegawai) agar form pengajuan diuji dengan
-     * sesi pegawai nyata melalui login Keycloak — bukan akun demo ber-password lokal.
+     * Memakai akun demo pegawai yang diizinkan dev-login agar form pengajuan diuji dengan sesi pegawai nyata.
      */
     private function resolveDemoPegawai(
+        ?string $jenisPegawaiId,
+        ?string $statusAktifId,
         Employee $approver,
     ): Employee {
-        $user = $this->ssoUserForRole(self::SSO_PEGAWAI_ROLE);
+        $user = User::query()
+            ->where('keycloak_username', self::DEMO_PEGAWAI_USERNAME)
+            ->firstOrFail();
 
         $employee = $user->employee_id !== null
             ? Employee::query()->find($user->employee_id)
-            : null;
+            : Employee::query()->where('email', $user->email)->first();
 
         if ($employee === null) {
-            throw new RuntimeException('Persona QA pegawai belum terhubung ke pegawai. Petakan akun melalui jalur administratif SIMPEG (UpdateUserMappingAction) lalu jalankan ulang seeder.');
+            throw new \RuntimeException('Employee untuk demo-klabat-pegawai belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
         }
 
-        // Persona SSO existing tidak boleh di-fix secara diam-diam: validasi state
-        // yang disiapkan (aktif + role sesuai) dan gagal dengan pesan actionable.
-        if (! $employee->isActive()) {
-            throw new RuntimeException("Persona QA pegawai ('{$employee->nama_lengkap}') berstatus '{$employee->status_aktif}', expected aktif. Perbaiki status melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
-        }
-
-        if ($user->role !== self::SSO_PEGAWAI_ROLE || $employee->role !== self::SSO_PEGAWAI_ROLE) {
-            throw new RuntimeException("Persona QA pegawai ber-role user '{$user->role}' / employee '{$employee->role}', expected '".self::SSO_PEGAWAI_ROLE."'. Set role melalui jalur administratif SIMPEG lalu jalankan ulang seeder.");
-        }
-
-        // Wiring relasi QA (penugasan atasan) boleh disiapkan seeder — bukan status
-        // lifecycle ataupun role internal.
         $employee->fill([
+            'nama_lengkap' => 'QA Fase 7 Pegawai',
+            'status_pegawai_id' => $statusAktifId,
+            'status_aktif' => 'Aktif',
+            'jenis_pegawai_id' => $jenisPegawaiId,
+            'jabatan_terakhir' => 'Analis Kepegawaian',
             'kepala_bagian_id' => $approver->id,
+            'is_kepala_lembaga' => false,
+            'role' => 'pegawai',
         ]);
         $employee->save();
 
@@ -387,6 +321,13 @@ class PhaseSevenBrowserQaSeeder extends Seeder
                 'tanggal_berakhir' => null,
             ],
         );
+
+        $user->fill([
+            'name' => 'QA Fase 7 Pegawai',
+            'role' => 'pegawai',
+            'employee_id' => $employee->id,
+        ]);
+        $user->save();
 
         return $employee;
     }
@@ -430,7 +371,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             [
                 'step_order' => 1,
                 'step_type' => 'kepala_bagian',
-                'role_label' => 'Atasan Langsung',
+                'role_label' => 'Kepala Bagian',
                 'approver_role_key' => 'kepala_bagian',
                 'approver_employee_id' => $approver->id,
                 'is_final' => false,
@@ -454,10 +395,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             $approver,
             $kepalaLembaga,
         );
-        $approvedFact = app(LeaveUsageRecordService::class)->recordApprovedRequest($approvedRequest, $admin);
-
-        // Fakta pengajuan harus ada lebih dulu agar snapshot rekonsiliasi membekukan pemakaian yang telah dihitung.
-        $this->ensureAnnualReconciliation($normalEmployee, $approvedFact, $admin);
+        app(LeaveUsageRecordService::class)->recordApprovedRequest($approvedRequest, $admin);
 
         // Status non-final dibuat langsung karena hanya menjadi variasi tampilan browser QA.
         $pendingRequest = $this->createRequest(
@@ -523,7 +461,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         $validSteps = [
             $this->approvalChainStep(1, 'verifier', 'Verifikator', $verifier, false),
-            $this->approvalChainStep(2, 'kepala_bagian', 'Atasan Langsung', $approver, false),
+            $this->approvalChainStep(2, 'kepala_bagian', 'Kepala Bagian', $approver, false),
             $this->approvalChainStep(3, 'pybmc', 'PYBMC', $finalApprover, true),
         ];
         $this->createPreviewChain(
@@ -538,7 +476,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             $invalidEmployee,
             'QA Fase 7 Chain Approver Nonaktif',
             [
-                $this->approvalChainStep(1, 'kepala_bagian', 'Atasan Langsung', $inactiveApprover, false),
+                $this->approvalChainStep(1, 'kepala_bagian', 'Kepala Bagian', $inactiveApprover, false),
                 $this->approvalChainStep(2, 'pybmc', 'PYBMC', $finalApprover, true),
             ],
             $admin,
@@ -606,14 +544,14 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             ->get();
 
         if ($existing->count() > 1) {
-            throw new RuntimeException('Fakta cuti manual fixture QA terduplikasi.');
+            throw new \RuntimeException('Fakta cuti manual fixture QA terduplikasi.');
         }
 
         if ($existing->isNotEmpty()) {
             $record = $existing->sole();
 
             if (! $this->matchesManualUsage($record, $leaveType, $activeApprover, $inactiveApprover)) {
-                throw new RuntimeException('Fakta cuti manual fixture QA tidak sesuai kontrak snapshot.');
+                throw new \RuntimeException('Fakta cuti manual fixture QA tidak sesuai kontrak snapshot.');
             }
 
             return $record;
@@ -690,107 +628,6 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             ];
     }
 
-    /**
-     * Membentuk projection QA dari satu snapshot fakta tiga tahun dengan aktor manusia eksplisit.
-     * Snapshot identik tidak diganti agar rerun tidak menambah fact, ledger, atau audit duplikat.
-     */
-    private function ensureAnnualReconciliation(
-        Employee $employee,
-        LeaveUsageRecord $approvedFact,
-        User $admin,
-    ): void {
-        $active = LeaveUsageReconciliationSet::query()
-            ->with(['records' => fn ($query) => $query->orderBy('usage_year')])
-            ->where('employee_id', $employee->id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->first();
-
-        if ($active !== null && $this->matchesQaReconciliation($active, $approvedFact)) {
-            return;
-        }
-
-        $reconciledAt = CarbonImmutable::create(
-            self::BALANCE_YEAR,
-            12,
-            31,
-            12,
-            0,
-            0,
-            config('app.timezone'),
-        );
-        $service = app(LeaveUsageReconciliationService::class);
-
-        if ($active === null) {
-            $service->createAnnualReconciliationSet(
-                $employee,
-                self::BALANCE_YEAR,
-                self::RECONCILIATION_USAGE,
-                $reconciledAt,
-                self::RECONCILIATION_NOTE,
-                $admin,
-            );
-
-            return;
-        }
-
-        if ($active->balance_year !== self::BALANCE_YEAR) {
-            throw new RuntimeException('Catatan pemakaian aktif fixture QA memakai tahun saldo yang tidak didukung.');
-        }
-
-        $service->replaceAnnualReconciliationSet(
-            $active,
-            self::RECONCILIATION_USAGE,
-            $reconciledAt,
-            self::RECONCILIATION_NOTE,
-            self::RECONCILIATION_CORRECTION_REASON,
-            $admin,
-        );
-    }
-
-    /**
-     * No-op hanya aman bila snapshot tiga tahun juga membekukan tepat satu fakta pengajuan QA.
-     * Membership yang hilang harus memicu replacement agar projection tidak menghitung dua kali.
-     */
-    private function matchesQaReconciliation(
-        LeaveUsageReconciliationSet $set,
-        LeaveUsageRecord $approvedFact,
-    ): bool {
-        if ($set->balance_year !== self::BALANCE_YEAR || $set->records->count() !== 3) {
-            return false;
-        }
-
-        $usage = $set->records
-            ->filter(fn (LeaveUsageRecord $record): bool => $record->source_type === LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION
-                && $record->record_status === LeaveUsageRecord::STATUS_ACTIVE)
-            ->mapWithKeys(fn (LeaveUsageRecord $record): array => [
-                $record->usage_year => $record->workdays,
-            ])
-            ->all();
-
-        if ($usage !== self::RECONCILIATION_USAGE
-            || $approvedFact->employee_id !== $set->employee_id
-            || $approvedFact->source_type !== LeaveUsageRecord::SOURCE_APPROVED_REQUEST
-            || $approvedFact->record_status !== LeaveUsageRecord::STATUS_ACTIVE
-            || $approvedFact->usage_year !== self::BALANCE_YEAR
-            || $approvedFact->workdays !== self::RECONCILIATION_USAGE[self::BALANCE_YEAR]
-        ) {
-            return false;
-        }
-
-        $annualFact = $set->records->first(
-            fn (LeaveUsageRecord $record): bool => $record->usage_year === self::BALANCE_YEAR
-                && $record->source_type === LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION
-                && $record->record_status === LeaveUsageRecord::STATUS_ACTIVE,
-        );
-        $membership = $set->memberships()->get();
-
-        return $annualFact instanceof LeaveUsageRecord
-            && $membership->count() === 1
-            && $membership->sole()->annual_reconciliation_record_id === $annualFact->id
-            && $membership->sole()->itemized_usage_record_id === $approvedFact->id
-            && $membership->sole()->included_workdays === $approvedFact->workdays;
-    }
-
     private function createRequest(
         Employee $employee,
         RefJenisCuti $jenisCuti,
@@ -805,7 +642,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
         if ($existing !== null) {
             if ($existing->employee_id !== $employee->id || $fixtureName !== 'disetujui') {
-                throw new RuntimeException('UUID pengajuan fixture QA sudah digunakan oleh data yang tidak didukung.');
+                throw new \RuntimeException('UUID pengajuan fixture QA sudah digunakan oleh data yang tidak didukung.');
             }
 
             return $existing;
@@ -826,7 +663,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         $firstStep = [
             'step_order' => 1,
             'step_type' => 'kepala_bagian',
-            'role_label' => 'Atasan Langsung',
+            'role_label' => 'Kepala Bagian',
             'approver_employee_id' => $approver->id,
             'status' => 'active',
             'is_final' => false,

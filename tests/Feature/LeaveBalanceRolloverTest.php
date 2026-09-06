@@ -18,7 +18,6 @@ use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceRecalculationService;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -281,7 +280,7 @@ class LeaveBalanceRolloverTest extends TestCase
             ->count());
     }
 
-    public function test_rollover_preserves_material_predecessor_without_active_reconciliation_set(): void
+    public function test_rollover_preserves_material_predecessor_from_single_usage_facts(): void
     {
         $employee = Employee::factory()->create([
             'email' => 'rollover-material-'.fake()->uuid().'@example.test',
@@ -348,9 +347,6 @@ class LeaveBalanceRolloverTest extends TestCase
             ->where('employee_id', $employee->id)
             ->where('tahun', 2026)
             ->sole();
-        $this->assertSame(0, DB::table('leave_usage_reconciliation_sets')
-            ->where('employee_id', $employee->id)
-            ->count());
         $this->assertSame([
             'carry_over' => 6,
             'terpakai' => 8,
@@ -367,8 +363,9 @@ class LeaveBalanceRolloverTest extends TestCase
             'sisa_tahun_berjalan',
         ]));
 
-        app(RolloverLeaveBalanceAction::class)->execute(2026);
+        $result = app(RolloverLeaveBalanceAction::class)->execute(2026);
 
+        $this->assertSame(1, $result['processed'], json_encode($result, JSON_THROW_ON_ERROR));
         $this->assertSame($sourceBefore->getAttributes(), $sourceBefore->fresh()->getAttributes());
         $this->assertDatabaseHas('leave_balances', [
             'employee_id' => $employee->id,
@@ -484,7 +481,7 @@ class LeaveBalanceRolloverTest extends TestCase
             'sisa_n1' => 6,
             'sisa_tahun_berjalan' => 12,
             'sisa' => 18,
-            'hangus' => 15,
+            'hangus' => 3,
         ]);
         $this->assertDatabaseHas('leave_balance_ledger', [
             'employee_id' => $employee->id,
@@ -595,13 +592,32 @@ class LeaveBalanceRolloverTest extends TestCase
         Carbon::setTestNow('2026-12-31 10:00:00');
 
         try {
-            app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+            $annual = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
+            foreach ($usage as $year => $workdays) {
+                if ($workdays <= 0) {
+                    continue;
+                }
+
+                $date = sprintf('%d-06-01', $year);
+                LeaveUsageRecord::query()->create([
+                    'employee_id' => $employee->id,
+                    'leave_type_id' => $annual->id,
+                    'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+                    'usage_year' => $year,
+                    'effective_date' => $date,
+                    'start_date' => $date,
+                    'end_date' => $date,
+                    'workdays' => $workdays,
+                    'administrative_note' => 'Fixture fakta manual untuk orkestrasi rollover.',
+                    'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+                    'recorded_by' => $this->reconciliationActor->id,
+                ]);
+            }
+            app(LeaveBalanceRecalculationService::class)->recalculate(
                 $employee,
                 2026,
-                $usage,
-                Carbon::parse('2026-12-31 10:00:00'),
-                'Fixture rekonsiliasi untuk orkestrasi rollover.',
                 $this->reconciliationActor,
+                'Membentuk projection fixture rollover dari fakta tunggal.',
             );
             $this->assertDatabaseMissing('leave_balances', [
                 'employee_id' => $employee->id,

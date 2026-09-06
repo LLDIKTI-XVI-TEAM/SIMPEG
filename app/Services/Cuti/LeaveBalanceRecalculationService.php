@@ -6,8 +6,6 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
-use App\Models\LeaveUsageReconciliationMembership;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
@@ -96,8 +94,8 @@ final class LeaveBalanceRecalculationService
     }
 
     /**
-     * Replay rollover mempertahankan predecessor material hanya saat belum ada
-     * set pemakaian aktif; set aktif tetap menjadi anchor horizon perhitungan.
+     * Rollover membentuk projection tahun target dari saldo tahun sumber yang
+     * telah dikunci oleh action. Projection sumber tidak boleh ditulis ulang.
      *
      * @return Collection<int, LeaveBalance>
      */
@@ -113,12 +111,12 @@ final class LeaveBalanceRecalculationService
 
         return $this->run(
             employee: $employee,
-            earliestAffectedYear: $sourceYear,
+            earliestAffectedYear: $sourceYear + 1,
             reason: trim($reason),
             actor: null,
             systemActor: $systemActor,
             httpRequest: null,
-            useMaterialPredecessorWithoutActiveSet: true,
+            useMaterialPredecessor: true,
         );
     }
 
@@ -153,7 +151,6 @@ final class LeaveBalanceRecalculationService
         bool $historicalFactsMayExpandHorizon = true,
         bool $useMaterialPredecessor = false,
         ?Carbon $effectiveTmtBefore = null,
-        bool $useMaterialPredecessorWithoutActiveSet = false,
     ): Collection {
         if ($reason === '') {
             throw ValidationException::withMessages(['reason' => 'Alasan rekalkulasi wajib diisi.']);
@@ -169,7 +166,6 @@ final class LeaveBalanceRecalculationService
             $historicalFactsMayExpandHorizon,
             $useMaterialPredecessor,
             $effectiveTmtBefore,
-            $useMaterialPredecessorWithoutActiveSet,
         ): Collection {
             $employeeQuery = Employee::query()
                 ->with(['jenisPegawai', 'appointments']);
@@ -184,11 +180,6 @@ final class LeaveBalanceRecalculationService
                 ->whereKey($employee->id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $activeSet = LeaveUsageReconciliationSet::query()
-                ->where('employee_id', $lockedEmployee->id)
-                ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-                ->lockForUpdate()
-                ->first();
             $facts = LeaveUsageRecord::query()
                 ->where('employee_id', $lockedEmployee->id)
                 ->orderBy('effective_date')
@@ -196,12 +187,6 @@ final class LeaveBalanceRecalculationService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
-            $memberships = $activeSet === null
-                ? collect()
-                : LeaveUsageReconciliationMembership::query()
-                    ->where('reconciliation_set_id', $activeSet->id)
-                    ->lockForUpdate()
-                    ->get();
             $annualTypeId = RefJenisCuti::query()->where('code', 'tahunan')->value('id');
 
             if ($annualTypeId === null) {
@@ -210,10 +195,10 @@ final class LeaveBalanceRecalculationService
 
             $startYear = $this->startYear(
                 $facts,
-                $activeSet,
                 $earliestAffectedYear,
                 $annualTypeId,
                 $historicalFactsMayExpandHorizon,
+                $useMaterialPredecessor,
             );
             $endYear = $this->businessClock->currentYear();
 
@@ -254,13 +239,15 @@ final class LeaveBalanceRecalculationService
                 ->get()
                 ->groupBy('tahun')
                 ->map(fn (Collection $events): int => max(0, (int) $events->sum('amount')));
-            $usageStartYear = $historicalFactsMayExpandHorizon
-                ? $startYear
-                : min($projectionStartYear, $startYear - 2);
+            // Rollover/upgrade menulis hanya projection target, tetapi ceiling
+            // dan Rule 2 tetap bergantung pada pemakaian dua tahun sebelumnya.
+            $usageStartYear = $useMaterialPredecessor
+                ? min($projectionStartYear, $startYear - 2)
+                : ($historicalFactsMayExpandHorizon
+                    ? $startYear
+                    : min($projectionStartYear, $startYear - 2));
             $usage = $this->usageByYear(
                 $facts,
-                $memberships,
-                $activeSet,
                 $annualTypeId,
                 $usageStartYear,
                 $endYear,
@@ -268,7 +255,6 @@ final class LeaveBalanceRecalculationService
             $projections = [];
             $previous = null;
             $mayUseMaterialPredecessor = $useMaterialPredecessor
-                || ($useMaterialPredecessorWithoutActiveSet && $activeSet === null)
                 || (! $historicalFactsMayExpandHorizon && ! $rebuildVirtualPredecessor);
 
             if ($mayUseMaterialPredecessor && $materialPredecessorYear !== null) {
@@ -394,12 +380,6 @@ final class LeaveBalanceRecalculationService
                 }
 
                 $sourceState = [
-                    'active_set' => $activeSet === null ? null : [
-                        'id' => $activeSet->id,
-                        'balance_year' => $activeSet->balance_year,
-                        'status' => $activeSet->status,
-                        'updated_at' => $activeSet->updated_at?->toISOString(),
-                    ],
                     'facts' => $facts
                         ->where('usage_year', '<=', $year)
                         ->map(fn (LeaveUsageRecord $fact): array => [
@@ -512,14 +492,16 @@ final class LeaveBalanceRecalculationService
      */
     private function startYear(
         Collection $facts,
-        ?LeaveUsageReconciliationSet $activeSet,
         int $earliestAffectedYear,
         string $annualTypeId,
         bool $historicalFactsMayExpandHorizon,
+        bool $useMaterialPredecessor,
     ): int {
-        // Snapshot aktif selalu menjadi anchor agar fakta historis di luar N-2/N-1/N tidak menciptakan carry baru.
-        if ($activeSet !== null) {
-            return $activeSet->balance_year - 2;
+        // Jalur upgrade hanya mereplay tahun material yang diminta dengan
+        // predecessor yang telah tervalidasi. Horizon fakta baru tidak boleh
+        // menimpa projection material yang sedang dimigrasikan.
+        if ($useMaterialPredecessor) {
+            return $earliestAffectedYear;
         }
 
         // Koreksi TMT harus mereplay projection material, bukan membentuk ulang seluruh sejarah fakta.
@@ -528,9 +510,13 @@ final class LeaveBalanceRecalculationService
         }
 
         $factYear = $facts
-            ->where('source_type', '!=', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
             ->where('leave_type_id', $annualTypeId)
             ->min('usage_year');
+
+        // K-MTG-10.3 menjadikan fakta manual/approved satu-satunya sumber
+        // pemakaian. Ketiadaan fakta pada N-2/N-1 tetap berarti pemakaian nol
+        // ketika saldo dihitung; ia bukan alasan membuat proyeksi atau fakta
+        // historis nol baru di luar horizon mutasi yang diminta.
 
         return min(array_filter([
             $earliestAffectedYear,
@@ -540,68 +526,22 @@ final class LeaveBalanceRecalculationService
 
     /**
      * @param  Collection<int, LeaveUsageRecord>  $facts
-     * @param  Collection<int, LeaveUsageReconciliationMembership>  $memberships
      * @return array<int, array{workdays:int, ordered_fact_ids:list<string>}>
      */
     private function usageByYear(
         Collection $facts,
-        Collection $memberships,
-        ?LeaveUsageReconciliationSet $activeSet,
         string $annualTypeId,
         int $startYear,
         int $endYear,
     ): array {
-        $children = $facts->whereNotNull('replaces_id')->keyBy('replaces_id');
-        $factsById = $facts->keyBy('id');
-        $declarations = $activeSet === null
-            ? collect()
-            : $facts->where('reconciliation_set_id', $activeSet->id)
-                ->where('source_type', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-                ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-                ->keyBy('usage_year');
-        $covered = [];
-        $membershipAdjustments = [];
-
-        foreach ($memberships as $membership) {
-            $annual = $factsById->get($membership->annual_reconciliation_record_id);
-            $terminal = $factsById->get($membership->itemized_usage_record_id);
-
-            while ($terminal !== null) {
-                $covered[$terminal->id] = true;
-                $child = $children->get($terminal->id);
-
-                if ($child === null) {
-                    break;
-                }
-
-                $terminal = $child;
-            }
-
-            if ($annual !== null) {
-                $membershipAdjustments[$annual->usage_year] = ($membershipAdjustments[$annual->usage_year] ?? 0)
-                    - $membership->included_workdays;
-            }
-
-            if ($terminal?->record_status === LeaveUsageRecord::STATUS_ACTIVE
-                && $terminal->leave_type_id === $annualTypeId
-                && $terminal->source_type !== LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION) {
-                $membershipAdjustments[$terminal->usage_year] = ($membershipAdjustments[$terminal->usage_year] ?? 0)
-                    + $terminal->workdays;
-            }
-        }
-
         $result = [];
 
         for ($year = $startYear; $year <= $endYear; $year++) {
-            $activeItemized = $facts
+            $activeFacts = $facts
                 ->where('usage_year', $year)
                 ->where('leave_type_id', $annualTypeId)
-                ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-                ->where('source_type', '!=', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION);
-            $newFacts = $activeItemized->reject(fn (LeaveUsageRecord $fact): bool => isset($covered[$fact->id]));
-            $workdays = (int) ($declarations->get($year)?->workdays ?? 0)
-                + (int) ($membershipAdjustments[$year] ?? 0)
-                + (int) $newFacts->sum('workdays');
+                ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE);
+            $workdays = (int) $activeFacts->sum('workdays');
 
             if ($workdays < 0) {
                 throw ValidationException::withMessages([
@@ -611,7 +551,7 @@ final class LeaveBalanceRecalculationService
 
             $result[$year] = [
                 'workdays' => $workdays,
-                'ordered_fact_ids' => $activeItemized->pluck('id')->values()->all(),
+                'ordered_fact_ids' => $activeFacts->pluck('id')->values()->all(),
             ];
         }
 
@@ -695,11 +635,15 @@ final class LeaveBalanceRecalculationService
             $employee,
             Carbon::parse("{$expectedYear}-12-31")->endOfDay(),
         ) ? $this->calculator->annualEntitlement() : 0;
-        $remaining = $snapshot['sisa_n2'] + $snapshot['sisa_n1'] + $snapshot['sisa_tahun_berjalan'];
+        $remainingCarry = $snapshot['sisa_n2'] + $snapshot['sisa_n1'];
+        $remaining = $remainingCarry + $snapshot['sisa_tahun_berjalan'];
+        $consumedCarry = $snapshot['carry_over'] - $remainingCarry;
 
         if ($snapshot['tahun'] !== $expectedYear
             || $snapshot['jatah_awal'] !== $expectedEntitlement
-            || $snapshot['carry_over'] !== $snapshot['sisa_n2'] + $snapshot['sisa_n1']
+            || $remainingCarry > $snapshot['carry_over']
+            || $snapshot['sisa_tahun_berjalan'] !== $snapshot['jatah_awal'] - $snapshot['terpakai_tahun_berjalan']
+            || $snapshot['terpakai'] !== $consumedCarry + $snapshot['terpakai_tahun_berjalan']
             || $snapshot['sisa'] !== $remaining
             || $snapshot['jatah_awal'] + $snapshot['carry_over'] !== $snapshot['terpakai'] + $snapshot['sisa']) {
             throw ValidationException::withMessages([

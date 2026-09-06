@@ -10,7 +10,6 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
@@ -19,7 +18,6 @@ use App\Services\Cuti\AnnualLeaveBusinessClock;
 use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\Cuti\LeaveBalanceReservationService;
 use App\Services\Cuti\LeaveBalanceService;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,12 +48,12 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
     public function test_koreksi_tmt_ke_tanggal_belum_eligible_segera_mereplay_projection_tahun_berjalan(): void
     {
         [$employee, $appointment, $actor] = $this->employeeWithAppointment('2024-01-01');
-        $this->replayBaselineWithUsageHistory($employee, $actor);
+        $this->replayBaseline($employee, $actor);
         $beforeLedger = $this->replayLedgerCount($employee);
         $beforeAudit = $this->replayAuditCount($employee);
 
-        $this->assertSame(6, $this->currentBalance($employee)->carry_over);
-        $this->assertSame(18, $this->currentBalance($employee)->sisa);
+        $this->assertSame(0, $this->currentBalance($employee)->carry_over);
+        $this->assertSame(12, $this->currentBalance($employee)->sisa);
 
         $this->updateAppointment($employee, $actor, '2026-01-01')
             ->assertSessionHasNoErrors()
@@ -82,7 +80,6 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $this->replayMaterialProjectionWithoutFacts($employee, $actor);
         app(RolloverLeaveBalanceAction::class)->execute(2025);
 
-        $this->assertSame(0, LeaveUsageReconciliationSet::query()->whereBelongsTo($employee)->count());
         $this->assertSame(0, LeaveUsageRecord::query()->whereBelongsTo($employee)->count());
         $this->assertDatabaseHas('leave_balance_ledger', [
             'employee_id' => $employee->id,
@@ -101,9 +98,9 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $this->assertSame(12, $balance->jatah_awal);
         $this->assertSame(6, $balance->carry_over);
         $this->assertSame(18, $balance->sisa);
+        $this->assertSame(0, $balance->sisa_n2);
         $this->assertSame(6, $balance->sisa_n1);
         $this->assertSame(12, $balance->sisa_tahun_berjalan);
-        $this->assertSame(0, LeaveUsageReconciliationSet::query()->whereBelongsTo($employee)->count());
         $this->assertSame(0, LeaveUsageRecord::query()->whereBelongsTo($employee)->count());
     }
 
@@ -233,17 +230,9 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
             $actor,
             'Membentuk predecessor sebelum snapshot pemakaian aktif.',
         );
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $employee,
-            2026,
-            [2024 => 4, 2025 => 0, 2026 => 0],
-            Carbon::now(),
-            'Snapshot aktif untuk regresi predecessor koreksi TMT.',
-            $actor,
-        );
+        $this->recordHistoricalManualAnnualUsage($employee, $actor, 2024, 4);
 
-        $this->assertSame(1, LeaveUsageReconciliationSet::query()->whereBelongsTo($employee)->count());
-        $this->assertSame(3, LeaveUsageRecord::query()->whereBelongsTo($employee)->count());
+        $this->assertSame(1, LeaveUsageRecord::query()->whereBelongsTo($employee)->count());
 
         $this->updateAppointment($employee, $actor, '2020-06-01')
             ->assertSessionHasNoErrors()
@@ -265,7 +254,6 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $request = $this->activeAnnualRequest($employee, 3, '2025-09-01');
         app(LeaveBalanceReservationService::class)->reserveForNewRequest($request, $actor);
 
-        $this->assertSame(0, LeaveUsageReconciliationSet::query()->whereBelongsTo($employee)->count());
         $this->assertSame(0, LeaveUsageRecord::query()->whereBelongsTo($employee)->count());
         $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
@@ -368,7 +356,7 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $beforeAudit = $this->replayAuditCount($employee);
         $usageBefore = $this->usageFactSnapshot($employee);
 
-        $this->assertSame(24, $this->currentBalance($employee)->sisa);
+        $this->assertSame(18, $this->currentBalance($employee)->sisa);
 
         $this->updatePppkContractEnd($employee, $actor, '2026-05-31')
             ->assertSessionHasNoErrors()
@@ -380,16 +368,16 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $this->assertSame(12, $balance->jatah_awal);
         $this->assertSame(6, $balance->carry_over);
         $this->assertSame(18, $balance->sisa);
-        $this->assertSame(6, $balance->sisa_n2);
-        $this->assertSame(0, $balance->sisa_n1);
+        $this->assertSame(0, $balance->sisa_n2);
+        $this->assertSame(6, $balance->sisa_n1);
         $this->assertSame(12, $balance->sisa_tahun_berjalan);
         $this->assertSame(18, app(LeaveBalanceService::class)->availableFor(
             $employee->fresh(),
             2026,
             Carbon::now(),
         ));
-        $this->assertSame($beforeLedger + 1, $this->replayLedgerCount($employee));
-        $this->assertSame($beforeAudit + 1, $this->replayAuditCount($employee));
+        $this->assertSame($beforeLedger, $this->replayLedgerCount($employee));
+        $this->assertSame($beforeAudit, $this->replayAuditCount($employee));
         $this->assertSame($usageBefore, $this->usageFactSnapshot($employee));
     }
 
@@ -405,7 +393,7 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $beforeAudit = $this->replayAuditCount($employee);
         $usageBefore = $this->usageFactSnapshot($employee);
 
-        $this->assertSame(24, $this->currentBalance($employee)->sisa);
+        $this->assertSame(18, $this->currentBalance($employee)->sisa);
 
         $this->updatePppkAppointment($employee, $actor, '2023-07-01')
             ->assertSessionHasNoErrors()
@@ -417,16 +405,16 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $this->assertSame(12, $balance->jatah_awal);
         $this->assertSame(6, $balance->carry_over);
         $this->assertSame(18, $balance->sisa);
-        $this->assertSame(6, $balance->sisa_n2);
-        $this->assertSame(0, $balance->sisa_n1);
+        $this->assertSame(0, $balance->sisa_n2);
+        $this->assertSame(6, $balance->sisa_n1);
         $this->assertSame(12, $balance->sisa_tahun_berjalan);
         $this->assertSame(18, app(LeaveBalanceService::class)->availableFor(
             $employee->fresh(),
             2026,
             Carbon::now(),
         ));
-        $this->assertSame($beforeLedger + 1, $this->replayLedgerCount($employee));
-        $this->assertSame($beforeAudit + 1, $this->replayAuditCount($employee));
+        $this->assertSame($beforeLedger, $this->replayLedgerCount($employee));
+        $this->assertSame($beforeAudit, $this->replayAuditCount($employee));
         $this->assertSame($usageBefore, $this->usageFactSnapshot($employee));
     }
 
@@ -438,7 +426,7 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $beforeAudit = $this->replayAuditCount($employee);
         $usageBefore = $this->usageFactSnapshot($employee);
 
-        $this->assertSame(24, $this->currentBalance($employee)->sisa);
+        $this->assertSame(18, $this->currentBalance($employee)->sisa);
 
         $this->updateAppointment($employee, $actor, '2020-01-01', 'SK-PENGANGKATAN-PPPK', 'PPPK')
             ->assertSessionHasNoErrors()
@@ -563,14 +551,8 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
 
     private function replayBaselineWithUsageHistory(Employee $employee, User $actor): void
     {
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $employee,
-            2026,
-            [2024 => 0, 2025 => 0, 2026 => 0],
-            Carbon::now(),
-            'Membentuk riwayat pemakaian untuk pengujian koreksi TMT.',
-            $actor,
-        );
+        $this->recordHistoricalManualAnnualUsage($employee, $actor, 2025, 6);
+        $this->replayBaseline($employee, $actor);
     }
 
     private function activeAnnualRequest(
@@ -705,11 +687,30 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
             ->orderBy('id')
             ->get([
                 'id',
-                'reconciliation_set_id',
                 'usage_year',
                 'workdays',
                 'record_status',
             ])
             ->toArray();
+    }
+
+    private function recordHistoricalManualAnnualUsage(Employee $employee, User $actor, int $year, int $workdays): void
+    {
+        $annual = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
+        $date = sprintf('%d-06-01', $year);
+
+        LeaveUsageRecord::query()->create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $annual->id,
+            'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+            'usage_year' => $year,
+            'effective_date' => $date,
+            'start_date' => $date,
+            'end_date' => $date,
+            'workdays' => $workdays,
+            'administrative_note' => 'Fakta manual historis untuk regresi koreksi TMT.',
+            'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+            'recorded_by' => $actor->id,
+        ]);
     }
 }

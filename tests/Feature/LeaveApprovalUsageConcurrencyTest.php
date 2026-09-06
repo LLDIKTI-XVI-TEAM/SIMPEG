@@ -2,14 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApproval;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
-use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
@@ -31,12 +29,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 #[Group('serial')]
 class LeaveApprovalUsageConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
+    use RecordsHistoricalAnnualLeaveUsage;
 
     private ?string $raceDirectory = null;
 
@@ -175,52 +175,6 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             ->count());
     }
 
-    public function test_dua_persetujuan_paralel_aktor_lintas_peran_tidak_melompati_tahap_berikutnya(): void
-    {
-        $fixture = $this->makeCommittedCrossRoleApprovalFixture();
-
-        $outcomes = $this->runRace($fixture);
-
-        $diagnostic = $outcomes->toJson();
-        $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
-        $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
-        $winner = $outcomes->firstWhere('ok', true);
-        $loser = $outcomes->firstWhere('ok', false);
-        $this->assertSame('menunggu_approval', $winner['status'] ?? null, $diagnostic);
-        $this->assertSame(ValidationException::class, $loser['class'] ?? null, $diagnostic);
-        $this->assertSame(
-            ['Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.'],
-            $loser['errors']['active_step_id'] ?? null,
-            $diagnostic,
-        );
-
-        $this->assertSame('menunggu_approval', $fixture['request']->fresh()->status);
-        $this->assertDatabaseHas('leave_request_steps', [
-            'id' => $fixture['first_step']->id,
-            'status' => 'approved',
-            'step_type' => 'kepala_bagian',
-        ]);
-        $this->assertDatabaseHas('leave_request_steps', [
-            'id' => $fixture['second_step']->id,
-            'status' => 'active',
-            'step_type' => 'pybmc',
-        ]);
-        $this->assertSame(1, LeaveApproval::query()
-            ->where('leave_request_id', $fixture['request']->id)
-            ->where('action', 'APPROVE')
-            ->count());
-        $this->assertSame(0, LeaveRequestStep::query()
-            ->where('leave_request_id', $fixture['request']->id)
-            ->where('status', 'skipped')
-            ->count());
-        $this->assertSame(0, LeaveUsageRecord::query()
-            ->where('leave_request_id', $fixture['request']->id)
-            ->count());
-        $this->assertSame(0, LeaveProof::query()
-            ->where('leave_request_id', $fixture['request']->id)
-            ->count());
-    }
-
     public function test_persetujuan_final_dan_penangguhan_tugas_dinas_paralel_tidak_deadlock_atau_mencampur_efek_terminal(): void
     {
         $fixture = $this->makeCommittedFinalApprovalFixture();
@@ -275,188 +229,9 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
         $this->assertSame($metadataPaths, $storedPaths, 'Race terminal tidak boleh meninggalkan PDF orphan.');
     }
 
-    public function test_persetujuan_final_dan_permohonan_pembatalan_paralel_hanya_menyimpan_satu_hasil(): void
-    {
-        $fixture = $this->makeCommittedFinalApprovalFixture();
-
-        $outcomes = $this->runRace($fixture, [
-            ['operation' => 'approve'],
-            [
-                'operation' => 'request_cancellation',
-                'actor_user_id' => $fixture['pemohon_user']->id,
-            ],
-        ]);
-
-        $diagnostic = $outcomes->toJson();
-        $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
-        $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
-        $this->assertSame(ValidationException::class, $outcomes->firstWhere('ok', false)['class'] ?? null, $diagnostic);
-
-        $request = $fixture['request']->fresh();
-        $cancellationCount = LeaveCancellationRequest::query()
-            ->where('leave_request_id', $request->id)
-            ->count();
-        $this->assertContains($request->status, ['disetujui', LeaveRequest::STATUS_CANCELLATION_PENDING]);
-        $this->assertSame(
-            $cancellationCount,
-            AuditLog::query()
-                ->where('auditable_type', 'LeaveCancellationRequest')
-                ->where('event', 'LEAVE_CANCELLATION_REQUESTED')
-                ->count(),
-        );
-
-        if ($request->status === 'disetujui') {
-            $this->assertSame(0, $cancellationCount);
-            $this->assertSame(1, LeaveUsageRecord::query()->where('leave_request_id', $request->id)->count());
-            $this->assertSame(1, LeaveProof::query()->where('leave_request_id', $request->id)->count());
-            $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
-                ->where('leave_request_id', $request->id)
-                ->sum('amount'));
-
-            return;
-        }
-
-        $this->assertSame(1, $cancellationCount);
-        $this->assertSame(0, LeaveApproval::query()->where('leave_request_id', $request->id)->count());
-        $this->assertSame(0, LeaveUsageRecord::query()->where('leave_request_id', $request->id)->count());
-        $this->assertSame(0, LeaveProof::query()->where('leave_request_id', $request->id)->count());
-        $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
-            ->where('leave_request_id', $request->id)
-            ->sum('amount'));
-    }
-
-    public function test_dua_keputusan_pembatalan_paralel_hanya_menyimpan_keputusan_pertama(): void
-    {
-        $fixture = $this->makeCommittedFinalApprovalFixture();
-        $cancellation = $this->createPendingCancellation($fixture['request'], $fixture['pemohon_user']);
-
-        $outcomes = $this->runRace($fixture, [
-            [
-                'operation' => 'approve_cancellation',
-                'actor_user_id' => $fixture['admin']->id,
-                'cancellation_id' => $cancellation->id,
-            ],
-            [
-                'operation' => 'reject_cancellation',
-                'actor_user_id' => $fixture['admin']->id,
-                'cancellation_id' => $cancellation->id,
-            ],
-        ]);
-
-        $diagnostic = $outcomes->toJson();
-        $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
-        $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
-        $this->assertSame(ValidationException::class, $outcomes->firstWhere('ok', false)['class'] ?? null, $diagnostic);
-
-        $cancellation = $cancellation->fresh();
-        $request = $fixture['request']->fresh();
-        $releaseCount = LeaveBalanceReservationEvent::query()
-            ->where('leave_request_id', $request->id)
-            ->where('dedup_key', "leave_reservation:{$request->id}:released:approved_cancellation:{$cancellation->id}:2026")
-            ->count();
-        $this->assertContains($cancellation->status, [
-            LeaveCancellationRequest::STATUS_APPROVED,
-            LeaveCancellationRequest::STATUS_REJECTED,
-        ]);
-        $this->assertSame(
-            1,
-            AuditLog::query()
-                ->where('auditable_type', 'LeaveCancellationRequest')
-                ->where('auditable_id', $cancellation->id)
-                ->whereIn('event', ['LEAVE_CANCELLATION_APPROVED', 'LEAVE_CANCELLATION_REJECTED'])
-                ->count(),
-        );
-        $this->assertSame(1, SimpegNotification::query()
-            ->where('user_id', $fixture['pemohon']->id)
-            ->whereIn('type', ['cuti.pembatalan_disetujui', 'cuti.pembatalan_ditolak'])
-            ->count());
-
-        if ($cancellation->status === LeaveCancellationRequest::STATUS_APPROVED) {
-            $this->assertSame(LeaveRequest::STATUS_CANCELLED, $request->status);
-            $this->assertSame(1, $releaseCount);
-            $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
-                ->where('leave_request_id', $request->id)
-                ->sum('amount'));
-
-            return;
-        }
-
-        $this->assertSame('menunggu_approval', $request->status);
-        $this->assertSame(0, $releaseCount);
-        $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
-            ->where('leave_request_id', $request->id)
-            ->sum('amount'));
-    }
-
-    public function test_revisi_dan_persetujuan_pertama_paralel_menghormati_revision_version(): void
-    {
-        $fixture = $this->makeCommittedCrossRoleApprovalFixture();
-
-        $outcomes = $this->runRace($fixture, [
-            ['operation' => 'approve'],
-            [
-                'operation' => 'revise',
-                'actor_user_id' => $fixture['pemohon_user']->id,
-            ],
-        ]);
-
-        $diagnostic = $outcomes->toJson();
-        $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
-        $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
-        $this->assertSame(ValidationException::class, $outcomes->firstWhere('ok', false)['class'] ?? null, $diagnostic);
-
-        $request = $fixture['request']->fresh();
-        $approvalCount = LeaveApproval::query()->where('leave_request_id', $request->id)->count();
-
-        if ($approvalCount === 1) {
-            $this->assertSame(1, $request->revision_version);
-            $this->assertSame('Pengajuan race lintas peran.', $request->alasan);
-            $this->assertSame('approved', $fixture['first_step']->fresh()->status);
-            $this->assertSame('active', $fixture['second_step']->fresh()->status);
-
-            return;
-        }
-
-        $this->assertSame(0, $approvalCount);
-        $this->assertSame(2, $request->revision_version);
-        $this->assertSame('Pengajuan diperbarui saat race.', $request->alasan);
-        $this->assertSame('active', $fixture['first_step']->fresh()->status);
-        $this->assertSame('pending', $fixture['second_step']->fresh()->status);
-    }
-
-    public function test_dua_permohonan_pembatalan_paralel_hanya_membuat_satu_pending(): void
-    {
-        $fixture = $this->makeCommittedFinalApprovalFixture();
-        $operation = [
-            'operation' => 'request_cancellation',
-            'actor_user_id' => $fixture['pemohon_user']->id,
-        ];
-
-        $outcomes = $this->runRace($fixture, [$operation, $operation]);
-
-        $diagnostic = $outcomes->toJson();
-        $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
-        $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
-        $this->assertSame(ValidationException::class, $outcomes->firstWhere('ok', false)['class'] ?? null, $diagnostic);
-        $this->assertSame(1, LeaveCancellationRequest::query()
-            ->where('leave_request_id', $fixture['request']->id)
-            ->where('status', LeaveCancellationRequest::STATUS_PENDING)
-            ->count());
-        $this->assertSame(1, AuditLog::query()
-            ->where('auditable_type', 'LeaveCancellationRequest')
-            ->where('event', 'LEAVE_CANCELLATION_REQUESTED')
-            ->count());
-        $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $fixture['request']->fresh()->status);
-        $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
-            ->where('leave_request_id', $fixture['request']->id)
-            ->sum('amount'));
-    }
-
     /**
      * @return array{
      *     pemohon: Employee,
-     *     pemohon_user: User,
-     *     admin: User,
      *     request: LeaveRequest,
      *     approver: Employee,
      *     approver_user: User,
@@ -487,22 +262,12 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             'role' => 'pimpinan',
             'employee_id' => $approver->id,
         ]);
-        $adminEmployee = Employee::factory()->create([
-            'nama_lengkap' => 'Admin Race Approval',
-            'email' => 'admin-race-'.Str::uuid().'@example.test',
-        ]);
-        $admin = User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
-        app(ReconcileAnnualLeaveUsageAction::class)->execute(
-            $pemohon->id,
-            [
-                'balance_year' => 2026,
-                'usage_n2' => 0,
-                'usage_n1' => 0,
-                'usage_current' => 0,
-                'administrative_note' => 'Rekonsiliasi fixture race persetujuan.',
-            ],
+        $admin = User::factory()->adminKepegawaian()->create();
+        $this->recordHistoricalAnnualUsage(
+            $pemohon,
+            [2024 => 0, 2025 => 0, 2026 => 0],
             $admin,
-            $this->requestFor($admin),
+            'Fakta pemakaian eksternal fixture race persetujuan.',
         );
         $request = LeaveRequest::query()->create([
             'employee_id' => $pemohon->id,
@@ -535,8 +300,6 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
 
         return [
             'pemohon' => $pemohon,
-            'pemohon_user' => $pemohonUser,
-            'admin' => $admin,
             'request' => $request->fresh(),
             'approver' => $approver,
             'approver_user' => $approverUser,
@@ -545,77 +308,7 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
     }
 
     /**
-     * @return array{
-     *     request: LeaveRequest,
-     *     pemohon_user: User,
-     *     approver: Employee,
-     *     approver_user: User,
-     *     first_step: LeaveRequestStep,
-     *     second_step: LeaveRequestStep
-     * }
-     */
-    private function makeCommittedCrossRoleApprovalFixture(): array
-    {
-        $leaveType = RefJenisCuti::query()->create([
-            'nama' => 'Cuti Race Lintas Peran',
-            'code' => 'race_lintas_peran',
-            'mengurangi_saldo_tahunan' => false,
-            'khusus_pns' => false,
-        ]);
-        $pemohon = Employee::factory()->create([
-            'nama_lengkap' => 'Pemohon Race Lintas Peran',
-            'email' => 'pemohon-race-lintas-peran-'.Str::uuid().'@example.test',
-        ]);
-        $pemohonUser = User::factory()->pegawai()->create(['employee_id' => $pemohon->id]);
-        $approver = Employee::factory()->create(['nama_lengkap' => 'Approver Race Lintas Peran']);
-        $approverUser = User::factory()->create([
-            'name' => 'User Race Lintas Peran',
-            'role' => 'pimpinan',
-            'employee_id' => $approver->id,
-        ]);
-        $request = LeaveRequest::query()->create([
-            'employee_id' => $pemohon->id,
-            'jenis_cuti_id' => $leaveType->id,
-            'tanggal_mulai' => '2026-08-20',
-            'tanggal_selesai' => '2026-08-20',
-            'jumlah_hari_kerja' => 1,
-            'alasan' => 'Pengajuan race lintas peran.',
-            'alamat_selama_cuti' => 'Alamat privat race lintas peran.',
-            'nomor_telepon' => '081234000001',
-            'status' => 'menunggu_approval',
-        ]);
-        $firstStep = LeaveRequestStep::query()->create([
-            'leave_request_id' => $request->id,
-            'step_order' => 1,
-            'step_type' => 'kepala_bagian',
-            'role_label' => 'Atasan Langsung',
-            'approver_employee_id' => $approver->id,
-            'status' => 'active',
-            'is_final' => false,
-        ]);
-        $secondStep = LeaveRequestStep::query()->create([
-            'leave_request_id' => $request->id,
-            'step_order' => 2,
-            'step_type' => 'pybmc',
-            'role_label' => 'PYBMC',
-            'approver_employee_id' => $approver->id,
-            'status' => 'pending',
-            'is_final' => true,
-        ]);
-
-        return [
-            'request' => $request->fresh(),
-            'pemohon_user' => $pemohonUser,
-            'approver' => $approver,
-            'approver_user' => $approverUser,
-            'first_step' => $firstStep,
-            'second_step' => $secondStep,
-        ];
-    }
-
-    /**
      * @param  array{request: LeaveRequest, approver: Employee, approver_user: User}  $fixture
-     * @param  list<string|array<string, string>>  $operations
      * @return Collection<int, array<string, mixed>>
      */
     private function runRace(array $fixture, array $operations = ['approve', 'approve']): Collection
@@ -629,26 +322,22 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
 
         try {
             foreach ($operations as $index => $operation) {
-                $operationPayload = is_string($operation)
-                    ? ['operation' => $operation]
-                    : $operation;
                 $ready = "{$directory}/ready-{$index}";
                 $result = "{$directory}/result-{$index}.json";
                 $results[] = $result;
                 $process = new Process([
                     PHP_BINARY,
                     base_path('tests/Fixtures/LeaveApprovalRaceWorker.php'),
-                    base64_encode(json_encode(array_merge([
+                    base64_encode(json_encode([
                         'leave_request_id' => $fixture['request']->id,
                         'approver_employee_id' => $fixture['approver']->id,
                         'actor_user_id' => $fixture['approver_user']->id,
-                        'active_step_id' => $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'),
-                        'revision_version' => (string) $fixture['request']->fresh()->revision_version,
+                        'operation' => $operation,
                         'ready' => $ready,
                         'barrier' => $barrier,
                         'result' => $result,
                         'storage_root' => $this->proofStorageRoot,
-                    ], $operationPayload), JSON_THROW_ON_ERROR)),
+                    ], JSON_THROW_ON_ERROR)),
                 ], base_path(), timeout: 60);
                 $process->start();
                 $processes[] = $process;
@@ -722,20 +411,6 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
         return $request;
     }
 
-    private function createPendingCancellation(LeaveRequest $request, User $owner): LeaveCancellationRequest
-    {
-        $cancellation = LeaveCancellationRequest::query()->create([
-            'leave_request_id' => $request->id,
-            'requested_by' => $owner->id,
-            'reason' => 'Permohonan pembatalan untuk race keputusan.',
-            'status' => LeaveCancellationRequest::STATUS_PENDING,
-            'resume_status' => 'menunggu_approval',
-        ]);
-        $request->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
-
-        return $cancellation;
-    }
-
     private function cleanupProtectedDatabaseEvidence(): void
     {
         DB::unprepared(<<<'SQL'
@@ -743,20 +418,13 @@ DROP TRIGGER IF EXISTS leave_balance_ledger_no_update_delete ON leave_balance_le
 DROP TRIGGER IF EXISTS leave_balance_ledger_no_truncate ON leave_balance_ledger;
 DROP TRIGGER IF EXISTS audit_logs_append_only ON audit_logs;
 DROP TRIGGER IF EXISTS audit_logs_append_only_truncate ON audit_logs;
-DROP TRIGGER IF EXISTS leave_usage_membership_validate ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_update_delete ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_truncate ON leave_usage_reconciliation_memberships;
 DROP TRIGGER IF EXISTS leave_usage_record_no_delete ON leave_usage_records;
 DROP TRIGGER IF EXISTS leave_usage_record_no_truncate ON leave_usage_records;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_delete ON leave_usage_reconciliation_sets;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_truncate ON leave_usage_reconciliation_sets;
 SQL);
 
         foreach ([
             'leave_usage_documents',
-            'leave_usage_reconciliation_memberships',
             'leave_usage_records',
-            'leave_usage_reconciliation_sets',
             'leave_balance_ledger',
             'leave_balance_reservation_events',
             'audit_logs',
@@ -764,7 +432,6 @@ SQL);
             'leave_proofs',
             'leave_approvals',
             'leave_request_steps',
-            'leave_cancellation_requests',
             'leave_requests',
             'leave_request_cases',
             'leave_balances',

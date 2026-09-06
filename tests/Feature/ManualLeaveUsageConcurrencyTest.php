@@ -314,25 +314,18 @@ DROP TRIGGER IF EXISTS audit_logs_append_only_truncate ON audit_logs;
 DROP TRIGGER IF EXISTS leave_usage_document_restrict_update ON leave_usage_documents;
 DROP TRIGGER IF EXISTS leave_usage_document_no_delete ON leave_usage_documents;
 DROP TRIGGER IF EXISTS leave_usage_document_no_truncate ON leave_usage_documents;
-DROP TRIGGER IF EXISTS leave_usage_membership_validate ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_update_delete ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_truncate ON leave_usage_reconciliation_memberships;
 DROP TRIGGER IF EXISTS leave_usage_record_no_delete ON leave_usage_records;
 DROP TRIGGER IF EXISTS leave_usage_record_no_truncate ON leave_usage_records;
 DROP TRIGGER IF EXISTS leave_usage_external_approval_no_mutation ON leave_usage_external_approval_steps;
 DROP TRIGGER IF EXISTS leave_usage_external_approval_no_truncate ON leave_usage_external_approval_steps;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_delete ON leave_usage_reconciliation_sets;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_truncate ON leave_usage_reconciliation_sets;
 SQL);
 
         if (Schema::hasTable('leave_usage_documents')) {
             DB::table('leave_usage_documents')->delete();
         }
 
-        DB::table('leave_usage_reconciliation_memberships')->delete();
         DB::table('leave_usage_external_approval_steps')->delete();
         DB::table('leave_usage_records')->delete();
-        DB::table('leave_usage_reconciliation_sets')->delete();
         DB::table('leave_balance_ledger')->delete();
         DB::table('leave_balance_reservation_events')->delete();
         DB::table('audit_logs')->delete();

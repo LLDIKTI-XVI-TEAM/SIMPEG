@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Actions\Cuti\DownloadLeaveUsageDocumentAction;
 use App\Models\Employee;
 use App\Models\LeaveUsageDocument;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\Permission;
 use App\Models\RefJenisCuti;
@@ -152,10 +151,6 @@ class LeaveUsageDocumentDownloadTest extends TestCase
         Storage::disk(LeaveUsageDocument::STORAGE_DISK)->delete($missingDocument->path);
         $this->actingAs($admin)->get($this->downloadUrl($missingRecord, $missingDocument))->assertNotFound();
 
-        [$reconciliationRecord, $reconciliationDocument] = $this->reconciliationDocument();
-        $this->actingAs($admin)
-            ->get($this->downloadUrl($reconciliationRecord, $reconciliationDocument))
-            ->assertNotFound();
     }
 
     public function test_path_nested_dalam_folder_pegawai_yang_sama_tetap_ditolak(): void
@@ -271,52 +266,6 @@ class LeaveUsageDocumentDownloadTest extends TestCase
         );
 
         return $task;
-    }
-
-    /** @return array{LeaveUsageRecord, LeaveUsageDocument} */
-    private function reconciliationDocument(): array
-    {
-        $employee = Employee::factory()->create();
-        $actor = User::factory()->adminKepegawaian()->create();
-        $type = RefJenisCuti::query()->firstOrCreate(
-            ['code' => 'tahunan'],
-            ['nama' => 'Cuti Tahunan', 'mengurangi_saldo_tahunan' => true, 'khusus_pns' => false],
-        );
-        $set = LeaveUsageReconciliationSet::query()->create([
-            'employee_id' => $employee->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-18',
-            'status' => LeaveUsageReconciliationSet::STATUS_ACTIVE,
-            'administrative_note' => 'Fixture rekonsiliasi.',
-            'recorded_by' => $actor->id,
-        ]);
-        $record = LeaveUsageRecord::query()->create([
-            'employee_id' => $employee->id,
-            'leave_type_id' => $type->id,
-            'source_type' => LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION,
-            'reconciliation_set_id' => $set->id,
-            'usage_year' => 2026,
-            'effective_date' => '2026-08-18',
-            'workdays' => 1,
-            'administrative_note' => 'Fixture deklarasi rekonsiliasi.',
-            'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
-            'recorded_by' => $actor->id,
-        ]);
-        $storedName = Str::uuid().'.pdf';
-        $path = LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/'.$storedName;
-        Storage::disk(LeaveUsageDocument::STORAGE_DISK)->put($path, 'rekonsiliasi');
-        $document = LeaveUsageDocument::query()->create([
-            'leave_usage_record_id' => $record->id,
-            'original_name' => 'rekonsiliasi.pdf',
-            'stored_name' => $storedName,
-            'path' => $path,
-            'disk' => LeaveUsageDocument::STORAGE_DISK,
-            'mime_type' => 'application/pdf',
-            'size_bytes' => 12,
-            'uploaded_by' => $actor->id,
-        ]);
-
-        return [$record, $document];
     }
 
     private function downloadUrl(LeaveUsageRecord $record, LeaveUsageDocument $document): string

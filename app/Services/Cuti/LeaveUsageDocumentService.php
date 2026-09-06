@@ -3,7 +3,6 @@
 namespace App\Services\Cuti;
 
 use App\Models\LeaveUsageDocument;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\User;
 use App\Services\StorageRecoveryService;
@@ -90,38 +89,6 @@ final class LeaveUsageDocumentService
 
         return LeaveUsageDocument::query()->create(array_merge(Arr::except($stored, ['recovery_task_id']), [
             'leave_usage_record_id' => $record->id,
-            'leave_usage_reconciliation_set_id' => null,
-            'uploaded_by' => $actor->id,
-        ]));
-    }
-
-    /**
-     * Mengikat satu bukti koreksi ke replacement set, bukan ke salah satu dari tiga fakta tahunan.
-     *
-     * @param  array{original_name:string,stored_name:string,path:string,disk:string,mime_type:string,size_bytes:int,recovery_task_id:string}  $stored
-     */
-    public function attachToReconciliation(
-        LeaveUsageReconciliationSet $set,
-        array $stored,
-        User $actor,
-    ): LeaveUsageDocument {
-        if ($set->status !== LeaveUsageReconciliationSet::STATUS_ACTIVE || $set->replaces_id === null) {
-            throw ValidationException::withMessages([
-                'reconciliation_set' => 'Dokumen koreksi hanya boleh terkait replacement set aktif.',
-            ]);
-        }
-
-        // ID dokumen disamakan dengan UUID filename agar download dapat membuktikan
-        // metadata masih mengarah ke file yang memang dibuat untuk record ini.
-        $documentId = pathinfo($stored['stored_name'], PATHINFO_FILENAME);
-        if (! Str::isUuid($documentId)) {
-            throw ValidationException::withMessages(['dokumen' => 'Nama simpan dokumen koreksi tidak valid.']);
-        }
-
-        return LeaveUsageDocument::query()->create(array_merge(Arr::except($stored, ['recovery_task_id']), [
-            'id' => $documentId,
-            'leave_usage_record_id' => null,
-            'leave_usage_reconciliation_set_id' => $set->id,
             'uploaded_by' => $actor->id,
         ]));
     }

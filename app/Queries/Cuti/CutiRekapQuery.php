@@ -193,15 +193,9 @@ SQL);
     {
         $this->guardUuidFilters($filters);
         $saldoTahun = $this->saldoYear($filters);
-        $period = $this->parsePeriod($filters['periode'] ?? null);
-        $aggregateAnnualBalance = $period?->month === null;
-        $rows = $this->itemizedSummaryRows($filters, $saldoTahun, $aggregateAnnualBalance);
-
-        if ($aggregateAnnualBalance) {
-            // Saldo material adalah hasil authoritative dari deklarasi, membership, dan fakta baru.
-            // Memakainya untuk total tahunan mencegah deklarasi hilang atau itemized terhitung dua kali.
-            $rows = $rows->concat($this->annualBalanceSummaryRows($filters, $saldoTahun, $period));
-        }
+        // Catat Pemakaian Tahunan tidak lagi menjadi sumber agregat. Ringkasan selalu
+        // menghitung fakta aktif yang memiliki provenance, termasuk untuk periode setahun.
+        $rows = $this->itemizedSummaryRows($filters, $saldoTahun);
 
         return $rows
             ->sort(fn (array $left, array $right): int => [
@@ -221,19 +215,10 @@ SQL);
     {
         $this->guardUuidFilters($filters);
         $saldoTahun = $this->saldoYear($filters);
-        $period = $this->parsePeriod($filters['periode'] ?? null);
-        $aggregateAnnualBalance = $period?->month === null;
-        $count = $this->groupedSummaryCount(
-            $this->itemizedSummaryQuery($filters, $saldoTahun, $aggregateAnnualBalance),
+
+        return $this->groupedSummaryCount(
+            $this->itemizedSummaryQuery($filters, $saldoTahun),
         );
-
-        if ($aggregateAnnualBalance) {
-            $count += $this->groupedSummaryCount(
-                $this->annualBalanceSummaryQuery($filters, $saldoTahun, $period),
-            );
-        }
-
-        return $count;
     }
 
     /**
@@ -243,10 +228,10 @@ SQL);
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array{employee_id: string, nip: string, nama: string, jenis: string, total_hari: int, sisa_saldo: int|string, saldo_tahun: int}>
      */
-    private function itemizedSummaryRows(array $filters, int $saldoTahun, bool $excludeAnnual): Collection
+    private function itemizedSummaryRows(array $filters, int $saldoTahun): Collection
     {
         return $this->mapSummaryRows(
-            $this->itemizedSummaryQuery($filters, $saldoTahun, $excludeAnnual)
+            $this->itemizedSummaryQuery($filters, $saldoTahun)
                 ->orderBy('employees.nama_lengkap')
                 ->orderBy('leave_types.nama')
                 ->orderBy('usage.leave_type_id')
@@ -261,7 +246,7 @@ SQL);
      *
      * @param  array<string, mixed>  $filters
      */
-    private function itemizedSummaryQuery(array $filters, int $saldoTahun, bool $excludeAnnual): QueryBuilder
+    private function itemizedSummaryQuery(array $filters, int $saldoTahun): QueryBuilder
     {
         $query = DB::table('leave_usage_records as usage')
             ->join('employees as employees', 'employees.id', '=', 'usage.employee_id')
@@ -277,11 +262,7 @@ SQL);
                 LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
                 LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
             ])
-            ->where('usage.record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->when($excludeAnnual, fn (QueryBuilder $builder) => $builder
-                ->where(fn (QueryBuilder $leaveTypeQuery) => $leaveTypeQuery
-                    ->whereNull('leave_types.code')
-                    ->orWhere('leave_types.code', '!=', 'tahunan')));
+            ->where('usage.record_status', LeaveUsageRecord::STATUS_ACTIVE);
 
         $this->applySummaryFilters($query, $filters);
 
@@ -296,68 +277,6 @@ CAST(employees.nip AS text) AS nip,
 CAST(employees.nama_lengkap AS text) AS nama,
 CAST(leave_types.nama AS text) AS jenis,
 CAST(SUM(usage.workdays) AS integer) AS total_hari,
-balances.sisa AS sisa_saldo
-SQL);
-    }
-
-    /**
-     * Agregat tahunan membaca field terpakai yang sudah direkalkulasi dari sumber fakta resmi.
-     * Filter bulan tidak masuk jalur ini karena deklarasi agregat tidak memiliki tanggal kejadian.
-     *
-     * @param  array<string, mixed>  $filters
-     * @return Collection<int, array{employee_id: string, nip: string, nama: string, jenis: string, total_hari: int, sisa_saldo: int|string, saldo_tahun: int}>
-     */
-    private function annualBalanceSummaryRows(
-        array $filters,
-        int $saldoTahun,
-        ?CutiPeriodFilter $period,
-    ): Collection {
-        return $this->mapSummaryRows(
-            $this->annualBalanceSummaryQuery($filters, $saldoTahun, $period)->get(),
-            $saldoTahun,
-        );
-    }
-
-    /**
-     * Query kelompok saldo tahunan dipakai bersama oleh render dan guard jumlah baris.
-     *
-     * @param  array<string, mixed>  $filters
-     */
-    private function annualBalanceSummaryQuery(
-        array $filters,
-        int $saldoTahun,
-        ?CutiPeriodFilter $period,
-    ): QueryBuilder {
-        return DB::table('leave_balances as usage_balances')
-            ->join('employees as employees', 'employees.id', '=', 'usage_balances.employee_id')
-            ->crossJoin('ref_jenis_cuti as leave_types')
-            ->leftJoinSub($this->currentPositions(), 'current_positions', function ($join): void {
-                $join->on('current_positions.employee_id', '=', 'usage_balances.employee_id');
-            })
-            ->leftJoin('leave_balances as balances', function ($join) use ($saldoTahun): void {
-                $join->on('balances.employee_id', '=', 'usage_balances.employee_id')
-                    ->where('balances.tahun', '=', $saldoTahun);
-            })
-            ->where('leave_types.code', 'tahunan')
-            ->where('usage_balances.terpakai', '>', 0)
-            ->when($this->stringFilter($filters, 'unit'), fn (QueryBuilder $builder, string $unit) => $builder
-                ->where('current_positions.unit_kerja_id', $unit))
-            ->when($this->stringFilter($filters, 'pegawai'), fn (QueryBuilder $builder, string $pegawai) => $builder
-                ->where('usage_balances.employee_id', $pegawai))
-            ->when($this->stringFilter($filters, 'jenis'), fn (QueryBuilder $builder, string $jenis) => $builder
-                ->where('leave_types.id', $jenis))
-            ->when($period, fn (QueryBuilder $builder, CutiPeriodFilter $periodFilter) => $builder
-                ->where('usage_balances.tahun', $periodFilter->year))
-            ->groupBy([
-                'usage_balances.employee_id', 'employees.nip', 'employees.nama_lengkap',
-                'leave_types.id', 'leave_types.nama', 'balances.sisa',
-            ])
-            ->selectRaw(<<<'SQL'
-CAST(usage_balances.employee_id AS text) AS employee_id,
-CAST(employees.nip AS text) AS nip,
-CAST(employees.nama_lengkap AS text) AS nama,
-CAST(leave_types.nama AS text) AS jenis,
-CAST(SUM(usage_balances.terpakai) AS integer) AS total_hari,
 balances.sisa AS sisa_saldo
 SQL);
     }

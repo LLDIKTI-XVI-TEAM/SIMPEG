@@ -25,7 +25,6 @@ class LeaveBalanceAdminPageRequest extends ListCutiRekapRequest
             'per_page' => ['bail', 'nullable', 'integer', Rule::in([10, 25, 50])],
             'tab' => ['bail', 'nullable', 'in:pendaftaran,manual,riwayat'],
             'source_type' => ['bail', 'nullable', 'string', Rule::in([
-                LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION,
                 LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
                 LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
             ])],

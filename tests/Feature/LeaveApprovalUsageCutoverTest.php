@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\ApproveLeaveAction;
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Models\Appointment;
 use App\Models\AuditLog;
@@ -43,10 +42,12 @@ use Mockery\CompositeExpectation;
 use Mockery\Expectation;
 use Mockery\MockInterface;
 use RuntimeException;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 class LeaveApprovalUsageCutoverTest extends TestCase
 {
+    use RecordsHistoricalAnnualLeaveUsage;
     use RefreshDatabase;
 
     private QueueManager $actualQueueManager;
@@ -189,8 +190,9 @@ class LeaveApprovalUsageCutoverTest extends TestCase
                 ->where('event', 'UPDATE')
                 ->where('auditable_type', 'LeaveBalance')
                 ->where('auditable_id', $balance->id)
+                ->whereNotIn('id', $auditBefore)
                 ->latest('created_at')
-                ->firstOrFail(),
+                ->sole(),
             AuditLog::query()
                 ->where('event', 'LEAVE_PROOF_GENERATED')
                 ->where('auditable_type', 'LeaveProof')
@@ -550,17 +552,11 @@ class LeaveApprovalUsageCutoverTest extends TestCase
             ]);
 
             $admin = User::factory()->adminKepegawaian()->create();
-            app(ReconcileAnnualLeaveUsageAction::class)->execute(
-                $pemohon->id,
-                [
-                    'balance_year' => 2026,
-                    'usage_n2' => 0,
-                    'usage_n1' => 0,
-                    'usage_current' => 0,
-                    'administrative_note' => 'Rekonsiliasi fixture persetujuan final.',
-                ],
+            $this->recordHistoricalAnnualUsage(
+                $pemohon,
+                [2024 => 0, 2025 => 0, 2026 => 0],
                 $admin,
-                $this->approvalRequest($admin),
+                'Fakta pemakaian eksternal fixture persetujuan final.',
             );
         }
 

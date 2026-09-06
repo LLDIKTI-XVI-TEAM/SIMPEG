@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
@@ -13,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
-/** Regresi PostgreSQL untuk FK recorded_by pada fakta dan set pemakaian cuti yang append-only. */
+/** Regresi PostgreSQL untuk FK recorded_by pada fakta pemakaian cuti yang append-only. */
 class LeaveUsageRecordedByForeignKeyNullingTest extends TestCase
 {
     use RefreshDatabase;
@@ -25,27 +24,12 @@ class LeaveUsageRecordedByForeignKeyNullingTest extends TestCase
         $this->assertParentDeletionOnlyNulls('leave_usage_records', $record->id, 'recorded_by', $actor);
     }
 
-    public function test_penghapusan_user_hanya_menullkan_recorded_by_set_rekonsiliasi(): void
-    {
-        [$set, $actor] = $this->reconciliationSetFixture();
-
-        $this->assertParentDeletionOnlyNulls('leave_usage_reconciliation_sets', $set->id, 'recorded_by', $actor);
-    }
-
     public function test_update_manual_recorded_by_fakta_ditolak_selama_user_masih_ada(): void
     {
         [$record, $actor] = $this->usageRecordFixture();
 
         $this->assertManualNullingRejected('leave_usage_records', $record->id);
         $this->assertSame($actor->id, $record->fresh()->recorded_by);
-    }
-
-    public function test_update_manual_recorded_by_set_ditolak_selama_user_masih_ada(): void
-    {
-        [$set, $actor] = $this->reconciliationSetFixture();
-
-        $this->assertManualNullingRejected('leave_usage_reconciliation_sets', $set->id);
-        $this->assertSame($actor->id, $set->fresh()->recorded_by);
     }
 
     /** @return array{LeaveUsageRecord, User} */
@@ -73,22 +57,6 @@ class LeaveUsageRecordedByForeignKeyNullingTest extends TestCase
         ]);
 
         return [$record, $actor];
-    }
-
-    /** @return array{LeaveUsageReconciliationSet, User} */
-    private function reconciliationSetFixture(): array
-    {
-        $employee = Employee::factory()->create();
-        $actor = User::factory()->create();
-        $set = LeaveUsageReconciliationSet::query()->create([
-            'employee_id' => $employee->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-20',
-            'administrative_note' => 'Fixture FK actor set rekonsiliasi.',
-            'recorded_by' => $actor->id,
-        ]);
-
-        return [$set, $actor];
     }
 
     private function assertParentDeletionOnlyNulls(string $table, string $id, string $foreignKey, User $actor): void

@@ -294,12 +294,6 @@ class Employee extends Model
         return $this->hasMany(LeaveUsageRecord::class);
     }
 
-    /** @return HasMany<LeaveUsageReconciliationSet, $this> */
-    public function leaveUsageReconciliationSets(): HasMany
-    {
-        return $this->hasMany(LeaveUsageReconciliationSet::class);
-    }
-
     /** @return HasMany<EmployeeMilestone, $this> */
     public function milestones(): HasMany
     {

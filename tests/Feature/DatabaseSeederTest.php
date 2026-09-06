@@ -2,373 +2,58 @@
 
 namespace Tests\Feature;
 
-use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageExternalApprovalStep;
-use App\Models\LeaveUsageReconciliationMembership;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
-use App\Models\RefStatusPegawai;
 use App\Models\User;
 use App\Queries\Cuti\CurrentApprovalChainPreviewQuery;
-use App\Services\Cuti\LeaveUsageReconciliationService;
-use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\PhaseSevenBrowserQaSeeder;
-use Database\Seeders\SsoRoleMappedAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use RuntimeException;
 use Tests\TestCase;
 
 class DatabaseSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_database_seeder_creates_expected_approval_and_mapped_users(): void
+    public function test_database_seeder_creates_expected_demo_and_approval_users(): void
     {
         $this->seed(DatabaseSeeder::class);
 
-        // Jumlah user bervariasi tergantung seeders yang aktif (approval + mapping).
-        // Cek keberadaan user penting, bukan hitungan eksak.
+        $this->assertDatabaseCount('users', 9);
+        $this->assertDatabaseHas('users', [
+            'keycloak_username' => 'demo-klabat',
+            'role' => 'super_admin',
+        ]);
+        $this->assertDatabaseHas('users', [
+            'keycloak_username' => 'demo-klabat-kabag',
+            'role' => 'kepala_bagian',
+        ]);
         $this->assertDatabaseHas('users', [
             'email' => 'merlina.rahman@example.com',
             'role' => 'admin_kepegawaian',
         ]);
-
-        foreach (SsoRoleMappedAccountSeeder::roleMapping() as $email => $role) {
-            $this->assertDatabaseHas('users', [
-                'email' => $email,
-                'role' => $role,
-            ]);
-        }
-
-        // Setiap akun UAT membawa preferred_username fixture-nya.
-        foreach (SsoRoleMappedAccountSeeder::UAT_ACCOUNTS as $uatAccount) {
-            $this->assertDatabaseHas('users', [
-                'email' => $uatAccount['email'],
-                'keycloak_username' => $uatAccount['username'],
-                'role' => $uatAccount['role'],
-            ]);
-        }
+        $this->assertDatabaseCount('leave_balances', 0);
+        $this->assertFileDoesNotExist(database_path('seeders/LeaveBalance2026Seeder.php'));
     }
 
-    public function test_database_seeder_creates_sso_role_mapped_accounts(): void
-    {
-        $this->seed(DatabaseSeeder::class);
-
-        foreach (SsoRoleMappedAccountSeeder::roleMapping() as $email => $role) {
-            $this->assertDatabaseHas('users', [
-                'email' => $email,
-                'role' => $role,
-            ]);
-            $this->assertDatabaseHas('employees', [
-                'email' => $email,
-                'status_aktif' => 'Aktif',
-            ]);
-        }
-    }
-
-    public function test_seeder_does_not_reactivate_existing_employee(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-
-        // Pegawai existing berstatus Pensiun — seeder ulang tidak boleh
-        // menghidupkannya kembali hanya agar login SSO lulus.
-        $employee = Employee::factory()->create([
-            'email' => $email,
-            'status_aktif' => 'Pensiun',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        $this->assertDatabaseHas('employees', [
-            'id' => $employee->id,
-            'status_aktif' => 'Pensiun',
-        ]);
-    }
-
-    public function test_seeder_does_not_move_user_to_another_employee(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-
-        $pegawaiAsal = Employee::factory()->create([
-            'nama_lengkap' => 'Pegawai Asal',
-        ]);
-
-        // User sudah terhubung ke pegawai asal; seeder yang menemukan placeholder
-        // baru untuk email yang sama tidak boleh memindahkan akun ke pegawai itu.
-        User::factory()->create([
-            'email' => $email,
-            'employee_id' => $pegawaiAsal->id,
-            'role' => 'pegawai',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        $this->assertDatabaseHas('users', [
-            'email' => $email,
-            'employee_id' => $pegawaiAsal->id,
-            'role' => 'pegawai',
-        ]);
-
-        // Mapping ditolak SEBELUM pembuatan placeholder: tidak ada employee palsu
-        // tanpa user yang tertinggal untuk email yang konflik.
-        $this->assertSame(0, Employee::where('email', $email)->count());
-    }
-
-    /**
-     * Persona browser QA di-resolve via employee_id kanonis: user existing yang
-     * dipakai ulang SsoRoleMappedAccountSeeder boleh memegang email internal berbeda
-     * dari email mapping — lookup email eksak pada user akan gagal menemukannya.
-     */
-    public function test_phase_seven_browser_persona_resolves_via_employee_id_with_internal_email(): void
-    {
-        $email = $this->ssoEmailForRole('pegawai');
-
-        // Employee kanonis memegang email mapping pada email_pribadi; user internalnya
-        // memakai email kantor berbeda (kasus reuse yang didukung seeder SSO).
-        $employee = Employee::factory()->create([
-            'email_pribadi' => $email,
-        ]);
-        $user = User::factory()->create([
-            'email' => 'internal-persona@lldikti.go.id',
-            'employee_id' => $employee->id,
-            'role' => 'pegawai',
-            'name' => 'Persona Internal Asli',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-
-        // Persona QA diterapkan pada user yang sama (via employee_id); email internal,
-        // nama, dan role existing TIDAK pernah ditimpa oleh seeder QA.
-        $user->refresh();
-        $this->assertSame($employee->id, $user->employee_id);
-        $this->assertSame('internal-persona@lldikti.go.id', $user->email);
-        $this->assertSame('Persona Internal Asli', $user->name);
-        $this->assertSame('pegawai', $user->role);
-    }
-
-    public function test_seeder_preserves_existing_user_name_on_reseed(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-        $customName = 'Nama Kustom Yang Sudah Ada';
-
-        // User existing dengan nama yang sudah ditetapkan (bukan derived dari email).
-        User::factory()->create([
-            'email' => $email,
-            'name' => $customName,
-            'role' => 'pegawai',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        $this->assertDatabaseHas('users', [
-            'email' => $email,
-            'name' => $customName,
-        ]);
-        $this->assertSame(
-            $customName,
-            User::where('email', $email)->first()->name,
-            'Seeder ulang tidak boleh menimpa nama user existing.'
-        );
-    }
-
-    /** Seeder memakai kontrak kanonis Issue #6: user milik pegawai di-resolve via employee_id, email internal tetap. */
-    public function test_seeder_resolves_user_via_employee_id_with_different_internal_email(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-
-        // Pegawai kanonis memegang email mapping pada email_pribadi; user internalnya
-        // memakai email kantor yang berbeda.
-        $employee = Employee::factory()->create([
-            'email_pribadi' => $email,
-        ]);
-
-        $user = User::factory()->create([
-            'email' => 'dayen-internal@lldikti.go.id',
-            'employee_id' => $employee->id,
-            'role' => 'pimpinan',
-            'name' => 'Nama Internal Asli',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        $user->refresh();
-        // User yang sama dipakai ulang: email internal, role, dan nama tidak ditimpa.
-        $this->assertSame('dayen-internal@lldikti.go.id', $user->email);
-        $this->assertSame('pimpinan', $user->role);
-        $this->assertSame('Nama Internal Asli', $user->name);
-        $this->assertSame($employee->id, $user->employee_id);
-
-        // Tidak ada user duplikat untuk pegawai yang sama.
-        $this->assertSame(1, User::where('employee_id', $employee->id)->count());
-    }
-
-    /**
-     * Seeder menolak pencocokan pegawai yang ambigu (lebih dari satu pegawai aktif cocok)
-     * sama seperti kontrak callback: tidak memilih arbitrer, tidak membuat/mengikat user.
-     */
-    public function test_seeder_skips_ambiguous_employee_match(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-
-        $employeeA = Employee::factory()->create([
-            'nama_lengkap' => 'Ambigu A',
-            'email' => $email,
-        ]);
-        $employeeB = Employee::factory()->create([
-            'nama_lengkap' => 'Ambigu B',
-        ]);
-        // Kolom legacy email tidak unik: data lama/impor bisa menimbulkan kecocokan kedua.
-        DB::table('employees')->where('id', $employeeB->id)->update(['email' => $email]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        // Seeder tidak membuat/mengikat user untuk email ambigu itu.
-        $this->assertSame(0, User::where('email', $email)->count());
-        $this->assertSame(0, User::where('employee_id', $employeeA->id)->count());
-        $this->assertSame(0, User::where('employee_id', $employeeB->id)->count());
-    }
-
-    /**
-     * Seeder mendeteksi konflik identitas yang akan ditolak callback: user milik pegawai
-     * dan user pemilik email mapping adalah dua akun berbeda → mapping dilewati tanpa
-     * mutasi apa pun (fixture tidak dipaksakan jadi sumber identity_conflict).
-     */
-    public function test_seeder_skips_mapping_when_employee_user_conflicts_with_email_user(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-
-        $employee = Employee::factory()->create([
-            'email_pribadi' => $email,
-        ]);
-
-        $userByEmployee = User::factory()->create([
-            'email' => 'internal-konflik@lldikti.go.id',
-            'employee_id' => $employee->id,
-            'role' => 'pimpinan',
-            'name' => 'User Pegawai Asli',
-        ]);
-        $userByEmail = User::factory()->create([
-            'email' => $email,
-            'role' => 'pegawai',
-            'name' => 'User Email Asli',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        // Kedua user sama sekali tidak berubah (mapping untuk email itu dilewati).
-        $userByEmployee->refresh();
-        $this->assertSame('internal-konflik@lldikti.go.id', $userByEmployee->email);
-        $this->assertSame('pimpinan', $userByEmployee->role);
-
-        $userByEmail->refresh();
-        $this->assertSame($email, $userByEmail->email);
-        $this->assertSame('pegawai', $userByEmail->role);
-        $this->assertNull($userByEmail->employee_id);
-        $this->assertNull($userByEmployee->refresh()->keycloak_id);
-    }
-
-    /**
-     * Seeder tidak meng-bind otomatis user ber-privilege yang belum terhubung pegawai
-     * (invariant manual_binding_required runtime): mapping dilewati tanpa membuat
-     * placeholder employee dan tanpa mengubah user tersebut.
-     */
-    public function test_seeder_skips_privileged_user_without_employee_binding(): void
-    {
-        $email = collect(SsoRoleMappedAccountSeeder::roleMapping())->keys()->first();
-
-        $privileged = User::factory()->create([
-            'email' => $email,
-            'role' => 'admin_kepegawaian',
-            'employee_id' => null,
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        // User sama sekali tidak berubah: tanpa employee_id, role dipertahankan.
-        $privileged->refresh();
-        $this->assertNull($privileged->employee_id);
-        $this->assertSame('admin_kepegawaian', $privileged->role);
-
-        // Tidak ada placeholder employee yang dibuat untuk email yang dilewati.
-        $this->assertSame(0, Employee::where('email', $email)->count());
-    }
-
-    /** Persona QA menolak pencocokan pegawai ambigu (harus tepat satu kandidat). */
-    public function test_phase_seven_persona_rejects_ambiguous_employee_match(): void
-    {
-        $pegawaiEmail = collect(SsoRoleMappedAccountSeeder::roleMapping())
-            ->search('pegawai');
-
-        Employee::factory()->create([
-            'email_pribadi' => $pegawaiEmail,
-        ]);
-        $legacy = Employee::factory()->create();
-        DB::table('employees')->where('id', $legacy->id)->update(['email' => $pegawaiEmail]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('lebih dari satu pegawai');
-
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-    }
-
-    /** Persona QA admin wajib memegang pegawai aktif (bukan hanya role + employee_id). */
-    public function test_phase_seven_persona_rejects_inactive_admin_employee(): void
-    {
-        $adminEmail = collect(SsoRoleMappedAccountSeeder::roleMapping())
-            ->search('admin_kepegawaian');
-
-        $nonaktif = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->firstOrFail();
-        $employee = Employee::factory()->create([
-            'email_pribadi' => $adminEmail,
-            'status_pegawai_id' => $nonaktif->id,
-            'status_aktif' => 'Non-Aktif',
-        ]);
-        User::factory()->create([
-            'email' => 'internal-admin-qa@lldikti.go.id',
-            'employee_id' => $employee->id,
-            'role' => 'admin_kepegawaian',
-        ]);
-
-        $this->seed(DatabaseSeeder::class);
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('expected aktif');
-
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-    }
-
-    public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void
+    public function test_phase_seven_browser_fixture_mencatat_pengajuan_disetujui_sebagai_fakta_tunggal(): void
     {
         $this->seed(DatabaseSeeder::class);
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
         $employee = User::query()
-            ->where('email', $this->ssoEmailForRole('pegawai'))
+            ->where('keycloak_username', 'demo-klabat-pegawai')
             ->firstOrFail();
         $admin = User::query()
-            ->where('email', $this->ssoEmailForRole('admin_kepegawaian'))
+            ->where('keycloak_username', 'demo-klabat-kepeg')
             ->firstOrFail();
-        $set = LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->employee_id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->sole();
-        $facts = LeaveUsageRecord::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->where('source_type', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->orderBy('usage_year')
-            ->get();
         $approvedRequest = LeaveRequest::query()
             ->where('employee_id', $employee->employee_id)
             ->where('status', 'disetujui')
@@ -380,41 +65,17 @@ class DatabaseSeederTest extends TestCase
             ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
             ->sole();
-        $membership = LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->where('itemized_usage_record_id', $approvedFact->id)
-            ->sole();
         $projection = LeaveBalance::query()
             ->where('employee_id', $employee->employee_id)
             ->where('tahun', 2026)
             ->sole();
 
-        $this->assertSame(1, LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->employee_id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->count());
-        $this->assertSame(2026, $set->balance_year);
-        $this->assertSame([
-            2024 => 12,
-            2025 => 12,
-            2026 => 2,
-        ], $facts->mapWithKeys(fn (LeaveUsageRecord $fact): array => [
-            $fact->usage_year => $fact->workdays,
-        ])->all());
-        $this->assertSame(4, LeaveUsageRecord::query()
-            ->where('employee_id', $employee->employee_id)
-            ->count());
         $this->assertSame(1, LeaveUsageRecord::query()
             ->where('employee_id', $employee->employee_id)
             ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->count());
         $this->assertSame(2, $approvedFact->workdays);
         $this->assertSame($admin->id, $approvedFact->recorded_by);
-        $this->assertSame($facts->where('usage_year', 2026)->sole()->id, $membership->annual_reconciliation_record_id);
-        $this->assertSame(2, $membership->included_workdays);
-        $this->assertSame(1, LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->count());
         $this->assertSame([
             'tahun' => 2026,
             'jatah_awal' => 12,
@@ -447,10 +108,7 @@ class DatabaseSeederTest extends TestCase
             ])
             ->count());
 
-        $auditedIds = $facts->pluck('id')
-            ->push($approvedFact->id)
-            ->push($set->id)
-            ->push($projection->id);
+        $auditedIds = collect([$approvedFact->id, $projection->id]);
         $humanAudits = AuditLog::query()
             ->whereIn('auditable_id', $auditedIds)
             ->get();
@@ -460,34 +118,20 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame([$admin->id], $humanAudits->pluck('user_id')->unique()->values()->all());
 
         $counts = [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->employee_id)->count(),
             'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->employee_id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->where('reconciliation_set_id', $set->id)->count(),
             'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->employee_id)->count(),
             'audit' => AuditLog::query()->count(),
         ];
 
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
-        $this->assertSame($set->id, LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->employee_id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->sole()
-            ->id);
         $this->assertSame($approvedFact->id, LeaveUsageRecord::query()
             ->where('leave_request_id', $approvedRequest->id)
             ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->sole()
             ->id);
-        $this->assertSame($membership->id, LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->where('itemized_usage_record_id', $approvedFact->id)
-            ->sole()
-            ->id);
         $this->assertSame($counts, [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->employee_id)->count(),
             'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->employee_id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->where('reconciliation_set_id', $set->id)->count(),
             'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->employee_id)->count(),
             'audit' => AuditLog::query()->count(),
         ]);
@@ -500,7 +144,7 @@ class DatabaseSeederTest extends TestCase
 
         try {
             $this->seed(PhaseSevenBrowserQaSeeder::class);
-        } catch (RuntimeException $caught) {
+        } catch (\RuntimeException $caught) {
             $exception = $caught;
         } finally {
             Carbon::setTestNow();
@@ -518,134 +162,12 @@ class DatabaseSeederTest extends TestCase
             'leave_approval_chains',
             'leave_requests',
             'leave_usage_records',
-            'leave_usage_reconciliation_sets',
-            'leave_usage_reconciliation_memberships',
             'leave_balances',
             'leave_balance_ledger',
             'audit_logs',
         ] as $table) {
             $this->assertDatabaseCount($table, 0);
         }
-    }
-
-    public function test_phase_seven_browser_fixture_memperbaiki_snapshot_legacy_tanpa_membership_secara_idempoten(): void
-    {
-        $this->seed(DatabaseSeeder::class);
-
-        $employeeUser = User::query()->where('email', $this->ssoEmailForRole('pegawai'))->firstOrFail();
-        $employee = $employeeUser->employee()->firstOrFail();
-        $admin = User::query()->where('email', $this->ssoEmailForRole('admin_kepegawaian'))->firstOrFail();
-        Appointment::query()->updateOrCreate(
-            ['employee_id' => $employee->id],
-            [
-                'jenis_pengangkatan' => 'PNS',
-                'tmt_pengangkatan' => '2020-01-01',
-            ],
-        );
-        $legacySet = app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $employee,
-            2026,
-            [2024 => 12, 2025 => 12, 2026 => 2],
-            CarbonImmutable::create(2026, 12, 31, 12, 0, 0, config('app.timezone')),
-            'Snapshot legacy tanpa membership pengajuan disetujui.',
-            $admin,
-        );
-        $legacyFacts = $legacySet->records()->orderBy('usage_year')->get()->keyBy('usage_year');
-        $approvedRequest = LeaveRequest::unguarded(fn (): LeaveRequest => LeaveRequest::query()->create([
-            'id' => '70000000-0000-4000-8000-000000000014',
-            'employee_id' => $employee->id,
-            'jenis_cuti_id' => $legacyFacts->get(2026)->leave_type_id,
-            'tanggal_mulai' => '2026-11-02',
-            'tanggal_selesai' => '2026-11-03',
-            'jumlah_hari_kerja' => 2,
-            'alasan' => '[QA Phase 7 Browser] disetujui',
-            'status' => 'disetujui',
-        ]));
-
-        $this->assertDatabaseCount('leave_usage_reconciliation_memberships', 0);
-        $this->assertDatabaseMissing('leave_usage_records', [
-            'leave_request_id' => $approvedRequest->id,
-            'source_type' => LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
-        ]);
-
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-
-        $activeSet = LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->sole();
-        $activeFacts = $activeSet->records()
-            ->where('source_type', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->orderBy('usage_year')
-            ->get();
-        $approvedFact = LeaveUsageRecord::query()
-            ->where('leave_request_id', $approvedRequest->id)
-            ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
-            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->sole();
-        $projection = LeaveBalance::query()
-            ->where('employee_id', $employee->id)
-            ->where('tahun', 2026)
-            ->sole();
-
-        $this->assertSame(2, $projection->terpakai);
-        $this->assertSame(10, $projection->sisa);
-        $this->assertSame(LeaveUsageReconciliationSet::STATUS_SUPERSEDED, $legacySet->fresh()->status);
-        $this->assertSame($legacySet->id, $activeSet->replaces_id);
-        $this->assertSame([2024 => 12, 2025 => 12, 2026 => 2], $activeFacts
-            ->mapWithKeys(fn (LeaveUsageRecord $fact): array => [$fact->usage_year => $fact->workdays])
-            ->all());
-
-        foreach ($activeFacts as $fact) {
-            $this->assertSame($legacyFacts->get($fact->usage_year)->id, $fact->replaces_id);
-        }
-
-        $membership = LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $activeSet->id)
-            ->where('itemized_usage_record_id', $approvedFact->id)
-            ->sole();
-        $this->assertSame($activeFacts->where('usage_year', 2026)->sole()->id, $membership->annual_reconciliation_record_id);
-        $this->assertSame(2, $membership->included_workdays);
-        $this->assertSame($admin->id, $approvedFact->recorded_by);
-        $this->assertDatabaseHas('audit_logs', [
-            'auditable_id' => $activeSet->id,
-            'user_id' => $admin->id,
-        ]);
-
-        $ids = [
-            'set' => $activeSet->id,
-            'approved_fact' => $approvedFact->id,
-            'membership' => $membership->id,
-        ];
-        $counts = [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->id)->count(),
-            'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->count(),
-            'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->id)->count(),
-            'audit' => AuditLog::query()->count(),
-        ];
-
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-
-        $this->assertSame($ids, [
-            'set' => LeaveUsageReconciliationSet::query()
-                ->where('employee_id', $employee->id)
-                ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-                ->sole()->id,
-            'approved_fact' => LeaveUsageRecord::query()
-                ->where('leave_request_id', $approvedRequest->id)
-                ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
-                ->sole()->id,
-            'membership' => LeaveUsageReconciliationMembership::query()->sole()->id,
-        ]);
-        $this->assertSame($counts, [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->id)->count(),
-            'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->count(),
-            'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->id)->count(),
-            'audit' => AuditLog::query()->count(),
-        ]);
     }
 
     public function test_phase_seven_browser_fixture_menyediakan_preview_chain_valid_dan_invalid(): void
@@ -686,12 +208,12 @@ class DatabaseSeederTest extends TestCase
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
         $employee = User::query()
-            ->where('email', $this->ssoEmailForRole('pegawai'))
+            ->where('keycloak_username', 'demo-klabat-pegawai')
             ->firstOrFail()
             ->employee()
             ->firstOrFail();
         $approver = User::query()
-            ->where('email', $this->ssoEmailForRole('kepala_bagian'))
+            ->where('keycloak_username', 'demo-klabat-kabag')
             ->firstOrFail()
             ->employee()
             ->firstOrFail();
@@ -783,16 +305,5 @@ class DatabaseSeederTest extends TestCase
             'notifications' => DB::table('notifications')->count(),
             'jobs' => DB::table('jobs')->count(),
         ]);
-    }
-
-    /**
-     * Email akun uji SSO untuk role persona — sumber tunggal fixture seeder.
-     */
-    private function ssoEmailForRole(string $role): string
-    {
-        $email = array_search($role, SsoRoleMappedAccountSeeder::roleMapping(), true);
-        $this->assertIsString($email, "Fixture SSO untuk role '{$role}' tidak ditemukan.");
-
-        return $email;
     }
 }

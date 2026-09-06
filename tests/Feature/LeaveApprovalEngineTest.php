@@ -17,7 +17,7 @@ use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
-use App\Services\Cuti\LeaveUsageReconciliationService;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -374,14 +374,12 @@ class LeaveApprovalEngineTest extends TestCase
             'tanggal_sk' => '2020-01-01',
         ]);
         $jenis = $this->jenisCuti('Cuti Tahunan');
-        $reconciliationActor = User::factory()->adminKepegawaian()->create();
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+        $recalculationActor = User::factory()->adminKepegawaian()->create();
+        app(LeaveBalanceRecalculationService::class)->recalculate(
             $pemohon['employee'],
             2026,
-            [2024 => 12, 2025 => 12, 2026 => 0],
-            now(config('app.timezone')),
-            'Fixture fakta pemakaian untuk regresi penundaan generik.',
-            $reconciliationActor,
+            $recalculationActor,
+            'Membentuk projection untuk regresi penundaan generik.',
         );
         $balance = LeaveBalance::query()
             ->where('employee_id', $pemohon['employee']->id)

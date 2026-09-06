@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\LeaveUsageDocument;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\User;
@@ -20,7 +19,7 @@ class LeaveUsageDocumentAppendOnlyTest extends TestCase
 
     public function test_postgresql_menolak_update_metadata_target_path_dan_timestamp_dokumen(): void
     {
-        [$document, , $reconciliationSet] = $this->documentFixture();
+        [$document] = $this->documentFixture();
 
         foreach ([
             "original_name = 'nama-baru.pdf'",
@@ -29,7 +28,7 @@ class LeaveUsageDocumentAppendOnlyTest extends TestCase
             "disk = 'public'",
             "mime_type = 'image/png'",
             'size_bytes = 999',
-            "leave_usage_record_id = NULL, leave_usage_reconciliation_set_id = '{$reconciliationSet->id}'",
+            'leave_usage_record_id = NULL',
             "created_at = created_at + INTERVAL '1 second'",
             "updated_at = updated_at + INTERVAL '1 second'",
             'uploaded_by = NULL',
@@ -95,7 +94,7 @@ class LeaveUsageDocumentAppendOnlyTest extends TestCase
     }
 
     /**
-     * @return array{LeaveUsageDocument, User, LeaveUsageReconciliationSet}
+     * @return array{LeaveUsageDocument, User}
      */
     private function documentFixture(): array
     {
@@ -119,13 +118,6 @@ class LeaveUsageDocumentAppendOnlyTest extends TestCase
             'administrative_note' => 'Fixture guard dokumen.',
             'recorded_by' => null,
         ]);
-        $reconciliationSet = LeaveUsageReconciliationSet::query()->create([
-            'employee_id' => $employee->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-20',
-            'administrative_note' => 'Target pengganti yang tidak boleh dipakai.',
-            'recorded_by' => null,
-        ]);
         $document = LeaveUsageDocument::query()->create([
             'leave_usage_record_id' => $record->id,
             'original_name' => 'bukti-awal.pdf',
@@ -137,7 +129,7 @@ class LeaveUsageDocumentAppendOnlyTest extends TestCase
             'uploaded_by' => $uploader->id,
         ]);
 
-        return [$document, $uploader, $reconciliationSet];
+        return [$document, $uploader];
     }
 
     private function assertStatementRejected(string $statement, string $message): void

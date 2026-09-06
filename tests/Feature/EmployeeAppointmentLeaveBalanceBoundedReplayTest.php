@@ -7,7 +7,6 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
@@ -77,7 +76,6 @@ class EmployeeAppointmentLeaveBalanceBoundedReplayTest extends TestCase
             ->orderBy('tahun')
             ->pluck('tahun')
             ->all());
-        $this->assertSame(0, LeaveUsageReconciliationSet::query()->whereBelongsTo($employee)->count());
 
         $response = $this->updateAppointment($employee, $actor, '2023-06-01');
         $response

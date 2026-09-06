@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
@@ -18,6 +17,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 /**
@@ -27,6 +27,7 @@ use Tests\TestCase;
  */
 class CutiEndToEndApprovalTest extends TestCase
 {
+    use RecordsHistoricalAnnualLeaveUsage;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -97,17 +98,11 @@ class CutiEndToEndApprovalTest extends TestCase
             'khusus_pns' => false,
         ]);
         $admin = User::factory()->adminKepegawaian()->create();
-        app(ReconcileAnnualLeaveUsageAction::class)->execute(
-            $pemohon->id,
-            [
-                'balance_year' => 2026,
-                'usage_n2' => 12,
-                'usage_n1' => 12,
-                'usage_current' => 0,
-                'administrative_note' => 'Rekonsiliasi saldo awal fixture alur lengkap.',
-            ],
+        $this->recordHistoricalAnnualUsage(
+            $pemohon,
+            [2024 => 12, 2025 => 12, 2026 => 0],
             $admin,
-            $this->actorRequest($admin),
+            'Fakta pemakaian eksternal fixture alur lengkap.',
         );
 
         // === Tahap 1: pegawai mengajukan cuti (3-7 Agustus 2026 = 5 hari kerja) ===
