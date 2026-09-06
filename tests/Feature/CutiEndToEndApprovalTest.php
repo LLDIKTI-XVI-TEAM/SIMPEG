@@ -104,6 +104,8 @@ class CutiEndToEndApprovalTest extends TestCase
             $admin,
             'Fakta pemakaian eksternal fixture alur lengkap.',
         );
+        // Pemakaian tiap tahun menghabiskan hak tertua; sisa enam hari tahun lalu masih dapat dibawa.
+        $this->assertSame(18, $pemohon->leaveBalances()->where('tahun', 2026)->sole()->sisa);
 
         // === Tahap 1: pegawai mengajukan cuti (3-7 Agustus 2026 = 5 hari kerja) ===
         $this->actingAs($pegawaiUser)
@@ -194,7 +196,10 @@ class CutiEndToEndApprovalTest extends TestCase
             ->where('tahun', 2026)
             ->firstOrFail();
         $this->assertSame(5, $balance->terpakai);
-        $this->assertSame(7, $balance->sisa);
+        $this->assertSame(13, $balance->sisa);
+        $this->assertSame(0, $balance->sisa_n2);
+        $this->assertSame(1, $balance->sisa_n1);
+        $this->assertSame(12, $balance->sisa_tahun_berjalan);
         $this->assertDatabaseHas('leave_balance_ledger', [
             'employee_id' => $pemohon->id,
         ]);

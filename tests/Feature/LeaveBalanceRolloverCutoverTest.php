@@ -79,7 +79,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             'sisa_n1' => 6,
             'sisa_tahun_berjalan' => 12,
             'terpakai_tahun_berjalan' => 0,
-            'hangus' => 3,
+            'hangus' => 15,
         ]);
         $marker = LeaveBalanceLedger::query()
             ->where('employee_id', $fixture['employee']->id)
@@ -106,7 +106,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             ->where('tahun', 2027)
             ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_EXPIRED)
             ->sole();
-        $this->assertSame(3, $expiry->metadata['expired_days'] ?? null);
+        $this->assertSame(15, $expiry->metadata['expired_days'] ?? null);
         $this->assertNull($expiry->created_by);
 
         $recalculation = LeaveBalanceLedger::query()
@@ -247,14 +247,14 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             'target' => [
                 'tahun' => 2027,
                 'jatah_awal' => 12,
-                'carry_over' => 6,
+                'carry_over' => 12,
                 'terpakai' => 0,
-                'sisa' => 18,
-                'sisa_n2' => 0,
+                'sisa' => 24,
+                'sisa_n2' => 6,
                 'sisa_n1' => 6,
                 'sisa_tahun_berjalan' => 12,
                 'terpakai_tahun_berjalan' => 0,
-                'hangus' => 6,
+                'hangus' => 12,
             ],
             'marker' => 1,
             'carry' => 1,
@@ -767,14 +767,14 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
     {
         $this->assertProjection($employee, 2027, [
             'jatah_awal' => 12,
-            'carry_over' => 0,
+            'carry_over' => 6,
             'terpakai' => 0,
-            'sisa' => 12,
-            'sisa_n2' => 0,
+            'sisa' => 18,
+            'sisa_n2' => 6,
             'sisa_n1' => 0,
             'sisa_tahun_berjalan' => 12,
             'terpakai_tahun_berjalan' => 0,
-            'hangus' => 12,
+            'hangus' => 18,
         ]);
     }
 
@@ -782,14 +782,14 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
     {
         $this->assertProjection($employee, 2027, [
             'jatah_awal' => 12,
-            'carry_over' => 6,
+            'carry_over' => 12,
             'terpakai' => 0,
-            'sisa' => 18,
-            'sisa_n2' => 0,
+            'sisa' => 24,
+            'sisa_n2' => 6,
             'sisa_n1' => 6,
             'sisa_tahun_berjalan' => 12,
             'terpakai_tahun_berjalan' => 0,
-            'hangus' => 6,
+            'hangus' => 12,
         ]);
     }
 
@@ -811,7 +811,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             ->where('event_type', LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED)
             ->firstOrFail();
         $this->assertSame($actor->id, $recalculation->created_by);
-        $this->assertSame(12, $recalculation->metadata['after']['sisa'] ?? null);
+        $this->assertSame(18, $recalculation->metadata['after']['sisa'] ?? null);
         $this->assertSame(1, AuditLog::query()
             ->where('auditable_type', 'LeaveBalance')
             ->where('auditable_id', $target->id)
@@ -822,7 +822,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             ->where('auditable_id', $target->id)
             ->sole();
         $this->assertSystemAudit($markerAudit);
-        $this->assertSame(0, LeaveBalanceLedger::query()
+        $this->assertSame(1, LeaveBalanceLedger::query()
             ->where('employee_id', $employee->id)
             ->where('tahun', 2027)
             ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED)

@@ -221,7 +221,19 @@ final class LeaveBalanceRecalculationService
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('tahun');
+            // Baseline nol sebelum anniversary dapat tertinggal saat scheduler melewatkan akhir tahun.
+            // Jalur normal membentuknya dari eligibility, bukan memperlakukan baseline itu sebagai hak final.
+            $hasMaterialPredecessor = $existingBalances->has($startYear - 1)
+                && ($useMaterialPredecessor || ! $historicalFactsMayExpandHorizon
+                    || $existingBalances->get($startYear - 1)->jatah_awal > 0);
             $projectionStartYear = $startYear;
+            if (! $useMaterialPredecessor && ! $rebuildVirtualPredecessor
+                && ! $hasMaterialPredecessor) {
+                // Dua tahun pendahulu membentuk carry yang sah meski tanpa fakta pemakaian.
+                // Koreksi TMT juga memerlukannya bila predecessor belum pernah disimpan.
+                // Hasil virtual hanya dihitung; penulisan tetap dimulai pada tahun material.
+                $projectionStartYear = max(1900, $startYear - 2);
+            }
             if (! $historicalFactsMayExpandHorizon && $rebuildVirtualPredecessor) {
                 $predecessorYear = $startYear - 1;
                 if ($this->canBuildVirtualPredecessor($lockedEmployee, $predecessorYear)) {
@@ -244,7 +256,7 @@ final class LeaveBalanceRecalculationService
             $usageStartYear = $useMaterialPredecessor
                 ? min($projectionStartYear, $startYear - 2)
                 : ($historicalFactsMayExpandHorizon
-                    ? $startYear
+                    ? $projectionStartYear
                     : min($projectionStartYear, $startYear - 2));
             $usage = $this->usageByYear(
                 $facts,
@@ -254,10 +266,11 @@ final class LeaveBalanceRecalculationService
             );
             $projections = [];
             $previous = null;
-            $mayUseMaterialPredecessor = $useMaterialPredecessor
-                || (! $historicalFactsMayExpandHorizon && ! $rebuildVirtualPredecessor);
+            // Fakta sebelum startYear sudah memperluas horizon. Predecessor material yang tersisa
+            // harus dipertahankan agar expiry dan carry penangguhan dinas hasil rollover tidak berubah.
+            $mayUseMaterialPredecessor = $useMaterialPredecessor || ! $rebuildVirtualPredecessor;
 
-            if ($mayUseMaterialPredecessor && $materialPredecessorYear !== null) {
+            if ($mayUseMaterialPredecessor && $hasMaterialPredecessor && $materialPredecessorYear !== null) {
                 $materialPredecessor = $existingBalances->get($materialPredecessorYear);
                 if ($materialPredecessor instanceof LeaveBalance) {
                     $previous = $this->validatedMaterialPredecessor(
@@ -513,11 +526,8 @@ final class LeaveBalanceRecalculationService
             ->where('leave_type_id', $annualTypeId)
             ->min('usage_year');
 
-        // K-MTG-10.3 menjadikan fakta manual/approved satu-satunya sumber
-        // pemakaian. Ketiadaan fakta pada N-2/N-1 tetap berarti pemakaian nol
-        // ketika saldo dihitung; ia bukan alasan membuat proyeksi atau fakta
-        // historis nol baru di luar horizon mutasi yang diminta.
-
+        // Tahun material mengikuti mutasi dan fakta paling awal; predecessor tanpa fakta
+        // dihitung terpisah agar tidak menghasilkan catatan pemakaian nol sintetis.
         return min(array_filter([
             $earliestAffectedYear,
             $factYear === null ? null : (int) $factYear,

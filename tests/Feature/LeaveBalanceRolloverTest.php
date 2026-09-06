@@ -481,7 +481,7 @@ class LeaveBalanceRolloverTest extends TestCase
             'sisa_n1' => 6,
             'sisa_tahun_berjalan' => 12,
             'sisa' => 18,
-            'hangus' => 3,
+            'hangus' => 15,
         ]);
         $this->assertDatabaseHas('leave_balance_ledger', [
             'employee_id' => $employee->id,

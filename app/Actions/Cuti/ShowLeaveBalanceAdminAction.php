@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cuti;
 
+use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveUsageExternalApprovalStep;
@@ -15,6 +16,7 @@ use App\Queries\Cuti\ManualLeaveCaseOptionQuery;
 use App\Services\Cuti\AnnualLeaveBusinessClock;
 use App\Services\Cuti\LeaveBalanceService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ShowLeaveBalanceAdminAction
 {
@@ -111,15 +113,15 @@ class ShowLeaveBalanceAdminAction
                 ])
                 ->values()
                 ->all();
-        // Error validasi selalu menang; koreksi mengambil snapshot persisted, sedangkan create sengaja mulai kosong.
-        $initialApprovalSteps = session()->hasOldInput('approval_steps')
-            ? old('approval_steps')
-            : ($editableApprovalSteps ?? []);
         $canManageManual = $this->canManageManualUsage();
         // Preview dan opsi hanya diperlukan saat panel manual dibuka agar tab administrasi lain tidak memuat query tambahan.
         $manualWorkspaceActive = $canManageManual
             && $selectedEmployee !== null
             && ($tab === 'manual' || $editableUsage !== null);
+        // Error validasi selalu menang; koreksi mengambil snapshot persisted, sedangkan create sengaja mulai kosong.
+        $initialApprovalSteps = $manualWorkspaceActive && session()->hasOldInput('approval_steps')
+            ? $this->restoreApprovalLabels(old('approval_steps'), $editableApprovalSteps ?? [])
+            : ($editableApprovalSteps ?? []);
         // Koreksi memakai snapshot historis pada cutover berikutnya, bukan current chain; jangan memuat preview konfigurasi saat editor aktif.
         $currentApprovalChainPreview = $manualWorkspaceActive && $editableUsage === null
             ? $this->approvalChainPreviewQuery->forEmployee($selectedEmployee?->id)
@@ -181,6 +183,38 @@ class ShowLeaveBalanceAdminAction
             'ledgerRows',
             'rolloverRows',
         );
+    }
+
+    /**
+     * Form lama hanya membawa UUID, bukan label. Pulihkan identitas minimum secara bounded;
+     * label kiriman klien tidak dipercaya dan nama snapshot koreksi tidak diganti profil terbaru.
+     *
+     * @param  list<array<string, mixed>>  $persistedSteps
+     * @return list<array<string, mixed>>
+     */
+    private function restoreApprovalLabels(mixed $oldSteps, array $persistedSteps): array
+    {
+        $steps = collect(is_array($oldSteps) ? $oldSteps : [])->take(10)
+            ->filter(fn (mixed $step): bool => is_array($step))->values();
+        $ids = $steps->where('approver_source', 'simpeg_employee')->pluck('approver_employee_id')
+            ->filter(fn (mixed $id): bool => is_string($id) && Str::isUuid($id))->unique()->values()->all();
+        $labels = $ids === [] ? collect() : Employee::query()->whereIn('id', $ids)
+            ->get(['id', 'nama_lengkap', 'nip'])
+            ->mapWithKeys(fn (Employee $employee): array => [$employee->id => "{$employee->nama_lengkap} - NIP {$employee->nip}"]);
+        $snapshots = collect($persistedSteps)->where('approver_source', 'simpeg_employee');
+
+        return $steps->map(function (array $step) use ($labels, $snapshots): array {
+            $step['approver_label'] = '';
+            $id = $step['approver_employee_id'] ?? null;
+            if (($step['approver_source'] ?? null) === 'simpeg_employee' && is_string($id)) {
+                // Ikuti writer: satu snapshot dikonsumsi per UUID, bukan berdasarkan peran atau indeks tahap.
+                $key = $snapshots->search(fn (array $snapshot): bool => $snapshot['approver_employee_id'] === $id);
+                $snapshot = $key === false ? null : $snapshots->pull($key);
+                $step['approver_label'] = $snapshot['approver_label'] ?? $labels->get($id, '');
+            }
+
+            return $step;
+        })->all();
     }
 
     /**

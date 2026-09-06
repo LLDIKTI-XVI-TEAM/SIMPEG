@@ -2,16 +2,24 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\StoreManualLeaveUsageAction;
+use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
+use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageDocument;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +28,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
 use Tests\TestCase;
@@ -123,16 +132,94 @@ class ManualLeaveUsageConcurrencyTest extends TestCase
         $this->assertDocumentFilesMatch(($winner['mode'] ?? null) === 'manual' ? 1 : 0);
     }
 
+    /** @param list<string> $modes */
+    #[DataProvider('manualMutationOrders')]
+    public function test_race_koreksi_dan_pembatalan_fakta_tahunan_memiliki_satu_pemenang_atomik(array $modes): void
+    {
+        $this->seed(ReferenceSeeder::class);
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'jenis_pegawai_id' => RefJenisPegawai::query()->where('nama', 'PNS')->value('id'),
+        ]);
+        Appointment::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+        ]);
+        $annual = RefJenisCuti::query()->where('code', 'tahunan')->sole();
+        $original = app(StoreManualLeaveUsageAction::class)->execute(
+            $employee->id,
+            [
+                'leave_type_id' => $annual->id,
+                'tanggal_mulai' => '2026-01-05',
+                'tanggal_selesai' => '2026-01-07',
+                'alasan' => 'Fakta tahunan sebelum race.',
+                'approval_steps' => $this->validManualApprovalPayload(),
+            ],
+            UploadedFile::fake()->create('awal.pdf', 20, 'application/pdf'),
+            $admin,
+        );
+        $originalEvidence = Arr::only($original->getAttributes(), ['workdays', 'start_date', 'end_date', 'administrative_note', 'recorded_by']);
+        $stepsBefore = $original->externalApprovalSteps()->orderBy('step_order')->get()->toArray();
+        $this->assertSame(21, $employee->leaveBalances()->where('tahun', 2026)->sole()->sisa);
+
+        $outcomes = $this->runRace($employee, $annual, array_map(fn (string $mode): array => [
+            'mode' => $mode, 'actor_id' => $admin->id, 'record_id' => $original->id,
+            'start_date' => '2026-01-05', 'end_date' => $mode === 'correct' ? '2026-01-08' : '2026-01-07',
+        ], $modes), verifyEmployeeLock: true);
+
+        $this->assertControlledSingleWinner($outcomes, 'usage_record');
+        $this->assertSame($modes[0], $outcomes->firstWhere('ok', true)['mode']);
+        $corrected = $outcomes->firstWhere('ok', true)['mode'] === 'correct';
+        $original->refresh();
+        $this->assertSame($originalEvidence, Arr::only($original->getAttributes(), array_keys($originalEvidence)));
+        $this->assertSame($stepsBefore, $original->externalApprovalSteps()->orderBy('step_order')->get()->toArray());
+        $this->assertSame($corrected ? LeaveUsageRecord::STATUS_SUPERSEDED : LeaveUsageRecord::STATUS_CANCELLED, $original->record_status);
+        $this->assertSame($corrected ? 2 : 1, $employee->leaveUsageRecords()->count());
+        $active = $employee->leaveUsageRecords()->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)->get();
+        $this->assertCount($corrected ? 1 : 0, $active);
+        if ($corrected) {
+            $this->assertSame($original->id, $active->sole()->replaces_id);
+            $this->assertSame(4, $active->sole()->workdays);
+        }
+        $balance = $employee->leaveBalances()->where('tahun', 2026)->sole();
+        $this->assertSame($corrected ? 20 : 24, $balance->sisa);
+        $this->assertSame($corrected ? 4 : 0, $balance->terpakai);
+        $this->assertSame($corrected ? 2 : 6, $balance->sisa_n2);
+        $this->assertSame(6, $balance->sisa_n1);
+        $this->assertSame(12, $balance->sisa_tahun_berjalan);
+        $this->assertSame(1, AuditLog::query()->whereIn('new_values->operation', [
+            'manual_usage_corrected', 'manual_usage_cancelled',
+        ])->count());
+        foreach ([
+            LeaveBalanceLedger::EVENT_USAGE_FACT_CANCELLED => $corrected ? 0 : 1,
+            LeaveBalanceLedger::EVENT_USAGE_FACT_SUPERSEDED => $corrected ? 1 : 0,
+            LeaveBalanceLedger::EVENT_USAGE_FACT_RECORDED => $corrected ? 2 : 1,
+        ] as $event => $expected) {
+            $this->assertSame($expected, LeaveBalanceLedger::query()->where('event_type', $event)->count());
+        }
+        $this->assertDocumentFilesMatch($corrected ? 2 : 1);
+    }
+
+    /** @return array<string, array{list<string>}> */
+    public static function manualMutationOrders(): array
+    {
+        return ['koreksi lebih dahulu' => [['correct', 'cancel']], 'pembatalan lebih dahulu' => [['cancel', 'correct']]];
+    }
+
     /**
-     * @param  list<array{mode:string, actor_id:string, start_date:string, end_date:string}>  $workers
+     * @param  list<array{mode:string, actor_id:string, start_date:string, end_date:string, record_id?:string}>  $workers
      * @return Collection<int, array<string, mixed>>
      */
-    private function runRace(Employee $employee, RefJenisCuti $type, array $workers): Collection
+    private function runRace(Employee $employee, RefJenisCuti $type, array $workers, bool $verifyEmployeeLock = false): Collection
     {
         $directory = storage_path('framework/testing/manual-leave-race-'.Str::uuid());
         $this->raceDirectory = $directory;
         File::ensureDirectoryExists($directory);
         $barrier = $directory.'/go';
+        $lockAcquired = $directory.'/employee-locked';
+        $releaseLock = $directory.'/release-lock';
+        $applicationPrefix = 'manual-race-'.Str::uuid();
         $processes = [];
         $results = [];
 
@@ -151,8 +238,13 @@ class ManualLeaveUsageConcurrencyTest extends TestCase
                         'actor_id' => $worker['actor_id'],
                         'start_date' => $worker['start_date'],
                         'end_date' => $worker['end_date'],
+                        'record_id' => $worker['record_id'] ?? '',
+                        'now' => now()->toDateTimeString(),
                         'ready' => $ready,
-                        'barrier' => $barrier,
+                        'barrier' => $verifyEmployeeLock ? $barrier.'-'.$index : $barrier,
+                        'application_name' => $applicationPrefix.'-'.$index,
+                        'lock_acquired' => $verifyEmployeeLock && $index === 0 ? $lockAcquired : '',
+                        'release_lock' => $releaseLock,
                         'result' => $result,
                         'storage_root' => $this->usageStorageRoot,
                     ], JSON_THROW_ON_ERROR)),
@@ -168,7 +260,15 @@ class ManualLeaveUsageConcurrencyTest extends TestCase
                 ));
             }
 
-            File::put($barrier, 'go');
+            if ($verifyEmployeeLock) {
+                File::put($barrier.'-0', 'go');
+                $this->assertTrue($this->waitFor($lockAcquired, self::WORKER_READY_TIMEOUT_MILLISECONDS));
+                File::put($barrier.'-1', 'go');
+                $this->assertTrue($this->waitForEmployeeLockContention($applicationPrefix), 'Worker kedua wajib menunggu mutex pegawai yang dipegang worker pertama.');
+                File::put($releaseLock, 'release');
+            } else {
+                File::put($barrier, 'go');
+            }
 
             foreach ($processes as $process) {
                 $process->wait();
@@ -177,6 +277,7 @@ class ManualLeaveUsageConcurrencyTest extends TestCase
 
             return collect($results)->map($this->readRaceResult(...));
         } finally {
+            File::put($releaseLock, 'release');
             foreach ($processes as $process) {
                 if ($process->isRunning()) {
                     $process->stop(1);
@@ -186,14 +287,35 @@ class ManualLeaveUsageConcurrencyTest extends TestCase
         }
     }
 
-    private function assertControlledSingleWinner(Collection $outcomes): void
+    /** Barrier bootstrap saja tidak membuktikan transaksi overlap; pg_blocking_pids memeriksa penantian lock nyata. */
+    private function waitForEmployeeLockContention(string $applicationPrefix): bool
+    {
+        $deadline = microtime(true) + (self::WORKER_READY_TIMEOUT_MILLISECONDS / 1000);
+        do {
+            $waiting = DB::selectOne(<<<'SQL'
+SELECT EXISTS (
+    SELECT 1 FROM pg_stat_activity waiter
+    JOIN pg_stat_activity blocker ON blocker.pid = ANY(pg_blocking_pids(waiter.pid))
+    WHERE waiter.application_name = ? AND blocker.application_name = ?
+) AS waiting
+SQL, [$applicationPrefix.'-1', $applicationPrefix.'-0']);
+            if ($waiting->waiting) {
+                return true;
+            }
+            usleep(10_000);
+        } while (microtime(true) < $deadline);
+
+        return false;
+    }
+
+    private function assertControlledSingleWinner(Collection $outcomes, string $errorField = 'tanggal_mulai'): void
     {
         $diagnostic = $outcomes->toJson();
         $this->assertSame(1, $outcomes->where('ok', true)->count(), $diagnostic);
         $this->assertSame(1, $outcomes->where('ok', false)->count(), $diagnostic);
         $loser = $outcomes->firstWhere('ok', false);
         $this->assertSame(ValidationException::class, $loser['class'] ?? null, $diagnostic);
-        $this->assertArrayHasKey('tanggal_mulai', $loser['errors'] ?? [], $diagnostic);
+        $this->assertArrayHasKey($errorField, $loser['errors'] ?? [], $diagnostic);
     }
 
     /** @return array<string, mixed> */

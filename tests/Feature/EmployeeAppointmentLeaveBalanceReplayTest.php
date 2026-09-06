@@ -52,8 +52,8 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $beforeLedger = $this->replayLedgerCount($employee);
         $beforeAudit = $this->replayAuditCount($employee);
 
-        $this->assertSame(0, $this->currentBalance($employee)->carry_over);
-        $this->assertSame(12, $this->currentBalance($employee)->sisa);
+        $this->assertSame(6, $this->currentBalance($employee)->carry_over);
+        $this->assertSame(18, $this->currentBalance($employee)->sisa);
 
         $this->updateAppointment($employee, $actor, '2026-01-01')
             ->assertSessionHasNoErrors()
@@ -86,8 +86,8 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
             'event_type' => LeaveBalanceLedger::EVENT_ROLLOVER_APPLIED,
             'source_year' => 2025,
         ]);
-        $this->assertSame(6, $this->currentBalance($employee)->carry_over);
-        $this->assertSame(18, $this->currentBalance($employee)->sisa);
+        $this->assertSame(12, $this->currentBalance($employee)->carry_over);
+        $this->assertSame(24, $this->currentBalance($employee)->sisa);
 
         $this->updateAppointment($employee, $actor, '2023-06-01')
             ->assertSessionHasNoErrors()
@@ -96,9 +96,9 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $balance = $this->currentBalance($employee);
         $this->assertSame('2023-06-01', $appointment->fresh()->tmt_pengangkatan?->toDateString());
         $this->assertSame(12, $balance->jatah_awal);
-        $this->assertSame(6, $balance->carry_over);
-        $this->assertSame(18, $balance->sisa);
-        $this->assertSame(0, $balance->sisa_n2);
+        $this->assertSame(12, $balance->carry_over);
+        $this->assertSame(24, $balance->sisa);
+        $this->assertSame(6, $balance->sisa_n2);
         $this->assertSame(6, $balance->sisa_n1);
         $this->assertSame(12, $balance->sisa_tahun_berjalan);
         $this->assertSame(0, LeaveUsageRecord::query()->whereBelongsTo($employee)->count());
@@ -145,14 +145,14 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
                 ->where('event', 'UPDATE')
                 ->count();
 
-            $this->assertSame([12, 6, 0, 6, 12, 18, 6], $this->balanceBucketSnapshots($employee)[2024]);
+            $this->assertSame([12, 12, 6, 6, 12, 24, 12], $this->balanceBucketSnapshots($employee)[2024]);
 
             $this->updatePppkContractEnd($employee, $actor, '2022-01-01')
                 ->assertSessionHasNoErrors()
                 ->assertRedirect();
 
             $snapshots = $this->balanceBucketSnapshots($employee);
-            $this->assertSame([12, 6, 0, 6, 12, 18, 6], $snapshots[2024]);
+            $this->assertSame([12, 12, 6, 6, 12, 24, 12], $snapshots[2024]);
             $this->assertSame([12, 0, 0, 0, 12, 12, 12], $snapshots[2027]);
             $this->assertSame($historicalLedgerCount, LeaveBalanceLedger::query()
                 ->where('employee_id', $employee->id)
@@ -198,9 +198,9 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         app(LeaveBalanceReservationService::class)->reserveForNewRequest($request, $actor);
 
         $expected = [
-            2023 => [12, 0, 0, 0, 12, 12, 0],
-            2024 => [12, 6, 0, 2, 12, 14, 6],
-            2025 => [12, 6, 0, 6, 12, 18, 8],
+            2023 => [12, 12, 6, 6, 12, 24, 6],
+            2024 => [12, 12, 2, 6, 12, 20, 12],
+            2025 => [12, 6, 0, 6, 12, 18, 14],
             2026 => [12, 6, 0, 6, 12, 18, 12],
         ];
         $this->assertSame($expected, $this->balanceBucketSnapshots($employee));
@@ -240,9 +240,9 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
 
         $this->assertSame('2020-06-01', $appointment->fresh()->tmt_pengangkatan?->toDateString());
         $this->assertSame([
-            2023 => [12, 0, 0, 0, 12, 12, 0],
-            2024 => [12, 6, 0, 2, 12, 14, 6],
-            2025 => [12, 6, 0, 6, 12, 18, 8],
+            2023 => [12, 12, 6, 6, 12, 24, 6],
+            2024 => [12, 12, 2, 6, 12, 20, 12],
+            2025 => [12, 6, 0, 6, 12, 18, 14],
             2026 => [12, 6, 0, 6, 12, 18, 12],
         ], $this->balanceBucketSnapshots($employee));
     }
@@ -267,12 +267,12 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
                 && str_contains($message, 'lebih kecil dari reservasi aktif 3 hari'));
 
         $this->assertSame('2023-01-01', $appointment->fresh()->tmt_pengangkatan?->toDateString());
-        $this->assertSame(12, LeaveBalance::query()
+        $this->assertSame(18, LeaveBalance::query()
             ->whereBelongsTo($employee)
             ->where('tahun', 2025)
             ->sole()
             ->sisa);
-        $this->assertSame(18, $this->currentBalance($employee)->sisa);
+        $this->assertSame(24, $this->currentBalance($employee)->sisa);
         $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
             ->where('tahun', 2025)
@@ -295,7 +295,7 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
                 && str_contains($message, 'lebih kecil dari reservasi aktif 3 hari'));
 
         $this->assertSame('2024-01-01', $appointment->fresh()->tmt_pengangkatan?->toDateString());
-        $this->assertSame(12, $this->currentBalance($employee)->sisa);
+        $this->assertSame(18, $this->currentBalance($employee)->sisa);
         $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
             ->where('leave_request_id', $request->id)
             ->sum('amount'));
@@ -394,6 +394,7 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
         $usageBefore = $this->usageFactSnapshot($employee);
 
         $this->assertSame(18, $this->currentBalance($employee)->sisa);
+        $this->assertSame(12, $this->currentBalance($employee)->hangus);
 
         $this->updatePppkAppointment($employee, $actor, '2023-07-01')
             ->assertSessionHasNoErrors()
@@ -413,8 +414,10 @@ class EmployeeAppointmentLeaveBalanceReplayTest extends TestCase
             2026,
             Carbon::now(),
         ));
-        $this->assertSame($beforeLedger, $this->replayLedgerCount($employee));
-        $this->assertSame($beforeAudit, $this->replayAuditCount($employee));
+        // Plafon baru mengubah carry pendahulu dan expiry meski total saldo akhir tetap sama.
+        $this->assertSame(6, $balance->hangus);
+        $this->assertSame($beforeLedger + 1, $this->replayLedgerCount($employee));
+        $this->assertSame($beforeAudit + 1, $this->replayAuditCount($employee));
         $this->assertSame($usageBefore, $this->usageFactSnapshot($employee));
     }
 
