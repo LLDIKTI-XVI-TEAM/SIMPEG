@@ -13,6 +13,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
 use App\Services\LeaveApprovalService;
@@ -463,7 +464,7 @@ class LeaveProofTest extends TestCase
         $this->assertSame(0, LeaveBalanceLedger::where('leave_request_id', $fixture['request']->id)->count());
         $balance = LeaveBalance::where('employee_id', $fixture['pemohon_employee']->id)->where('tahun', 2026)->firstOrFail();
         $this->assertSame(0, $balance->terpakai);
-        $this->assertSame(12, $balance->sisa);
+        $this->assertSame(18, $balance->sisa);
     }
 
     public function test_acting_user_yang_bukan_akun_approver_ditolak_tanpa_efek_samping(): void
@@ -503,7 +504,7 @@ class LeaveProofTest extends TestCase
 
         $balance = LeaveBalance::where('employee_id', $fixture['pemohon_employee']->id)->where('tahun', 2026)->firstOrFail();
         $this->assertSame(0, $balance->terpakai);
-        $this->assertSame(12, $balance->sisa);
+        $this->assertSame(18, $balance->sisa);
     }
 
     public function test_admin_detail_menampilkan_link_bukti_persetujuan_untuk_pengajuan_final_dengan_proof(): void
@@ -928,6 +929,9 @@ class LeaveProofTest extends TestCase
         );
 
         if ($createBalance) {
+            $pemohonEmployee->forceFill([
+                'jenis_pegawai_id' => RefJenisPegawai::firstOrCreate(['nama' => 'PNS'])->id,
+            ])->save();
             Appointment::create([
                 'employee_id' => $pemohonEmployee->id,
                 'jenis_pengangkatan' => 'PNS',

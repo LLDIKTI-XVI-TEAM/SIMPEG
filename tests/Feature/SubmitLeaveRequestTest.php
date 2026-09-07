@@ -142,7 +142,7 @@ class SubmitLeaveRequestTest extends TestCase
     }
 
     /**
-     * Membentuk projection dari fakta pemakaian eksternal; nilai default menghabiskan N-2/N-1.
+     * Membentuk projection dari fakta pemakaian eksternal; sisa hak mengikuti FIFO, bukan 12 dikurangi pemakaian.
      *
      * @param  array{employee: Employee, user: User}  $aktor
      * @param  array<int, int>|null  $usage
@@ -595,7 +595,12 @@ class SubmitLeaveRequestTest extends TestCase
     {
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Tahunan');
-        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 10]);
+        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 16]);
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'sisa' => 2,
+        ]);
 
         $this->actingAs($aktor['user']);
         $response = $this->postJson(route(self::ROUTE), $this->payload($jenis));
@@ -768,8 +773,8 @@ class SubmitLeaveRequestTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('saldoCuti', function (array $saldoCuti): bool {
-            return $saldoCuti['saldo_aktual'] === 7
-                && $saldoCuti['saldo_dapat_diajukan'] === 7
+            return $saldoCuti['saldo_aktual'] === 13
+                && $saldoCuti['saldo_dapat_diajukan'] === 13
                 && $saldoCuti['dialokasikan_aktif'] === 0;
         });
         $response->assertSee('Saldo Tersedia Aktual', escape: false);
@@ -988,7 +993,12 @@ class SubmitLeaveRequestTest extends TestCase
         $cutiTahunan = RefJenisCuti::query()->where('nama', 'Cuti Tahunan')->firstOrFail();
 
         $aktor = $this->makePemohon();
-        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 11]);
+        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 17]);
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'sisa' => 1,
+        ]);
 
         $this->actingAs($aktor['user']);
         $response = $this->postJson(route(self::ROUTE), $this->payload($cutiTahunan));

@@ -72,21 +72,22 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertSame(1, LeaveUsageRecord::query()
             ->where('employee_id', $employee->employee_id)
-            ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->count());
         $this->assertSame(2, $approvedFact->workdays);
         $this->assertSame($admin->id, $approvedFact->recorded_by);
+
+        // Hak dua tahun tanpa pemakaian dihitung tanpa fakta buatan; dua hari memakai bucket tertua.
         $this->assertSame([
             'tahun' => 2026,
             'jatah_awal' => 12,
-            'carry_over' => 0,
+            'carry_over' => 12,
             'terpakai' => 2,
-            'sisa' => 10,
-            'sisa_n2' => 0,
-            'sisa_n1' => 0,
-            'sisa_tahun_berjalan' => 10,
-            'terpakai_tahun_berjalan' => 2,
-            'hangus' => 0,
+            'sisa' => 22,
+            'sisa_n2' => 4,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 6,
         ], collect($projection->only([
             'tahun',
             'jatah_awal',

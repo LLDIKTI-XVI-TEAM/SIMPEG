@@ -78,9 +78,9 @@ class PegawaiDashboardTest extends TestCase
 
         $response->assertViewHas('saldoCuti', fn ($saldo): bool => $saldo !== null
             && $saldo['jatah_dasar'] === 12
-            && $saldo['carry_over'] === 0
+            && $saldo['carry_over'] === 2
             && $saldo['terpakai_final'] === 4
-            && $saldo['saldo_dapat_diajukan'] === 11);
+            && $saldo['saldo_dapat_diajukan'] === 14);
     }
 
     public function test_dashboard_pegawai_tanpa_saldo_mengirim_saldo_null_ke_view(): void
