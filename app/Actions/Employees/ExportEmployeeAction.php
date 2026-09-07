@@ -7,7 +7,6 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\User;
-use App\Services\Employees\KepalaBagianScopeService;
 use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -30,9 +29,8 @@ class ExportEmployeeAction
         $effectiveRole = $actor->getEffectiveRole();
         abort_unless(in_array($effectiveRole, ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'], true), 403);
 
-        // Pimpinan menerima ekspor lengkap seluruh organisasi sebagai pengecualian
-        // stakeholder. Kepala Bagian dan Pegawai selalu memakai scope serta kolom aman.
-        $masked = in_array($effectiveRole, ['kepala_bagian', 'pegawai'], true);
+        // Export pegawai adalah laporan general. Aksesnya ditentukan oleh gabungan
+        // employees.read dan employees.export pada route, tanpa pemotongan scope role.
         $requestedIds = collect($request->input('ids', []))
             ->filter(fn ($id) => is_string($id) && trim($id) !== '')
             ->map(fn (string $id) => trim($id))
@@ -49,18 +47,7 @@ class ExportEmployeeAction
                 ->with('unitKerja:id,nama'),
         ]);
 
-        if ($effectiveRole === 'kepala_bagian') {
-            $query->whereIn('employees.id', app(KepalaBagianScopeService::class)->directReportIds($actor));
-        } elseif ($effectiveRole === 'pegawai') {
-            $query->whereKey($actor->employee_id ?? '');
-        }
-
         if ($requestedIds->isNotEmpty()) {
-            if ($masked) {
-                $scopedIds = (clone $query)->whereIn('employees.id', $requestedIds->all())->pluck('employees.id');
-                abort_unless($scopedIds->count() === $requestedIds->count(), 403);
-            }
-
             $query->whereIn('id', $requestedIds->all());
         } else {
             $search = mb_strtolower(trim((string) $request->query('search', '')));

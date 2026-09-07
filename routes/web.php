@@ -452,27 +452,27 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('ews.config.update');
 
     Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/preview', [LaporanController::class, 'exportPegawaiPreview'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.preview');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.excel');
 
     Route::get('/laporan/export-pegawai/pdf', [LaporanController::class, 'exportPegawaiPdf'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.pdf');
 
     Route::get('/laporan/export-pegawai/pdf-nominatif', [LaporanController::class, 'exportPegawaiNominatifPdf'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.pdf-nominatif');
 
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.custom');
 
     Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])
@@ -757,7 +757,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware('permission:notifications.read');
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
-        ->middleware(['permission:employees.export'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('pegawai.export');
 
     // =========================================================================
@@ -871,16 +871,16 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->middleware('permission:employee_histories.export')
                 ->name('laporan.kepangkatan.pdf');
             Route::get('/laporan/nominatif', [PimpinanReportController::class, 'fixedEmployeeReport'])
-                ->middleware('permission:employees.export')
+                ->middleware(['permission:employees.read', 'permission:employees.export'])
                 ->name('laporan.nominatif');
             Route::get('/laporan/nominatif/excel', [PimpinanReportController::class, 'exportFixedEmployeeReportExcel'])
-                ->middleware('permission:employees.export')
+                ->middleware(['permission:employees.read', 'permission:employees.export'])
                 ->name('laporan.nominatif.excel');
             Route::get('/laporan/nominatif/pdf', [PimpinanReportController::class, 'exportFixedEmployeeReportPdf'])
-                ->middleware('permission:employees.export')
+                ->middleware(['permission:employees.read', 'permission:employees.export'])
                 ->name('laporan.nominatif.pdf');
             Route::get('/laporan/pegawai', [PimpinanReportController::class, 'fixedEmployeeReport'])
-                ->middleware('permission:employees.export')
+                ->middleware(['permission:employees.read', 'permission:employees.export'])
                 ->name('laporan.pegawai');
             Route::get('/laporan/cuti', fn () => redirect()->route('cuti.rekap'))->name('laporan.cuti');
             Route::get('/laporan', fn () => redirect()->route('laporan.pegawai'))->name('laporan.index');

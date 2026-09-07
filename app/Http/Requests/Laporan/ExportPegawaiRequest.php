@@ -28,7 +28,8 @@ class ExportPegawaiRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('employees.read');
+        return (bool) $this->user()?->hasPermission('employees.read')
+            && $this->user()?->hasPermission('employees.export');
     }
 
     /** @return array<string, list<string|Rule>> */

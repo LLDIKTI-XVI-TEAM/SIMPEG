@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
-use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -86,6 +85,7 @@ class EmployeeExcelExportTest extends TestCase
         foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             Role::where('name', $role)->firstOrFail()
                 ->permissions()->syncWithoutDetaching([
+                    Permission::where('name', 'employees.read')->firstOrFail()->id,
                     Permission::where('name', 'employees.export')->firstOrFail()->id,
                 ]);
         }
@@ -134,37 +134,31 @@ class EmployeeExcelExportTest extends TestCase
         $this->assertSame('08123456789', $rows[1][7]);
     }
 
-    public function test_kepala_bagian_export_hanya_memuat_bawahan_langsung_dengan_kolom_aman(): void
+    public function test_kepala_bagian_export_memuat_data_general_setelah_dua_permission_diberikan(): void
     {
         $this->seed(RbacSeeder::class);
         Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employees.read')->firstOrFail()->id,
             Permission::where('name', 'employees.export')->firstOrFail()->id,
         ]);
         $kabag = Employee::factory()->create();
         $bawahan = Employee::factory()->create(['nama_lengkap' => 'Bawahan Export']);
         $lainnya = Employee::factory()->create(['nama_lengkap' => 'Lain Export']);
-        SupervisorAssignment::create([
-            'employee_id' => $bawahan->id,
-            'kepala_bagian_id' => $kabag->id,
-            'supervisor_id' => $kabag->id,
-            'tanggal_mulai' => now()->subDay()->toDateString(),
-        ]);
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $kabag->id]);
 
         $rows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export')));
-        $this->assertSame(['No', 'Nama Pegawai', 'Unit Kerja', 'Golongan', 'Jabatan', 'Jenis Pegawai', 'Status Pegawai'], $rows[0]);
-        $this->assertSame('Bawahan Export', $rows[1][1]);
-        $this->assertCount(2, $rows);
+        $this->assertCount(4, $rows);
 
         $this->actingAs($user)->get(route('pegawai.export', [
             'ids' => [$bawahan->id, $lainnya->id],
-        ]))->assertForbidden();
+        ]))->assertOk();
     }
 
-    public function test_pegawai_export_hanya_memuat_data_sendiri_dengan_kolom_aman(): void
+    public function test_pegawai_export_memuat_data_general_setelah_dua_permission_diberikan(): void
     {
         $this->seed(RbacSeeder::class);
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employees.read')->firstOrFail()->id,
             Permission::where('name', 'employees.export')->firstOrFail()->id,
         ]);
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Sendiri']);
@@ -172,11 +166,9 @@ class EmployeeExcelExportTest extends TestCase
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
 
         $rows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export')));
-        $this->assertSame(['No', 'Nama Pegawai', 'Unit Kerja', 'Golongan', 'Jabatan', 'Jenis Pegawai', 'Status Pegawai'], $rows[0]);
-        $this->assertSame('Pegawai Sendiri', $rows[1][1]);
-        $this->assertCount(2, $rows);
+        $this->assertCount(3, $rows);
 
-        $this->actingAs($user)->get(route('pegawai.export', ['ids' => [$lainnya->id]]))->assertForbidden();
+        $this->actingAs($user)->get(route('pegawai.export', ['ids' => [$lainnya->id]]))->assertOk();
     }
 
     /** @return array<int, array<int, mixed>> */

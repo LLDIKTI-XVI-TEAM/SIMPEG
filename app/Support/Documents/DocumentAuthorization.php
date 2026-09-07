@@ -6,14 +6,6 @@ use App\Models\User;
 
 class DocumentAuthorization
 {
-    /**
-     * Role efektif yang dapat membuka arsip lintas pegawai saat memiliki permission.
-     * Arsip tetap read-only; mutasi dokumen mengikuti canManage().
-     *
-     * @var list<string>
-     */
-    public const ARCHIVE_VIEWER_ROLES = ['super_admin', 'admin_kepegawaian', 'kepala_bagian', 'pegawai'];
-
     public static function allowsLocalApiBypass(): bool
     {
         return app()->environment('local')
@@ -26,8 +18,7 @@ class DocumentAuthorization
             return false;
         }
 
-        return self::hasArchiveViewerRole($user)
-            && $user->hasPermission('dokumen_sk.read');
+        return $user->hasPermission('dokumen_sk.read');
     }
 
     public static function canManage(?User $user): bool
@@ -68,9 +59,4 @@ class DocumentAuthorization
         return $user->hasPermission('dokumen_sk.delete');
     }
 
-    private static function hasArchiveViewerRole(?User $user): bool
-    {
-        return $user !== null
-            && in_array($user->getEffectiveRole(), self::ARCHIVE_VIEWER_ROLES, true);
-    }
 }
