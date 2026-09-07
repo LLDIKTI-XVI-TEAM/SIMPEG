@@ -70,142 +70,117 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            // Dashboard mengikuti role efektif (tiap role punya beranda sendiri).
-            $dashboardRoute = match ($activeRole) {
-                'pimpinan' => 'pimpinan.dashboard',
-                'kepala_bagian' => 'kepala-bagian.dashboard',
-                default => 'dashboard',
-            };
+            $canAdministerLeaveBalance = ($layoutCapabilities['cuti.balance.reconcile'] ?? false)
+                || ($layoutCapabilities['cuti.manual.manage'] ?? false);
+            $canViewEmployeeStatistics = $layoutCapabilities['employees.read'] ?? false;
+            $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
+                && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
 
-            // Ambil daftar permission untuk role aktif dari RBAC (Role & Permission)
-            $rolePermissions = [];
-            if ($authUser) {
-                try {
-                    $rolePermissions = \Illuminate\Support\Facades\DB::table('roles')
-                        ->join('role_permissions', 'role_permissions.role_id', '=', 'roles.id')
-                        ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-                        ->where('roles.name', $activeRole)
-                        ->pluck('permissions.name')
-                        ->flip()
-                        ->all();
-                } catch (\Throwable) {
-                    $rolePermissions = [];
-                }
-            }
+            // Menu terlarang/dikunci untuk masing-masing role
+            $lockedMenus = [
+                'super_admin' => [],
+                'admin_kepegawaian' => [
+                    'user-management',
+                    'rbac',
+                    'data-master',
+                    'hari-libur',
+                    'ews.config',
+                ],
+                'pimpinan' => [
+                    'audit-log',
+                    'user-management',
+                    'rbac',
+                    'ews.config',
+                ],
+                'kepala_bagian' => [
+                    'data-pegawai',
+                    'pegawai.import',
+                    'hari-libur',
+                    'dokumen',
+                    'audit-log',
+                    'user-management',
+                    'rbac',
+                    'data-master',
+                    'laporan',
+                    'laporan.pegawai',
+                    'cuti.laporan',
+                    'cuti.rekap',
+                    'ews',
+                    'ews.config',
+                ],
 
-            // Menu sidebar difilter per role dan permission RBAC.
-            // - Fitur eksklusif role dikunci via 'roles' (contoh: Daftar Bawahan khusus kepala_bagian).
-            // - Fitur bersama dikontrol via 'permission' (dinamis dari halaman Role & Permission).
-            // - Menu yang tidak mendapatkan akses akan tampil dengan style disabled (abu-abu & non-aktif).
-            // ============================================================
-            // PANDUAN STRUKTUR MENU:
-            // - 'roles' saja         → Menu EKSKLUSIF role, tidak bisa diubah dari RBAC admin.
-            //                          Contoh: Daftar Bawahan (hanya kepala_bagian).
-            // - 'permission' saja    → Menu RBAC, aksesnya diatur dari halaman Role & Permission.
-            //                          Contoh: Data Pegawai (tergantung employees.read).
-            // - Tanpa keduanya       → Dapat diakses semua role yang login.
-            //                          Contoh: Dashboard, Monitoring Cuti.
-            // ============================================================
+                'pegawai' => [
+                    'data-pegawai',
+                    'pegawai.import',
+                    'dokumen',
+                    'cuti.rekap',
+                    'ews',
+                    'ews.config',
+                    'laporan',
+                    'laporan.pegawai',
+                    'cuti.laporan',
+                    'user-management',
+                    'rbac',
+                    'data-master',
+                    'hari-libur',
+                    'audit-log',
+                ],
+            ];
+
+            $myLockedMenus = $lockedMenus[$activeRole] ?? [];
+
             $menuGroups = [
                 [
                     'group' => '',
                     'items' => [
-                        // Semua role dapat mengakses dashboard
-                        ['label' => 'Dashboard', 'route' => $dashboardRoute, 'icon' => 'squares-2x2'],
+                        ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'squares-2x2'],
                     ]
                 ],
                 [
                     'group' => 'Kepegawaian',
-                    'items' => [
-                        // RBAC: dikontrol dari Role & Permission admin (employees.read)
-                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users',
-                         'permission' => 'employees.read'],
-                        // Eksklusif kepala_bagian: tidak bisa diubah dari RBAC
-                        ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users',
-                         'roles' => ['kepala_bagian']],
-                        // RBAC: dikontrol dari Role & Permission admin (dokumen_sk.read)
-                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open',
-                         'permission' => 'dokumen_sk.read', 'capability' => 'document_archive'],
-                        // RBAC: dikontrol dari Role & Permission admin (employees.export)
-                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
-                         'permission' => 'employees.export'],
-                        ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar',
-                         'permission' => 'employees.read'],
-                        // RBAC: dikontrol dari Role & Permission admin (employee_histories.export)
-                        ['label' => 'Riwayat Kepangkatan', 'route' => 'laporan.kepangkatan', 'icon' => 'document-chart-bar',
-                         'permission' => 'employee_histories.export'],
-                    ]
+                    'items' => array_filter([
+                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
+                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
+                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
+                        $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
+                    ])
                 ],
                 [
                     'group' => 'Cuti',
-                    'items' => [
-                        // Semua role defaultnya dapat membaca pengajuan sendiri.
-                        ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        // Semua role dapat menjadi approver bila ditunjuk di approval chain aktif.
-                        ['label' => 'Antrean Persetujuan', 'route' => 'cuti.approval', 'icon' => 'check-badge'],
-                        // Semua role defaultnya dapat melihat saldo cuti sendiri.
-                        ['label' => 'Saldo Cuti Saya', 'route' => 'cuti.saldo', 'icon' => 'document-text'],
-                        // Eksklusif pimpinan: tidak bisa diubah dari RBAC
-                        ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge',
-                         'roles' => ['pimpinan']],
-                        // Eksklusif kepala_bagian: tidak bisa diubah dari RBAC
-                        ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge',
-                         'roles' => ['kepala_bagian']],
-                        // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
-                        ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text',
-                         'permission' => 'cuti.read_all'],
-                        // Cukup memiliki salah satu permission mutasi saldo/manual.
-                        ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal',
-                         'permissions_any' => ['cuti.balance.reconcile', 'cuti.manual.manage']],
-                        // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
-                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down',
-                         'permission' => 'cuti.read_all'],
-                        ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge',
-                         'permission' => 'cuti.cancellation.manage'],
-                        // RBAC: dikontrol dari Role & Permission admin (cuti.configure)
-                        ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth',
-                         'permission' => 'cuti.configure'],
-                    ]
+                    'items' => array_filter([
+                        $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
+                        ['label' => in_array($activeRole, ['pegawai'], true) ? 'Pengajuan Cuti' : 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                        ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
+                        $canAdministerLeaveBalance
+                            ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                            : null,
+                        $canManageLeaveCancellations
+                            ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
+                            : null,
+                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
+                        $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
+                    ])
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
-                    'items' => [
-                        // Eksklusif pegawai
-                        ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle',
-                         'roles' => ['pegawai']],
-                        // Eksklusif kepala_bagian
-                        ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle',
-                         'roles' => ['kepala_bagian']],
-                        // RBAC: dikontrol dari Role & Permission admin (ews.read)
-                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle',
-                         'permission' => 'ews.read'],
-                        // RBAC: dikontrol dari Role & Permission admin (ews.configure)
-                        ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth',
-                         'permission' => 'ews.configure'],
-                        // RBAC: dikontrol dari Role & Permission admin (notifications.read)
+                    'items' => array_filter([
+                        $activeRole === 'kepala_bagian' ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
-                        // Eksklusif super_admin
-                        ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal',
-                         'roles' => ['super_admin']],
-                    ]
+                        $activeRole === 'pegawai' ? ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle'] : null,
+                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
+                        ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
+                        $activeRole === 'super_admin' ? ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal'] : null,
+                    ])
                 ],
                 [
                     'group' => 'Administrasi Sistem',
                     'items' => [
-                        // Eksklusif super_admin
-                        ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check',
-                         'roles' => ['super_admin']],
-                        // Eksklusif super_admin
-                        ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key',
-                         'roles' => ['super_admin']],
-                        // Dikontrol dari Role & Permission (reference_tables.manage)
-                        ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells',
-                         'permission' => 'reference_tables.manage'],
-                        // RBAC: dikontrol dari Role & Permission admin (hari_libur.read)
+                        ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
+                        ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
+                        ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
-                        // RBAC: dikontrol dari Role & Permission admin (audit_logs.read)
-                        ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list',
-                         'permission' => 'audit_logs.read'],
+                        ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
                     ]
                 ]
             ];
@@ -226,12 +201,13 @@
                     ],
                     [
                         'group' => 'Cuti',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                            ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge',
-                             'permission' => 'cuti.cancellation.manage'],
-                        ]
+                            $canAdministerLeaveBalance
+                                ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                                : null,
+                        ])
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
@@ -242,14 +218,13 @@
                     ],
                     [
                         'group' => 'Laporan',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
-                            ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar',
-                             'permission' => 'employees.read'],
+                            $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
                             ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
                             ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
-                        ]
+                        ])
                     ]
                 ];
             }
@@ -270,12 +245,13 @@
                     ],
                     [
                         'group' => 'Cuti',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                            ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge',
-                             'permission' => 'cuti.cancellation.manage'],
-                        ],
+                            $canAdministerLeaveBalance
+                                ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                                : null,
+                        ]),
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
@@ -286,10 +262,9 @@
                     ],
                     [
                         'group' => 'Laporan',
-                        'items' => [
-                            ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar',
-                             'permission' => 'employees.read'],
-                        ],
+                        'items' => array_filter([
+                            $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
+                        ]),
                     ],
                 ];
             }
@@ -307,36 +282,8 @@
                     $visibleItems = [];
                     foreach ($group['items'] as $menu) {
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                        if ($routeExists) {
-                            // 1. Menu Eksklusif Role (memiliki 'roles'):
-                            // Jika role user tidak ada di dalam daftar 'roles', sembunyikan sepenuhnya (tidak tampil di sidebar)
-                            if (isset($menu['roles'])) {
-                                if (!in_array($activeRole, $menu['roles'], true)) {
-                                    continue;
-                                }
-                                $menu['disabled'] = false;
-                            } else {
-                                // 2. Menu RBAC / Bersama (tidak memiliki 'roles'):
-                                // Cek permission dari matriks RBAC database. Jika belum diberi izin, tampilkan sebagai disabled.
-                                if (($menu['capability'] ?? null) === 'document_archive') {
-                                    $permissionAllowed = $authUser !== null
-                                        && \App\Support\Documents\DocumentAuthorization::canViewArchive($authUser);
-                                } elseif ($activeRole === 'super_admin') {
-                                    $permissionAllowed = true;
-                                } elseif (isset($menu['permissions_any'])) {
-                                    $permissionAllowed = false;
-                                    foreach ($menu['permissions_any'] as $permission) {
-                                        if (isset($rolePermissions[$permission])) {
-                                            $permissionAllowed = true;
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    $permissionAllowed = !isset($menu['permission']) || isset($rolePermissions[$menu['permission']]);
-                                }
-                                $menu['disabled'] = !$permissionAllowed;
-                            }
-
+                        $isLocked    = in_array($menu['route'], $myLockedMenus);
+                        if ($routeExists && !$isLocked) {
                             $visibleItems[] = $menu;
                         }
                     }
@@ -352,11 +299,10 @@
                         @foreach($visibleItems as $menu)
                             @php
                                 $isActive = false;
-                                $isDisabled = $menu['disabled'] ?? false;
                             $currentRoute = request()->route() ? request()->route()->getName() : null;
-                            if (!$isDisabled && $currentRoute === $menu['route']) {
+                            if ($currentRoute === $menu['route']) {
                                 $isActive = true;
-                            } elseif (!$isDisabled && $currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
+                            } elseif ($currentRoute && str_starts_with($currentRoute, $menu['route'] . '.')) {
                                 $hasMoreSpecific = false;
                                 foreach ($allMenuRoutes as $otherRoute) {
                                     if ($otherRoute !== $menu['route'] &&
@@ -371,30 +317,17 @@
                                 }
                             }
 
-                            if ($isDisabled) {
-                                $itemClass = 'text-muted/40 cursor-not-allowed select-none bg-transparent hover:bg-transparent';
-                                $iconClass = 'text-muted/30';
-                            } elseif ($isActive) {
-                                $itemClass = 'bg-primary text-white font-semibold';
-                                $iconClass = 'text-white';
-                            } else {
-                                $itemClass = 'text-muted hover:bg-soft hover:text-ink font-medium';
-                                $iconClass = 'text-muted';
-                            }
+                            $href = route($menu['route']);
+                            $itemClass = $isActive
+                                ? 'bg-primary text-white font-semibold'
+                                : 'text-muted hover:bg-soft hover:text-ink font-medium';
+                            $iconClass = $isActive ? 'text-white' : 'text-muted';
                         @endphp
-                        @if($isDisabled)
-                        <div
-                            class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm {{ $itemClass }}"
-                            title="Tidak Mendapatkan Akses"
-                            aria-disabled="true"
-                        >
-                        @else
                         <a
-                            href="{{ route($menu['route']) }}"
+                            href="{{ $href }}"
                             wire:navigate
                             class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors {{ $itemClass }}"
                         >
-                        @endif
                             @if($menu['icon'] === 'squares-2x2')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
                             @elseif($menu['icon'] === 'users')
@@ -404,7 +337,7 @@
                             @elseif($menu['icon'] === 'arrow-up-tray')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
                             @elseif($menu['icon'] === 'calendar')
-                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5m-9-6h.008v.008H12v-.008ZM12 15h.008v.008H12V15Zm0 2.25h.008v.008H12v-.008ZM9.75 15h.008v.008H9.75V15Zm0 2.25h.008v.008H9.75v-.008ZM7.5 15h.008v.008H7.5V15Zm0 2.25h.008v.008H7.5v-.008Zm6.75-4.5h.008v.008h-.008v-.008Zm0 2.25h.008v.008h-.008V15Zm0 2.25h.008v.008h-.008v-.008Zm2.25-4.5h.008v.008H18v-.008Zm0 2.25h.008v.008H18V15Z" /></svg>
+                                <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
                             @elseif($menu['icon'] === 'check-badge')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296a3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043a3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" /></svg>
                             @elseif($menu['icon'] === 'document-text')
@@ -441,15 +374,7 @@
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" /></svg>
                             @endif
                             <span class="truncate">{{ $menu['label'] }}</span>
-                            @if($isDisabled)
-                                {{-- Ikon gembok kecil untuk menu tanpa akses --}}
-                                <svg class="w-3.5 h-3.5 shrink-0 ml-auto {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                            @endif
-                        @if($isDisabled)
-                        </div>
-                        @else
                         </a>
-                        @endif
                     @endforeach
                 </div>
                 @endif
@@ -627,12 +552,14 @@
                                 </svg>
                                 <span>Profil Saya</span>
                             </a>
-
-                            {{-- Switch Role hanya bagi role asal yang diizinkan dan memiliki users.switch_role;
-                                 saat simulasi aktif, hanya aksi revert yang tampil. --}}
-                            @if(auth()->check() && (auth()->user()->canInitiateSwitchRole() || auth()->user()->temporary_role))
-                                {{-- Submenu hanya bagi akun yang belum simulasi. --}}
-                                @if(auth()->user()->canInitiateSwitchRole() && ! auth()->user()->temporary_role)
+                            {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
+                                 switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
+                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
+                                {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
+                                     selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
+                                     role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
+                                     yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
+                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"
@@ -670,7 +597,7 @@
                                             class="mt-1 space-y-0.5 rounded-lg bg-soft/60 p-1 border border-border/50"
                                             style="display: none;"
                                         >
-                                            @foreach(auth()->user()->switchableRoleOptions() as $roleKey => $roleLabel)
+                                            @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
                                                 @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
                                                     <form method="POST" action="{{ route('switch-role') }}">
                                                         @csrf
@@ -701,20 +628,6 @@
                                         </form>
                                     </div>
                                 @endif
-                            @elseif(auth()->check() && auth()->user()->role === 'pimpinan' && ! auth()->user()->temporary_role)
-                                {{-- Pimpinan tidak boleh memulai simulasi: tampilkan disabled agar jelas bukan bug UI. --}}
-                                <div
-                                    class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-muted/60 font-sans font-medium cursor-not-allowed select-none"
-                                    title="Simulasi Role hanya tersedia untuk Super Admin dan Admin Kepegawaian"
-                                    aria-disabled="true"
-                                >
-                                    <div class="flex items-center gap-2.5">
-                                        <svg class="w-4 h-4 text-muted/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                                        </svg>
-                                        <span>Simulasi Role</span>
-                                    </div>
-                                </div>
                             @endif
                         </div>
                         <div class="border-t border-border p-1.5">

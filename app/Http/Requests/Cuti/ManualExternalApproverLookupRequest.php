@@ -2,18 +2,14 @@
 
 namespace App\Http\Requests\Cuti;
 
-use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class ManualExternalApproverLookupRequest extends FormRequest
 {
-    /** Lookup penyetuju mengikuti penerima permission pemakaian manual yang sah. */
+    /** Lookup hanya membuka referensi identitas bagi pemegang permission, bukan akses profil kandidat. */
     public function authorize(): bool
     {
-        $actor = $this->user();
-
-        return $actor instanceof User
-            && $actor->hasPermission('cuti.manual.manage');
+        return $this->user()?->hasPermission('cuti.manual.manage') ?? false;
     }
 
     /** @return array<string, list<string>> */

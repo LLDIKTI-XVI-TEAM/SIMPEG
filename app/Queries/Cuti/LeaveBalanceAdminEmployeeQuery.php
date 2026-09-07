@@ -8,7 +8,7 @@ use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveUsageRecord;
 use App\Models\User;
-use App\Services\Employees\EmployeeDashboardScopeService;
+use App\Services\Cuti\LeaveUsageAuthorizationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -16,12 +16,12 @@ use Illuminate\Database\Query\JoinClause;
 
 class LeaveBalanceAdminEmployeeQuery
 {
-    public function __construct(private readonly EmployeeDashboardScopeService $employeeScope) {}
+    public function __construct(private readonly LeaveUsageAuthorizationService $authorization) {}
 
     /**
-     * Mengambil identitas pegawai dan projection tahun aktif dalam satu query detail.
+     * Mengambil identitas pegawai dalam scope aktor dan projection tahun aktif dalam satu query detail.
      *
-     * @return array{employee:?Employee,balance:?LeaveBalance,rule5Active:bool,activeReserved:int,dutyProtected:int}
+     * @return array{employee:Employee,balance:?LeaveBalance,rule5Active:bool,activeReserved:int,dutyProtected:int}
      */
     public function selectedWorkspace(string $employeeId, int $year, User $actor): array
     {
@@ -42,7 +42,7 @@ class LeaveBalanceAdminEmployeeQuery
             ->where('leave_balance_ledger.source_year', $year)
             ->where('leave_balance_ledger.event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED);
 
-        $employee = $this->employeeScope->for($actor)
+        $employee = $this->authorization->employeeScope($actor)
             ->leftJoin('leave_balances as selected_balance', function (JoinClause $join) use ($year): void {
                 $join->on('selected_balance.employee_id', '=', 'employees.id')
                     ->where('selected_balance.tahun', $year);
@@ -71,17 +71,7 @@ class LeaveBalanceAdminEmployeeQuery
             ->selectSub($activeReservations, 'selected_active_reserved')
             ->selectSub($dutyProtectedQuery, 'selected_duty_protected')
             ->where('employees.id', $employeeId)
-            ->first();
-
-        if (! $employee instanceof Employee) {
-            return [
-                'employee' => null,
-                'balance' => null,
-                'rule5Active' => false,
-                'activeReserved' => 0,
-                'dutyProtected' => 0,
-            ];
-        }
+            ->firstOrFail();
 
         $rule5Active = filter_var($employee->getAttribute('selected_rule5_active'), FILTER_VALIDATE_BOOL);
         $activeReserved = (int) $employee->getAttribute('selected_active_reserved');
@@ -111,13 +101,13 @@ class LeaveBalanceAdminEmployeeQuery
     }
 
     /**
-     * Membatasi populasi pada pegawai yang belum dihapus dan mencocokkan pencarian tanpa membedakan kapitalisasi.
+     * Mengiriskan pencarian dengan scope aktor sebelum pagination maupun hitungan status.
      *
      * @return Builder<Employee>
      */
     private function populationQuery(string $search, User $actor): Builder
     {
-        $query = $this->employeeScope->for($actor);
+        $query = $this->authorization->employeeScope($actor);
         $search = trim($search);
 
         if ($search === '') {

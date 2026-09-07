@@ -35,7 +35,7 @@ final class CorrectManualLeaveUsageAction
     ) {}
 
     /**
-     * Membuat versi pengganti setelah permission dan scope pemilik diperiksa di server.
+     * Membuat versi pengganti setelah permission dan scope pemilik diperiksa, lalu menghitung hari kerja server.
      * Versi lama serta file historis dipertahankan; file koreksi baru dihapus bila transaksi gagal.
      *
      * @param  array<string, mixed>  $data

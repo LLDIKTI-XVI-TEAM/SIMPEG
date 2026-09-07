@@ -108,12 +108,12 @@ class CutiRekapExportTest extends TestCase
             'super admin' => ['super_admin', 200],
             'admin kepegawaian' => ['admin_kepegawaian', 200],
             'pimpinan' => ['pimpinan', 200],
-            'kepala bagian' => ['kepala_bagian', 200],
             'pegawai' => ['pegawai', 403],
+            'kepala bagian' => ['kepala_bagian', 403],
         ];
     }
 
-    public function test_pimpinan_dapat_membaca_rekap_dan_mengakses_konfigurasi_cuti(): void
+    public function test_pimpinan_hanya_dapat_membaca_rekap_tanpa_akses_konfigurasi_cuti(): void
     {
         $pimpinan = User::factory()->create(['role' => 'pimpinan']);
 
@@ -121,7 +121,7 @@ class CutiRekapExportTest extends TestCase
             ->assertOk()
             ->assertSee('id="rekap-pegawai"', false)
             ->assertSee('role="combobox"', false);
-        $this->actingAs($pimpinan)->get(route('cuti.config'))->assertOk();
+        $this->actingAs($pimpinan)->get(route('cuti.config'))->assertForbidden();
     }
 
     #[DataProvider('deniedRekapRoleProvider')]
@@ -137,6 +137,7 @@ class CutiRekapExportTest extends TestCase
     {
         return [
             'pegawai' => ['pegawai'],
+            'kepala bagian' => ['kepala_bagian'],
         ];
     }
 
@@ -185,7 +186,7 @@ class CutiRekapExportTest extends TestCase
         $this->assertFalse($data['canAdministerBalance']);
     }
 
-    public function test_aksi_administrasi_saldo_mengikuti_permission_dan_role_yang_berhak(): void
+    public function test_aksi_administrasi_saldo_mengikuti_grant_dan_revoke_permission(): void
     {
         $employee = Employee::factory()->create();
         LeaveBalance::create(['employee_id' => $employee->id, 'tahun' => 2026]);
@@ -205,9 +206,15 @@ class CutiRekapExportTest extends TestCase
             ->assertOk()
             ->assertDontSee($url);
 
+        Role::query()->where('name', 'super_admin')->firstOrFail()->permissions()->syncWithoutDetaching($permissions);
         $this->actingAs(User::factory()->superAdmin()->create())->get(route('cuti.rekap'))
             ->assertOk()
             ->assertSee($url);
+
+        Role::query()->where('name', 'super_admin')->firstOrFail()->permissions()->detach($permissions);
+        $this->get(route('cuti.rekap'))
+            ->assertOk()
+            ->assertDontSee($url);
     }
 
     public function test_tautan_laporan_rekap_mempertahankan_filter_kanonis_tanpa_url_legacy(): void

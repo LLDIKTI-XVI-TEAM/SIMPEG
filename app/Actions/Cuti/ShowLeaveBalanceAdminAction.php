@@ -15,7 +15,7 @@ use App\Queries\Cuti\LeaveUsageAdminQuery;
 use App\Queries\Cuti\ManualLeaveCaseOptionQuery;
 use App\Services\Cuti\AnnualLeaveBusinessClock;
 use App\Services\Cuti\LeaveBalanceService;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Str;
 
 class ShowLeaveBalanceAdminAction
@@ -35,8 +35,15 @@ class ShowLeaveBalanceAdminAction
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function execute(array $filters): array
+    public function execute(array $filters, User $actor): array
     {
+        // Guard membaca matrix terbaru; cache capability UI tidak boleh meloloskan revoke dalam request yang sama.
+        // Permission rekonsiliasi existing hanya membuka read model; mutasi manual memerlukan grant tersendiri.
+        $canManageManual = $actor->hasPermission('cuti.manual.manage');
+        if (! $canManageManual && ! $actor->hasPermission('cuti.balance.reconcile')) {
+            throw new AuthorizationException('Anda tidak memiliki izin membaca administrasi pemakaian cuti.');
+        }
+
         // Tahun administrasi mengikuti kalender bisnis WITA, bukan timezone proses atau parameter klien.
         $periode = (string) $this->businessClock->currentYear();
         $filters['periode'] = $periode;
@@ -44,8 +51,9 @@ class ShowLeaveBalanceAdminAction
         $status = $this->stringFilter($filters, 'status') ?? 'perlu_tindakan';
         $search = trim($this->stringFilter($filters, 'search') ?? '');
         $tab = $this->stringFilter($filters, 'tab') ?? 'pendaftaran';
-        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search);
-        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search);
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 10;
+        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search, $actor, $perPage);
+        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search, $actor);
 
         $workspace = $pegawaiId === null
             ? [
@@ -55,7 +63,7 @@ class ShowLeaveBalanceAdminAction
                 'activeReserved' => 0,
                 'dutyProtected' => 0,
             ]
-            : $this->employeeQuery->selectedWorkspace($pegawaiId, (int) $periode);
+            : $this->employeeQuery->selectedWorkspace($pegawaiId, (int) $periode, $actor);
         $selectedEmployee = $workspace['employee'];
         $selectedBalance = $workspace['balance'];
         $rule5Active = $workspace['rule5Active'];
@@ -72,6 +80,15 @@ class ShowLeaveBalanceAdminAction
         $usageFilters = $this->usageFilters($filters);
         $leaveTypeOptions = $this->usageQuery->leaveTypeOptions($this->stringFilter($filters, 'leave_type'));
         $editUsageId = $this->stringFilter($filters, 'edit_usage');
+        if ($editUsageId !== null) {
+            // Kepemilikan diperiksa terpisah dari status/filter histori agar redirect koreksi atau pembatalan tetap dapat dibaca.
+            abort_if($selectedEmployee === null || ! Str::isUuid($editUsageId), 404);
+            abort_unless(LeaveUsageRecord::query()
+                ->whereKey($editUsageId)
+                ->where('employee_id', $selectedEmployee->id)
+                ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
+                ->exists(), 404);
+        }
         $usageRowsUseScalarType = $tab === 'manual' && $editUsageId === null;
         // Form catat manual tetap merender jenis dan dokumen histori, tetapi tidak membaca relasi pegawai/request yang tidak dipakai.
         $usageRows = $this->usageQuery->paginate(
@@ -113,7 +130,6 @@ class ShowLeaveBalanceAdminAction
                 ])
                 ->values()
                 ->all();
-        $canManageManual = $this->canManageManualUsage();
         // Preview dan opsi hanya diperlukan saat panel manual dibuka agar tab administrasi lain tidak memuat query tambahan.
         $manualWorkspaceActive = $canManageManual
             && $selectedEmployee !== null
@@ -265,26 +281,6 @@ class ShowLeaveBalanceAdminAction
             'direction' => $this->stringFilter($filters, 'direction') ?? 'desc',
             'per_page_usage' => $this->integerFilter($filters, 'per_page_usage') ?? 10,
         ];
-    }
-
-    /**
-     * UI memakai satu pembacaan permission; route, FormRequest, dan Action mutation tetap gate otoritatif.
-     */
-    private function canManageManualUsage(): bool
-    {
-        $actor = auth()->user();
-        $effectiveRole = $actor instanceof User ? $actor->getEffectiveRole() : null;
-
-        if (! $actor instanceof User || $effectiveRole !== 'admin_kepegawaian') {
-            return false;
-        }
-
-        return DB::table('roles')
-            ->join('role_permissions', 'role_permissions.role_id', '=', 'roles.id')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('roles.name', $effectiveRole)
-            ->where('permissions.name', 'cuti.manual.manage')
-            ->exists();
     }
 
     /**

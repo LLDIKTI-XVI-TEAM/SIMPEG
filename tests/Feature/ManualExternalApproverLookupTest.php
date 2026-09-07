@@ -23,26 +23,22 @@ class ManualExternalApproverLookupTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
-    public function test_lookup_hanya_menerima_role_yang_diizinkan_dengan_permission_manual(): void
+    public function test_lookup_mengikuti_grant_dan_revoke_tanpa_membatasi_kandidat_ke_scope_pemilik(): void
     {
         $manualPermission = Permission::query()->where('name', 'cuti.manual.manage')->sole();
 
-        foreach (['kepala_bagian', 'pegawai'] as $role) {
+        $approver = Employee::factory()->create(['nama_lengkap' => 'Referensi Penyetuju']);
+        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             Role::query()->where('name', $role)->sole()->permissions()->syncWithoutDetaching([$manualPermission->id]);
 
             $this->actingAs(User::factory()->create(['role' => $role]))
-                ->getJson(self::LOOKUP_PATH.'?q=Pegawai')
+                ->getJson(self::LOOKUP_PATH.'?q=Referensi')
+                ->assertOk()->assertJsonPath('data.0.id', $approver->id);
+
+            Role::query()->where('name', $role)->sole()->permissions()->detach($manualPermission->id);
+            $this->getJson(self::LOOKUP_PATH.'?q=Referensi')
                 ->assertForbidden();
         }
-
-        Role::query()->where('name', 'pimpinan')->sole()->permissions()->syncWithoutDetaching([$manualPermission->id]);
-        $this->actingAs(User::factory()->create(['role' => 'pimpinan']))
-            ->getJson(self::LOOKUP_PATH.'?q=Pegawai')
-            ->assertOk();
-
-        $this->actingAs(User::factory()->superAdmin()->create())
-            ->getJson(self::LOOKUP_PATH.'?q=Pegawai')
-            ->assertOk();
 
         $adminRole = Role::query()->where('name', 'admin_kepegawaian')->sole();
         $adminRole->permissions()->detach($manualPermission->id);
@@ -80,7 +76,6 @@ class ManualExternalApproverLookupTest extends TestCase
                     'nama_lengkap' => "Ni Luh Śakti O'Connor",
                     'nip' => '198765432100000001',
                     'jabatan_terakhir' => 'Pejabat Penguji',
-                    'status_aktif' => 'Aktif',
                 ]],
             ]);
         $cacheControl = (string) $response->headers->get('Cache-Control');
@@ -131,5 +126,14 @@ class ManualExternalApproverLookupTest extends TestCase
                 ->assertUnprocessable()
                 ->assertJsonValidationErrors('q');
         }
+    }
+
+    public function test_lookup_membatasi_hasil_ke_lima_belas_identitas(): void
+    {
+        Employee::factory()->count(16)->create(['nama_lengkap' => 'Referensi Penyetuju']);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->getJson(self::LOOKUP_PATH.'?q=Referensi')
+            ->assertOk()->assertJsonCount(15, 'data');
     }
 }

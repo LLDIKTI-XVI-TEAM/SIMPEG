@@ -440,7 +440,7 @@ class LeaveBalanceReservationTest extends TestCase
         $this->assertSame(9, $preview['saldo_dapat_diajukan']);
 
         $workspace = app(LeaveBalanceAdminEmployeeQuery::class)
-            ->selectedWorkspace($aktor['employee']->id, 2026);
+            ->selectedWorkspace($aktor['employee']->id, 2026, $aktor['user']);
         $this->assertSame(3, $workspace['activeReserved']);
 
         app(LeaveBalanceRecalculationService::class)->recalculateForDatabaseUpgrade(

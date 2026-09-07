@@ -6,11 +6,13 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\User;
 use App\Queries\Cuti\CutiRekapQuery;
+use App\Services\Rbac\UiPermissionCapabilityService;
 
 class ShowCutiRekapAction
 {
     public function __construct(
         private readonly CutiRekapQuery $rekapQuery,
+        private readonly UiPermissionCapabilityService $capabilities,
     ) {}
 
     /**
@@ -44,8 +46,8 @@ class ShowCutiRekapAction
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
         $unitOptions = $this->rekapQuery->unitOptions($unit);
         $jenisOptions = $this->rekapQuery->leaveTypeOptions($jenisId);
-        $canAdministerBalance = $actor !== null && ($actor->hasPermission('cuti.balance.reconcile')
-            || $actor->hasPermission('cuti.manual.manage'));
+        $canAdministerBalance = $this->capabilities->allows($actor, 'cuti.balance.reconcile')
+            || $this->capabilities->allows($actor, 'cuti.manual.manage');
 
         return compact(
             'summary', 'leaveBalances', 'usageRows',

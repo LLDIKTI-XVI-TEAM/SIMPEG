@@ -15,6 +15,8 @@ final class LookupManualExternalApproversAction
     /**
      * Mencari identitas minimum approver tanpa mengirim kontak, alamat, atau atribut pegawai sensitif lainnya.
      *
+     * Kandidat boleh berada di luar scope pemilik fakta karena atasan/PYBMC bukan pemilik cuti tersebut.
+     *
      * @return list<array{id:string,nama_lengkap:string,nip:string,jabatan_terakhir:?string}>
      */
     public function execute(string $query, User $actor): array

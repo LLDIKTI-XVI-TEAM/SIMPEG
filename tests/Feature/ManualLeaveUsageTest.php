@@ -66,14 +66,14 @@ class ManualLeaveUsageTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_route_manual_hanya_menerima_role_berhak_dengan_permission(): void
+    public function test_route_manual_menolak_role_default_tanpa_permission_manual(): void
     {
         $employee = Employee::factory()->create();
 
         $this->post($this->storeUrl($employee), $this->validPayload())
             ->assertRedirect(route('login'));
 
-        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $user = User::factory()->create(['role' => $role]);
 
             $this->actingAs($user)
@@ -97,11 +97,6 @@ class ManualLeaveUsageTest extends TestCase
             ->post($this->storeUrl($employee), $this->validPayload())
             ->assertRedirect();
 
-        Role::query()->where('name', 'pimpinan')->firstOrFail()->permissions()->attach($permission);
-        $this->actingAs(User::factory()->pimpinan()->create())
-            ->post($this->storeUrl($employee), $this->validPayload())
-            ->assertRedirect();
-
         $this->assertDatabaseHas('leave_usage_records', [
             'employee_id' => $employee->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
@@ -109,12 +104,12 @@ class ManualLeaveUsageTest extends TestCase
         ]);
     }
 
-    public function test_action_langsung_mempertahankan_role_dan_permission_gate(): void
+    public function test_action_langsung_menolak_aktor_tanpa_permission_manual(): void
     {
         $employee = Employee::factory()->create();
         $current = $this->rawManualFact($employee, User::factory()->adminKepegawaian()->create());
 
-        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $actor = User::factory()->create(['role' => $role]);
             $this->assertAllManualActionsReject($employee, $current, $actor, $role);
         }
@@ -165,10 +160,10 @@ class ManualLeaveUsageTest extends TestCase
             $existingResponse->assertRedirect(route('login'));
         }
 
-        $pimpinan = User::factory()->pimpinan()->create();
+        $superAdmin = User::factory()->superAdmin()->create();
         foreach ($requests as [$unknownUrl, $existingUrl, $payload]) {
-            $unknownResponse = $this->actingAs($pimpinan)->post($unknownUrl, $payload());
-            $existingResponse = $this->actingAs($pimpinan)->post($existingUrl, $payload());
+            $unknownResponse = $this->actingAs($superAdmin)->post($unknownUrl, $payload());
+            $existingResponse = $this->actingAs($superAdmin)->post($existingUrl, $payload());
             $this->assertSame($existingResponse->getStatusCode(), $unknownResponse->getStatusCode());
             $unknownResponse->assertForbidden();
             $existingResponse->assertForbidden();
@@ -536,6 +531,10 @@ SQL))->pluck('confdeltype', 'conname');
 
         $this->post($correctUrl, [])->assertRedirect(route('login'));
         $this->post($cancelUrl, [])->assertRedirect(route('login'));
+
+        $superAdmin = User::factory()->superAdmin()->create();
+        $this->actingAs($superAdmin)->post($correctUrl, [])->assertForbidden();
+        $this->actingAs($superAdmin)->post($cancelUrl, [])->assertForbidden();
 
         $role = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
         $permission = Permission::query()->where('name', 'cuti.manual.manage')->firstOrFail();

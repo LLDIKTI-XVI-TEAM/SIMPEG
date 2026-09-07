@@ -37,7 +37,7 @@ final class StoreManualLeaveUsageAction
     ) {}
 
     /**
-     * Mencatat fakta manual setelah permission dan scope pemilik fakta diperiksa di server.
+     * Mencatat fakta manual hanya setelah permission, scope pegawai, dan hitung hari kerja server.
      * Transaksi fail-closed; file UUID baru dikompensasi bila mutasi, replay, dokumen, atau audit gagal.
      *
      * @param  array<string, mixed>  $data
