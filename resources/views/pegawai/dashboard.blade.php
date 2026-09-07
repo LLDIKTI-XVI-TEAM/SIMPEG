@@ -198,12 +198,14 @@
                                     $statusVariant = match ($cuti->status) {
                                          'menunggu_approval' => 'info',
                                          'ditangguhkan' => 'warning',
+                                         'menunggu_pembatalan' => 'warning',
                                          'dikembalikan_karena_rollover' => 'warning',
                                          'perlu_perubahan' => 'danger',
                                          default => 'primary',
                                      };
                                      $statusLabel = match ($cuti->status) {
                                          'menunggu_approval' => 'Menunggu Keputusan',
+                                         'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
                                          'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
                                          'perlu_perubahan' => 'Perubahan',
                                          default => ucwords(str_replace('_', ' ', $cuti->status)),

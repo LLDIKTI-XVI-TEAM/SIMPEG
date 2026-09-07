@@ -39,10 +39,20 @@ final class NotificationEventCatalog
             'group' => 'Cuti',
             'allowed_channels' => ['in_app', 'email', 'whatsapp_business'],
         ],
-        'cuti.perlu_perubahan' => [
-            'label' => 'Cuti perlu perubahan',
+        'cuti.pembatalan_diajukan' => [
+            'label' => 'Permohonan pembatalan cuti diajukan',
             'group' => 'Cuti',
-            'allowed_channels' => ['in_app', 'email', 'whatsapp_business'],
+            'allowed_channels' => ['in_app', 'email'],
+        ],
+        'cuti.pembatalan_disetujui' => [
+            'label' => 'Permohonan pembatalan cuti disetujui',
+            'group' => 'Cuti',
+            'allowed_channels' => ['in_app', 'email'],
+        ],
+        'cuti.pembatalan_ditolak' => [
+            'label' => 'Permohonan pembatalan cuti ditolak',
+            'group' => 'Cuti',
+            'allowed_channels' => ['in_app', 'email'],
         ],
         'cuti.tidak_disetujui' => [
             'label' => 'Cuti tidak disetujui',

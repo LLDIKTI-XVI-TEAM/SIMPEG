@@ -6,6 +6,8 @@
             'ditangguhkan' => 'warning',
             'ditangguhkan_tugas_dinas' => 'warning',
             'dikembalikan_karena_rollover' => 'warning',
+            'menunggu_pembatalan' => 'warning',
+            'dibatalkan' => 'danger',
             'perlu_perubahan' => 'danger',
             'tidak_disetujui' => 'danger',
         ];
@@ -16,6 +18,8 @@
             'ditangguhkan' => 'Ditangguhkan',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
+            'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
+            'dibatalkan' => 'Dibatalkan',
             'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
@@ -97,10 +101,12 @@
                         <option value="">Semua Status</option>
                         <option value="menunggu_saya" @selected(($filters['status'] ?? '') === 'menunggu_saya')>Menunggu Tindakan Saya</option>
                         <option value="menunggu" @selected(($filters['status'] ?? '') === 'menunggu')>Menunggu Keputusan</option>
+                        <option value="menunggu_pembatalan" @selected(($filters['status'] ?? '') === 'menunggu_pembatalan')>Menunggu Keputusan Pembatalan</option>
                         <option value="disetujui" @selected(($filters['status'] ?? '') === 'disetujui')>Disetujui</option>
                         <option value="ditangguhkan" @selected(($filters['status'] ?? '') === 'ditangguhkan')>Ditangguhkan</option>
                         <option value="ditangguhkan_tugas_dinas" @selected(($filters['status'] ?? '') === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
                         <option value="dikembalikan_karena_rollover" @selected(($filters['status'] ?? '') === 'dikembalikan_karena_rollover')>Dikembalikan karena Rollover</option>
+                        <option value="dibatalkan" @selected(($filters['status'] ?? '') === 'dibatalkan')>Dibatalkan</option>
                         <option value="perubahan" @selected(($filters['status'] ?? '') === 'perubahan')>Perubahan</option>
                         <option value="tidak_disetujui" @selected(($filters['status'] ?? '') === 'tidak_disetujui')>Tidak Disetujui</option>
                     </x-form.select>

@@ -24,7 +24,14 @@ try {
         $request = LeaveRequest::query()->findOrFail($input['request_id']);
         $approver = Employee::query()->findOrFail($input['approver_id']);
         $actingUser = User::query()->findOrFail($input['actor_user_id']);
-        app(LeaveApprovalService::class)->approve($request, $approver, $input['active_step_id'], null, $actingUser);
+        app(LeaveApprovalService::class)->approve(
+            $request,
+            $approver,
+            $input['active_step_id'],
+            (int) $request->revision_version,
+            null,
+            $actingUser,
+        );
     } else {
         DB::transaction(function () use ($input): void {
             // Pengajuan baru belum memiliki request untuk dikunci, sehingga mutex pegawai

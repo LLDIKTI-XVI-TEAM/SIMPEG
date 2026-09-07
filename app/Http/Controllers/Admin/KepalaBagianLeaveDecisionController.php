@@ -6,7 +6,6 @@ use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\RecordDutyPostponementAction;
-use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\KepalaBagianLeaveDecisionRequest;
 use App\Http\Requests\Cuti\RecordDutyPostponementRequest;
@@ -20,7 +19,6 @@ class KepalaBagianLeaveDecisionController extends Controller
         LeaveRequest $leave,
         KepalaBagianScopeService $scope,
         ApproveLeaveAction $approve,
-        RequestChangesLeaveAction $requestChanges,
         PostponeLeaveAction $postpone,
         DeclineLeaveAction $decline,
     ) {
@@ -31,15 +29,13 @@ class KepalaBagianLeaveDecisionController extends Controller
 
         $payload = $request->validated();
         match ($payload['keputusan']) {
-            'DISETUJUI' => $approve->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'] ?? null, $request),
-            'PERUBAHAN' => $requestChanges->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
-            'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
-            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['active_step_id'], $payload['catatan'], $request),
+            'DISETUJUI' => $approve->execute($leave, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['catatan'] ?? null, $request),
+            'DITANGGUHKAN' => $postpone->execute($leave, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['catatan'], $request),
+            'TIDAK_DISETUJUI' => $decline->execute($leave, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['catatan'], $request),
         };
 
         $message = match ($payload['keputusan']) {
             'DISETUJUI' => 'Pengajuan cuti berhasil disetujui.',
-            'PERUBAHAN' => 'Pengajuan cuti dikembalikan untuk perbaikan.',
             'DITANGGUHKAN' => 'Pengajuan cuti ditangguhkan dan pemohon telah diberi tahu.',
             'TIDAK_DISETUJUI' => 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.',
         };
@@ -60,7 +56,7 @@ class KepalaBagianLeaveDecisionController extends Controller
         abort_unless($scope->hasDirectReport($user, $leave->employee_id), 403);
 
         $payload = $request->validated();
-        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['alasan']);
+        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['revision_version'], $payload['alasan']);
 
         return redirect()->route('kepala-bagian.cuti.show', $leave)
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');

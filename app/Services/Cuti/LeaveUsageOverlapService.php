@@ -14,7 +14,7 @@ final class LeaveUsageOverlapService
     public const ACTIVE_REQUEST_STATUSES = [
         'menunggu_approval',
         'ditangguhkan',
-        'perlu_perubahan',
+        LeaveRequest::STATUS_CANCELLATION_PENDING,
         'ditangguhkan_tugas_dinas',
         LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
         'disetujui',

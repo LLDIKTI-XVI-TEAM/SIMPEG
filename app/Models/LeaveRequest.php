@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
  * @property string $employee_id
  * @property string|null $leave_request_case_id
  * @property string $status
+ * @property int $revision_version
  * @property int $jumlah_hari_kerja
  * @property string $alasan
  * @property string|null $alamat_selama_cuti
@@ -39,6 +40,15 @@ class LeaveRequest extends Model
 
     public const STATUS_RETURNED_FOR_ROLLOVER = 'dikembalikan_karena_rollover';
 
+    public const STATUS_CANCELLATION_PENDING = 'menunggu_pembatalan';
+
+    public const STATUS_CANCELLED = 'dibatalkan';
+
+    // Default model menjaga payload notifikasi pertama memiliki versi sebelum reload dari database.
+    protected $attributes = [
+        'revision_version' => 1,
+    ];
+
     protected $fillable = [
         'employee_id',
         'jenis_cuti_id',
@@ -63,6 +73,7 @@ class LeaveRequest extends Model
             'jumlah_hari_kerja' => 'integer',
             'rollover_source_year' => 'integer',
             'rollover_target_year' => 'integer',
+            'revision_version' => 'integer',
         ];
     }
 
@@ -88,6 +99,12 @@ class LeaveRequest extends Model
     public function approvals(): HasMany
     {
         return $this->hasMany(LeaveApproval::class);
+    }
+
+    /** @return HasMany<LeaveCancellationRequest, $this> */
+    public function cancellationRequests(): HasMany
+    {
+        return $this->hasMany(LeaveCancellationRequest::class);
     }
 
     /** @return HasMany<LeaveRequestStep, $this> */

@@ -1120,7 +1120,9 @@ class LeaveUsageAdminPageTest extends TestCase
                 && $rows->every(fn (LeaveUsageRecord $row): bool => ! $row->relationLoaded('jenisCuti')
                     && $row->getAttribute('workspace_usage_type_name') === 'Cuti Melahirkan'));
 
-        $this->assertLessThan(120 * 1024, strlen($response->getContent()));
+        // Header, navigasi berizin, dan kontrol aksesibel menambah markup tetap;
+        // anggaran workspace 122 KiB tetap membatasi payload opsi dan riwayat.
+        $this->assertLessThan(122 * 1024, strlen($response->getContent()));
         $this->assertLessThanOrEqual(23, $this->pageQueryCount($url));
     }
 

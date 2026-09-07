@@ -151,6 +151,7 @@ class CutiApprovalQueueTest extends TestCase
             ->followingRedirects()
             ->post(route('cuti.approve', $leave->id), [
                 'active_step_id' => '00000000-0000-4000-8000-000000000034',
+                'revision_version' => $leave->fresh()->revision_version,
             ])
             ->assertOk()
             ->assertSee('Keputusan belum dapat disimpan')

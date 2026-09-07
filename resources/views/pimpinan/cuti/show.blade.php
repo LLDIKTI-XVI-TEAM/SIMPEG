@@ -6,6 +6,8 @@
             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
             'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
             'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
+            'menunggu_pembatalan' => ['label' => 'Menunggu Keputusan Pembatalan', 'variant' => 'warning'],
+            'dibatalkan' => ['label' => 'Dibatalkan', 'variant' => 'danger'],
             'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
             'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
             default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],
@@ -19,6 +21,9 @@
         @endif
         @error('active_step_id')
             <x-ui.alert variant="danger">{{ $message }}</x-ui.alert>
+        @enderror
+        @error('revision_version')
+            <x-ui.alert variant="danger" role="alert">{{ $message }}</x-ui.alert>
         @enderror
 
         <div>
@@ -128,7 +133,7 @@
                         <div x-data="{ 
                             decision: '{{ old('keputusan', 'DISETUJUI') }}', 
                             confirmOpen: false,
-                            dutyPostponementOpen: {{ $errors->dutyPostponement->hasAny(['alasan', 'active_step_id']) ? 'true' : 'false' }},
+                            dutyPostponementOpen: {{ $errors->dutyPostponement->hasAny(['alasan', 'active_step_id', 'revision_version']) ? 'true' : 'false' }},
                             dutyPostponementTrigger: null,
                             submitting: false,
                             openDutyPostponement(event) {
@@ -151,42 +156,38 @@
                             <form x-ref="decisionForm" method="POST" action="{{ route('pimpinan.cuti.decision', $leave) }}" class="space-y-4" @submit="submitting = true">
                                 @csrf
                                 <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
-                                <div>
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keputusan Resmi</label>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="DISETUJUI" x-model="decision" class="peer sr-only" />
-                                            <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-success peer-checked:bg-success/10 peer-checked:text-success-dark">
+                                <input type="hidden" name="revision_version" value="{{ $leave->revision_version }}">
+                                <fieldset aria-describedby="{{ $errors->has('keputusan') ? 'pimpinan-decision-help pimpinan-decision-error' : 'pimpinan-decision-help' }}">
+                                    <legend class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-ink font-sans">Keputusan Resmi</legend>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <label for="pimpinan-decision-approved" class="cursor-pointer relative block">
+                                            <input id="pimpinan-decision-approved" type="radio" name="keputusan" value="DISETUJUI" x-model="decision" aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}" class="peer sr-only" />
+                                            <div class="flex min-h-11 items-center justify-center rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-colors peer-checked:border-success peer-checked:bg-success/10 peer-checked:text-success-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
                                                 <span class="text-sm font-bold font-sans">Disetujui</span>
                                             </div>
                                         </label>
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="PERUBAHAN" x-model="decision" class="peer sr-only" />
-                                            <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-warning peer-checked:bg-warning/10 peer-checked:text-warning-dark">
-                                                <span class="text-sm font-bold font-sans">Perubahan</span>
-                                            </div>
-                                        </label>
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="DITANGGUHKAN" x-model="decision" class="peer sr-only" />
-                                            <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark">
+                                        <label for="pimpinan-decision-postponed" class="cursor-pointer relative block">
+                                            <input id="pimpinan-decision-postponed" type="radio" name="keputusan" value="DITANGGUHKAN" x-model="decision" aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}" class="peer sr-only" />
+                                            <div class="flex min-h-11 items-center justify-center rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-colors peer-checked:border-info peer-checked:bg-info/10 peer-checked:text-info-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
                                                 <span class="text-sm font-bold font-sans">Ditangguhkan</span>
                                             </div>
                                         </label>
-                                        <label class="cursor-pointer relative block">
-                                            <input type="radio" name="keputusan" value="TIDAK_DISETUJUI" x-model="decision" class="peer sr-only" />
-                                            <div class="rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-all peer-checked:border-danger peer-checked:bg-danger/10 peer-checked:text-danger-dark">
+                                        <label for="pimpinan-decision-not-approved" class="cursor-pointer relative block">
+                                            <input id="pimpinan-decision-not-approved" type="radio" name="keputusan" value="TIDAK_DISETUJUI" x-model="decision" aria-invalid="{{ $errors->has('keputusan') ? 'true' : 'false' }}" class="peer sr-only" />
+                                            <div class="flex min-h-11 items-center justify-center rounded-lg border border-border bg-white px-3 py-2.5 text-center transition-colors peer-checked:border-danger peer-checked:bg-danger/10 peer-checked:text-danger-dark peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2">
                                                 <span class="text-sm font-bold font-sans">Tidak Disetujui</span>
                                             </div>
                                         </label>
                                     </div>
-                                    <p class="text-xs text-muted font-sans mt-2">Pilih salah satu tindakan. Keputusan Anda akan dicatat ke dalam timeline.</p>
-                                    @error('keputusan')<p class="mt-2 text-sm text-danger">{{ $message }}</p>@enderror
-                                </div>
+                                    <p id="pimpinan-decision-help" class="text-xs text-muted font-sans mt-2">Pilih salah satu tindakan. Keputusan Anda akan dicatat ke dalam timeline.</p>
+                                    @error('keputusan')<p id="pimpinan-decision-error" class="mt-2 text-sm text-danger" role="alert">{{ $message }}</p>@enderror
+                                </fieldset>
 
                                 <div x-show="decision !== 'DISETUJUI'" x-cloak>
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan / Catatan Tambahan <span class="text-danger">*</span></label>
-                                    <textarea rows="3" name="catatan" :required="decision !== 'DISETUJUI'" minlength="5" maxlength="500" placeholder="Wajib diisi jika memilih Perubahan, Ditangguhkan, atau Tidak Disetujui..." class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
-                                    @error('catatan')<p class="mt-1 text-sm text-danger">{{ $message }}</p>@enderror
+                                    <label for="pimpinan-decision-note" class="block text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1.5">Keterangan / Catatan Tambahan <span class="text-danger">*</span></label>
+                                    <textarea id="pimpinan-decision-note" rows="3" name="catatan" :required="decision !== 'DISETUJUI'" minlength="5" maxlength="500" aria-invalid="{{ $errors->has('catatan') ? 'true' : 'false' }}" aria-describedby="{{ $errors->has('catatan') ? 'pimpinan-decision-note-help pimpinan-decision-note-error' : 'pimpinan-decision-note-help' }}" placeholder="Wajib diisi jika memilih Ditangguhkan atau Tidak Disetujui…" class="w-full rounded-lg border border-border bg-white p-3 text-sm font-sans placeholder:text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary focus-visible:ring-2 focus-visible:ring-primary/30 shadow-sm @error('catatan') border-danger @enderror">{{ old('catatan') }}</textarea>
+                                    <p id="pimpinan-decision-note-help" class="mt-1 text-xs text-muted">Wajib untuk keputusan Ditangguhkan dan Tidak Disetujui.</p>
+                                    @error('catatan')<p id="pimpinan-decision-note-error" class="mt-1 text-sm text-danger" role="alert">{{ $message }}</p>@enderror
                                 </div>
 
                                 <div class="flex justify-end gap-3 pt-2">
@@ -198,7 +199,7 @@
                                             Simpan Keputusan
                                         </span>
                                         <span x-show="submitting" style="display: none;" class="flex items-center gap-2">
-                                            <x-ui.loading size="sm" color="white" /> Menyimpan keputusan...
+                                            <x-ui.loading size="sm" color="white" /> Menyimpan keputusan…
                                         </span>
                                     </x-ui.button>
                                 </div>
@@ -215,6 +216,7 @@
                                     <form method="POST" action="{{ route('pimpinan.cuti.penangguhan-tugas-dinas', $leave) }}" class="mt-4 space-y-4">
                                         @csrf
                                         <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
+                                        <input type="hidden" name="revision_version" value="{{ $leave->revision_version }}">
                                         @error('active_step_id', 'dutyPostponement')
                                             <p class="text-sm text-danger" role="alert">{{ $message }}</p>
                                         @enderror
@@ -239,11 +241,12 @@
                                     <form method="POST" action="{{ route('pimpinan.cuti.decision', $leave) }}" @submit="submitting = true">
                                         @csrf
                                         <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
+                                        <input type="hidden" name="revision_version" value="{{ $leave->revision_version }}">
                                         <input type="hidden" name="keputusan" value="DISETUJUI">
                                         <x-ui.button type="submit" x-bind:disabled="submitting" variant="success">
                                             <span x-show="!submitting">Ya, Setujui</span>
                                             <span x-show="submitting" style="display: none;" class="flex items-center gap-2">
-                                                <x-ui.loading size="sm" color="white" /> Menyetujui...
+                                                <x-ui.loading size="sm" color="white" /> Menyetujui…
                                             </span>
                                         </x-ui.button>
                                     </form>
@@ -288,7 +291,7 @@
                                     'approved' => ['label' => 'Disetujui', 'variant' => 'success'],
                                     'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                                      'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
-                                     'active' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
+                                     'active' => ['label' => $leave->status === 'menunggu_pembatalan' ? 'Menunggu Keputusan Pembatalan' : 'Menunggu Keputusan', 'variant' => 'warning'],
                                      'pending' => ['label' => "Menunggu {$stepRoleLabel}", 'variant' => 'muted'],
                                      'skipped' => ['label' => 'Dilewati', 'variant' => 'muted'],
                                     default => ['label' => 'Status tidak tersedia', 'variant' => 'muted'],
@@ -304,7 +307,7 @@
                                 variant="{{ $stepStatus['variant'] }}"
                                 title="Tahap {{ $step->step_order }} · {{ $stepRoleLabel }}"
                                 description="{{ $step->approver?->nama_lengkap ?? 'Approver tidak tersedia' }}"
-                                pulse="{{ $step->status == 'active' }}">
+                                :pulse="$step->status === 'active' && $leave->status !== 'menunggu_pembatalan'">
 
                                 <div class="mt-2 bg-soft/50 rounded-lg p-3 border border-border">
                                     <p class="text-[11px] font-bold uppercase tracking-wider text-ink font-sans mb-1">{{ $stepStatus['label'] }}</p>

@@ -33,6 +33,7 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($fixture['user'])
             ->post(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ])
             ->assertRedirect(route('pimpinan.cuti.show', $fixture['leave']))
@@ -65,6 +66,7 @@ class PimpinanLeaveDecisionTest extends TestCase
                 ->from(route('pimpinan.cuti.show', $fixture['leave']))
                 ->post(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                     'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                    'revision_version' => $fixture['leave']->fresh()->revision_version,
                     'alasan' => $reason,
                 ])
                 ->assertRedirect(route('pimpinan.cuti.show', $fixture['leave']))
@@ -91,6 +93,7 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($user)
             ->post(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ])
             ->assertForbidden();
@@ -118,7 +121,26 @@ class PimpinanLeaveDecisionTest extends TestCase
             ->assertSee('closeDutyPostponement()', false)
             ->assertSee("document.getElementById('pimpinan-duty-postponement-reason')?.focus()", false)
             ->assertSee('dutyPostponementTrigger?.focus()', false)
-            ->assertSee('aria-describedby="pimpinan-duty-postponement-description"', false);
+            ->assertSee('aria-describedby="pimpinan-duty-postponement-description"', false)
+            ->assertSee('id="pimpinan-decision-approved"', false)
+            ->assertSee('aria-describedby="pimpinan-decision-note-help"', false)
+            ->assertDontSee('value="PERUBAHAN"', false)
+            ->assertDontSee('Minta Perubahan')
+            ->assertDontSee('memilih Perubahan');
+
+        $fixture['leave']->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
+        $this->actingAs($fixture['user'])
+            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSee('Menunggu Keputusan Pembatalan')
+            ->assertDontSee('Status tidak tersedia');
+
+        $fixture['leave']->forceFill(['status' => LeaveRequest::STATUS_CANCELLED])->save();
+        $this->actingAs($fixture['user'])
+            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSee('Dibatalkan')
+            ->assertDontSee('Status tidak tersedia');
 
         $other = Employee::factory()->create();
         $otherUser = User::factory()->pimpinan()->create(['employee_id' => $other->id]);
@@ -151,6 +173,7 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($fixture['user'])
             ->post(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ]);
 
@@ -205,6 +228,7 @@ class PimpinanLeaveDecisionTest extends TestCase
             ->followingRedirects()
             ->post(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'abcd',
             ])
             ->assertOk()
@@ -283,6 +307,7 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($pimpinan)
             ->post(route('pimpinan.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
@@ -344,6 +369,7 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->actingAs($pimpinan)
             ->post(route('pimpinan.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'TIDAK_DISETUJUI',
                 'catatan' => 'Dokumen pendukung tidak sesuai.',
             ])

@@ -25,6 +25,31 @@ class CutiListDisplayTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
+    public function test_refresh_mempertahankan_filter_dan_jumlah_baris_tanpa_double_escape(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $response = $this->actingAs($user)->get(route('cuti', [
+            'status' => LeaveRequest::STATUS_CANCELLED,
+            'per_page' => 25,
+        ]))->assertOk();
+
+        $this->assertSame(1, preg_match(
+            '~<a\b(?=[^>]*\baria-label="Refresh monitoring cuti")[^>]*\bhref="([^"]+)"~s',
+            (string) $response->getContent(),
+            $matches,
+        ));
+        // Browser mendekode entity atribut sekali; URL tidak boleh menyisakan key amp;.
+        $refreshUrl = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        parse_str((string) parse_url($refreshUrl, PHP_URL_QUERY), $refreshParameters);
+        $this->assertSame('25', $refreshParameters['per_page'] ?? null);
+        $this->assertSame(LeaveRequest::STATUS_CANCELLED, $refreshParameters['status'] ?? null);
+
+        $this->get($refreshUrl)
+            ->assertOk()
+            ->assertViewHas('status', LeaveRequest::STATUS_CANCELLED)
+            ->assertViewHas('riwayatCuti', fn ($rows): bool => $rows->perPage() === 25);
+    }
+
     public function test_list_rows_expose_current_step_label_from_the_active_snapshot(): void
     {
         $user = User::factory()->superAdmin()->create();
@@ -245,6 +270,47 @@ class CutiListDisplayTest extends TestCase
             ->assertSee('Dikembalikan karena Rollover')
             ->assertDontSee('Pegawai Menunggu');
         $this->assertSame(1, $response->viewData('jumlahMenunggu'));
+    }
+
+    public function test_list_renders_and_filters_cancellation_lifecycle_with_clear_labels(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Status Pembatalan',
+            'code' => 'status-pembatalan',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $pending = $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Menunggu Pembatalan']),
+            $jenis,
+            'Pengajuan sedang ditahan.',
+            LeaveRequest::STATUS_CANCELLATION_PENDING,
+        );
+        $cancelled = $this->createLeave(
+            Employee::factory()->create(['nama_lengkap' => 'Pegawai Dibatalkan']),
+            $jenis,
+            'Pengajuan sudah dibatalkan.',
+            LeaveRequest::STATUS_CANCELLED,
+        );
+
+        $pendingResponse = $this->actingAs($user)->get(route('cuti', [
+            'status' => LeaveRequest::STATUS_CANCELLATION_PENDING,
+        ]));
+        $pendingResponse->assertOk()
+            ->assertSee('Pegawai Menunggu Pembatalan')
+            ->assertSee('Menunggu Keputusan Pembatalan')
+            ->assertDontSee('Pegawai Dibatalkan');
+        $this->assertSame($pending->id, $pendingResponse->viewData('riwayatCuti')->getCollection()->sole()['id']);
+
+        $cancelledResponse = $this->actingAs($user)->get(route('cuti', [
+            'status' => LeaveRequest::STATUS_CANCELLED,
+        ]));
+        $cancelledResponse->assertOk()
+            ->assertSee('Pegawai Dibatalkan')
+            ->assertSee('Dibatalkan')
+            ->assertDontSee('Pegawai Menunggu Pembatalan');
+        $this->assertSame($cancelled->id, $cancelledResponse->viewData('riwayatCuti')->getCollection()->sole()['id']);
     }
 
     public function test_pegawai_only_sees_own_rows_and_counters(): void

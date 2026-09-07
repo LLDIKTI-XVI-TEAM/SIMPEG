@@ -114,7 +114,6 @@ class ManualLeaveUsageConcurrencyTest extends TestCase
                 + LeaveRequest::query()->whereIn('status', [
                     'menunggu_approval',
                     'ditangguhkan',
-                    'perlu_perubahan',
                     'ditangguhkan_tugas_dinas',
                     'dikembalikan_karena_rollover',
                     'disetujui',

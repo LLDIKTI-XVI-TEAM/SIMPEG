@@ -19,14 +19,19 @@
     </source>
     <php>
         <ini name="memory_limit" value="-1"/>
-        <env name="APP_ENV" value="testing"/>
+        <!-- Laravel memprioritaskan $_SERVER; nilai ini menahan .env DB_DATABASE=simpeg agar database pengembangan tidak pernah menjadi target test. -->
+        <server name="APP_ENV" value="testing"/>
+        <server name="DB_CONNECTION" value="pgsql"/>
+        <server name="DB_DATABASE" value="simpeg_test"/>
+        <server name="DB_URL" value=""/>
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
-        <env name="DB_URL" value=""/>
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="simpeg_test" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="KEYCLOAK_TEST_USERNAME" value="demo-klabat"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

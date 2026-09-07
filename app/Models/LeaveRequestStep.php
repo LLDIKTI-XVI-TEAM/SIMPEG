@@ -26,6 +26,8 @@ class LeaveRequestStep extends Model
 
     public const SKIPPED_DUTY_POSTPONEMENT_TERMINAL = 'duty_postponement_terminal';
 
+    public const SKIPPED_REQUEST_CANCELLED = 'request_cancelled';
+
     public const STATUS_DUTY_POSTPONED = 'ditangguhkan_tugas_dinas';
 
     protected $fillable = [

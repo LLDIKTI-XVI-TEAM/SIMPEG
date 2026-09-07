@@ -14,7 +14,6 @@ use App\Models\RefJenisPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\LeaveEligibilityService;
-use App\Services\LeaveApprovalService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -166,10 +165,10 @@ class LeaveEligibilityPolicyTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $leaveRequest = LeaveRequest::query()->sole();
-        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal cuti perlu diperbaiki.');
 
         $this->actingAs($aktor['user'])
             ->patchJson(route('cuti.resubmit', $leaveRequest), [
+                'revision_version' => $leaveRequest->fresh()->revision_version,
                 'tanggal_mulai' => '2026-08-03',
                 'tanggal_selesai' => '2026-11-03',
                 'alasan' => 'Periode diperbaiki.',
@@ -182,7 +181,7 @@ class LeaveEligibilityPolicyTest extends TestCase
 
         $leaveRequest->refresh();
         $this->assertSame('2026-08-07', $leaveRequest->tanggal_selesai->toDateString());
-        $this->assertSame('perlu_perubahan', $leaveRequest->status);
+        $this->assertSame('menunggu_approval', $leaveRequest->status);
     }
 
     public function test_maternity_leave_creates_an_explicit_case_and_enforces_three_calendar_months(): void
@@ -228,6 +227,7 @@ class LeaveEligibilityPolicyTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $caseId = LeaveRequest::query()->sole()->leave_request_case_id;
+        LeaveRequest::query()->where('status', 'menunggu_approval')->update(['status' => 'disetujui']);
 
         $this->actingAs($aktor['user'])
             ->post(route('cuti.store'), $this->payload($melahirkan, '2027-01-01', '2027-02-28', [
@@ -236,6 +236,7 @@ class LeaveEligibilityPolicyTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $this->assertSame(2, LeaveRequest::query()->where('leave_request_case_id', $caseId)->count());
+        LeaveRequest::query()->where('status', 'menunggu_approval')->update(['status' => 'disetujui']);
 
         $this->actingAs($aktor['user'])
             ->postJson(route('cuti.store'), $this->payload($melahirkan, '2027-03-01', '2027-03-01', [
@@ -255,12 +256,14 @@ class LeaveEligibilityPolicyTest extends TestCase
             ->assertRedirect(route('cuti'));
 
         $caseId = LeaveRequest::query()->sole()->leave_request_case_id;
+        LeaveRequest::query()->where('status', 'menunggu_approval')->update(['status' => 'disetujui']);
 
         $this->actingAs($aktor['user'])
             ->post(route('cuti.store'), $this->payload($cltn, '2028-12-29', '2028-12-31', [
                 'leave_request_case_id' => $caseId,
             ]))
             ->assertRedirect(route('cuti'));
+        LeaveRequest::query()->where('status', 'menunggu_approval')->update(['status' => 'disetujui']);
 
         $this->actingAs($aktor['user'])
             ->postJson(route('cuti.store'), $this->payload($cltn, '2029-01-01', '2029-01-02', [
@@ -678,10 +681,10 @@ class LeaveEligibilityPolicyTest extends TestCase
 
         $leaveRequest = LeaveRequest::query()->sole();
         $caseId = $leaveRequest->leave_request_case_id;
-        app(LeaveApprovalService::class)->requestChanges($leaveRequest, $aktor['supervisor'], $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'), 'Tanggal perlu diperbaiki.');
 
         $this->actingAs($aktor['user'])
             ->patchJson(route('cuti.resubmit', $leaveRequest), [
+                'revision_version' => $leaveRequest->fresh()->revision_version,
                 'tanggal_mulai' => '2026-01-01',
                 'tanggal_selesai' => '2026-04-01',
                 'alasan' => 'Periode diperbaiki.',
@@ -694,7 +697,7 @@ class LeaveEligibilityPolicyTest extends TestCase
         $leaveRequest->refresh();
         $this->assertSame('2026-01-15', $leaveRequest->tanggal_selesai->toDateString());
         $this->assertSame($caseId, $leaveRequest->leave_request_case_id);
-        $this->assertSame('perlu_perubahan', $leaveRequest->status);
+        $this->assertSame('menunggu_approval', $leaveRequest->status);
     }
 
     public function test_pppk_and_non_case_types_cannot_bypass_server_side_rules(): void

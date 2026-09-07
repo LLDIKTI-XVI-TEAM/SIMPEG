@@ -46,6 +46,20 @@
     }
 }
 
+/* Warna Chart.js menggunakan semantic token yang sama dengan komponen SIMPEG. */
+.statistics-chart-tone-primary { background-color: var(--color-primary); }
+.statistics-chart-tone-secondary { background-color: var(--color-secondary); }
+.statistics-chart-tone-info { background-color: var(--color-info); }
+.statistics-chart-tone-success { background-color: var(--color-success); }
+.statistics-chart-tone-warning { background-color: var(--color-warning); }
+.statistics-chart-tone-orange { background-color: var(--color-orange); }
+.statistics-chart-tone-danger { background-color: var(--color-danger); }
+.statistics-chart-tone-muted { background-color: var(--color-muted); }
+
+.statistics-progress-bar {
+    width: 0;
+}
+
 /* Riwayat pemakaian ditampilkan sebagai kartu agar setiap fakta tetap terbaca pada layar sempit. */
 @media (max-width: 767px) {
     #usage-history {
@@ -207,4 +221,3 @@ input:-webkit-autofill:active {
 [x-cloak] {
     display: none !important;
 }
-

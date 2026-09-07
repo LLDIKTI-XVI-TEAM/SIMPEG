@@ -53,7 +53,7 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->seed(RbacSeeder::class);
 
         // Seeder gabungan mencakup permission operasional, cuti, data referensi, dan simulasi role.
-        $this->assertSame(41, Permission::count());
+        $this->assertSame(42, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -145,6 +145,25 @@ class RbacPermissionMiddlewareTest extends TestCase
             ]);
             $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
         }
+    }
+
+    public function test_cancellation_permission_migration_hanya_memetakan_admin_kepegawaian(): void
+    {
+        Permission::query()->where('name', 'cuti.cancellation.manage')->delete();
+
+        $migration = require database_path('migrations/2026_09_03_000002_add_leave_cancellation_access_and_notification_policies.php');
+        $migration->up();
+        $migration->up();
+
+        $permission = Permission::query()->where('name', 'cuti.cancellation.manage')->firstOrFail();
+        $admin = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
+
+        $this->assertSame('cuti', $permission->module);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $admin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
     }
 
     public function test_switch_role_permission_migration_backfills_existing_database_without_running_seeder(): void

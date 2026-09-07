@@ -26,9 +26,21 @@
 
                     <div class="p-6 space-y-5">
                         @php
-                            // Form dikunci ketika chain approval belum siap agar pemohon tidak mengirim pengajuan yang pasti ditolak server.
-                            $formLocked = ! $chainReady;
+                            // UI memberi umpan balik awal; Action submit tetap menjadi enforcement kanonis di bawah lock pegawai.
+                            $formLocked = ! $chainReady || $hasActiveLeaveWorkflow;
                         @endphp
+
+                        @if($hasActiveLeaveWorkflow)
+                        <div role="alert" class="rounded-lg border border-warning/40 bg-warning/10 p-4">
+                            <p class="text-sm font-semibold text-ink">Pengajuan aktif masih perlu diselesaikan.</p>
+                            <p class="mt-1 text-sm text-warning-dark">
+                                Selesaikan proses pengajuan atau permohonan pembatalan yang sedang berjalan sebelum membuat pengajuan baru.
+                            </p>
+                            <a href="{{ route('cuti') }}" wire:navigate class="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                                Lihat pengajuan cuti
+                            </a>
+                        </div>
+                        @endif
 
                         <!-- Peringatan bila rantai approval cuti belum dikonfigurasi -->
                         @unless($chainReady)

@@ -12,7 +12,6 @@ use App\Models\StorageRecoveryTask;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\EmployeeFileStorageService;
-use App\Services\LeaveApprovalService;
 use App\Services\StorageRecoveryService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\QueryException;
@@ -163,12 +162,6 @@ SQL);
             $this->document('resubmit-old.pdf'),
         ));
         $leaveRequest = LeaveRequest::query()->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges(
-            $leaveRequest,
-            $actor['supervisor'],
-            $leaveRequest->steps()->where('status', 'active')->valueOrFail('id'),
-            'Lampiran perlu diganti.',
-        );
 
         $realDisk = Storage::disk(LeaveRequest::ATTACHMENT_STORAGE_DISK);
         $leaseHeldAfterGrace = false;
@@ -190,6 +183,7 @@ SQL);
             ->andReturn($probedDisk, $realDisk);
 
         $response = $this->patch(route('cuti.resubmit', $leaveRequest), [
+            'revision_version' => $leaveRequest->fresh()->revision_version,
             'tanggal_mulai' => '2026-09-14',
             'tanggal_selesai' => '2026-09-16',
             'alasan' => 'Lampiran sudah diperbaiki.',

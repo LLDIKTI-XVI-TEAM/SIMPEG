@@ -115,6 +115,9 @@
                     ],
                     $selectedEmployee ? [['label' => $selectedEmployee->nama_lengkap]] : []
                 )" />
+                <p class="mt-2 max-w-2xl text-xs leading-relaxed text-muted">
+                    Saldo merupakan hasil perhitungan baca-saja berdasarkan fakta pemakaian. Perbaiki data pemakaian tahunan atau entri cuti manual bila sumber datanya berubah.
+                </p>
             </div>
 
             @if ($selectedEmployee)
@@ -132,10 +135,6 @@
                 </div>
             @endif
         </div>
-
-        <x-ui.alert variant="info">
-            Saldo merupakan hasil perhitungan baca-saja berdasarkan fakta pemakaian. Perbaiki data pemakaian tahunan atau entri cuti manual bila sumber datanya berubah.
-        </x-ui.alert>
 
         @if (session('success'))
             <x-ui.alert variant="success">{{ session('success') }}</x-ui.alert>

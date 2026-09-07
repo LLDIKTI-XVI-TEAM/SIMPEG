@@ -103,6 +103,26 @@ class PimpinanLeaveDetailTest extends TestCase
             ->assertDontSee('status_rahasia');
     }
 
+    public function test_detail_shows_active_step_as_held_while_cancellation_is_pending(): void
+    {
+        $leave = $this->leave(Employee::factory()->create(), $this->leaveType(), '2026-07-06', LeaveRequest::STATUS_CANCELLATION_PENDING);
+        LeaveRequestStep::create([
+            'leave_request_id' => $leave->id,
+            'step_order' => 1,
+            'step_type' => 'pybmc',
+            'role_label' => 'PYBMC',
+            'approver_employee_id' => Employee::factory()->create()->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        $this->actingAs($this->pimpinan())
+            ->get(route('pimpinan.cuti.show', $leave))
+            ->assertOk()
+            ->assertSeeInOrder(['Timeline Persetujuan', 'Tahap 1 · PYBMC', 'Menunggu Keputusan Pembatalan'])
+            ->assertDontSee('animate-pulse', false);
+    }
+
     public function test_detail_shows_official_timeline_actions_notes_and_times(): void
     {
         $approver = Employee::factory()->create(['nama_lengkap' => 'Pejabat Cuti']);

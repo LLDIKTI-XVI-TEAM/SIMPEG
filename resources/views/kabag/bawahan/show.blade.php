@@ -83,6 +83,8 @@
                             'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
                             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
                             'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
+                            'menunggu_pembatalan' => ['label' => 'Menunggu Keputusan Pembatalan', 'variant' => 'warning'],
+                            'dibatalkan' => ['label' => 'Dibatalkan', 'variant' => 'danger'],
                             'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
                             'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                             default => ['label' => $leave->status, 'variant' => 'muted'],

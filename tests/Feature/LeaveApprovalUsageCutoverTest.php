@@ -301,6 +301,7 @@ class LeaveApprovalUsageCutoverTest extends TestCase
                     $fixture['request'],
                     $fixture['approver'],
                     $fixture['request']->steps()->where('status', 'active')->valueOrFail('id'),
+                    (int) $fixture['request']->fresh()->revision_version,
                     'Disetujui final.',
                     $actingUser,
                 );
@@ -611,6 +612,7 @@ class LeaveApprovalUsageCutoverTest extends TestCase
             $fixture['request']->fresh(),
             $fixture['approver'],
             $fixture['active_step_id'],
+            (int) $fixture['request']->fresh()->revision_version,
             'Disetujui final melalui SIMPEG.',
             $this->approvalRequest($fixture['approver_user']),
         );

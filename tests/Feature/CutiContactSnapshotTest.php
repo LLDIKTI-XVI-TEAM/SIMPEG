@@ -11,7 +11,6 @@ use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
-use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -296,23 +295,23 @@ class CutiContactSnapshotTest extends TestCase
 
     public function test_resubmit_menolak_pengajuan_tanpa_kontak(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload());
+        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload($leave));
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['alamat_selama_cuti', 'nomor_telepon']);
         $leave->refresh();
-        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('menunggu_approval', $leave->status);
     }
 
     public function test_resubmit_menolak_alamat_dan_telepon_hanya_spasi(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => '     ',
             'nomor_telepon' => '   ',
         ]));
@@ -320,15 +319,15 @@ class CutiContactSnapshotTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['alamat_selama_cuti', 'nomor_telepon']);
         $leave->refresh();
-        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('menunggu_approval', $leave->status);
     }
 
     public function test_resubmit_menolak_alamat_melebihi_1000_karakter(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => str_repeat('a', 1001),
             'nomor_telepon' => self::TELEPON_VALID,
         ]));
@@ -336,15 +335,15 @@ class CutiContactSnapshotTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['alamat_selama_cuti']);
         $leave->refresh();
-        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('menunggu_approval', $leave->status);
     }
 
     public function test_resubmit_menolak_telepon_melebihi_20_karakter(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => self::ALAMAT_VALID,
             'nomor_telepon' => str_repeat('1', 21),
         ]));
@@ -352,15 +351,15 @@ class CutiContactSnapshotTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['nomor_telepon']);
         $leave->refresh();
-        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('menunggu_approval', $leave->status);
     }
 
     public function test_resubmit_menolak_telepon_mengandung_huruf(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => self::ALAMAT_VALID,
             'nomor_telepon' => '0812ABC5678',
         ]));
@@ -368,15 +367,15 @@ class CutiContactSnapshotTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['nomor_telepon']);
         $leave->refresh();
-        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('menunggu_approval', $leave->status);
     }
 
     public function test_resubmit_menolak_telepon_mengandung_garis_miring(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patchJson(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => self::ALAMAT_VALID,
             'nomor_telepon' => '0812/5678',
         ]));
@@ -384,15 +383,15 @@ class CutiContactSnapshotTest extends TestCase
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['nomor_telepon']);
         $leave->refresh();
-        $this->assertSame('perlu_perubahan', $leave->status);
+        $this->assertSame('menunggu_approval', $leave->status);
     }
 
     public function test_resubmit_menerima_kontak_valid(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         $this->actingAs($aktor['user']);
-        $response = $this->patch(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patch(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => self::ALAMAT_VALID,
             'nomor_telepon' => self::TELEPON_VALID,
         ]));
@@ -405,11 +404,11 @@ class CutiContactSnapshotTest extends TestCase
 
     public function test_resubmit_memangkas_spasi_di_sekitar_kontak_valid(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
 
         // Alamat 1000 karakter dibungkus spasi (total 1004): lolos max:1000 hanya bila dipangkas lebih dulu.
         $this->actingAs($aktor['user']);
-        $response = $this->patch(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patch(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => '  '.str_repeat('a', 1000).'  ',
             'nomor_telepon' => '  '.self::TELEPON_VALID.'  ',
         ]));
@@ -422,7 +421,7 @@ class CutiContactSnapshotTest extends TestCase
 
     public function test_resubmit_mengganti_snapshot_kontak_terpangkas_tanpa_mengubah_snapshot_step_dan_audit_tanpa_pii_mentah(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
         $piiProfil = [
             'nip' => '198001012006041999',
             'email_pribadi' => 'audit-rahasia@example.test',
@@ -439,7 +438,7 @@ class CutiContactSnapshotTest extends TestCase
         $telepon = '  +62 (431) 555-0200  ';
 
         $this->actingAs($aktor['user']);
-        $response = $this->patch(route('cuti.resubmit', $leave), $this->resubmitPayload([
+        $response = $this->patch(route('cuti.resubmit', $leave), $this->resubmitPayload($leave, [
             'alamat_selama_cuti' => $alamat,
             'nomor_telepon' => $telepon,
         ]));
@@ -471,12 +470,12 @@ class CutiContactSnapshotTest extends TestCase
         }
         $this->assertSame($leave->employee_id, $oldValues['employee_id']);
         $this->assertSame($leave->jenis_cuti_id, $oldValues['jenis_cuti_id']);
-        $this->assertSame('perlu_perubahan', $oldValues['status']);
+        $this->assertSame('menunggu_approval', $oldValues['status']);
         $this->assertSame('Keperluan keluarga.', $oldValues['alasan']);
         $this->assertSame('2026-07-06', $this->auditDate($oldValues['tanggal_mulai']));
         $this->assertSame('2026-07-10', $this->auditDate($oldValues['tanggal_selesai']));
         $this->assertSame('menunggu_approval', $newValues['status']);
-        $this->assertSame('Revisi tanggal sesuai arahan approver.', $newValues['alasan']);
+        $this->assertSame('Revisi tanggal sebelum persetujuan pertama.', $newValues['alasan']);
         $this->assertSame('2026-07-13', $this->auditDate($newValues['tanggal_mulai']));
         $this->assertSame('2026-07-15', $this->auditDate($newValues['tanggal_selesai']));
         foreach ([$oldValues, $newValues] as $auditValues) {
@@ -508,7 +507,7 @@ class CutiContactSnapshotTest extends TestCase
 
     public function test_form_kirim_ulang_merender_kontrol_kontak_wajib_dengan_fallback_model_dan_error_tereskape(): void
     {
-        [$aktor, $leave] = $this->makePerluPerubahan();
+        [$aktor, $leave] = $this->makeDirectlyEditableLeave();
         $alamatSnapshot = 'Jl. <Snapshot> & Keluarga, Manado';
         $teleponSnapshot = '+62 <431> & 456';
         $alamatLama = 'Jl. <Revisi> & Keluarga, Manado';
@@ -658,22 +657,23 @@ class CutiContactSnapshotTest extends TestCase
      * @param  array<string, mixed>  $override
      * @return array<string, mixed>
      */
-    private function resubmitPayload(array $override = []): array
+    private function resubmitPayload(LeaveRequest $leave, array $override = []): array
     {
         return array_merge([
+            'revision_version' => $leave->fresh()->revision_version,
             'tanggal_mulai' => '2026-07-13',
             'tanggal_selesai' => '2026-07-15',
-            'alasan' => 'Revisi tanggal sesuai arahan approver.',
+            'alasan' => 'Revisi tanggal sebelum persetujuan pertama.',
         ], $override);
     }
 
     /**
-     * Menyiapkan pengajuan berstatus perlu_perubahan milik pemohon agar gerbang otorisasi resubmit terpenuhi.
-     * Pengajuan awal disimpan dengan kontak valid supaya store yang kini mewajibkan kontak tetap lolos.
+     * Menyiapkan pengajuan yang belum memiliki tindakan approval agar masih dapat diedit langsung.
+     * Pengajuan awal disimpan dengan kontak valid supaya store yang mewajibkan kontak tetap lolos.
      *
      * @return array{0: array{user: User, employee: Employee, supervisor: Employee, pybmc: Employee}, 1: LeaveRequest}
      */
-    private function makePerluPerubahan(): array
+    private function makeDirectlyEditableLeave(): array
     {
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Sakit');
@@ -685,13 +685,6 @@ class CutiContactSnapshotTest extends TestCase
         ]));
 
         $leave = LeaveRequest::with('steps')->firstOrFail();
-        app(LeaveApprovalService::class)->requestChanges(
-            $leave,
-            $aktor['supervisor'],
-            $leave->steps()->where('status', 'active')->valueOrFail('id'),
-            'Tanggal harus diperbaiki.',
-        );
-        $leave->refresh();
 
         return [$aktor, $leave];
     }

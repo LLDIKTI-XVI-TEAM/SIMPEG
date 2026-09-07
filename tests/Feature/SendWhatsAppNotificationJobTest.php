@@ -2169,7 +2169,7 @@ class SendWhatsAppNotificationJobTest extends TestCase
                 buttonVariables: ['button_target_url' => 'https://simpeg.example.test/cuti/approval'],
                 leaveRequestId: $leaveRequest->id,
                 leaveRequestStepId: $step->id,
-                leaveRequestVersion: $leaveRequest->updated_at?->utc()->format('Y-m-d\TH:i:s.u\Z'),
+                leaveRequestVersion: (string) $leaveRequest->fresh()->revision_version,
                 variablesMap: $this->providerVariablesMap('simpeg_cuti_perlu_tindakan'),
             );
             $job->handle(
@@ -2188,8 +2188,9 @@ class SendWhatsAppNotificationJobTest extends TestCase
         $this->fakeAdapter->assertSentCount(1);
     }
 
-    public function test_job_tindakan_lama_dilewati_setelah_pengajuan_diubah_dan_dikirim_ulang(): void
+    public function test_job_tindakan_lama_dilewati_meski_revisi_baru_memiliki_updated_at_yang_sama(): void
     {
+        Carbon::setTestNow('2026-09-01 08:00:00');
         $this->enableWhatsAppForEvent('cuti.pengajuan_baru');
         config(['services.whatsapp.templates.simpeg_cuti_perlu_tindakan' => [
             'id' => 'tmpl_cuti_tindakan_123',
@@ -2214,17 +2215,18 @@ class SendWhatsAppNotificationJobTest extends TestCase
             'status' => 'active',
             'is_final' => true,
         ]);
-        $queuedVersion = $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z');
+        $queuedVersion = (string) $leaveRequest->fresh()->revision_version;
+        $queuedUpdatedAt = $leaveRequest->getRawOriginal('updated_at');
 
-        // Perubahan lalu resubmit mempertahankan step aktif yang sama, tetapi mengubah data pengajuan.
-        $leaveRequest->forceFill(['status' => 'perlu_perubahan'])->save();
+        // Revisi langsung mempertahankan step aktif yang sama, tetapi menaikkan versi data pengajuan.
         $leaveRequest->forceFill([
             'status' => 'menunggu_approval',
+            'revision_version' => 2,
             'tanggal_mulai' => '2026-09-10',
             'tanggal_selesai' => '2026-09-12',
             'jumlah_hari_kerja' => 3,
-            'updated_at' => now()->addSecond(),
         ])->save();
+        $this->assertSame($queuedUpdatedAt, $leaveRequest->fresh()->getRawOriginal('updated_at'));
 
         $delivery = WhatsAppNotificationDelivery::create([
             'idempotency_key' => 'tindakan-versi-lama',

@@ -111,7 +111,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
             'alasan' => 'Fixture resubmit direct Action.',
             'alamat_selama_cuti' => 'Jl. Sam Ratulangi No. 1',
             'nomor_telepon' => '+62 431 123456',
-            'status' => 'perlu_perubahan',
+            'status' => 'menunggu_approval',
         ]);
         $reservationEventCount = 0;
 
@@ -166,6 +166,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
         $fixture = $this->fixture($code);
         $payload = [
             'jenis_cuti_id' => $fixture['type']->id,
+            'revision_version' => (int) $fixture['request']->fresh()->revision_version,
             // 4-5 Juli 2026 adalah akhir pekan, sehingga tidak ada hari kerja pada rentang ini.
             'tanggal_mulai' => '2026-07-04',
             'tanggal_selesai' => '2026-07-05',
@@ -226,7 +227,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
 
         if ($operation === 'resubmit') {
             $fixture['request']->refresh();
-            $this->assertSame('perlu_perubahan', $fixture['request']->status);
+            $this->assertSame('menunggu_approval', $fixture['request']->status);
             $this->assertSame('2026-07-06', $fixture['request']->tanggal_mulai->toDateString());
             $this->assertSame('2026-07-10', $fixture['request']->tanggal_selesai->toDateString());
             $this->assertSame($beforeRequestWorkdays, $fixture['request']->jumlah_hari_kerja);
@@ -242,6 +243,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
         $fixture = $this->fixture($code);
         $payload = [
             'jenis_cuti_id' => $fixture['type']->id,
+            'revision_version' => (int) $fixture['request']->fresh()->revision_version,
             'tanggal_mulai' => '2026-12-30',
             'tanggal_selesai' => '2027-01-05',
             'alasan' => 'Direct Action lintas tahun.',
@@ -287,7 +289,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
 
         if ($operation === 'resubmit') {
             $fixture['request']->refresh();
-            $this->assertSame('perlu_perubahan', $fixture['request']->status);
+            $this->assertSame('menunggu_approval', $fixture['request']->status);
             $this->assertSame('2026-07-06', $fixture['request']->tanggal_mulai->toDateString());
             $this->assertSame('2026-07-10', $fixture['request']->tanggal_selesai->toDateString());
             $this->assertSame('Fixture resubmit direct Action.', $fixture['request']->alasan);
@@ -298,6 +300,7 @@ class LeaveActionCalendarBoundaryTest extends TestCase
     public function test_direct_submit_menerima_rentang_dalam_satu_tahun_kalender(): void
     {
         $fixture = $this->fixture('tahunan');
+        $fixture['request']->forceFill(['status' => 'tidak_disetujui'])->save();
         $payload = [
             'jenis_cuti_id' => $fixture['type']->id,
             'tanggal_mulai' => '2026-12-01',

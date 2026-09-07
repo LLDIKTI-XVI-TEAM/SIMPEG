@@ -162,8 +162,10 @@ class ReferenceSeederTest extends TestCase
             'cuti.disetujui',
             'cuti.ditunda',
             'cuti.menunggu_persetujuan',
+            'cuti.pembatalan_diajukan',
+            'cuti.pembatalan_disetujui',
+            'cuti.pembatalan_ditolak',
             'cuti.pengajuan_baru',
-            'cuti.perlu_perubahan',
             'cuti.tidak_disetujui',
             'ews.kenaikan_pangkat',
             'ews.kgb',
@@ -185,12 +187,15 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(28, $policies);
+        $this->assertCount(32, $policies);
         $this->assertSame($expectedEvents, $policies->pluck('event_key')->unique()->values()->all());
         $this->assertSame(['email', 'in_app'], $policies->pluck('code')->unique()->sort()->values()->all());
         $this->assertTrue($policies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
         $this->assertDatabaseMissing('notification_event_channels', [
             'event_key' => 'status_pegawai.diaktifkan_kembali',
+        ]);
+        $this->assertDatabaseMissing('notification_event_channels', [
+            'event_key' => 'cuti.perlu_perubahan',
         ]);
 
         foreach ($expectedEvents as $eventKey) {
@@ -215,10 +220,10 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        // 43 = 33 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
+        // 47 = 37 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
         // + 2 baris status_pegawai.diubah (in_app + email)
         // + 2 baris status_pegawai.dinonaktifkan (in_app + email).
-        $this->assertDatabaseCount('notification_event_channels', 43);
+        $this->assertDatabaseCount('notification_event_channels', 47);
         $this->assertCount(1, $policies);
         $this->assertSame('in_app', $policies->sole()->code);
         $this->assertTrue((bool) $policies->sole()->is_enabled);
@@ -256,10 +261,10 @@ class ReferenceSeederTest extends TestCase
 
         $this->seedReferenceData();
 
-        // 43 = 33 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
+        // 47 = 37 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
         // + 2 baris status_pegawai.diubah (in_app + email)
         // + 2 baris status_pegawai.dinonaktifkan (in_app + email).
-        $this->assertDatabaseCount('notification_event_channels', 43);
+        $this->assertDatabaseCount('notification_event_channels', 47);
         $this->assertDatabaseHas('notification_event_channels', [
             'event_key' => 'ews.satyalancana',
             'notification_channel_id' => $emailChannelId,

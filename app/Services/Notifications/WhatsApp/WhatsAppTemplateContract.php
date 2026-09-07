@@ -27,7 +27,6 @@ final class WhatsAppTemplateContract
         'cuti.menunggu_persetujuan' => self::ARCHETYPE_CUTI_PERLU_TINDAKAN,
         'cuti.disetujui' => self::ARCHETYPE_CUTI_STATUS,
         'cuti.ditunda' => self::ARCHETYPE_CUTI_STATUS,
-        'cuti.perlu_perubahan' => self::ARCHETYPE_CUTI_STATUS,
         'cuti.tidak_disetujui' => self::ARCHETYPE_CUTI_STATUS,
         'cuti.ditangguhkan_tugas_dinas' => self::ARCHETYPE_CUTI_STATUS,
         'cuti.dikembalikan_karena_rollover' => self::ARCHETYPE_CUTI_STATUS,

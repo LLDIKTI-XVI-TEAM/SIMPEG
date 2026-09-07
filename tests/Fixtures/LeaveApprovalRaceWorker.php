@@ -3,8 +3,12 @@
 namespace Tests\Fixtures;
 
 use App\Actions\Cuti\ApproveLeaveAction;
+use App\Actions\Cuti\DecideLeaveCancellationAction;
 use App\Actions\Cuti\RecordDutyPostponementAction;
+use App\Actions\Cuti\RequestLeaveCancellationAction;
+use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Models\Employee;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageRecord;
@@ -41,12 +45,62 @@ final class LeaveApprovalRaceWorker
             $request->setUserResolver(fn (): User => $actor);
             $operation = $input['operation'] ?? 'approve';
 
-            if ($operation === 'duty_postponement') {
+            if ($operation === 'request_cancellation') {
+                $cancellation = app(RequestLeaveCancellationAction::class)->execute(
+                    $leaveRequest,
+                    $actor,
+                    'Permohonan pembatalan pada race.',
+                    $request,
+                );
+                $result = [
+                    'ok' => true,
+                    'operation' => $operation,
+                    'request_id' => $leaveRequest->id,
+                    'cancellation_id' => $cancellation->id,
+                    'status' => $cancellation->status,
+                ];
+            } elseif (in_array($operation, ['approve_cancellation', 'reject_cancellation'], true)) {
+                $cancellation = LeaveCancellationRequest::query()->findOrFail($input['cancellation_id']);
+                $decided = app(DecideLeaveCancellationAction::class)->execute(
+                    $cancellation,
+                    $actor,
+                    $operation === 'approve_cancellation' ? 'DISETUJUI' : 'DITOLAK',
+                    $request,
+                );
+                $result = [
+                    'ok' => true,
+                    'operation' => $operation,
+                    'request_id' => $leaveRequest->id,
+                    'cancellation_id' => $decided->id,
+                    'status' => $decided->status,
+                ];
+            } elseif ($operation === 'revise') {
+                $revised = app(ResubmitLeaveRequestAction::class)->execute(
+                    $leaveRequest,
+                    [
+                        'tanggal_mulai' => '2026-08-21',
+                        'tanggal_selesai' => '2026-08-21',
+                        'alasan' => 'Pengajuan diperbarui saat race.',
+                        'alamat_selama_cuti' => 'Alamat hasil revisi race.',
+                        'nomor_telepon' => '081234000099',
+                        'revision_version' => (int) $input['revision_version'],
+                    ],
+                    $request,
+                );
+                $result = [
+                    'ok' => true,
+                    'operation' => $operation,
+                    'request_id' => $revised->id,
+                    'status' => $revised->status,
+                    'revision_version' => $revised->revision_version,
+                ];
+            } elseif ($operation === 'duty_postponement') {
                 $terminal = app(RecordDutyPostponementAction::class)->execute(
                     $leaveRequest,
                     $approver,
                     $actor,
                     $input['active_step_id'],
+                    (int) $input['revision_version'],
                     'Penangguhan tugas dinas race.',
                 );
                 $result = [
@@ -60,6 +114,7 @@ final class LeaveApprovalRaceWorker
                     $leaveRequest,
                     $approver,
                     $input['active_step_id'],
+                    (int) $input['revision_version'],
                     'Persetujuan final race.',
                     $request,
                 );

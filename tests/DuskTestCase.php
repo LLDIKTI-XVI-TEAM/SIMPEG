@@ -40,7 +40,9 @@ abstract class DuskTestCase extends BaseTestCase
 
         return RemoteWebDriver::create(
             $_ENV['DUSK_DRIVER_URL'] ?? config('dusk.driver_url'),
-            DesiredCapabilities::chrome()->setCapability(ChromeOptions::CAPABILITY, $options),
+            DesiredCapabilities::chrome()
+                ->setCapability(ChromeOptions::CAPABILITY, $options)
+                ->setCapability('goog:loggingPrefs', ['browser' => 'ALL']),
         );
     }
 }

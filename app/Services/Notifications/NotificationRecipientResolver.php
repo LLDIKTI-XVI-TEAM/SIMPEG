@@ -3,6 +3,7 @@
 namespace App\Services\Notifications;
 
 use App\Models\Employee;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -47,6 +48,44 @@ class NotificationRecipientResolver
     public function shouldEmailPrimaryRecipient(string $type, ?array $data = null): bool
     {
         return $this->emailEnabled($type, $data);
+    }
+
+    /**
+     * Mengambil penerima keputusan pembatalan dari role efektif dan matrix permission saat ini.
+     * Query dibatasi pada kandidat Admin Kepegawaian serta pegawai aktif, lalu role sementara
+     * divalidasi lagi supaya simulasi yang tidak sah tidak ikut menerima data workflow.
+     *
+     * @return Collection<int, Employee>
+     */
+    public function cancellationDecisionRecipients(): Collection
+    {
+        $hasPermission = Role::query()
+            ->where('name', 'admin_kepegawaian')
+            ->whereHas('permissions', fn ($query) => $query->where('name', 'cuti.cancellation.manage'))
+            ->exists();
+
+        if (! $hasPermission) {
+            return collect();
+        }
+
+        return User::query()
+            ->where(function ($query): void {
+                $query->where('role', 'admin_kepegawaian')
+                    ->orWhere(function ($temporaryRole): void {
+                        $temporaryRole->where('role', 'super_admin')
+                            ->where('temporary_role', 'admin_kepegawaian');
+                    });
+            })
+            ->whereNotNull('employee_id')
+            ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
+            ->with(['employee.statusPegawai'])
+            ->get()
+            ->filter(fn (User $user): bool => $user->getEffectiveRole() === 'admin_kepegawaian'
+                && $user->employee instanceof Employee
+                && $user->employee->isActive())
+            ->pluck('employee')
+            ->unique('id')
+            ->values();
     }
 
     /**

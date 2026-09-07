@@ -120,6 +120,7 @@ class CutiDetailTimelineTest extends TestCase
             ->followingRedirects()
             ->post(route('cuti.approve', $leaveRequest->id), [
                 'active_step_id' => '00000000-0000-4000-8000-000000000034',
+                'revision_version' => $leaveRequest->fresh()->revision_version,
             ])
             ->assertOk()
             ->assertSee('Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.')
@@ -325,7 +326,7 @@ class CutiDetailTimelineTest extends TestCase
             ->assertSee('Dikembalikan karena Rollover')
             ->assertDontSee(route('cuti.approve', $leaveRequest->id), false)
             ->assertDontSee(route('cuti.postpone', $leaveRequest->id), false)
-            ->assertDontSee(route('cuti.request-changes', $leaveRequest->id), false)
+            ->assertDontSee('Minta Perubahan')
             ->assertDontSee(route('cuti.decline', $leaveRequest->id), false);
     }
 

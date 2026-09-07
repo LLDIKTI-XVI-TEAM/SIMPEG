@@ -138,6 +138,7 @@ class CutiEndToEndApprovalTest extends TestCase
         $this->actingAs($kabagUser)
             ->post(route('kepala-bagian.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
             ])
             ->assertRedirect(route('kepala-bagian.cuti.show', $leave))
@@ -168,6 +169,7 @@ class CutiEndToEndApprovalTest extends TestCase
         $this->actingAs($pimpinanUser)
             ->post(route('pimpinan.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
@@ -337,6 +339,7 @@ class CutiEndToEndApprovalTest extends TestCase
             $this->actingAs($user)
                 ->post(route('cuti.approve', $leave->id), [
                     'active_step_id' => $step->id,
+                    'revision_version' => $leave->fresh()->revision_version,
                     'komentar' => "Menyetujui tahap {$step->step_order}.",
                 ])
                 ->assertRedirect(route('cuti.approval'));
@@ -485,6 +488,7 @@ class CutiEndToEndApprovalTest extends TestCase
             $this->actingAs($user)
                 ->post(route('cuti.approve', $leave->id), [
                     'active_step_id' => $step->id,
+                    'revision_version' => $leave->fresh()->revision_version,
                     'komentar' => 'Satu tindakan per tahap approval.',
                 ])
                 ->assertRedirect(route('cuti.approval'));

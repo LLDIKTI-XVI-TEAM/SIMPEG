@@ -37,6 +37,7 @@ class PimpinanLeaveProofTest extends TestCase
         $this->actingAs($pimpinan)
             ->post(route('pimpinan.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
@@ -61,6 +62,7 @@ class PimpinanLeaveProofTest extends TestCase
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
             'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $leave->fresh()->revision_version,
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ]);
@@ -93,6 +95,7 @@ class PimpinanLeaveProofTest extends TestCase
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
             'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $leave->fresh()->revision_version,
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ]);
@@ -142,6 +145,7 @@ class PimpinanLeaveProofTest extends TestCase
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
             'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $leave->fresh()->revision_version,
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ])->assertRedirect();
@@ -179,6 +183,7 @@ class PimpinanLeaveProofTest extends TestCase
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
             'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $leave->fresh()->revision_version,
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ])->assertRedirect();
@@ -206,6 +211,7 @@ class PimpinanLeaveProofTest extends TestCase
 
         $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
             'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $leave->fresh()->revision_version,
             'keputusan' => 'DISETUJUI',
             'catatan' => 'Disetujui.',
         ]);

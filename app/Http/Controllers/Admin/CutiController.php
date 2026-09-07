@@ -12,7 +12,6 @@ use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
 use App\Actions\Cuti\PrepareLeaveRequestFormAction;
 use App\Actions\Cuti\RecordDutyPostponementAction;
-use App\Actions\Cuti\RequestChangesLeaveAction;
 use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Actions\Cuti\ShowCutiRekapAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
@@ -110,10 +109,10 @@ class CutiController extends Controller
         $action->execute($employee, $request->validated(), $request);
 
         return redirect()->route('cuti')
-            ->with('success', 'Pengajuan cuti berhasil dikirim dan menunggu persetujuan atasan langsung.');
+            ->with('success', 'Pengajuan cuti berhasil dikirim dan menunggu proses persetujuan.');
     }
 
-    /** Mengirim ulang pengajuan perlu perubahan dengan snapshot approval yang sama. */
+    /** Mengirim ulang revisi awal atau pengajuan yang dikembalikan setelah pergantian tahun melalui Action. */
     public function resubmit(ResubmitLeaveRequestRequest $request, LeaveRequest $leaveRequest, ResubmitLeaveRequestAction $action)
     {
         $action->execute($leaveRequest, $request->validated(), $request);
@@ -150,7 +149,7 @@ class CutiController extends Controller
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menyetujui cuti.');
 
         $payload = $request->validated();
-        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'] ?? null, $request);
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['komentar'] ?? null, $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti berhasil disetujui.');
@@ -168,25 +167,10 @@ class CutiController extends Controller
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menunda cuti.');
 
         $payload = $request->validated();
-        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'], $request);
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['komentar'], $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti ditunda dan pemohon telah diberi tahu.');
-    }
-
-    /** Meminta perubahan pengajuan cuti pada step aktif; catatan wajib menjadi dasar revisi pemohon. */
-    public function requestChanges(ReviewLeaveDecisionRequest $request, $id, RequestChangesLeaveAction $action)
-    {
-        $leaveRequest = LeaveRequest::findOrFail($id);
-        $actor = $request->user()->employee;
-
-        abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat meminta perubahan cuti.');
-
-        $payload = $request->validated();
-        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'], $request);
-
-        return redirect()->route('cuti.approval')
-            ->with('success', 'Pengajuan cuti dikembalikan untuk perbaikan.');
     }
 
     /** Menutup pengajuan sebagai Tidak Disetujui pada step aktif. */
@@ -198,7 +182,7 @@ class CutiController extends Controller
         abort_if($actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat memutuskan cuti.');
 
         $payload = $request->validated();
-        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['komentar'], $request);
+        $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['komentar'], $request);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
@@ -215,7 +199,7 @@ class CutiController extends Controller
         abort_if($user === null || $actor === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat menangguhkan cuti.');
 
         $payload = $request->validated();
-        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['alasan']);
+        $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['revision_version'], $payload['alasan']);
 
         return redirect()->route('cuti.approval')
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');

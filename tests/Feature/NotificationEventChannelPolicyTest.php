@@ -13,6 +13,23 @@ class NotificationEventChannelPolicyTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_cancellation_events_only_support_in_app_and_email(): void
+    {
+        $catalog = app(NotificationEventCatalog::class);
+
+        foreach ([
+            'cuti.pembatalan_diajukan',
+            'cuti.pembatalan_disetujui',
+            'cuti.pembatalan_ditolak',
+        ] as $eventKey) {
+            $this->assertTrue($catalog->hasEvent($eventKey));
+            $this->assertSame(['in_app', 'email'], $catalog->events()[$eventKey]['allowed_channels']);
+            $this->assertFalse($catalog->supportsChannel($eventKey, 'whatsapp_business'));
+        }
+
+        $this->assertFalse($catalog->hasEvent('cuti.perlu_perubahan'));
+    }
+
     public function test_duty_postponement_event_catalog_and_enabled_channel_policies_are_available(): void
     {
         $catalog = app(NotificationEventCatalog::class);

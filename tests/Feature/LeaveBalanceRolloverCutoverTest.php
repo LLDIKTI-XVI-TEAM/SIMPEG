@@ -685,6 +685,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
                 $approval['request'],
                 $approval['approver'],
                 $approval['request']->steps()->where('status', 'active')->valueOrFail('id'),
+                (int) $approval['request']->fresh()->revision_version,
                 'Keputusan final terlambat.',
                 $this->approvalRequest($approval['user']),
             );

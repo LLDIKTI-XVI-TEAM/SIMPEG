@@ -21,6 +21,11 @@
                 {{ $message }}
             </x-ui.alert>
         @enderror
+        @error('revision_version')
+            <x-ui.alert variant="danger" title="Pengajuan telah berubah" role="alert">
+                {{ $message }}
+            </x-ui.alert>
+        @enderror
 
         {{-- Table Card --}}
         <x-ui.card padding="none" class="overflow-hidden">
@@ -47,7 +52,7 @@
                         @php
                             $activeStep = $r->steps->firstWhere('status', 'active');
                         @endphp
-                        <x-ui.table-row :interactive="true">
+                        <x-ui.table-row>
                             <x-ui.table-td padding="comfortable">
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -66,12 +71,12 @@
                                 </div>
                             </x-ui.table-td>
                             <x-ui.table-td padding="comfortable" class="text-sm">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
-                            <x-ui.table-td title="{{ $r->alasan }}" padding="comfortable" class="text-muted max-w-xs truncate">{{ $r->alasan }}</x-ui.table-td>
+                            <x-ui.table-td padding="comfortable" class="max-w-xs break-words whitespace-normal text-muted">{{ $r->alasan }}</x-ui.table-td>
                             <x-ui.table-td align="right" padding="comfortable">
                                 <div class="flex items-center justify-end gap-2.5">
                                     {{-- Detail --}}
 
-                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="secondary" size="icon" title="Tinjau Detail" aria-label="Tinjau Detail">
+                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="secondary" size="icon" class="min-h-11 min-w-11" title="Tinjau Detail" aria-label="Tinjau Detail">
 
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -84,18 +89,19 @@
                                         open(ev) { this.lastTrigger = ev?.currentTarget ?? null; this.confirming = true; },
                                         close() { this.confirming = false; this.$nextTick(() => this.lastTrigger?.focus()); } }" class="inline-flex items-center gap-2"
                                         x-effect="if (confirming) $nextTick(() => $refs.confirmApprove?.focus())">
-                                        <x-ui.button type="button" variant="success-solid" size="sm" x-show="!confirming" @click="open($event)">Setuju</x-ui.button>
+                                        <x-ui.button type="button" variant="success-solid" size="sm" class="min-h-11" x-show="!confirming" @click="open($event)">Setuju</x-ui.button>
                                         <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
                                             @csrf
                                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
+                                            <input type="hidden" name="revision_version" value="{{ $r->revision_version }}">
                                             <span class="text-xs text-muted">Yakin?</span>
-                                            <x-ui.button type="submit" variant="success-solid" size="sm" x-ref="confirmApprove">Ya, setujui</x-ui.button>
-                                            <x-ui.button type="button" variant="secondary" size="sm" @click="close()">Batal</x-ui.button>
+                                            <x-ui.button type="submit" variant="success-solid" size="sm" class="min-h-11" x-ref="confirmApprove">Ya, setujui</x-ui.button>
+                                            <x-ui.button type="button" variant="secondary" size="sm" class="min-h-11" @click="close()">Batal</x-ui.button>
                                         </form>
                                     </div>
 
                                     {{-- Tunda: butuh alasan, arahkan ke detail tempat form penundaan tersedia --}}
-                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="warning-solid" size="sm">Tunda</x-ui.button>
+                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="warning-solid" size="sm" class="min-h-11">Tunda</x-ui.button>
                                 </div>
                             </x-ui.table-td>
                         </x-ui.table-row>

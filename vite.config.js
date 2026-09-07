@@ -10,6 +10,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/pages/employee-import.js',
                 'resources/js/pages/manual-external-approval.js',
+                'resources/js/pages/employee-statistics.js',
             ],
             refresh: true,
         }),
