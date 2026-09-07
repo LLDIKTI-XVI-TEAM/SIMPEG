@@ -33,7 +33,7 @@ final class CancelManualLeaveUsageAction
         ?Request $request = null,
     ): LeaveUsageRecord {
         $this->authorization->assertCanManageManual($actor);
-        $current = $this->resolveManualUsage($current);
+        $current = $this->resolveManualUsage($current, $actor);
         $reason = Validator::make(['correction_reason' => $correctionReason], [
             'correction_reason' => ['required', 'string', 'max:2000'],
         ])->validate()['correction_reason'];
@@ -62,12 +62,13 @@ final class CancelManualLeaveUsageAction
         });
     }
 
-    private function resolveManualUsage(string $current): LeaveUsageRecord
+    private function resolveManualUsage(string $current, User $actor): LeaveUsageRecord
     {
         abort_unless(Str::isUuid($current), 404);
 
         return LeaveUsageRecord::query()
             ->whereKey($current)
+            ->whereIn('employee_id', $this->authorization->employeeScope($actor)->select('employees.id'))
             ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
             ->firstOrFail();
     }

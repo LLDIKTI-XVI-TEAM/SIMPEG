@@ -648,7 +648,6 @@ class CutiExcelExportTest extends TestCase
             'employee_id' => $employee->id,
             'leave_type_id' => $jenis->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
-            'reconciliation_set_id' => null,
             'leave_request_id' => null,
             'leave_request_case_id' => null,
             'usage_year' => 2026,

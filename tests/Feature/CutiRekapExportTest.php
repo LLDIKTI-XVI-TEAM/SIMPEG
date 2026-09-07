@@ -8,8 +8,6 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
-use App\Models\LeaveUsageReconciliationMembership;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\Permission;
 use App\Models\PositionHistory;
@@ -188,7 +186,7 @@ class CutiRekapExportTest extends TestCase
         $this->assertFalse($data['canAdministerBalance']);
     }
 
-    public function test_aksi_administrasi_saldo_mempertahankan_gate_role_dan_permission(): void
+    public function test_aksi_administrasi_saldo_mengikuti_grant_dan_revoke_permission(): void
     {
         $employee = Employee::factory()->create();
         LeaveBalance::create(['employee_id' => $employee->id, 'tahun' => 2026]);
@@ -210,6 +208,11 @@ class CutiRekapExportTest extends TestCase
 
         Role::query()->where('name', 'super_admin')->firstOrFail()->permissions()->syncWithoutDetaching($permissions);
         $this->actingAs(User::factory()->superAdmin()->create())->get(route('cuti.rekap'))
+            ->assertOk()
+            ->assertSee($url);
+
+        Role::query()->where('name', 'super_admin')->firstOrFail()->permissions()->detach($permissions);
+        $this->get(route('cuti.rekap'))
             ->assertOk()
             ->assertDontSee($url);
     }
@@ -400,23 +403,6 @@ class CutiRekapExportTest extends TestCase
             'record_status' => LeaveUsageRecord::STATUS_CANCELLED,
             'correction_reason' => 'Pembatalan tidak boleh tampil.',
         ]);
-        $set = LeaveUsageReconciliationSet::query()->forceCreate([
-            'employee_id' => $pegawai->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-06-30',
-            'status' => LeaveUsageReconciliationSet::STATUS_ACTIVE,
-            'administrative_note' => 'Rekonsiliasi bukan detail cuti.',
-            'recorded_by' => $user->id,
-        ]);
-        $this->createUsage($pegawai, $jenis, [
-            'source_type' => LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION,
-            'reconciliation_set_id' => $set->id,
-            'start_date' => null,
-            'end_date' => null,
-            'effective_date' => '2026-06-30',
-            'workdays' => 0,
-        ]);
-
         $response = $this->actingAs($user)->get(route('cuti.rekap', [
             'pegawai' => $pegawai->id,
             'periode' => '2026-06',
@@ -539,46 +525,21 @@ class CutiRekapExportTest extends TestCase
         $this->assertSame($expectedEmployeeIds, $summary->pluck('employee_id')->sort()->values()->all());
     }
 
-    public function test_ringkasan_tahunan_memakai_total_pemakaian_efektif_dari_saldo_material(): void
+    public function test_ringkasan_tahunan_menjumlahkan_fakta_pemakaian_aktif(): void
     {
         $employee = Employee::factory()->create();
-        $actor = User::factory()->adminKepegawaian()->create();
         $annual = RefJenisCuti::query()->create([
             'code' => 'tahunan',
             'nama' => 'Cuti Tahunan',
             'mengurangi_saldo_tahunan' => true,
             'khusus_pns' => false,
         ]);
-        $covered = $this->createUsage($employee, $annual, [
+        $this->createUsage($employee, $annual, [
             'usage_year' => 2024,
             'effective_date' => '2024-06-03',
             'start_date' => '2024-06-03',
             'end_date' => '2024-06-05',
             'workdays' => 3,
-        ]);
-        $set = LeaveUsageReconciliationSet::query()->create([
-            'employee_id' => $employee->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-20',
-            'status' => LeaveUsageReconciliationSet::STATUS_ACTIVE,
-            'administrative_note' => 'Snapshot agregat delapan hari.',
-            'recorded_by' => $actor->id,
-        ]);
-        $declaration = $this->createUsage($employee, $annual, [
-            'source_type' => LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION,
-            'reconciliation_set_id' => $set->id,
-            'usage_year' => 2024,
-            'effective_date' => '2024-12-31',
-            'start_date' => null,
-            'end_date' => null,
-            'workdays' => 8,
-            'recorded_by' => $actor->id,
-        ]);
-        LeaveUsageReconciliationMembership::query()->create([
-            'reconciliation_set_id' => $set->id,
-            'annual_reconciliation_record_id' => $declaration->id,
-            'itemized_usage_record_id' => $covered->id,
-            'included_workdays' => 3,
         ]);
         $this->createUsage($employee, $annual, [
             'usage_year' => 2024,
@@ -605,7 +566,7 @@ class CutiRekapExportTest extends TestCase
 
         $this->assertSame($employee->id, $row['employee_id']);
         $this->assertSame('Cuti Tahunan', $row['jenis']);
-        $this->assertSame(10, $row['total_hari']);
+        $this->assertSame(5, $row['total_hari']);
         $this->assertSame(2, $row['sisa_saldo']);
     }
 
@@ -1339,7 +1300,6 @@ class CutiRekapExportTest extends TestCase
             'employee_id' => $employee->id,
             'leave_type_id' => $jenis->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
-            'reconciliation_set_id' => null,
             'leave_request_id' => null,
             'leave_request_case_id' => null,
             'usage_year' => 2026,

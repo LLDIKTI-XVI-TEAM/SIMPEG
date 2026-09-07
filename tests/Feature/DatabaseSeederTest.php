@@ -2,20 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageExternalApprovalStep;
-use App\Models\LeaveUsageReconciliationMembership;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\User;
 use App\Queries\Cuti\CurrentApprovalChainPreviewQuery;
-use App\Services\Cuti\LeaveUsageReconciliationService;
-use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\PhaseSevenBrowserQaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -48,7 +43,7 @@ class DatabaseSeederTest extends TestCase
         $this->assertFileDoesNotExist(database_path('seeders/LeaveBalance2026Seeder.php'));
     }
 
-    public function test_phase_seven_browser_fixture_builds_projection_from_explicit_reconciliation_facts(): void
+    public function test_phase_seven_browser_fixture_mencatat_pengajuan_disetujui_sebagai_fakta_tunggal(): void
     {
         $this->seed(DatabaseSeeder::class);
         $this->seed(PhaseSevenBrowserQaSeeder::class);
@@ -59,16 +54,6 @@ class DatabaseSeederTest extends TestCase
         $admin = User::query()
             ->where('keycloak_username', 'demo-klabat-kepeg')
             ->firstOrFail();
-        $set = LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->employee_id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->sole();
-        $facts = LeaveUsageRecord::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->where('source_type', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->orderBy('usage_year')
-            ->get();
         $approvedRequest = LeaveRequest::query()
             ->where('employee_id', $employee->employee_id)
             ->where('status', 'disetujui')
@@ -80,52 +65,29 @@ class DatabaseSeederTest extends TestCase
             ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
             ->sole();
-        $membership = LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->where('itemized_usage_record_id', $approvedFact->id)
-            ->sole();
         $projection = LeaveBalance::query()
             ->where('employee_id', $employee->employee_id)
             ->where('tahun', 2026)
             ->sole();
 
-        $this->assertSame(1, LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->employee_id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->count());
-        $this->assertSame(2026, $set->balance_year);
-        $this->assertSame([
-            2024 => 12,
-            2025 => 12,
-            2026 => 2,
-        ], $facts->mapWithKeys(fn (LeaveUsageRecord $fact): array => [
-            $fact->usage_year => $fact->workdays,
-        ])->all());
-        $this->assertSame(4, LeaveUsageRecord::query()
-            ->where('employee_id', $employee->employee_id)
-            ->count());
         $this->assertSame(1, LeaveUsageRecord::query()
             ->where('employee_id', $employee->employee_id)
-            ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->count());
         $this->assertSame(2, $approvedFact->workdays);
         $this->assertSame($admin->id, $approvedFact->recorded_by);
-        $this->assertSame($facts->where('usage_year', 2026)->sole()->id, $membership->annual_reconciliation_record_id);
-        $this->assertSame(2, $membership->included_workdays);
-        $this->assertSame(1, LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->count());
+
+        // Hak dua tahun tanpa pemakaian dihitung tanpa fakta buatan; dua hari memakai bucket tertua.
         $this->assertSame([
             'tahun' => 2026,
             'jatah_awal' => 12,
-            'carry_over' => 0,
+            'carry_over' => 12,
             'terpakai' => 2,
-            'sisa' => 10,
-            'sisa_n2' => 0,
-            'sisa_n1' => 0,
-            'sisa_tahun_berjalan' => 10,
-            'terpakai_tahun_berjalan' => 2,
-            'hangus' => 0,
+            'sisa' => 22,
+            'sisa_n2' => 4,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'terpakai_tahun_berjalan' => 0,
+            'hangus' => 6,
         ], collect($projection->only([
             'tahun',
             'jatah_awal',
@@ -147,10 +109,7 @@ class DatabaseSeederTest extends TestCase
             ])
             ->count());
 
-        $auditedIds = $facts->pluck('id')
-            ->push($approvedFact->id)
-            ->push($set->id)
-            ->push($projection->id);
+        $auditedIds = collect([$approvedFact->id, $projection->id]);
         $humanAudits = AuditLog::query()
             ->whereIn('auditable_id', $auditedIds)
             ->get();
@@ -160,34 +119,20 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame([$admin->id], $humanAudits->pluck('user_id')->unique()->values()->all());
 
         $counts = [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->employee_id)->count(),
             'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->employee_id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->where('reconciliation_set_id', $set->id)->count(),
             'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->employee_id)->count(),
             'audit' => AuditLog::query()->count(),
         ];
 
         $this->seed(PhaseSevenBrowserQaSeeder::class);
 
-        $this->assertSame($set->id, LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->employee_id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->sole()
-            ->id);
         $this->assertSame($approvedFact->id, LeaveUsageRecord::query()
             ->where('leave_request_id', $approvedRequest->id)
             ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
             ->sole()
             ->id);
-        $this->assertSame($membership->id, LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $set->id)
-            ->where('itemized_usage_record_id', $approvedFact->id)
-            ->sole()
-            ->id);
         $this->assertSame($counts, [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->employee_id)->count(),
             'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->employee_id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->where('reconciliation_set_id', $set->id)->count(),
             'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->employee_id)->count(),
             'audit' => AuditLog::query()->count(),
         ]);
@@ -218,134 +163,12 @@ class DatabaseSeederTest extends TestCase
             'leave_approval_chains',
             'leave_requests',
             'leave_usage_records',
-            'leave_usage_reconciliation_sets',
-            'leave_usage_reconciliation_memberships',
             'leave_balances',
             'leave_balance_ledger',
             'audit_logs',
         ] as $table) {
             $this->assertDatabaseCount($table, 0);
         }
-    }
-
-    public function test_phase_seven_browser_fixture_memperbaiki_snapshot_legacy_tanpa_membership_secara_idempoten(): void
-    {
-        $this->seed(DatabaseSeeder::class);
-
-        $employeeUser = User::query()->where('keycloak_username', 'demo-klabat-pegawai')->firstOrFail();
-        $employee = $employeeUser->employee()->firstOrFail();
-        $admin = User::query()->where('keycloak_username', 'demo-klabat-kepeg')->firstOrFail();
-        Appointment::query()->updateOrCreate(
-            ['employee_id' => $employee->id],
-            [
-                'jenis_pengangkatan' => 'PNS',
-                'tmt_pengangkatan' => '2020-01-01',
-            ],
-        );
-        $legacySet = app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $employee,
-            2026,
-            [2024 => 12, 2025 => 12, 2026 => 2],
-            CarbonImmutable::create(2026, 12, 31, 12, 0, 0, config('app.timezone')),
-            'Snapshot legacy tanpa membership pengajuan disetujui.',
-            $admin,
-        );
-        $legacyFacts = $legacySet->records()->orderBy('usage_year')->get()->keyBy('usage_year');
-        $approvedRequest = LeaveRequest::unguarded(fn (): LeaveRequest => LeaveRequest::query()->create([
-            'id' => '70000000-0000-4000-8000-000000000014',
-            'employee_id' => $employee->id,
-            'jenis_cuti_id' => $legacyFacts->get(2026)->leave_type_id,
-            'tanggal_mulai' => '2026-11-02',
-            'tanggal_selesai' => '2026-11-03',
-            'jumlah_hari_kerja' => 2,
-            'alasan' => '[QA Phase 7 Browser] disetujui',
-            'status' => 'disetujui',
-        ]));
-
-        $this->assertDatabaseCount('leave_usage_reconciliation_memberships', 0);
-        $this->assertDatabaseMissing('leave_usage_records', [
-            'leave_request_id' => $approvedRequest->id,
-            'source_type' => LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
-        ]);
-
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-
-        $activeSet = LeaveUsageReconciliationSet::query()
-            ->where('employee_id', $employee->id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->sole();
-        $activeFacts = $activeSet->records()
-            ->where('source_type', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->orderBy('usage_year')
-            ->get();
-        $approvedFact = LeaveUsageRecord::query()
-            ->where('leave_request_id', $approvedRequest->id)
-            ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
-            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-            ->sole();
-        $projection = LeaveBalance::query()
-            ->where('employee_id', $employee->id)
-            ->where('tahun', 2026)
-            ->sole();
-
-        $this->assertSame(2, $projection->terpakai);
-        $this->assertSame(10, $projection->sisa);
-        $this->assertSame(LeaveUsageReconciliationSet::STATUS_SUPERSEDED, $legacySet->fresh()->status);
-        $this->assertSame($legacySet->id, $activeSet->replaces_id);
-        $this->assertSame([2024 => 12, 2025 => 12, 2026 => 2], $activeFacts
-            ->mapWithKeys(fn (LeaveUsageRecord $fact): array => [$fact->usage_year => $fact->workdays])
-            ->all());
-
-        foreach ($activeFacts as $fact) {
-            $this->assertSame($legacyFacts->get($fact->usage_year)->id, $fact->replaces_id);
-        }
-
-        $membership = LeaveUsageReconciliationMembership::query()
-            ->where('reconciliation_set_id', $activeSet->id)
-            ->where('itemized_usage_record_id', $approvedFact->id)
-            ->sole();
-        $this->assertSame($activeFacts->where('usage_year', 2026)->sole()->id, $membership->annual_reconciliation_record_id);
-        $this->assertSame(2, $membership->included_workdays);
-        $this->assertSame($admin->id, $approvedFact->recorded_by);
-        $this->assertDatabaseHas('audit_logs', [
-            'auditable_id' => $activeSet->id,
-            'user_id' => $admin->id,
-        ]);
-
-        $ids = [
-            'set' => $activeSet->id,
-            'approved_fact' => $approvedFact->id,
-            'membership' => $membership->id,
-        ];
-        $counts = [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->id)->count(),
-            'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->count(),
-            'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->id)->count(),
-            'audit' => AuditLog::query()->count(),
-        ];
-
-        $this->seed(PhaseSevenBrowserQaSeeder::class);
-
-        $this->assertSame($ids, [
-            'set' => LeaveUsageReconciliationSet::query()
-                ->where('employee_id', $employee->id)
-                ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-                ->sole()->id,
-            'approved_fact' => LeaveUsageRecord::query()
-                ->where('leave_request_id', $approvedRequest->id)
-                ->where('source_type', LeaveUsageRecord::SOURCE_APPROVED_REQUEST)
-                ->sole()->id,
-            'membership' => LeaveUsageReconciliationMembership::query()->sole()->id,
-        ]);
-        $this->assertSame($counts, [
-            'sets' => LeaveUsageReconciliationSet::query()->where('employee_id', $employee->id)->count(),
-            'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->id)->count(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->count(),
-            'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->id)->count(),
-            'audit' => AuditLog::query()->count(),
-        ]);
     }
 
     public function test_phase_seven_browser_fixture_menyediakan_preview_chain_valid_dan_invalid(): void

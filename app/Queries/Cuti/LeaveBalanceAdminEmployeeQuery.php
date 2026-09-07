@@ -6,8 +6,9 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
+use App\Models\User;
+use App\Services\Cuti\LeaveUsageAuthorizationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -15,12 +16,14 @@ use Illuminate\Database\Query\JoinClause;
 
 class LeaveBalanceAdminEmployeeQuery
 {
+    public function __construct(private readonly LeaveUsageAuthorizationService $authorization) {}
+
     /**
-     * Mengambil identitas pegawai dan projection tahun aktif dalam satu query detail.
+     * Mengambil identitas pegawai dalam scope aktor dan projection tahun aktif dalam satu query detail.
      *
-     * @return array{employee:?Employee,balance:?LeaveBalance,rule5Active:bool,activeReserved:int,dutyProtected:int}
+     * @return array{employee:Employee,balance:?LeaveBalance,rule5Active:bool,activeReserved:int,dutyProtected:int}
      */
-    public function selectedWorkspace(string $employeeId, int $year): array
+    public function selectedWorkspace(string $employeeId, int $year, User $actor): array
     {
         $activeReservations = LeaveBalanceReservationEvent::query()
             ->selectRaw('COALESCE(SUM(leave_balance_reservation_events.amount), 0)')
@@ -39,7 +42,7 @@ class LeaveBalanceAdminEmployeeQuery
             ->where('leave_balance_ledger.source_year', $year)
             ->where('leave_balance_ledger.event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED);
 
-        $employee = Employee::query()
+        $employee = $this->authorization->employeeScope($actor)
             ->leftJoin('leave_balances as selected_balance', function (JoinClause $join) use ($year): void {
                 $join->on('selected_balance.employee_id', '=', 'employees.id')
                     ->where('selected_balance.tahun', $year);
@@ -68,17 +71,7 @@ class LeaveBalanceAdminEmployeeQuery
             ->selectSub($activeReservations, 'selected_active_reserved')
             ->selectSub($dutyProtectedQuery, 'selected_duty_protected')
             ->where('employees.id', $employeeId)
-            ->first();
-
-        if (! $employee instanceof Employee) {
-            return [
-                'employee' => null,
-                'balance' => null,
-                'rule5Active' => false,
-                'activeReserved' => 0,
-                'dutyProtected' => 0,
-            ];
-        }
+            ->firstOrFail();
 
         $rule5Active = filter_var($employee->getAttribute('selected_rule5_active'), FILTER_VALIDATE_BOOL);
         $activeReserved = (int) $employee->getAttribute('selected_active_reserved');
@@ -108,13 +101,13 @@ class LeaveBalanceAdminEmployeeQuery
     }
 
     /**
-     * Membatasi populasi pada pegawai yang belum dihapus dan mencocokkan pencarian tanpa membedakan kapitalisasi.
+     * Mengiriskan pencarian dengan scope aktor sebelum pagination maupun hitungan status.
      *
      * @return Builder<Employee>
      */
-    private function populationQuery(string $search): Builder
+    private function populationQuery(string $search, User $actor): Builder
     {
-        $query = Employee::query();
+        $query = $this->authorization->employeeScope($actor);
         $search = trim($search);
 
         if ($search === '') {
@@ -131,35 +124,35 @@ class LeaveBalanceAdminEmployeeQuery
     }
 
     /**
-     * Memilih data minimum pegawai serta penanda set rekonsiliasi aktif pada periode yang sama.
+     * Memilih data minimum pegawai serta penanda fakta pemakaian aktif pada periode yang sama.
      *
      * @return Builder<Employee>
      */
-    private function rowsQuery(int $periode, string $search): Builder
+    private function rowsQuery(int $periode, string $search, User $actor): Builder
     {
-        return $this->populationQuery($search)
+        return $this->populationQuery($search, $actor)
             ->select(['employees.id', 'employees.nama_lengkap', 'employees.nip'])
             ->selectRaw(
-                'exists (select 1 from leave_usage_reconciliation_sets where leave_usage_reconciliation_sets.employee_id = employees.id and leave_usage_reconciliation_sets.balance_year = ? and leave_usage_reconciliation_sets.status = ?) as has_active_reconciliation',
-                [$periode, LeaveUsageReconciliationSet::STATUS_ACTIVE],
+                'exists (select 1 from leave_usage_records where leave_usage_records.employee_id = employees.id and leave_usage_records.usage_year = ? and leave_usage_records.record_status = ?) as has_active_usage',
+                [$periode, LeaveUsageRecord::STATUS_ACTIVE],
             );
     }
 
     /**
-     * Menyusun EXISTS terkorelasi dari set aktif tanpa fallback ke row projection atau ledger legacy.
+     * Menyusun EXISTS terkorelasi dari fakta pemakaian aktif pada tahun berjalan.
      */
-    private function activeReconciliationExists(QueryBuilder $query, int $periode): void
+    private function activeUsageExists(QueryBuilder $query, int $periode): void
     {
         $query
             ->selectRaw('1')
-            ->from('leave_usage_reconciliation_sets')
-            ->whereColumn('leave_usage_reconciliation_sets.employee_id', 'employees.id')
-            ->where('leave_usage_reconciliation_sets.balance_year', $periode)
-            ->where('leave_usage_reconciliation_sets.status', LeaveUsageReconciliationSet::STATUS_ACTIVE);
+            ->from('leave_usage_records')
+            ->whereColumn('leave_usage_records.employee_id', 'employees.id')
+            ->where('leave_usage_records.usage_year', $periode)
+            ->where('leave_usage_records.record_status', LeaveUsageRecord::STATUS_ACTIVE);
     }
 
     /**
-     * Status perlu tindakan berarti rekonsiliasi aktif exact-year belum ada.
+     * Status hanya menyaring read model fakta pemakaian; tidak memicu kewajiban input agregat.
      *
      * @param  Builder<Employee>  $query
      */
@@ -167,13 +160,13 @@ class LeaveBalanceAdminEmployeeQuery
     {
         if ($status === 'perlu_tindakan') {
             $query->whereNotExists(
-                fn (QueryBuilder $query) => $this->activeReconciliationExists($query, $periode),
+                fn (QueryBuilder $query) => $this->activeUsageExists($query, $periode),
             );
         }
 
         if ($status === 'sudah_terdaftar') {
             $query->whereExists(
-                fn (QueryBuilder $query) => $this->activeReconciliationExists($query, $periode),
+                fn (QueryBuilder $query) => $this->activeUsageExists($query, $periode),
             );
         }
     }
@@ -187,12 +180,12 @@ class LeaveBalanceAdminEmployeeQuery
      *     nip: string,
      *     periode: int,
      *     status_code: string,
-     *     has_active_reconciliation: bool
+     *     has_active_usage: bool
      * }>
      */
-    public function employeeRows(int $periode, string $status, string $search, int $perPage = 10): LengthAwarePaginator
+    public function employeeRows(int $periode, string $status, string $search, User $actor, int $perPage = 10): LengthAwarePaginator
     {
-        $query = $this->rowsQuery($periode, trim($search));
+        $query = $this->rowsQuery($periode, trim($search), $actor);
         $this->applyStatus($query, $status, $periode);
 
         return $query
@@ -201,15 +194,15 @@ class LeaveBalanceAdminEmployeeQuery
             ->paginate($perPage, ['*'], 'page_pegawai')
             ->withQueryString()
             ->through(function (Employee $employee) use ($periode): array {
-                $hasActiveReconciliation = (bool) $employee->getAttribute('has_active_reconciliation');
+                $hasActiveUsage = (bool) $employee->getAttribute('has_active_usage');
 
                 return [
                     'employee_id' => (string) $employee->id,
                     'nama_lengkap' => (string) $employee->nama_lengkap,
                     'nip' => (string) $employee->nip,
                     'periode' => $periode,
-                    'status_code' => $hasActiveReconciliation ? 'rekonsiliasi_aktif' : 'rekonsiliasi_belum_tercatat',
-                    'has_active_reconciliation' => $hasActiveReconciliation,
+                    'status_code' => $hasActiveUsage ? 'fakta_aktif' : 'belum_ada_fakta',
+                    'has_active_usage' => $hasActiveUsage,
                 ];
             });
     }
@@ -219,13 +212,13 @@ class LeaveBalanceAdminEmployeeQuery
      *
      * @return array{perlu_tindakan: int, sudah_terdaftar: int, semua_pegawai: int}
      */
-    public function statusCounts(int $periode, string $search): array
+    public function statusCounts(int $periode, string $search, User $actor): array
     {
         // Satu agregasi menjaga hitungan status tidak menambah query kedua pada halaman administrasi.
-        $counts = $this->populationQuery($search)
+        $counts = $this->populationQuery($search, $actor)
             ->selectRaw(
-                'COUNT(*) AS total_count, COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM leave_usage_reconciliation_sets WHERE leave_usage_reconciliation_sets.employee_id = employees.id AND leave_usage_reconciliation_sets.balance_year = ? AND leave_usage_reconciliation_sets.status = ?) THEN 1 ELSE 0 END), 0) AS registered_count',
-                [$periode, LeaveUsageReconciliationSet::STATUS_ACTIVE],
+                'COUNT(*) AS total_count, COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM leave_usage_records WHERE leave_usage_records.employee_id = employees.id AND leave_usage_records.usage_year = ? AND leave_usage_records.record_status = ?) THEN 1 ELSE 0 END), 0) AS registered_count',
+                [$periode, LeaveUsageRecord::STATUS_ACTIVE],
             )
             ->toBase()
             ->first();

@@ -70,9 +70,8 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            $canAdministerLeaveBalance = $activeRole === 'admin_kepegawaian'
-                && (($layoutCapabilities['cuti.balance.reconcile'] ?? false)
-                    || ($layoutCapabilities['cuti.manual.manage'] ?? false));
+            $canAdministerLeaveBalance = ($layoutCapabilities['cuti.balance.reconcile'] ?? false)
+                || ($layoutCapabilities['cuti.manual.manage'] ?? false);
             $canViewEmployeeStatistics = $layoutCapabilities['employees.read'] ?? false;
             $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
                 && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
@@ -202,10 +201,13 @@
                     ],
                     [
                         'group' => 'Cuti',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ]
+                            $canAdministerLeaveBalance
+                                ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                                : null,
+                        ])
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
@@ -243,10 +245,13 @@
                     ],
                     [
                         'group' => 'Cuti',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ],
+                            $canAdministerLeaveBalance
+                                ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
+                                : null,
+                        ]),
                     ],
                     [
                         'group' => 'EWS & Notifikasi',

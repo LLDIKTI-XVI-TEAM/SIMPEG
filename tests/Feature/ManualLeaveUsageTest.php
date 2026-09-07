@@ -16,7 +16,6 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\LeaveUsageDocument;
 use App\Models\LeaveUsageExternalApprovalStep;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\Permission;
 use App\Models\RefHariLibur;
@@ -26,7 +25,6 @@ use App\Models\StorageRecoveryTask;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\LeaveEligibilityService;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\Cuti\LeaveUsageRecordService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -68,7 +66,7 @@ class ManualLeaveUsageTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_route_manual_hanya_menerima_admin_kepegawaian_dengan_permission(): void
+    public function test_route_manual_menolak_role_default_tanpa_permission_manual(): void
     {
         $employee = Employee::factory()->create();
 
@@ -106,7 +104,7 @@ class ManualLeaveUsageTest extends TestCase
         ]);
     }
 
-    public function test_action_langsung_mempertahankan_exact_role_dan_permission_gate(): void
+    public function test_action_langsung_menolak_aktor_tanpa_permission_manual(): void
     {
         $employee = Employee::factory()->create();
         $current = $this->rawManualFact($employee, User::factory()->adminKepegawaian()->create());
@@ -264,23 +262,14 @@ class ManualLeaveUsageTest extends TestCase
         $this->assertSame([], Storage::disk(LeaveUsageDocument::STORAGE_DISK)->allFiles(LeaveUsageDocument::PATH_PREFIX));
     }
 
-    public function test_schema_dokumen_memiliki_uuid_xor_fk_restrict_index_unique_dan_tanpa_url_publik(): void
+    public function test_schema_dokumen_wajib_memiliki_fakta_pemakaian_restrict_index_unique_dan_tanpa_url_publik(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
         $record = $this->rawManualFact($employee, $admin);
-        $set = LeaveUsageReconciliationSet::query()->create([
-            'employee_id' => $employee->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-18',
-            'status' => 'active',
-            'administrative_note' => 'Fixture target dokumen rekonsiliasi.',
-            'recorded_by' => $admin->id,
-        ]);
         $base = [
             'id' => (string) Str::uuid(),
             'leave_usage_record_id' => $record->id,
-            'leave_usage_reconciliation_set_id' => null,
             'original_name' => 'bukti.pdf',
             'stored_name' => Str::uuid().'.pdf',
             'path' => 'cuti/pemakaian/'.$employee->id.'/'.Str::uuid().'.pdf',
@@ -296,10 +285,7 @@ class ManualLeaveUsageTest extends TestCase
         $this->assertTrue(Str::isUuid((string) DB::table('leave_usage_documents')->value('id')));
         $this->assertFalse(Schema::hasColumn('leave_usage_documents', 'public_url'));
 
-        foreach ([
-            ['leave_usage_record_id' => null],
-            ['leave_usage_reconciliation_set_id' => $set->id],
-        ] as $invalidTargets) {
+        foreach ([['leave_usage_record_id' => null]] as $invalidTargets) {
             try {
                 DB::transaction(fn (): bool => DB::table('leave_usage_documents')->insert(array_merge(
                     $base,
@@ -310,9 +296,9 @@ class ManualLeaveUsageTest extends TestCase
                         'path' => 'cuti/pemakaian/'.$employee->id.'/'.Str::uuid().'.pdf',
                     ],
                 )));
-                $this->fail('Target dokumen harus memenuhi XOR tepat satu FK.');
+                $this->fail('Target dokumen harus memiliki satu fakta pemakaian.');
             } catch (QueryException $exception) {
-                $this->assertStringContainsString('leave_usage_document_target_check', $exception->getMessage());
+                $this->assertSame('23514', (string) $exception->getCode());
             }
         }
 
@@ -329,7 +315,6 @@ class ManualLeaveUsageTest extends TestCase
             ->where('tablename', 'leave_usage_documents')
             ->pluck('indexname');
         $this->assertContains('leave_usage_documents_usage_record_index', $indexes);
-        $this->assertContains('leave_usage_documents_reconciliation_set_index', $indexes);
 
         $foreignKeys = collect(DB::select(<<<'SQL'
 SELECT conname, confdeltype
@@ -337,7 +322,6 @@ FROM pg_constraint
 WHERE conrelid = 'leave_usage_documents'::regclass AND contype = 'f'
 SQL))->pluck('confdeltype', 'conname');
         $this->assertSame('r', $foreignKeys['leave_usage_documents_leave_usage_record_id_foreign'] ?? null);
-        $this->assertSame('r', $foreignKeys['leave_usage_documents_leave_usage_reconciliation_set_id_foreign'] ?? null);
         $this->assertSame('n', $foreignKeys['leave_usage_documents_uploaded_by_foreign'] ?? null);
     }
 
@@ -537,7 +521,7 @@ SQL))->pluck('confdeltype', 'conname');
         yield 'EM SPACE' => ["\u{2003}"];
     }
 
-    public function test_route_koreksi_dan_pembatalan_memakai_post_uuid_dan_exact_admin_gate(): void
+    public function test_route_koreksi_dan_pembatalan_memakai_post_uuid_dan_permission_gate(): void
     {
         $employee = Employee::factory()->create();
         $fixtureActor = User::factory()->adminKepegawaian()->create();
@@ -1409,19 +1393,16 @@ SQL);
             ->count());
     }
 
-    public function test_backdated_setelah_snapshot_dan_delta_membership_koreksi_pembatalan_tepat(): void
+    public function test_fakta_backdated_koreksi_dan_pembatalan_mengubah_projection_secara_tepat(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = $this->eligibleEmployee();
         $annual = $this->annualType();
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $employee,
-            2026,
-            [2024 => 0, 2025 => 0, 2026 => 3],
-            Carbon::parse('2026-08-18'),
-            'Snapshot pemakaian awal.',
-            $admin,
-        );
+        $this->storeDirect($employee, $admin, [
+            'leave_type_id' => $annual->id,
+            'tanggal_mulai' => '2026-01-12',
+            'tanggal_selesai' => '2026-01-14',
+        ]);
 
         $backdated = $this->storeDirect($employee, $admin, [
             'leave_type_id' => $annual->id,
@@ -1771,7 +1752,7 @@ SQL);
                 $this->storeDirect($employee, $admin, [
                     'leave_type_id' => $this->annualType()->id,
                     'tanggal_mulai' => '2026-01-05',
-                    'tanggal_selesai' => '2026-01-30',
+                    'tanggal_selesai' => '2026-02-20',
                 ]);
                 $this->fail('Pemakaian tahun baru WITA yang melebihi hak wajib ditolak.');
             } catch (ValidationException $exception) {
@@ -1922,7 +1903,6 @@ SQL);
             'employee_id' => $employee->id,
             'leave_type_id' => $this->nonAnnualType()->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
-            'reconciliation_set_id' => null,
             'leave_request_id' => null,
             'leave_request_case_id' => null,
             'usage_year' => 2026,

@@ -11,7 +11,7 @@ use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\User;
-use App\Services\Cuti\LeaveUsageReconciliationService;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -52,13 +52,14 @@ class LeaveBalancePreviewTest extends TestCase
             'khusus_pns' => false,
         ]);
         Carbon::setTestNow('2027-08-04 09:00:00');
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+        $this->recordAnnualManualUsage($employee, $admin, 2025, 12);
+        $this->recordAnnualManualUsage($employee, $admin, 2026, 9);
+        $this->recordAnnualManualUsage($employee, $admin, 2027, 2);
+        app(LeaveBalanceRecalculationService::class)->recalculate(
             $employee,
-            2027,
-            [2025 => 12, 2026 => 9, 2027 => 2],
-            now(config('app.timezone')),
-            'Fixture fakta pemakaian untuk preview saldo.',
+            2025,
             $admin,
+            'Membentuk projection preview dari fakta pemakaian aktif.',
         );
         LeaveBalance::create([
             'employee_id' => $otherEmployee->id,
@@ -281,5 +282,25 @@ class LeaveBalancePreviewTest extends TestCase
         ]);
 
         return $employee;
+    }
+
+    private function recordAnnualManualUsage(Employee $employee, User $actor, int $year, int $workdays): void
+    {
+        $annual = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
+        $date = sprintf('%d-01-02', $year);
+
+        LeaveUsageRecord::query()->create([
+            'employee_id' => $employee->id,
+            'leave_type_id' => $annual->id,
+            'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+            'usage_year' => $year,
+            'effective_date' => $date,
+            'start_date' => $date,
+            'end_date' => $date,
+            'workdays' => $workdays,
+            'administrative_note' => 'Fixture fakta manual untuk preview saldo.',
+            'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+            'recorded_by' => $actor->id,
+        ]);
     }
 }

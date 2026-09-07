@@ -19,8 +19,6 @@ class LeaveUsageRecord extends Model
 {
     use HasUuid;
 
-    public const SOURCE_ANNUAL_RECONCILIATION = 'annual_reconciliation';
-
     public const SOURCE_APPROVED_REQUEST = 'approved_request';
 
     public const SOURCE_MANUAL_EXTERNAL = 'manual_external';
@@ -35,7 +33,6 @@ class LeaveUsageRecord extends Model
         'employee_id',
         'leave_type_id',
         'source_type',
-        'reconciliation_set_id',
         'leave_request_id',
         'leave_request_case_id',
         'usage_year',
@@ -81,12 +78,6 @@ class LeaveUsageRecord extends Model
         return $this->belongsTo(RefJenisCuti::class, 'leave_type_id');
     }
 
-    /** @return BelongsTo<LeaveUsageReconciliationSet, $this> */
-    public function reconciliationSet(): BelongsTo
-    {
-        return $this->belongsTo(LeaveUsageReconciliationSet::class, 'reconciliation_set_id');
-    }
-
     /** @return BelongsTo<LeaveRequest, $this> */
     public function leaveRequest(): BelongsTo
     {
@@ -115,12 +106,6 @@ class LeaveUsageRecord extends Model
     public function replacement(): HasOne
     {
         return $this->hasOne(self::class, 'replaces_id');
-    }
-
-    /** @return HasMany<LeaveUsageReconciliationMembership, $this> */
-    public function reconciliationMemberships(): HasMany
-    {
-        return $this->hasMany(LeaveUsageReconciliationMembership::class, 'itemized_usage_record_id');
     }
 
     /** @return HasMany<LeaveUsageDocument, $this> */

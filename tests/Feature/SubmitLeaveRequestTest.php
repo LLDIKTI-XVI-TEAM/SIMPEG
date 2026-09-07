@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
+use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
@@ -18,7 +19,7 @@ use App\Models\StorageRecoveryTask;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\ApprovalChainResolver;
-use App\Services\Cuti\LeaveUsageReconciliationService;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
 use App\Services\NotificationService;
@@ -141,7 +142,7 @@ class SubmitLeaveRequestTest extends TestCase
     }
 
     /**
-     * Membentuk projection lewat snapshot pemakaian authoritative; nilai default menghabiskan N-2/N-1.
+     * Membentuk projection dari fakta pemakaian eksternal; sisa hak mengikuti FIFO, bukan 12 dikurangi pemakaian.
      *
      * @param  array{employee: Employee, user: User}  $aktor
      * @param  array<int, int>|null  $usage
@@ -153,13 +154,36 @@ class SubmitLeaveRequestTest extends TestCase
 
         try {
             Carbon::setTestNow(Carbon::create($year, 2, 3, 10, 0, 0, config('app.timezone')));
-            app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+            foreach ($usage as $usageYear => $workdays) {
+                if ($workdays < 1) {
+                    continue;
+                }
+
+                LeaveUsageRecord::query()->create([
+                    'employee_id' => $aktor['employee']->id,
+                    'leave_type_id' => RefJenisCuti::query()->where('code', 'tahunan')->value('id'),
+                    'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+                    'leave_request_id' => null,
+                    'leave_request_case_id' => null,
+                    'usage_year' => $usageYear,
+                    'effective_date' => sprintf('%d-01-02', $usageYear),
+                    'start_date' => sprintf('%d-01-02', $usageYear),
+                    'end_date' => sprintf('%d-01-02', $usageYear),
+                    'workdays' => $workdays,
+                    'administrative_note' => 'Fixture fakta pemakaian pengajuan cuti.',
+                    'approval_document_number' => null,
+                    'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+                    'replaces_id' => null,
+                    'correction_reason' => null,
+                    'recorded_by' => $aktor['user']->id,
+                ]);
+            }
+
+            app(LeaveBalanceRecalculationService::class)->recalculate(
                 $aktor['employee'],
                 $year,
-                $usage,
-                now(config('app.timezone')),
-                'Fixture rekonsiliasi pengajuan cuti.',
                 $aktor['user'],
+                'Membentuk projection fixture dari fakta pemakaian eksternal.',
             );
         } finally {
             Carbon::setTestNow($testNow);
@@ -558,7 +582,12 @@ class SubmitLeaveRequestTest extends TestCase
     {
         $aktor = $this->makePemohon();
         $jenis = $this->jenisCuti('Cuti Tahunan');
-        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 10]);
+        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 16]);
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'sisa' => 2,
+        ]);
 
         $this->actingAs($aktor['user']);
         $response = $this->postJson(route(self::ROUTE), $this->payload($jenis));
@@ -584,11 +613,9 @@ class SubmitLeaveRequestTest extends TestCase
             'jenis_cuti_id' => $jenis->id,
             'jumlah_hari_kerja' => 5,
         ]);
-        $this->assertDatabaseHas('leave_usage_records', [
+        $this->assertDatabaseMissing('leave_usage_records', [
             'employee_id' => $aktor['employee']->id,
-            'source_type' => 'annual_reconciliation',
             'usage_year' => 2026,
-            'record_status' => 'active',
         ]);
     }
 
@@ -726,22 +753,15 @@ class SubmitLeaveRequestTest extends TestCase
 
         $year = (int) now(config('app.timezone'))->year;
         // Projection form harus dibentuk dari fakta pemakaian, bukan direct-write saldo legacy.
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $aktor['employee'],
-            $year,
-            [$year - 2 => 12, $year - 1 => 12, $year => 5],
-            now(config('app.timezone')),
-            'Setup fakta pemakaian untuk saldo tersedia tujuh hari.',
-            $aktor['user'],
-        );
+        $this->reconcileAnnualProjection($aktor, $year, [$year - 2 => 12, $year - 1 => 12, $year => 5]);
 
         $this->actingAs($aktor['user']);
         $response = $this->get(route('cuti.create'));
 
         $response->assertOk();
         $response->assertViewHas('saldoCuti', function (array $saldoCuti): bool {
-            return $saldoCuti['saldo_aktual'] === 7
-                && $saldoCuti['saldo_dapat_diajukan'] === 7
+            return $saldoCuti['saldo_aktual'] === 13
+                && $saldoCuti['saldo_dapat_diajukan'] === 13
                 && $saldoCuti['dialokasikan_aktif'] === 0;
         });
         $response->assertSee('Saldo Tersedia Aktual', escape: false);
@@ -960,7 +980,12 @@ class SubmitLeaveRequestTest extends TestCase
         $cutiTahunan = RefJenisCuti::query()->where('nama', 'Cuti Tahunan')->firstOrFail();
 
         $aktor = $this->makePemohon();
-        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 11]);
+        $this->reconcileAnnualProjection($aktor, 2026, [2024 => 12, 2025 => 12, 2026 => 17]);
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $aktor['employee']->id,
+            'tahun' => 2026,
+            'sisa' => 1,
+        ]);
 
         $this->actingAs($aktor['user']);
         $response = $this->postJson(route(self::ROUTE), $this->payload($cutiTahunan));

@@ -6,11 +6,10 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class ManualExternalApproverLookupRequest extends FormRequest
 {
-    /** Lookup penyetuju tetap dibatasi ke Admin Kepegawaian yang berhak mengelola fakta manual. */
+    /** Lookup hanya membuka referensi identitas bagi pemegang permission, bukan akses profil kandidat. */
     public function authorize(): bool
     {
-        return $this->user()?->getEffectiveRole() === 'admin_kepegawaian'
-            && $this->user()?->hasPermission('cuti.manual.manage');
+        return $this->user()?->hasPermission('cuti.manual.manage') ?? false;
     }
 
     /** @return array<string, list<string>> */

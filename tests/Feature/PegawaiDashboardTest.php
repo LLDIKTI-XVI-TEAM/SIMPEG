@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -15,10 +14,12 @@ use App\Services\Cuti\LeaveUsageRecordService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 class PegawaiDashboardTest extends TestCase
 {
+    use RecordsHistoricalAnnualLeaveUsage;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -77,9 +78,9 @@ class PegawaiDashboardTest extends TestCase
 
         $response->assertViewHas('saldoCuti', fn ($saldo): bool => $saldo !== null
             && $saldo['jatah_dasar'] === 12
-            && $saldo['carry_over'] === 0
+            && $saldo['carry_over'] === 2
             && $saldo['terpakai_final'] === 4
-            && $saldo['saldo_dapat_diajukan'] === 11);
+            && $saldo['saldo_dapat_diajukan'] === 14);
     }
 
     public function test_dashboard_pegawai_tanpa_saldo_mengirim_saldo_null_ke_view(): void
@@ -251,17 +252,12 @@ class PegawaiDashboardTest extends TestCase
             ],
         );
         $admin = User::factory()->adminKepegawaian()->create();
-        app(ReconcileAnnualLeaveUsageAction::class)->execute(
-            $employee->id,
-            [
-                'balance_year' => now()->year,
-                'usage_n2' => $usageN2,
-                'usage_n1' => $usageN1,
-                'usage_current' => $usageCurrent,
-                'administrative_note' => 'Rekonsiliasi fixture dashboard pegawai.',
-            ],
+        $year = now()->year;
+        $this->recordHistoricalAnnualUsage(
+            $employee,
+            [$year - 2 => $usageN2, $year - 1 => $usageN1, $year => $usageCurrent],
             $admin,
-            $this->actorRequest($admin),
+            'Fakta pemakaian eksternal fixture dashboard pegawai.',
         );
     }
 

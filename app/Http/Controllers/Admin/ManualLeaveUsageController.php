@@ -26,7 +26,7 @@ final class ManualLeaveUsageController extends Controller
         LookupManualExternalApproversAction $action,
     ): JsonResponse {
         return response()
-            ->json(['data' => $action->execute((string) $request->validated('q'))])
+            ->json(['data' => $action->execute((string) $request->validated('q'), $request->user())])
             ->header('Cache-Control', 'private, no-store');
     }
 

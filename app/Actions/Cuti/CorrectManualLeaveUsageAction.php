@@ -35,7 +35,7 @@ final class CorrectManualLeaveUsageAction
     ) {}
 
     /**
-     * Membuat versi pengganti setelah exact Admin guard dan menghitung ulang workdays di server.
+     * Membuat versi pengganti setelah permission dan scope pemilik diperiksa, lalu menghitung hari kerja server.
      * Versi lama serta file historis dipertahankan; file koreksi baru dihapus bila transaksi gagal.
      *
      * @param  array<string, mixed>  $data
@@ -59,7 +59,7 @@ final class CorrectManualLeaveUsageAction
             'approval_steps' => ['required', 'array', 'min:2', 'max:10'],
         ])->validate();
         $approvalSteps = $this->approvalChains->normalize($data['approval_steps'] ?? null);
-        $current = $this->resolveManualUsage($current);
+        $current = $this->resolveManualUsage($current, $actor);
         $administrativeNote = $this->text->required(
             (string) $validated['alasan'],
             'alasan',
@@ -158,12 +158,13 @@ final class CorrectManualLeaveUsageAction
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
-    private function resolveManualUsage(string $current): LeaveUsageRecord
+    private function resolveManualUsage(string $current, User $actor): LeaveUsageRecord
     {
         abort_unless(Str::isUuid($current), 404);
 
         return LeaveUsageRecord::query()
             ->whereKey($current)
+            ->whereIn('employee_id', $this->authorization->employeeScope($actor)->select('employees.id'))
             ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
             ->firstOrFail();
     }

@@ -66,7 +66,6 @@ final class LeaveUsageRecordService
                 'employee_id' => $employee->id,
                 'leave_type_id' => $leaveType->id,
                 'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
-                'reconciliation_set_id' => null,
                 'leave_request_id' => null,
                 'leave_request_case_id' => $leaveRequestCaseId,
                 'usage_year' => $year,
@@ -435,12 +434,7 @@ final class LeaveUsageRecordService
             return false;
         }
 
-        return LeaveBalance::query()->where('employee_id', $largeFact->employee_id)->exists()
-            || LeaveUsageRecord::query()
-                ->where('employee_id', $largeFact->employee_id)
-                ->where('source_type', LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-                ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
-                ->exists();
+        return LeaveBalance::query()->where('employee_id', $largeFact->employee_id)->exists();
     }
 
     private function isCutiBesar(string $leaveTypeId): bool

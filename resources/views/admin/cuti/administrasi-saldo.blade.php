@@ -20,11 +20,10 @@
             ['key' => 'saldo_dapat_diajukan', 'label' => 'Saldo dapat diajukan'],
         ];
         $statusLabels = [
-            'rekonsiliasi_belum_tercatat' => 'Pemakaian tahunan belum dicatat',
-            'rekonsiliasi_aktif' => 'Pemakaian tahunan sudah dicatat',
+            'belum_ada_fakta' => 'Belum ada fakta pemakaian',
+            'fakta_aktif' => 'Memiliki fakta pemakaian',
         ];
         $sourceLabels = [
-            'annual_reconciliation' => 'Catatan pemakaian tahunan',
             'approved_request' => 'Melalui SIMPEG',
             'manual_external' => 'Di luar SIMPEG',
         ];
@@ -41,20 +40,12 @@
             'per_page' => request('per_page'),
         ], static fn ($value) => $value !== null && $value !== ''));
         $requestedTab = old('tab', $tab);
-        $hasActiveReconciliation = (bool) $balanceReconciliation['reconciled'];
-        $isReconciled = (bool) $balanceReconciliation['current_year_reconciled'];
-        $correctionYear = (int) ($balanceReconciliation['balance_year'] ?? $tahunAcuan);
         $manualEditorActive = (bool) ($canManageManual && $editableUsage);
-        $availableTabs = $hasActiveReconciliation
-            ? ['pendaftaran', 'manual', 'riwayat']
-            : ['pendaftaran', 'manual'];
+        $availableTabs = ['pendaftaran', 'manual', 'riwayat'];
         $initialTab = $manualEditorActive
             ? 'manual'
             : (in_array($requestedTab, $availableTabs, true) ? $requestedTab : 'pendaftaran');
-        $usage = $balanceReconciliation['usage'];
-        $historyTabActive = $hasActiveReconciliation ? "activeTab === 'riwayat'" : 'false';
-        $historyTabClick = $hasActiveReconciliation ? "selectTab('riwayat')" : null;
-        $historyTabIndex = $hasActiveReconciliation ? "activeTab === 'riwayat' ? 0 : -1" : '-1';
+        $usage = $usageSummary;
         $manualTabUrl = route('cuti.saldo.administrasi', array_filter([
             'pegawai' => $selectedEmployee?->id,
             'status' => $status,
@@ -116,7 +107,7 @@
                     $selectedEmployee ? [['label' => $selectedEmployee->nama_lengkap]] : []
                 )" />
                 <p class="mt-2 max-w-2xl text-xs leading-relaxed text-muted">
-                    Saldo merupakan hasil perhitungan baca-saja berdasarkan fakta pemakaian. Perbaiki data pemakaian tahunan atau entri cuti manual bila sumber datanya berubah.
+                    Saldo merupakan hasil perhitungan baca-saja berdasarkan fakta pemakaian dari SIMPEG dan Cuti di Luar SIMPEG. Koreksi hanya dilakukan pada fakta Cuti di Luar SIMPEG secara append-only.
                 </p>
             </div>
 
@@ -170,8 +161,8 @@
                 <div class="relative">
                     <x-form.select id="filter-status" name="status" onchange="this.form.submit()" size="md" aria-label="Filter status antrian">
                         <option value="semua_pegawai" @selected($status === 'semua_pegawai')>Semua Pegawai ({{ $statusCounts['semua_pegawai'] }})</option>
-                        <option value="perlu_tindakan" @selected($status === 'perlu_tindakan')>Perlu Tindakan ({{ $statusCounts['perlu_tindakan'] }})</option>
-                        <option value="sudah_terdaftar" @selected($status === 'sudah_terdaftar')>Sudah Terdaftar ({{ $statusCounts['sudah_terdaftar'] }})</option>
+                        <option value="perlu_tindakan" @selected($status === 'perlu_tindakan')>Belum Ada Fakta ({{ $statusCounts['perlu_tindakan'] }})</option>
+                        <option value="sudah_terdaftar" @selected($status === 'sudah_terdaftar')>Memiliki Fakta ({{ $statusCounts['sudah_terdaftar'] }})</option>
                     </x-form.select>
                 </div>
             </x-ui.filter-bar>
@@ -180,8 +171,34 @@
         <section aria-labelledby="antrian-pegawai-title">
             <x-ui.card padding="none" class="overflow-hidden">
                 <div class="border-b border-border px-5 py-4">
-                    <h3 id="antrian-pegawai-title" class="text-sm font-semibold text-ink">Antrian Administrasi Pemakaian</h3>
-                    <p class="mt-1 text-xs text-muted">Pilih satu pegawai untuk membuka workspace administrasi.</p>
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h3 id="antrian-pegawai-title" class="text-sm font-semibold text-ink">Antrian Administrasi Pemakaian</h3>
+                            <p class="mt-1 text-xs text-muted">Pilih satu pegawai untuk membuka workspace administrasi.</p>
+                        </div>
+                        <nav class="flex flex-wrap gap-2" aria-label="Status antrian pegawai">
+                            @foreach ([
+                                'perlu_tindakan' => 'Belum Ada Fakta',
+                                'sudah_terdaftar' => 'Memiliki Fakta',
+                                'semua_pegawai' => 'Semua Pegawai',
+                            ] as $statusValue => $statusLabel)
+                                <a
+                                    href="{{ route('cuti.saldo.administrasi', array_filter([
+                                        'status' => $statusValue,
+                                        'search' => $search,
+                                    ])) }}"
+                                    @if ($status === $statusValue) aria-current="page" @endif
+                                    @class([
+                                        'inline-flex min-h-11 items-center justify-center rounded-xl border px-3.5 py-2 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-primary/20',
+                                        'border-primary bg-primary text-white' => $status === $statusValue,
+                                        'border-border bg-surface text-muted hover:bg-soft hover:text-ink' => $status !== $statusValue,
+                                    ])
+                                >
+                                    {{ $statusLabel }} ({{ $statusCounts[$statusValue] }})
+                                </a>
+                            @endforeach
+                        </nav>
+                    </div>
                 </div>
 
                 <div class="hidden overflow-x-auto md:block">
@@ -197,7 +214,7 @@
                         <x-ui.table-body>
                             @forelse ($employeeRows as $row)
                                 @php
-                                    $workspaceTab = $row['status_code'] === 'rekonsiliasi_aktif' ? $tab : 'pendaftaran';
+                                    $workspaceTab = 'pendaftaran';
                                     $workspaceUrl = route('cuti.saldo.administrasi', array_filter([
                                         'status' => $status,
                                         'search' => $search,
@@ -230,23 +247,16 @@
                                             <x-ui.button
                                                 as="a"
                                                 :href="$workspaceUrl"
-                                                x-bind:href="withActiveTab(@js($workspaceUrl), @js($row['status_code'] === 'rekonsiliasi_aktif' ? null : 'pendaftaran') ?? activeTab)"
                                                 variant="secondary"
                                                 size="icon"
                                                 tooltip-position="top-end"
-                                                :title="$row['status_code'] === 'rekonsiliasi_aktif' ? 'Lihat data pemakaian' : 'Catat pemakaian tahunan'"
-                                                :aria-label="$row['status_code'] === 'rekonsiliasi_aktif' ? 'Lihat data pemakaian' : 'Catat pemakaian tahunan'"
+                                                title="Lihat ringkasan pemakaian"
+                                                aria-label="Lihat ringkasan pemakaian"
                                             >
-                                                @if ($row['status_code'] === 'rekonsiliasi_aktif')
-                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-                                                    </svg>
-                                                @else
-                                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-                                                    </svg>
-                                                @endif
+                                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                                </svg>
                                             </x-ui.button>
                                             @if ($canManageManual)
                                                 <x-ui.button
@@ -293,14 +303,14 @@
                                         'status' => $status,
                                         'search' => $search,
                                         'pegawai' => $row['employee_id'],
-                                        'tab' => $row['status_code'] === 'rekonsiliasi_aktif' ? $tab : 'pendaftaran',
+                                        'tab' => 'pendaftaran',
                                         'page_pegawai' => request('page_pegawai'),
                                         'per_page' => request('per_page'),
                                     ])) }}"
-                                    x-bind:href="withActiveTab($el.getAttribute('href'), @js($row['status_code'] === 'rekonsiliasi_aktif' ? null : 'pendaftaran') ?? activeTab)"
+                                    x-bind:href="withActiveTab($el.getAttribute('href'), 'pendaftaran')"
                                     class="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-center text-sm font-semibold text-primary transition hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
                                 >
-                                    {{ $row['status_code'] === 'rekonsiliasi_aktif' ? 'Lihat data pemakaian' : 'Catat pemakaian tahunan' }}
+                                    Lihat ringkasan pemakaian
                                 </a>
                                 @if ($canManageManual)
                                     <a
@@ -390,7 +400,7 @@
                             x-bind:tabindex="activeTab === 'pendaftaran' ? 0 : -1"
                             class="min-h-11 focus-visible:ring-2 focus-visible:ring-primary/40"
                         >
-                            <span>Catat Pemakaian Tahunan</span>
+                            <span>Ringkasan Pemakaian Tahunan</span>
                         </x-ui.tab>
 
                         <x-ui.tab
@@ -408,24 +418,17 @@
 
                         <x-ui.tab
                             variant="sidebar"
-                            :active="$historyTabActive"
-                            :click="$historyTabClick"
+                            active="activeTab === 'riwayat'"
+                            click="selectTab('riwayat')"
                             id="tab-riwayat"
                             aria-controls="panel-riwayat"
-                            aria-disabled="{{ $hasActiveReconciliation ? 'false' : 'true' }}"
-                            aria-describedby="{{ $hasActiveReconciliation ? '' : 'riwayat-locked-message' }}"
-                            x-on:click.prevent="{{ $hasActiveReconciliation ? 'false' : 'true' }}"
-                            x-bind:tabindex="{{ $historyTabIndex }}"
-                            class="min-h-11 focus-visible:ring-2 focus-visible:ring-primary/40 {{ $hasActiveReconciliation ? '' : 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-muted' }}"
+                            x-bind:tabindex="activeTab === 'riwayat' ? 0 : -1"
+                            class="min-h-11 focus-visible:ring-2 focus-visible:ring-primary/40"
                         >
-                            <span>Perbaiki Data Pemakaian</span>
+                            <span>Ledger &amp; Rollover</span>
                         </x-ui.tab>
+
                     </x-ui.tabs>
-                    @if (! $hasActiveReconciliation)
-                        <p id="riwayat-locked-message" class="mt-3 px-3 text-xs leading-relaxed text-muted">
-                            Catat pemakaian tahunan pegawai terlebih dahulu sebelum membuka riwayat data pemakaian.
-                        </p>
-                    @endif
                 </x-ui.card>
             </aside>
 
@@ -436,7 +439,7 @@
                             <h3 class="text-sm font-semibold text-ink">Hasil Perhitungan Hak Cuti Tahunan</h3>
                             <p class="mt-1 text-xs text-muted">Tahun acuan: {{ $tahunAcuan }}</p>
                             <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
-                                Nilai ini dihitung sistem dari catatan pemakaian tahunan, pengajuan yang disetujui, dan cuti yang dicatat di luar SIMPEG.
+                                Nilai ini dihitung sistem dari pengajuan yang disetujui dan fakta Cuti di Luar SIMPEG yang tercatat.
                             </p>
                         </div>
                         <div class="text-right">
@@ -496,7 +499,7 @@
                         </section>
                     @else
                         <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                            Perhitungan saldo belum tersedia. Catat pemakaian tiga tahun agar saldo dapat dihitung dari fakta pemakaian yang tercatat.
+                            Perhitungan saldo belum tersedia. Saldo akan dihitung dari pengajuan SIMPEG yang disetujui dan fakta Cuti di Luar SIMPEG yang tercatat.
                         </div>
                     @endif
                 </x-ui.card>
@@ -510,116 +513,22 @@
                     class="space-y-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
                 >
                     <x-ui.card>
-                        <h3 class="text-sm font-semibold text-ink">Catat Pemakaian Tahunan</h3>
-                        @if ($isReconciled)
-                            <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
-                                Snapshot pemakaian aktif sudah tercatat. Buka Perbaiki Data Pemakaian untuk mengganti tiga fakta secara utuh dan auditabel.
-                            </p>
-                        @else
-                            <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
-                                Isi total hari cuti tahunan terpakai pada N-2, N-1, dan tahun berjalan berdasarkan dokumen administrasi.
-                            </p>
-                        @endif
-
-                        @if (! $canReconcile)
-                            <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                                Anda tidak memiliki hak untuk mencatat pemakaian cuti tahunan.
-                            </div>
-                        @elseif (! $isReconciled)
-                            <form method="POST" action="{{ route('cuti.reconciliation.store', $selectedEmployee) }}" class="mt-4 space-y-4">
-                                @csrf
-                                <input type="hidden" name="status" value="{{ $status }}">
-                                <input type="hidden" name="search" value="{{ $search }}">
-                                <input type="hidden" name="tab" value="{{ $tab }}" x-bind:value="activeTab">
-                                <input type="hidden" name="page_pegawai" value="{{ request('page_pegawai') }}">
-                                <input type="hidden" name="balance_year" value="{{ $tahunAcuan }}">
-
-                                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    <x-form.input
-                                        name="usage_n2"
-                                        label="Fakta pemakaian tahun {{ $tahunAcuan - 2 }}"
-                                        type="number"
-                                        min="0"
-                                        size="lg"
-                                        value="0"
-                                        help="Total hari terpakai pada N-2."
-                                        required
-                                    />
-                                    <x-form.input
-                                        name="usage_n1"
-                                        label="Fakta pemakaian tahun {{ $tahunAcuan - 1 }}"
-                                        type="number"
-                                        min="0"
-                                        size="lg"
-                                        value="0"
-                                        help="Total hari terpakai pada N-1."
-                                        required
-                                    />
-                                    <x-form.input
-                                        name="usage_current"
-                                        label="Fakta pemakaian tahun {{ $tahunAcuan }}"
-                                        type="number"
-                                        min="0"
-                                        size="lg"
-                                        value="0"
-                                        help="Total hari terpakai tahun berjalan."
-                                        required
-                                    />
+                        <h3 class="text-sm font-semibold text-ink">Ringkasan Pemakaian Tahunan</h3>
+                        <p class="mt-1 max-w-2xl text-xs leading-relaxed text-muted">
+                            Ringkasan ini hanya membaca fakta pemakaian aktif dari pengajuan yang disetujui di SIMPEG dan Cuti di Luar SIMPEG. Tidak ada input total tahunan langsung.
+                        </p>
+                        <dl class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Ringkasan pemakaian tahunan baca-saja">
+                            @foreach ([
+                                sprintf('Pemakaian tahun %d', $tahunAcuan - 2) => $usage['n2'],
+                                sprintf('Pemakaian tahun %d', $tahunAcuan - 1) => $usage['n1'],
+                                sprintf('Pemakaian tahun %d', $tahunAcuan) => $usage['current'],
+                            ] as $label => $value)
+                                <div class="rounded-xl border border-border bg-surface p-4">
+                                    <dt class="text-xs font-bold uppercase tracking-wide text-muted">{{ $label }}</dt>
+                                    <dd class="mt-1 text-xl font-bold text-ink">{{ $value }} hari</dd>
                                 </div>
-
-                                <x-form.textarea
-                                    name="administrative_note"
-                                    label="Keterangan atau sumber data"
-                                    rows="3"
-                                    placeholder="Contoh: Berdasarkan rekap pemakaian cuti tahunan."
-                                    help="Keterangan wajib diisi dan tercatat pada audit log."
-                                    required
-                                />
-
-                                <x-ui.button type="submit" class="w-full sm:w-auto">
-                                    Simpan Pemakaian Tahunan
-                                </x-ui.button>
-                            </form>
-                        @else
-                            <div class="mt-5 space-y-4" aria-label="Fakta pemakaian tahunan baca-saja">
-                                <div class="flex flex-col gap-3 rounded-xl border border-border bg-soft/40 p-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <p class="text-xs font-bold uppercase tracking-wide text-muted">Status data pemakaian</p>
-                                        <p class="mt-1 text-sm font-semibold text-ink">Aktif dan auditabel</p>
-                                    </div>
-                                    <div class="sm:text-right">
-                                        <p class="text-xs font-bold uppercase tracking-wide text-muted">Sumber data</p>
-                                        <p class="mt-1 text-sm font-semibold text-primary">Catatan pemakaian tahunan aktif</p>
-                                    </div>
-                                </div>
-
-                                @if ($usage)
-                                    <dl class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                        @foreach ([
-                                            sprintf('Fakta pemakaian tahun %d', $tahunAcuan - 2) => $usage['n2'],
-                                            sprintf('Fakta pemakaian tahun %d', $tahunAcuan - 1) => $usage['n1'],
-                                            sprintf('Fakta pemakaian tahun %d', $tahunAcuan) => $usage['current'],
-                                        ] as $label => $value)
-                                            <div class="rounded-xl border border-border bg-surface p-4">
-                                                <dt class="text-xs font-bold uppercase tracking-wide text-muted">{{ $label }}</dt>
-                                                <dd class="mt-1 text-xl font-bold text-ink">{{ $value ?? 'Tidak tersedia' }}</dd>
-                                            </div>
-                                        @endforeach
-                                    </dl>
-                                @endif
-
-                                <dl class="grid gap-3 text-xs sm:grid-cols-2">
-                                    <div>
-                                        <dt class="font-semibold text-muted">Tercatat pada</dt>
-                                        <dd class="mt-1 text-ink">{{ optional($balanceReconciliation['reconciled_at'])->format('d/m/Y') ?? 'Tidak tersedia' }}</dd>
-                                    </div>
-                                    <div>
-                                        <dt class="font-semibold text-muted">Alasan atau sumber</dt>
-                                        <dd class="mt-1 text-ink">{{ $balanceReconciliation['note'] ?? 'Catatan pemakaian cuti tahunan.' }}</dd>
-                                    </div>
-                                </dl>
-                            </div>
-                        @endif
+                            @endforeach
+                        </dl>
                     </x-ui.card>
                 </section>
 
@@ -633,111 +542,10 @@
                     class="space-y-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
                 >
                     <x-ui.card>
-                        <h3 class="text-sm font-semibold text-ink">Perbaiki Data Pemakaian</h3>
+                        <h3 class="text-sm font-semibold text-ink">Riwayat Saldo</h3>
                         <p class="mt-1 text-xs leading-relaxed text-muted">
-                            Perbaikan mengganti data pemakaian tiga tahun dan memicu hitung ulang.
+                            Koreksi atau pembatalan dilakukan per fakta Cuti di Luar SIMPEG secara append-only pada tab tersebut. Ringkasan tahunan tidak dapat diedit langsung.
                         </p>
-
-                        @if (! $hasActiveReconciliation)
-                            <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                                Catat pemakaian tahunan pegawai sebelum memperbaiki data pemakaian.
-                            </div>
-                        @elseif (! $canReconcile)
-                            <div class="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted">
-                                Anda tidak memiliki hak untuk memperbaiki data pemakaian cuti.
-                            </div>
-                        @else
-                            @if (count($balanceReconciliation['history']) > 0)
-                                <div class="mt-4 space-y-2" aria-label="Riwayat dokumen perubahan privat">
-                                    <p class="text-xs font-bold uppercase tracking-wide text-muted">Riwayat perubahan dan bukti</p>
-                                    @foreach ($balanceReconciliation['history'] as $historyItem)
-                                        <div class="rounded-lg border border-border p-3">
-                                            <p class="text-xs font-semibold text-muted">
-                                                Tahun {{ $historyItem['balance_year'] }} · {{ optional($historyItem['reconciled_at'])->format('d/m/Y') ?? 'Tanggal tidak tersedia' }}
-                                            </p>
-                                            @forelse ($historyItem['documents'] as $document)
-                                                <a class="mt-1 block text-sm font-semibold text-primary hover:underline" href="{{ route('cuti.reconciliation.document.download', [$historyItem['id'], $document['id']]) }}">
-                                                    Unduh bukti {{ $document['original_name'] }}
-                                                </a>
-                                            @empty
-                                                <p class="mt-1 text-xs text-muted">Tidak ada dokumen pendukung.</p>
-                                            @endforelse
-                                        </div>
-                                    @endforeach
-                                    @if ($balanceReconciliation['history'] instanceof \Illuminate\Contracts\Pagination\Paginator)
-                                        <div class="pt-2">
-                                            {{ $balanceReconciliation['history']->links() }}
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-                            <form method="POST" action="{{ route('cuti.reconciliation.correct', $balanceReconciliation['set_id']) }}" enctype="multipart/form-data" class="mt-4 space-y-4">
-                                @csrf
-                                <input type="hidden" name="status" value="{{ $status }}">
-                                <input type="hidden" name="search" value="{{ $search }}">
-                                <input type="hidden" name="tab" value="{{ $tab }}" x-bind:value="activeTab">
-                                <input type="hidden" name="page_pegawai" value="{{ request('page_pegawai') }}">
-                                <input type="hidden" name="balance_year" value="{{ $correctionYear }}">
-
-                                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                    <x-form.input
-                                        name="usage_n2"
-                                        label="Fakta pemakaian tahun {{ $correctionYear - 2 }}"
-                                        type="number"
-                                        min="0"
-                                        size="lg"
-                                        :value="$usage['n2']"
-                                        required
-                                    />
-                                    <x-form.input
-                                        name="usage_n1"
-                                        label="Fakta pemakaian tahun {{ $correctionYear - 1 }}"
-                                        type="number"
-                                        min="0"
-                                        size="lg"
-                                        :value="$usage['n1']"
-                                        required
-                                    />
-                                    <x-form.input
-                                        name="usage_current"
-                                        label="Fakta pemakaian tahun {{ $correctionYear }}"
-                                        type="number"
-                                        min="0"
-                                        size="lg"
-                                        :value="$usage['current']"
-                                        required
-                                    />
-                                </div>
-
-                                <x-form.textarea
-                                    name="administrative_note"
-                                    label="Keterangan atau sumber data"
-                                    rows="3"
-                                    :value="$balanceReconciliation['note']"
-                                    required
-                                />
-
-                                <x-form.textarea
-                                    name="correction_reason"
-                                    label="Alasan perbaikan"
-                                    rows="3"
-                                    placeholder="Jelaskan alasan penggantian snapshot tiga tahun."
-                                    required
-                                />
-
-                                <x-form.input
-                                    name="dokumen"
-                                    label="Dokumen bukti"
-                                    type="file"
-                                    size="lg"
-                                    required
-                                />
-
-                                <x-ui.button type="submit" class="w-full sm:w-auto">
-                                    Simpan Perbaikan
-                                </x-ui.button>
-                            </form>
-                        @endif
                     </x-ui.card>
 
                     <x-ui.card>

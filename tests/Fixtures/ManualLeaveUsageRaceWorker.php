@@ -2,13 +2,18 @@
 
 namespace Tests\Fixtures;
 
+use App\Actions\Cuti\CancelManualLeaveUsageAction;
+use App\Actions\Cuti\CorrectManualLeaveUsageAction;
 use App\Actions\Cuti\StoreManualLeaveUsageAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -18,10 +23,30 @@ final class ManualLeaveUsageRaceWorker
     /** @param array<string, string> $input */
     public function run(array $input): void
     {
+        Carbon::setTestNow($input['now']);
+        DB::selectOne("select set_config('application_name', ?, false)", [$input['application_name']]);
         config()->set('filesystems.disks.local.root', $input['storage_root']);
         Storage::forgetDisk('local');
         $employee = Employee::query()->findOrFail($input['employee_id']);
         $actor = User::query()->findOrFail($input['actor_id']);
+        if ($input['lock_acquired'] !== '') {
+            $paused = false;
+            // Tahan hanya mutex pegawai pertama; rekalkulasi dapat mengambil lock yang sama lagi dalam transaksi.
+            DB::listen(function (QueryExecuted $query) use ($input, &$paused): void {
+                if ($paused || ! str_contains($query->sql, 'from "employees"') || ! str_contains($query->sql, 'for update')) {
+                    return;
+                }
+                $paused = true;
+                file_put_contents($input['lock_acquired'], 'locked');
+                $deadline = microtime(true) + 90;
+                while (! is_file($input['release_lock'])) {
+                    if (microtime(true) >= $deadline) {
+                        throw new \RuntimeException('Batas tunggu pelepasan mutex pegawai terlampaui.');
+                    }
+                    usleep(10_000);
+                }
+            });
+        }
         file_put_contents($input['ready'], 'ready');
 
         while (! is_file($input['barrier'])) {
@@ -45,24 +70,34 @@ final class ManualLeaveUsageRaceWorker
                     ],
                     $request,
                 );
+            } elseif ($input['mode'] === 'cancel') {
+                $record = app(CancelManualLeaveUsageAction::class)->execute(
+                    $input['record_id'],
+                    'Pembatalan fakta tahunan pada race.',
+                    $actor,
+                );
             } else {
                 $request = Request::create('/cuti/pemakaian-manual', 'POST');
                 $request->setUserResolver(fn (): User => $actor);
-                $record = app(StoreManualLeaveUsageAction::class)->execute(
-                    $employee->id,
-                    [
-                        'leave_type_id' => $input['leave_type_id'],
-                        'leave_request_case_id' => null,
-                        'tanggal_mulai' => $input['start_date'],
-                        'tanggal_selesai' => $input['end_date'],
-                        'alasan' => 'Cuti eksternal pada race overlap.',
-                        'approval_document_number' => 'RACE/FIXTURE/001',
-                        'approval_steps' => $this->approvalSteps(),
-                    ],
-                    UploadedFile::fake()->create('race.pdf', 20, 'application/pdf'),
-                    $actor,
-                    $request,
-                );
+                $data = [
+                    'leave_type_id' => $input['leave_type_id'],
+                    'leave_request_case_id' => null,
+                    'tanggal_mulai' => $input['start_date'],
+                    'tanggal_selesai' => $input['end_date'],
+                    'alasan' => 'Cuti eksternal pada race overlap.',
+                    'approval_document_number' => 'RACE/FIXTURE/001',
+                    'approval_steps' => $this->approvalSteps(),
+                ];
+                $document = UploadedFile::fake()->create('race.pdf', 20, 'application/pdf');
+                $record = $input['mode'] === 'correct'
+                    ? app(CorrectManualLeaveUsageAction::class)->execute(
+                        $input['record_id'],
+                        [...$data, 'correction_reason' => 'Koreksi fakta tahunan pada race.'],
+                        $document,
+                        $actor,
+                        $request,
+                    )
+                    : app(StoreManualLeaveUsageAction::class)->execute($employee->id, $data, $document, $actor, $request);
             }
 
             $result = [

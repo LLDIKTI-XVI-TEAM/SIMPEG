@@ -464,7 +464,10 @@ class ManualExternalApprovalLifecycleTest extends TestCase
             ->actingAs($admin)
             ->get($url)
             ->assertOk()
-            ->assertViewHas('initialApprovalSteps', $oldSteps);
+            ->assertViewHas('initialApprovalSteps', array_map(
+                fn (array $step): array => [...$step, 'approver_label' => ''],
+                $oldSteps,
+            ));
     }
 
     public function test_workspace_koreksi_menghidrasi_snapshot_persisted_dan_merender_teks_adversarial_secara_aman(): void

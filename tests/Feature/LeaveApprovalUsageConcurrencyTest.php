@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
@@ -31,12 +30,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\Process\Process;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 #[Group('serial')]
 class LeaveApprovalUsageConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
+    use RecordsHistoricalAnnualLeaveUsage;
 
     private ?string $raceDirectory = null;
 
@@ -487,22 +488,12 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             'role' => 'pimpinan',
             'employee_id' => $approver->id,
         ]);
-        $adminEmployee = Employee::factory()->create([
-            'nama_lengkap' => 'Admin Race Approval',
-            'email' => 'admin-race-'.Str::uuid().'@example.test',
-        ]);
-        $admin = User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
-        app(ReconcileAnnualLeaveUsageAction::class)->execute(
-            $pemohon->id,
-            [
-                'balance_year' => 2026,
-                'usage_n2' => 0,
-                'usage_n1' => 0,
-                'usage_current' => 0,
-                'administrative_note' => 'Rekonsiliasi fixture race persetujuan.',
-            ],
+        $admin = User::factory()->adminKepegawaian()->create();
+        $this->recordHistoricalAnnualUsage(
+            $pemohon,
+            [2024 => 0, 2025 => 0, 2026 => 0],
             $admin,
-            $this->requestFor($admin),
+            'Fakta pemakaian eksternal fixture race persetujuan.',
         );
         $request = LeaveRequest::query()->create([
             'employee_id' => $pemohon->id,
@@ -743,20 +734,13 @@ DROP TRIGGER IF EXISTS leave_balance_ledger_no_update_delete ON leave_balance_le
 DROP TRIGGER IF EXISTS leave_balance_ledger_no_truncate ON leave_balance_ledger;
 DROP TRIGGER IF EXISTS audit_logs_append_only ON audit_logs;
 DROP TRIGGER IF EXISTS audit_logs_append_only_truncate ON audit_logs;
-DROP TRIGGER IF EXISTS leave_usage_membership_validate ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_update_delete ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_truncate ON leave_usage_reconciliation_memberships;
 DROP TRIGGER IF EXISTS leave_usage_record_no_delete ON leave_usage_records;
 DROP TRIGGER IF EXISTS leave_usage_record_no_truncate ON leave_usage_records;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_delete ON leave_usage_reconciliation_sets;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_truncate ON leave_usage_reconciliation_sets;
 SQL);
 
         foreach ([
             'leave_usage_documents',
-            'leave_usage_reconciliation_memberships',
             'leave_usage_records',
-            'leave_usage_reconciliation_sets',
             'leave_balance_ledger',
             'leave_balance_reservation_events',
             'audit_logs',

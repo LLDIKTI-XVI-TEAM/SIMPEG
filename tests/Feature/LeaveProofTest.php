@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Actions\Cuti\ReconcileAnnualLeaveUsageAction;
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Employee;
@@ -14,6 +13,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
 use App\Services\LeaveApprovalService;
@@ -28,10 +28,12 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Tests\Support\RecordsHistoricalAnnualLeaveUsage;
 use Tests\TestCase;
 
 class LeaveProofTest extends TestCase
 {
+    use RecordsHistoricalAnnualLeaveUsage;
     use RefreshDatabase;
 
     public function test_audit_bukti_cuti_dapat_disimpan_dengan_event_leave_proof_generated(): void
@@ -462,7 +464,7 @@ class LeaveProofTest extends TestCase
         $this->assertSame(0, LeaveBalanceLedger::where('leave_request_id', $fixture['request']->id)->count());
         $balance = LeaveBalance::where('employee_id', $fixture['pemohon_employee']->id)->where('tahun', 2026)->firstOrFail();
         $this->assertSame(0, $balance->terpakai);
-        $this->assertSame(12, $balance->sisa);
+        $this->assertSame(18, $balance->sisa);
     }
 
     public function test_acting_user_yang_bukan_akun_approver_ditolak_tanpa_efek_samping(): void
@@ -502,7 +504,7 @@ class LeaveProofTest extends TestCase
 
         $balance = LeaveBalance::where('employee_id', $fixture['pemohon_employee']->id)->where('tahun', 2026)->firstOrFail();
         $this->assertSame(0, $balance->terpakai);
-        $this->assertSame(12, $balance->sisa);
+        $this->assertSame(18, $balance->sisa);
     }
 
     public function test_admin_detail_menampilkan_link_bukti_persetujuan_untuk_pengajuan_final_dengan_proof(): void
@@ -927,6 +929,9 @@ class LeaveProofTest extends TestCase
         );
 
         if ($createBalance) {
+            $pemohonEmployee->forceFill([
+                'jenis_pegawai_id' => RefJenisPegawai::firstOrCreate(['nama' => 'PNS'])->id,
+            ])->save();
             Appointment::create([
                 'employee_id' => $pemohonEmployee->id,
                 'jenis_pengangkatan' => 'PNS',
@@ -934,17 +939,11 @@ class LeaveProofTest extends TestCase
             ]);
             $this->seed(RbacSeeder::class);
             $admin = User::factory()->adminKepegawaian()->create();
-            app(ReconcileAnnualLeaveUsageAction::class)->execute(
-                $pemohonEmployee->id,
-                [
-                    'balance_year' => 2026,
-                    'usage_n2' => 12,
-                    'usage_n1' => 12,
-                    'usage_current' => 0,
-                    'administrative_note' => 'Rekonsiliasi fixture penerbitan bukti cuti.',
-                ],
+            $this->recordHistoricalAnnualUsage(
+                $pemohonEmployee,
+                [2024 => 12, 2025 => 12, 2026 => 0],
                 $admin,
-                $this->actorRequest($admin),
+                'Fakta pemakaian eksternal fixture penerbitan bukti cuti.',
             );
         }
 
