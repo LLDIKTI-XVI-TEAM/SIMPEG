@@ -8,7 +8,6 @@ Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
     ->name('hari-libur.')
     ->group(function (): void {
         Route::get('/', [HariLiburController::class, 'index'])
-            ->middleware('permission:hari_libur.read')
             ->name('index');
         Route::post('/', [HariLiburController::class, 'store'])
             ->middleware('permission:hari_libur.create')

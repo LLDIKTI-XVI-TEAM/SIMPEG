@@ -268,24 +268,10 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                                             @php
                                                 $isLockedForRole = in_array($permission->id, $lockedPermissionIdsByRole[$role->id] ?? [], true);
                                                 $isAssigned = $role->permissions->contains('id', $permission->id);
-                                                $lockReason = $permission->name === 'users.switch_role'
-                                                    && in_array($role->name, ['kepala_bagian', 'pegawai'], true)
-                                                    ? 'Switch Role hanya dapat diberikan kepada Super Admin, Admin Kepegawaian, atau Pimpinan.'
-                                                    : 'Permission ini tidak berlaku untuk role tersebut.';
+                                                $lockReason = 'Permission ini tidak berlaku untuk role tersebut.';
                                             @endphp
                                             <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition" title="{{ $isLockedForRole ? $lockReason : '' }}">
-                                                @if($role->name === 'super_admin')
-                                                    {{-- Super Admin is always checked and disabled to prevent lockout --}}
-                                                    <div class="flex items-center justify-center">
-                                                        <x-form.checkbox
-                                                            checked
-                                                            disabled
-                                                            class="text-primary/45 bg-soft focus:ring-0"
-                                                        />
-                                                        {{-- Standard hidden inputs for checked values to send back --}}
-                                                        <input type="hidden" name="matrix[{{ $role->id }}][]" value="{{ $permission->id }}">
-                                                    </div>
-                                                @elseif($isLockedForRole)
+                                                @if($isLockedForRole)
                                                     {{-- Kebijakan juga dipaksa ulang di backend saat matriks disimpan. --}}
                                                     <div class="flex items-center justify-center" title="Tidak dapat diberikan ke role ini">
                                                         <x-form.checkbox

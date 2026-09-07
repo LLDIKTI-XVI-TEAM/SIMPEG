@@ -9,7 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Endpoint self-service riwayat pendidikan khusus role pegawai.
+ * Endpoint self-service riwayat pendidikan untuk pengguna yang terhubung pegawai.
  *
  * Employee selalu di-resolve dari user yang sedang login agar riwayat pegawai lain tidak terbaca.
  */

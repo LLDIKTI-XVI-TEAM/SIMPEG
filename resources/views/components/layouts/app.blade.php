@@ -140,13 +140,11 @@
                     'group' => 'Cuti',
                     'items' => [
                         // Semua role defaultnya dapat membaca pengajuan sendiri.
-                        ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar',
-                         'permission' => 'cuti.read_own'],
+                        ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         // Semua role dapat menjadi approver bila ditunjuk di approval chain aktif.
                         ['label' => 'Antrean Persetujuan', 'route' => 'cuti.approval', 'icon' => 'check-badge'],
                         // Semua role defaultnya dapat melihat saldo cuti sendiri.
-                        ['label' => 'Saldo Cuti Saya', 'route' => 'cuti.saldo', 'icon' => 'document-text',
-                         'permission' => 'cuti.balance.read'],
+                        ['label' => 'Saldo Cuti Saya', 'route' => 'cuti.saldo', 'icon' => 'document-text'],
                         // Eksklusif pimpinan: tidak bisa diubah dari RBAC
                         ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge',
                          'roles' => ['pimpinan']],
@@ -185,8 +183,7 @@
                         ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth',
                          'permission' => 'ews.configure'],
                         // RBAC: dikontrol dari Role & Permission admin (notifications.read)
-                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell',
-                         'permission' => 'notifications.read'],
+                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         // Eksklusif super_admin
                         ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal',
                          'roles' => ['super_admin']],
@@ -205,8 +202,7 @@
                         ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells',
                          'permission' => 'reference_tables.manage'],
                         // RBAC: dikontrol dari Role & Permission admin (hari_libur.read)
-                        ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days',
-                         'permission' => 'hari_libur.read'],
+                        ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
                         // RBAC: dikontrol dari Role & Permission admin (audit_logs.read)
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list',
                          'permission' => 'audit_logs.read'],

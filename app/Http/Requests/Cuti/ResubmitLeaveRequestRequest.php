@@ -26,7 +26,6 @@ class ResubmitLeaveRequestRequest extends FormRequest
 
         return $leaveRequest !== null
             && $actor !== null
-            && $actor->hasPermission('cuti.create')
             && $actor->employee_id === $leaveRequest->employee_id
             && ($leaveRequest->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER
                 || ($leaveRequest->status === 'menunggu_approval'

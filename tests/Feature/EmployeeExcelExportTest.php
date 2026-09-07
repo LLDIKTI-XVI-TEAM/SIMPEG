@@ -113,7 +113,7 @@ class EmployeeExcelExportTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pimpinan_export_mengikuti_pengecualian_stakeholder_dengan_kolom_lengkap(): void
+    public function test_pimpinan_export_memakai_kolom_masked(): void
     {
         $this->seed(RbacSeeder::class);
         Role::where('name', 'pimpinan')->firstOrFail()->permissions()->syncWithoutDetaching([
@@ -128,13 +128,13 @@ class EmployeeExcelExportTest extends TestCase
             ->get(route('pegawai.export', ['ids' => [$employee->id]]));
 
         $rows = $this->exportedRows($response);
-        $this->assertSame('Email Pegawai', $rows[0][2]);
-        $this->assertSame('Nomor Telepon', $rows[0][7]);
-        $this->assertSame('pegawai@example.test', $rows[1][2]);
-        $this->assertSame('08123456789', $rows[1][7]);
+        $this->assertSame('Unit Kerja', $rows[0][2]);
+        $this->assertSame('Status Pegawai', $rows[0][6]);
+        $this->assertNotContains('pegawai@example.test', $rows[1]);
+        $this->assertNotContains('08123456789', $rows[1]);
     }
 
-    public function test_kepala_bagian_export_memuat_data_general_setelah_dua_permission_diberikan(): void
+    public function test_kepala_bagian_export_hanya_memuat_bawahan_langsung_dan_menolak_uuid_asing(): void
     {
         $this->seed(RbacSeeder::class);
         Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([
@@ -142,19 +142,25 @@ class EmployeeExcelExportTest extends TestCase
             Permission::where('name', 'employees.export')->firstOrFail()->id,
         ]);
         $kabag = Employee::factory()->create();
-        $bawahan = Employee::factory()->create(['nama_lengkap' => 'Bawahan Export']);
+        $bawahan = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Export',
+            'kepala_bagian_id' => $kabag->id,
+        ]);
         $lainnya = Employee::factory()->create(['nama_lengkap' => 'Lain Export']);
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $kabag->id]);
 
         $rows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export')));
-        $this->assertCount(4, $rows);
+        $this->assertCount(2, $rows);
+        $this->assertSame('Bawahan Export', $rows[1][1]);
 
-        $this->actingAs($user)->get(route('pegawai.export', [
+        $foreignRows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export', [
             'ids' => [$bawahan->id, $lainnya->id],
-        ]))->assertOk();
+        ]));
+        $this->assertCount(2, $foreignRows);
+        $this->assertSame('Bawahan Export', $foreignRows[1][1]);
     }
 
-    public function test_pegawai_export_memuat_data_general_setelah_dua_permission_diberikan(): void
+    public function test_pegawai_export_hanya_memuat_data_sendiri_dan_menolak_uuid_asing(): void
     {
         $this->seed(RbacSeeder::class);
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([
@@ -166,9 +172,24 @@ class EmployeeExcelExportTest extends TestCase
         $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
 
         $rows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export')));
-        $this->assertCount(3, $rows);
+        $this->assertCount(2, $rows);
+        $this->assertSame('Pegawai Sendiri', $rows[1][1]);
 
-        $this->actingAs($user)->get(route('pegawai.export', ['ids' => [$lainnya->id]]))->assertOk();
+        $foreignRows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export', ['ids' => [$lainnya->id]])));
+        $this->assertCount(1, $foreignRows);
+    }
+
+    public function test_super_admin_export_berubah_sesuai_matrix_permission(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $superAdmin = User::factory()->superAdmin()->create();
+        $permission = Permission::where('name', 'employees.export')->firstOrFail();
+
+        $this->actingAs($superAdmin)->get(route('pegawai.export'))->assertOk();
+
+        Role::where('name', 'super_admin')->firstOrFail()->permissions()->detach($permission->id);
+
+        $this->actingAs($superAdmin->fresh())->get(route('pegawai.export'))->assertForbidden();
     }
 
     /** @return array<int, array<int, mixed>> */

@@ -176,11 +176,11 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('riwayat-pendidikan.store');
         Route::put('/{employee}/riwayat-pendidikan/{education}', [EducationHistoryController::class, 'update'])
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.update'))
             ->whereUuid(['employee', 'education'])
             ->name('riwayat-pendidikan.update');
         Route::delete('/{employee}/riwayat-pendidikan/{education}', [EducationHistoryController::class, 'destroy'])
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create'))
+            ->middleware($adminSubModuleMutationMiddleware('employee_histories.delete'))
             ->whereUuid(['employee', 'education'])
             ->name('riwayat-pendidikan.destroy');
         Route::get('/{employee}/pengangkatan', [AppointmentController::class, 'show'])

@@ -139,10 +139,6 @@ class User extends Authenticatable
             return false;
         }
 
-        if ($effectiveRole === 'super_admin') {
-            return true;
-        }
-
         return Role::query()
             ->where('name', $effectiveRole)
             ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
@@ -178,31 +174,22 @@ class User extends Authenticatable
             ->exists();
     }
 
-    /** Role asli yang boleh memakai Switch Role bila permission diberikan dari RBAC. */
-    public const SWITCH_ROLE_ORIGIN_ROLES = [
-        'super_admin',
-        'admin_kepegawaian',
-    ];
-
     /**
      * Switch Role dibatasi pada role asal yang disetujui. Hak memulai simulasi
      * tetap membutuhkan permission users.switch_role dari konfigurasi RBAC.
      */
     public function canInitiateSwitchRole(): bool
     {
-        return in_array($this->role, self::SWITCH_ROLE_ORIGIN_ROLES, true)
+        return isset(self::ROLE_RANKS[$this->role ?? ''])
             && $this->hasOriginalRolePermission('users.switch_role');
     }
 
     /**
      * Menentukan apakah role asli boleh memulai simulasi role.
      *
-     * Switch Role adalah exception RBAC yang dibatasi oleh kontrak produk: hanya
-     * role asli Super Admin dan Admin Kepegawaian dengan permission
-     * users.switch_role yang boleh mensimulasikan role target. Pimpinan,
-     * Kepala Bagian, dan Pegawai tetap fail-closed walaupun permission
-     * tersebut salah terpasang. Permission fitur biasa tetap ditentukan dari
-     * effective role saat simulasi aktif.
+     * Capability memulai simulasi berasal dari permission asal. Hierarki hanya
+     * menentukan target yang sah: selalu harus lebih rendah dari role asli.
+     * Permission fitur biasa tetap ditentukan dari effective role saat simulasi.
      */
     public function canSwitchToRole(string $targetRole): bool
     {

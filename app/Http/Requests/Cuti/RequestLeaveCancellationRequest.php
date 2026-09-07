@@ -9,7 +9,7 @@ class RequestLeaveCancellationRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('cuti.create');
+        return $this->user()?->employee !== null;
     }
 
     /** Alasan disimpan sebagai data sensitif pada record pembatalan, sehingga spasi tepi tidak dipertahankan. */

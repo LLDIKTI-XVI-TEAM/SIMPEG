@@ -32,8 +32,7 @@ final class DownloadLeaveAttachmentAction
             return true;
         }
 
-        if ($actor->hasPermission('cuti.read_own')
-            && $actor->employee_id !== null
+        if ($actor->employee_id !== null
             && $actor->employee_id === $leave->employee_id) {
             return true;
         }

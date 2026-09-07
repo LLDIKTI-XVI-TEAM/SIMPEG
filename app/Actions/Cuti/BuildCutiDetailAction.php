@@ -91,11 +91,9 @@ class BuildCutiDetailAction
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
         $canGenerateFormulir = $canDownloadFormulir
-            && $cuti->proof?->document_path === null
-            && $user->hasPermission('cuti.proof.generate');
+            && $cuti->proof?->document_path === null;
         $canReadAll = $user->hasPermission('cuti.read_all');
-        $canReadOwn = $user->hasPermission('cuti.read_own')
-            && $user->employee_id !== null
+        $canReadOwn = $user->employee_id !== null
             && $cuti->employee_id === $user->employee_id;
 
         // Snapshot approver lama tetap boleh membaca pengajuan untuk kebutuhan audit,
@@ -111,7 +109,6 @@ class BuildCutiDetailAction
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
         $latestCancellation = $isOwner ? $cuti->cancellationRequests->first() : null;
         $canRequestCancellation = $isOwner
-            && $user->hasPermission('cuti.create')
             && in_array($cuti->status, ['menunggu_approval', 'ditangguhkan'], true)
             && $latestCancellation?->status !== 'pending';
         $isVerifierContext = $canAct || $canReadAll;
@@ -134,7 +131,6 @@ class BuildCutiDetailAction
             'attachmentAvailable' => $this->attachmentDownloads->canReadAsGeneralActor($cuti, $user)
                 && $this->files->hasLeaveAttachment($cuti->lampiran_path, $cuti->employee_id),
             'canResubmit' => $isOwner
-                && $user->hasPermission('cuti.create')
                 && ($isRolloverReturn
                 || ($cuti->status === 'menunggu_approval' && $cuti->approvals->isEmpty())),
             'canRequestCancellation' => $canRequestCancellation,

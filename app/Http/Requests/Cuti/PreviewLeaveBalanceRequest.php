@@ -15,7 +15,9 @@ class PreviewLeaveBalanceRequest extends FormRequest
         $actor = $this->user();
 
         return $actor?->employee !== null
-            && $actor->hasPermission('cuti.create');
+            && in_array($actor->getEffectiveRole(), [
+                'super_admin', 'admin_kepegawaian', 'kepala_bagian', 'pegawai',
+            ], true);
     }
 
     /**

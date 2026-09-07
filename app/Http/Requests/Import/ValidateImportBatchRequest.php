@@ -15,13 +15,7 @@ class ValidateImportBatchRequest extends FormRequest
 
         $user = $this->user();
 
-        return $user !== null
-            && (
-                $user->hasPermission('employees.import')
-                || $user->getEffectiveRole() === 'super_admin'
-                || in_array($user->role, ['super_admin', 'admin_kepegawaian'], true)
-                || in_array($user->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true)
-            );
+        return $user !== null && $user->hasPermission('employees.import');
     }
 
     /**

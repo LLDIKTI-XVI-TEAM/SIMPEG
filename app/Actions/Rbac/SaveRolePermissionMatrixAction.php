@@ -5,26 +5,16 @@ namespace App\Actions\Rbac;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Services\AuditService;
+use App\Support\Rbac\PatenCapability;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class SaveRolePermissionMatrixAction
 {
-    /**
-     * Peran yang tidak boleh kehilangan kewenangan lewat matriks.
-     *
-     * Antarmuka menampilkan centang Super Admin dalam keadaan terkunci, namun penjagaan di
-     * antarmuka bukan kontrol akses. Tanpa penjagaan di peladen, satu permintaan tanpa kunci
-     * peran ini akan mengosongkan hak aksesnya dan menghapus satu-satunya jalan memulihkan RBAC.
-     */
-    private const PROTECTED_ROLES = ['super_admin'];
-
-    /**
-     * Permission Switch Role hanya relevan untuk role asal yang dapat memulai
-     * simulasi. Pembatasan ini wajib diselaraskan dengan User::canInitiateSwitchRole().
-     */
-    public const SWITCH_ROLE_ASSIGNABLE_ROLES = ['super_admin', 'admin_kepegawaian'];
+    /** Switch Role dapat diberikan oleh matriks kepada setiap role. Targetnya
+     * tetap dibatasi secara invariant oleh hierarki di User::canSwitchToRole(). */
+    public const SWITCH_ROLE_ASSIGNABLE_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'];
 
     /**
      * Menyimpan matriks hak akses peran dan mencatat setiap peran yang berubah.
@@ -46,10 +36,10 @@ class SaveRolePermissionMatrixAction
             $jumlahBerubah = 0;
 
             foreach ($roles as $role) {
-                if (in_array($role->name, self::PROTECTED_ROLES, true)) {
-                    continue;
-                }
-
+                $patenPermissionIds = $role->permissions
+                    ->filter(fn (Permission $permission): bool => PatenCapability::isPermissionName($permission->name))
+                    ->pluck('id')
+                    ->all();
                 $sebelum = $role->permissions->pluck('id')->sort()->values()->all();
                 $sesudah = collect($matrix[$role->id] ?? [])
                     ->unique()
@@ -59,6 +49,8 @@ class SaveRolePermissionMatrixAction
                         return is_string($permissionName)
                             && $this->isAssignableToRole($permissionName, $role->name);
                     })
+                    ->reject(fn (string $permissionId): bool => PatenCapability::isPermissionName((string) $namaPermission->get($permissionId)))
+                    ->merge($patenPermissionIds)
                     ->sort()
                     ->values()
                     ->all();

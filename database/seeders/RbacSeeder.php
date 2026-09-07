@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
+use App\Support\Rbac\PatenCapability;
 use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
@@ -87,12 +88,9 @@ class RbacSeeder extends Seeder
         // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
         // pada chain aktif. Pimpinan sengaja tidak menerima hak pengajuan cuti.
         $this->syncRolePermissions([
-            'super_admin' => array_values(array_diff(array_keys($permissions), [
-                'cuti.create',
-                'cuti.balance.reconcile',
-                'cuti.manual.manage',
-                'cuti.cancellation.manage',
-            ])),
+            // Super Admin menerima default semua capability RBAC, tetapi tetap
+            // dapat direvoke dari matrix setelah bootstrap.
+            'super_admin' => array_values(array_diff(array_keys($permissions), PatenCapability::PERMISSION_NAMES)),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
@@ -193,6 +191,10 @@ class RbacSeeder extends Seeder
     {
         foreach ($mapping as $roleName => $permissionNames) {
             $role = Role::where('name', $roleName)->firstOrFail();
+
+            // Permission legacy PATEN boleh masih ada pada tabel demi kompatibilitas
+            // deploy, tetapi bukan lagi grant role pada bootstrap baru.
+            $permissionNames = array_values(array_diff($permissionNames, PatenCapability::PERMISSION_NAMES));
 
             $permissionIds = Permission::query()
                 ->whereIn('name', $permissionNames)

@@ -16,8 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Memvalidasi pengajuan cuti oleh pegawai.
- * Otorisasi ditegakkan ganda: middleware route (permission:cuti.create) dan authorize() di sini
- * agar backend tidak hanya bergantung pada penyembunyian menu/tombol di UI.
+ * Otorisasi mengunci konteks self-service; kelayakan domain tetap divalidasi
+ * server-side agar backend tidak bergantung pada penyembunyian menu/tombol UI.
  * Aturan domain (atasan langsung, jenis cuti khusus PNS, dan kecukupan saldo) divalidasi di backend
  * sebagai sumber kebenaran, bukan sekadar batasan tampilan.
  */
@@ -25,10 +25,13 @@ class StoreLeaveRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Hanya pengguna dengan hak mengajukan cuti yang boleh menyimpan pengajuan.
+        // Pengajuan cuti adalah self-service PATEN. Role Pimpinan tidak membuat
+        // pengajuan pribadi; aturan lifecycle/eligibility tetap divalidasi di bawah.
         $actor = $this->user();
 
-        return $actor !== null && $actor->hasPermission('cuti.create');
+        return $actor !== null && in_array($actor->getEffectiveRole(), [
+            'super_admin', 'admin_kepegawaian', 'kepala_bagian', 'pegawai',
+        ], true);
     }
 
     /**

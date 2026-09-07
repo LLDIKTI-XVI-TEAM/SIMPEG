@@ -7,6 +7,7 @@ use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\User;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Support\Laporan\ExcelStyleHelper;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
@@ -18,6 +19,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportEmployeeAction
 {
+    public function __construct(private readonly EmployeeDashboardScopeService $employeeScope) {}
+
     /**
      * Mengekspor data pegawai menjadi file Excel dan mengembalikannya sebagai StreamedResponse.
      */
@@ -29,15 +32,15 @@ class ExportEmployeeAction
         $effectiveRole = $actor->getEffectiveRole();
         abort_unless(in_array($effectiveRole, ['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'], true), 403);
 
-        // Export pegawai adalah laporan general. Aksesnya ditentukan oleh gabungan
-        // employees.read dan employees.export pada route, tanpa pemotongan scope role.
+        // Permission route menentukan capability export. Dataset selalu dimulai
+        // dari scope kanonis aktor; ids[] hanya mempersempit dataset tersebut.
         $requestedIds = collect($request->input('ids', []))
             ->filter(fn ($id) => is_string($id) && trim($id) !== '')
             ->map(fn (string $id) => trim($id))
             ->unique()
             ->values();
 
-        $query = Employee::query()->with([
+        $query = $this->employeeScope->for($actor)->with([
             'jenisPegawai:id,nama',
             'statusPegawai:id,nama',
             'programStudi:id,nama',
@@ -119,6 +122,9 @@ class ExportEmployeeAction
                 ->values();
         }
 
+        // PII hanya diproyeksikan untuk operator administrasi global. Pimpinan
+        // dan role dengan scope bawahan/diri sendiri menerima kolom aman.
+        $masked = ! in_array($effectiveRole, ['super_admin', 'admin_kepegawaian'], true);
         $spreadsheet = $this->generateExcelSpreadsheet($pegawaiData, $masked);
 
         $filename = 'Data_Pegawai_SIMPEG_'.now()->format('Ymd').'.xlsx';

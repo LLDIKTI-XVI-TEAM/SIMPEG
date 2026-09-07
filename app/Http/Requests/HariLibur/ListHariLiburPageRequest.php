@@ -9,7 +9,7 @@ class ListHariLiburPageRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('hari_libur.read');
+        return $this->user() !== null;
     }
 
     public function rules(): array

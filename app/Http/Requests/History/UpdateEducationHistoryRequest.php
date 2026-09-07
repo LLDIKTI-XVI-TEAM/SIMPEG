@@ -14,7 +14,7 @@ class UpdateEducationHistoryRequest extends FormRequest
             return true;
         }
 
-        return $this->user()?->hasPermission('employee_histories.create') ?? false;
+        return $this->user()?->hasPermission('employee_histories.update') ?? false;
     }
 
     public function rules(): array

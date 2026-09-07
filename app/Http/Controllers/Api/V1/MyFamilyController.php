@@ -9,7 +9,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 
 /**
- * Endpoint self-service data keluarga khusus role pegawai.
+ * Endpoint self-service data keluarga untuk pengguna yang terhubung pegawai.
  *
  * Employee selalu di-resolve dari user yang sedang login agar data pegawai lain tidak terbaca.
  */
