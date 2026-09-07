@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Persona SSO sintetis (HANYA local/testing). Password autentikasi dikelola
+     * Persona SSO UAT nyata (HANYA local/testing). Password autentikasi dikelola
      * sepenuhnya oleh Keycloak dan tidak disimpan oleh seeder SIMPEG.
      *
      * Auth callback TIDAK PERNAH membaca daftar ini sebagai otorisasi: role internal tetap ditentukan
@@ -21,28 +21,28 @@ class SsoRoleMappedAccountSeeder extends Seeder
      */
     public const UAT_ACCOUNTS = [
         [
-            'email' => 'fixture-super-admin@example.test',
-            'username' => 'fixture-super-admin',
+            'email' => 'dayensite@gmail.com',
+            'username' => 'demo-klabat',
             'role' => 'super_admin',
         ],
         [
-            'email' => 'fixture-admin-kepegawaian@example.test',
-            'username' => 'fixture-admin-kepegawaian',
+            'email' => 'sitedayen@gmail.com',
+            'username' => 'demo-klabat-kepeg',
             'role' => 'admin_kepegawaian',
         ],
         [
-            'email' => 'fixture-pimpinan@example.test',
-            'username' => 'fixture-pimpinan',
+            'email' => 'dionkobi08@gmail.com',
+            'username' => 'demo-klabat-pimpinan',
             'role' => 'pimpinan',
         ],
         [
-            'email' => 'fixture-kepala-bagian@example.test',
-            'username' => 'fixture-kepala-bagian',
+            'email' => 'dayen6153@gmail.com',
+            'username' => 'demo-klabat-kabag',
             'role' => 'kepala_bagian',
         ],
         [
-            'email' => 'fixture-pegawai@example.test',
-            'username' => 'fixture-pegawai',
+            'email' => 'dionleonn05@gmail.com',
+            'username' => 'demo-klabat-pegawai',
             'role' => 'pegawai',
         ],
     ];
@@ -65,8 +65,8 @@ class SsoRoleMappedAccountSeeder extends Seeder
     }
 
     /**
-     * Menanam pegawai + user untuk setiap persona sintetis agar fixture autentikasi
-     * dan role lokal tersedia tanpa menyimpan identitas UAT nyata di repository.
+     * Menanam pegawai + user untuk setiap persona UAT yang disetujui agar identitas
+     * autentikasi Keycloak dan role lokal tersedia di local/testing.
      *
      * Seeder ini BUKAN sumber otorisasi: auth callback tidak pernah membaca
      * daftar ini; role internal ditentukan aplikasi SIMPEG.
