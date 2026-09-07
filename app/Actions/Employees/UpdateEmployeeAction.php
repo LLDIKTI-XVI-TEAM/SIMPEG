@@ -108,7 +108,7 @@ class UpdateEmployeeAction
                 && $request->filled('pangkat_tanggal_sk') && $request->filled('pangkat_tmt_pangkat');
             $wantsPangkatFile = $request->hasFile('file_sk_pangkat') || $request->filled('existing_document_id_pangkat');
             if ($wantsPangkat || $wantsPangkatFile) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+                $canHistory = $request->user()?->hasPermission('employee_histories.create');
                 if (! $canHistory) {
                     $this->warnings[] = 'Riwayat kepangkatan tidak dibuat: butuh permission employee_histories.create.';
                 } else {
@@ -127,7 +127,7 @@ class UpdateEmployeeAction
                             $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: data riwayat kepangkatan tidak lengkap.';
                         }
                     } else {
-                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update') || $request->user()?->getEffectiveRole() === 'super_admin';
+                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
                         if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                             if (! $canDoc) {
                                 $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -185,7 +185,7 @@ class UpdateEmployeeAction
                 && $request->filled('jabatan_tanggal_sk') && $request->filled('jabatan_tmt_jabatan');
             $wantsJabatanFile = $request->hasFile('file_sk_jabatan') || $request->filled('existing_document_id_jabatan');
             if ($wantsJabatan || $wantsJabatanFile) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+                $canHistory = $request->user()?->hasPermission('employee_histories.create');
                 if (! $canHistory) {
                     $this->warnings[] = 'Riwayat jabatan tidak dibuat: butuh permission employee_histories.create.';
                 } elseif (! $wantsJabatan) {
@@ -209,7 +209,7 @@ class UpdateEmployeeAction
                         'tmt_jabatan' => $validated['jabatan_tmt_jabatan'],
                     ];
 
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update') || $request->user()?->getEffectiveRole() === 'super_admin';
+                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
                     if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                         if (! $canDoc) {
                             $this->warnings[] = 'Berkas SK jabatan tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -260,7 +260,7 @@ class UpdateEmployeeAction
                 && $request->filled('kgb_tanggal_sk') && $request->filled('kgb_tmt_kgb');
             $wantsKgbFile = $request->hasFile('file_sk_kgb') || $request->filled('existing_document_id_kgb');
             if ($wantsKgb || $wantsKgbFile) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+                $canHistory = $request->user()?->hasPermission('employee_histories.create');
                 if (! $canHistory) {
                     $this->warnings[] = 'Riwayat KGB tidak dibuat: butuh permission employee_histories.create.';
                 } elseif (! $wantsKgb) {
@@ -275,7 +275,7 @@ class UpdateEmployeeAction
                         'tmt_kgb' => $validated['kgb_tmt_kgb'] ?? null,
                     ];
 
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update') || $request->user()?->getEffectiveRole() === 'super_admin';
+                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
                     if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                         if (! $canDoc) {
                             $this->warnings[] = 'Berkas SK KGB tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -335,7 +335,7 @@ class UpdateEmployeeAction
             // 4. Pengangkatan (Appointment)
             $wantsPengangkatan = $request->filled('pengangkatan_jenis_pengangkatan') || $request->hasFile('file_sk_pengangkatan') || $request->filled('existing_document_id_pengangkatan');
             if ($wantsPengangkatan) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create') || $request->user()?->hasPermission('employee_histories.update') || $request->user()?->getEffectiveRole() === 'super_admin' || $request->user()?->hasPermission('employees.update');
+                $canHistory = $request->user()?->hasPermission('employee_histories.create') || $request->user()?->hasPermission('employee_histories.update') || $request->user()?->hasPermission('employees.update');
                 // Pengangkatan juga boleh via employees.update (legacy), tapi gate history tetap cek
                 $canHistoryEff = $canHistory || $request->user()?->hasPermission('employees.update');
                 if (! $canHistoryEff) {
@@ -348,7 +348,7 @@ class UpdateEmployeeAction
                         'tanggal_sk' => $validated['pengangkatan_tanggal_sk'] ?? $request->input('pengangkatan_tanggal_sk'),
                     ];
 
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update') || $request->user()?->getEffectiveRole() === 'super_admin';
+                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
                     if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
                         if (! $canDoc) {
                             $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -418,7 +418,7 @@ class UpdateEmployeeAction
             // 5. Berkas Lainnya untuk edit (juga warning)
             $wantsBerkasEdit = $request->filled('berkas_lainnya_jenis') && $request->hasFile('file_berkas_lainnya');
             if ($wantsBerkasEdit) {
-                $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+                $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
                 if (! $canDoc) {
                     $this->warnings[] = 'Berkas lainnya tidak diunggah: butuh permission dokumen_sk.create.';
                 } elseif ($request->file('file_berkas_lainnya')->isValid()) {

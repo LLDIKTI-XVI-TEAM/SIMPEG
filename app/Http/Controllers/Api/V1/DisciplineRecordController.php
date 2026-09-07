@@ -33,7 +33,7 @@ class DisciplineRecordController extends Controller
         $validated = $request->validated();
         $warning = null;
         $hasFile = (array_key_exists('file_sk', $validated) && $validated['file_sk'] !== null && $validated['file_sk'] !== '') || ! empty($validated['dokumen_id']);
-        $canCreateDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+        $canCreateDoc = $request->user()?->hasPermission('dokumen_sk.create');
         if ($hasFile && ! $canCreateDoc) {
             unset($validated['file_sk'], $validated['dokumen_id']);
             $warning = 'Riwayat disiplin berhasil disimpan, tetapi berkas SK tidak diunggah karena Anda tidak memiliki permission dokumen_sk.create.';

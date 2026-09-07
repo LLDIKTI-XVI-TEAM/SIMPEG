@@ -14,8 +14,7 @@ class UpdateDocumentRequest extends FormRequest
     {
         $user = $this->user();
 
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return $user !== null && $user->hasPermission('dokumen_sk.update');
     }
 
     public function rules(): array

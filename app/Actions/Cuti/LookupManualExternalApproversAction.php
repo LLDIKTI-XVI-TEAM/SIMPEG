@@ -3,23 +3,28 @@
 namespace App\Actions\Cuti;
 
 use App\Models\Employee;
+use App\Models\User;
+use App\Services\Cuti\LeaveUsageAuthorizationService;
 
 final class LookupManualExternalApproversAction
 {
     private const RESULT_LIMIT = 15;
 
+    public function __construct(private readonly LeaveUsageAuthorizationService $authorization) {}
+
     /**
      * Mencari identitas minimum approver tanpa mengirim kontak, alamat, atau atribut pegawai sensitif lainnya.
      *
-     * @return list<array{id:string,nama_lengkap:string,nip:string,jabatan_terakhir:?string,status_aktif:?string}>
+     * @return list<array{id:string,nama_lengkap:string,nip:string,jabatan_terakhir:?string}>
      */
-    public function execute(string $query): array
+    public function execute(string $query, User $actor): array
     {
+        $this->authorization->assertCanManageManual($actor);
         $escaped = addcslashes($query, '\\%_');
         $pattern = "%{$escaped}%";
 
         return Employee::query()
-            ->select(['id', 'nama_lengkap', 'nip', 'jabatan_terakhir', 'status_aktif'])
+            ->select(['id', 'nama_lengkap', 'nip', 'jabatan_terakhir'])
             ->where(function ($employeeQuery) use ($pattern): void {
                 $employeeQuery
                     ->whereRaw("nama_lengkap ILIKE ? ESCAPE E'\\\\'", [$pattern])
@@ -37,7 +42,7 @@ final class LookupManualExternalApproversAction
     /**
      * Membatasi respons autocomplete pada identitas kerja yang diperlukan untuk memilih approver.
      *
-     * @return array{id:string,nama_lengkap:string,nip:string,jabatan_terakhir:?string,status_aktif:?string}
+     * @return array{id:string,nama_lengkap:string,nip:string,jabatan_terakhir:?string}
      */
     private function approverPayload(Employee $employee): array
     {
@@ -46,7 +51,6 @@ final class LookupManualExternalApproversAction
             'nama_lengkap' => $employee->nama_lengkap,
             'nip' => $employee->nip,
             'jabatan_terakhir' => $employee->jabatan_terakhir,
-            'status_aktif' => $employee->status_aktif,
         ];
     }
 }

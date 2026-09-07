@@ -37,7 +37,7 @@ final class StoreManualLeaveUsageAction
     ) {}
 
     /**
-     * Mencatat fakta manual hanya setelah exact Admin guard, lookup pegawai, dan hitung hari kerja server.
+     * Mencatat fakta manual setelah permission dan scope pemilik fakta diperiksa di server.
      * Transaksi fail-closed; file UUID baru dikompensasi bila mutasi, replay, dokumen, atau audit gagal.
      *
      * @param  array<string, mixed>  $data
@@ -60,7 +60,7 @@ final class StoreManualLeaveUsageAction
             'approval_steps' => ['required', 'array', 'min:2', 'max:10'],
         ])->validate();
         $approvalSteps = $this->approvalChains->normalize($data['approval_steps'] ?? null);
-        $employee = $this->resolveEmployee($employee);
+        $employee = $this->resolveEmployee($employee, $actor);
         $administrativeNote = $this->text->required(
             (string) $validated['alasan'],
             'alasan',
@@ -163,10 +163,10 @@ final class StoreManualLeaveUsageAction
         return is_string($value) && trim($value) !== '' ? trim($value) : null;
     }
 
-    private function resolveEmployee(string $employee): Employee
+    private function resolveEmployee(string $employee, User $actor): Employee
     {
         abort_unless(Str::isUuid($employee), 404);
 
-        return Employee::query()->whereKey($employee)->firstOrFail();
+        return $this->authorization->employeeScope($actor)->whereKey($employee)->firstOrFail();
     }
 }

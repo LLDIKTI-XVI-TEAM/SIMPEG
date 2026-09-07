@@ -14,6 +14,8 @@ use App\Queries\Cuti\LeaveUsageAdminQuery;
 use App\Queries\Cuti\ManualLeaveCaseOptionQuery;
 use App\Services\Cuti\AnnualLeaveBusinessClock;
 use App\Services\Cuti\LeaveBalanceService;
+use App\Services\Cuti\LeaveUsageAuthorizationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +29,7 @@ class ShowLeaveBalanceAdminAction
         private readonly CurrentApprovalChainPreviewQuery $approvalChainPreviewQuery,
         private readonly ManualLeaveCaseOptionQuery $manualLeaveCaseOptionQuery,
         private readonly AnnualLeaveBusinessClock $businessClock,
+        private readonly LeaveUsageAuthorizationService $authorization,
     ) {}
 
     /**
@@ -35,8 +38,12 @@ class ShowLeaveBalanceAdminAction
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function execute(array $filters): array
+    public function execute(array $filters, User $actor): array
     {
+        $canManageManual = $actor->hasPermission('cuti.manual.manage');
+        if (! $canManageManual && ! $actor->hasPermission('cuti.balance.reconcile')) {
+            throw new AuthorizationException('Anda tidak memiliki izin membaca administrasi pemakaian cuti.');
+        }
         // Tahun administrasi mengikuti kalender bisnis WITA, bukan timezone proses atau parameter klien.
         $periode = (string) $this->businessClock->currentYear();
         $filters['periode'] = $periode;
@@ -45,8 +52,8 @@ class ShowLeaveBalanceAdminAction
         $search = trim($this->stringFilter($filters, 'search') ?? '');
         $tab = $this->stringFilter($filters, 'tab') ?? 'pendaftaran';
         $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 10;
-        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search, $perPage);
-        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search);
+        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search, $actor, $perPage);
+        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search, $actor);
 
         $workspace = $pegawaiId === null
             ? [
@@ -56,7 +63,7 @@ class ShowLeaveBalanceAdminAction
                 'activeReserved' => 0,
                 'dutyProtected' => 0,
             ]
-            : $this->employeeQuery->selectedWorkspace($pegawaiId, (int) $periode);
+            : $this->employeeQuery->selectedWorkspace($pegawaiId, (int) $periode, $actor);
         $selectedEmployee = $workspace['employee'];
         $selectedBalance = $workspace['balance'];
         $rule5Active = $workspace['rule5Active'];
@@ -119,7 +126,7 @@ class ShowLeaveBalanceAdminAction
         $initialApprovalSteps = session()->hasOldInput('approval_steps')
             ? old('approval_steps')
             : ($editableApprovalSteps ?? []);
-        [$canReconcile, $canManageManual] = $this->uiCapabilities();
+        $canReconcile = $actor->hasPermission('cuti.balance.reconcile');
         // Preview dan opsi hanya diperlukan saat panel manual dibuka agar tab administrasi lain tidak memuat query tambahan.
         $manualWorkspaceActive = $canManageManual
             && $selectedEmployee !== null

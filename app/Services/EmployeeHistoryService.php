@@ -237,7 +237,7 @@ class EmployeeHistoryService
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
         $user = $request?->user() ?? auth()->user();
-        $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user?->getEffectiveRole() === 'super_admin';
+        $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
         if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
             $canCreateDoc = true;
         }
@@ -355,7 +355,7 @@ class EmployeeHistoryService
 
         if (($data['file_sk'] ?? null) instanceof UploadedFile) {
             $user = auth()->user();
-            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user->getEffectiveRole() === 'super_admin';
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
             // Di environment lokal dengan disable auth, bypass dianggap memiliki hak dokumen
             if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
                 $canCreateDoc = true;
@@ -373,7 +373,7 @@ class EmployeeHistoryService
         // String controlled path (reuse arsip) juga memerlukan dokumen_sk.create
         if (is_string($data['file_sk'] ?? null) && $data['file_sk'] !== '') {
             $user = auth()->user();
-            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user->getEffectiveRole() === 'super_admin';
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
             if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
                 $canCreateDoc = true;
             }

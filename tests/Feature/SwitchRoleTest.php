@@ -143,8 +143,7 @@ class SwitchRoleTest extends TestCase
     }
 
     /**
-     * RBAC dapat memberi users.switch_role kepada dua role asal yang disetujui.
-     * Pimpinan, Kepala Bagian, dan Pegawai tetap ditolak walaupun permission salah terpasang.
+     * RBAC membuka capability; hierarki menentukan target yang sah.
      */
     public function test_only_allowed_origin_roles_with_permission_can_switch_role(): void
     {
@@ -163,48 +162,48 @@ class SwitchRoleTest extends TestCase
             $this->assertSame($targetRole, $user->temporary_role);
         }
 
-        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach ([
+            'pimpinan' => 'kepala_bagian',
+            'kepala_bagian' => 'pegawai',
+        ] as $role => $targetRole) {
             $this->grantSwitchPermission($role);
             $user = $this->createUserWithRole($role);
 
             $this->actingAs($user)
-                ->post(route('switch-role'), ['target_role' => 'pegawai'])
-                ->assertForbidden();
+                ->post(route('switch-role'), ['target_role' => $targetRole])
+                ->assertRedirect(route('dashboard'));
 
             $user->refresh();
-            $this->assertNull($user->temporary_role);
-            $this->assertSame([], $user->switchableRoleOptions());
+            $this->assertSame($targetRole, $user->temporary_role);
         }
     }
 
-    /** Pimpinan tidak boleh memulai simulasi walaupun permission salah terpasang. */
-    public function test_pimpinan_with_permission_cannot_switch_to_kepala_bagian(): void
+    public function test_pimpinan_with_permission_can_switch_to_kepala_bagian(): void
     {
         $this->grantSwitchPermission('pimpinan');
         $user = $this->createUserWithRole('pimpinan');
 
-        $this->assertFalse($user->canInitiateSwitchRole());
+        $this->assertTrue($user->canInitiateSwitchRole());
 
         $this->actingAs($user)
             ->post(route('switch-role'), ['target_role' => 'kepala_bagian'])
-            ->assertForbidden();
+            ->assertRedirect(route('dashboard'));
 
         $user->refresh();
-        $this->assertNull($user->temporary_role);
+        $this->assertSame('kepala_bagian', $user->temporary_role);
     }
 
-    /** Grant pada Kepala Bagian juga tidak membuka Switch Role. */
-    public function test_kepala_bagian_with_permission_cannot_switch_to_pegawai(): void
+    public function test_kepala_bagian_with_permission_can_switch_to_pegawai(): void
     {
         $this->grantSwitchPermission('kepala_bagian');
         $user = $this->createUserWithRole('kepala_bagian');
 
         $this->actingAs($user)
             ->post(route('switch-role'), ['target_role' => 'pegawai'])
-            ->assertForbidden();
+            ->assertRedirect(route('dashboard'));
 
         $user->refresh();
-        $this->assertNull($user->temporary_role);
+        $this->assertSame('pegawai', $user->temporary_role);
     }
 
     /** Pegawai tidak memiliki target dan tetap ditolak walaupun permission salah terpasang. */
@@ -688,12 +687,11 @@ class SwitchRoleTest extends TestCase
         $this->assertTrue($user->hasPermission('employees.read'));
     }
 
-    /** Kepala Bagian dan Pegawai tetap ditolak meski permission salah terpasang. */
-    public function test_switch_role_rejects_granted_disallowed_origin_role(): void
+    public function test_switch_role_pegawai_tetap_ditolak_karena_tidak_ada_target_lebih_rendah(): void
     {
-        $this->grantSwitchPermission('kepala_bagian');
+        $this->grantSwitchPermission('pegawai');
 
-        $kepalaBagian = $this->createUserWithRole('kepala_bagian');
+        $kepalaBagian = $this->createUserWithRole('pegawai');
         $this->assertTrue($kepalaBagian->hasPermission('users.switch_role'));
 
         $this->actingAs($kepalaBagian)

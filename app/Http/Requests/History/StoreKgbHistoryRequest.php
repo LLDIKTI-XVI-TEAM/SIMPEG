@@ -20,9 +20,7 @@ class StoreKgbHistoryRequest extends FormRequest
             return false;
         }
 
-        return in_array($user->role, ['super_admin', 'admin_kepegawaian'], true)
-            || in_array($user->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true)
-            || $user->hasPermission('employee_histories.create');
+        return $user->hasPermission('employee_histories.create');
     }
 
     public function rules(): array

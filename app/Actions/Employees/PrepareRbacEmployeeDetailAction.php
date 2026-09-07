@@ -45,7 +45,7 @@ class PrepareRbacEmployeeDetailAction
         $canDeleteFamily = $viewer->hasPermission('employee_families.delete');
         $canCreateDiscipline = $viewer->hasPermission('discipline_records.create');
         $canCreateEmployeeHistory = $viewer->hasPermission('employee_histories.create');
-        $canUpdateEmployeeHistory = $viewer->hasPermission('employee_histories.update') || $viewer->hasPermission('employee_histories.create') || $viewer->getEffectiveRole() === 'super_admin';
+        $canUpdateEmployeeHistory = $viewer->hasPermission('employee_histories.update') || $viewer->hasPermission('employee_histories.create');
         $canCreateDocument = $viewer->hasPermission('dokumen_sk.create');
         $canUpdateDocument = $viewer->hasPermission('dokumen_sk.update');
         $canDeleteDocument = $viewer->hasPermission('dokumen_sk.delete');

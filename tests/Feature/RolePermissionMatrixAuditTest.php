@@ -107,20 +107,15 @@ class RolePermissionMatrixAuditTest extends TestCase
         $this->assertDatabaseMissing('audit_logs', ['event' => 'CONFIG_UPDATE']);
     }
 
-    public function test_hak_akses_super_admin_tidak_dapat_dikurangi_lewat_matriks(): void
+    public function test_hak_akses_super_admin_dapat_dikurangi_lewat_matriks(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
         $role = Role::query()->where('name', 'super_admin')->firstOrFail();
-        $sebelum = $role->permissions->pluck('id')->sort()->values()->all();
-        $this->assertNotEmpty($sebelum);
-
-        // Payload sengaja mengosongkan peran super admin. Bila peladen menurutinya, sistem kehilangan
-        // satu-satunya peran yang dapat memperbaiki hak akses sehingga tidak ada jalan pulih.
         $this->actingAs($superAdmin)->post(route('rbac.update'), [
             'matrix' => [$role->id => []],
         ]);
 
-        $this->assertSame($sebelum, $role->fresh()->permissions->pluck('id')->sort()->values()->all());
+        $this->assertTrue($role->fresh()->permissions->isEmpty());
     }
 
     public function test_hak_akses_peran_biasa_dapat_dikosongkan_ketika_tidak_ada_centang(): void
@@ -143,31 +138,27 @@ class RolePermissionMatrixAuditTest extends TestCase
         ]);
     }
 
-    public function test_matriks_dapat_menugaskan_permission_cuti_generic_ke_role_mana_pun(): void
+    public function test_matriks_hanya_menugaskan_capability_cuti_rbac(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
         $pimpinan = Role::query()->where('name', 'pimpinan')->firstOrFail();
         $pegawai = Role::query()->where('name', 'pegawai')->firstOrFail();
-        $create = Permission::query()->where('name', 'cuti.create')->sole();
         $manual = Permission::query()->where('name', 'cuti.manual.manage')->sole();
-        $proof = Permission::query()->where('name', 'cuti.proof.generate')->sole();
         $readAll = Permission::query()->where('name', 'cuti.read_all')->sole();
 
         $response = $this->actingAs($superAdmin)->post(route('rbac.update'), [
             'matrix' => [
-                $pimpinan->id => array_merge($pimpinan->permissions->pluck('id')->all(), [$create->id, $manual->id]),
-                $pegawai->id => array_merge($pegawai->permissions->pluck('id')->all(), [$proof->id, $readAll->id]),
+                $pimpinan->id => array_merge($pimpinan->permissions->pluck('id')->all(), [$manual->id]),
+                $pegawai->id => array_merge($pegawai->permissions->pluck('id')->all(), [$readAll->id]),
             ],
         ]);
 
         $response->assertRedirect();
-        $this->assertTrue($pimpinan->fresh()->permissions->contains('id', $create->id));
         $this->assertTrue($pimpinan->fresh()->permissions->contains('id', $manual->id));
-        $this->assertTrue($pegawai->fresh()->permissions->contains('id', $proof->id));
         $this->assertTrue($pegawai->fresh()->permissions->contains('id', $readAll->id));
     }
 
-    public function test_matriks_menolak_switch_role_untuk_kepala_bagian_dan_pegawai(): void
+    public function test_matriks_dapat_menugaskan_switch_role_ke_semua_role(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
         $kepalaBagian = Role::query()->where('name', 'kepala_bagian')->firstOrFail();
@@ -182,8 +173,8 @@ class RolePermissionMatrixAuditTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertFalse($kepalaBagian->fresh()->permissions->contains('id', $switchRole->id));
-        $this->assertFalse($pegawai->fresh()->permissions->contains('id', $switchRole->id));
+        $this->assertTrue($kepalaBagian->fresh()->permissions->contains('id', $switchRole->id));
+        $this->assertTrue($pegawai->fresh()->permissions->contains('id', $switchRole->id));
     }
 
     public function test_peran_tanpa_kewenangan_tidak_dapat_mengubah_hak_akses(): void

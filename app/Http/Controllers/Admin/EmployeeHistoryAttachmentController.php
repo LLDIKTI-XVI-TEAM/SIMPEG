@@ -20,10 +20,10 @@ class EmployeeHistoryAttachmentController extends Controller
         $user = request()->user();
         // Granular permission gate per type + dokumen_sk.read sudah di middleware, tapi cek histories/discipline spesifik di sini
         if (in_array($type, ['rank', 'position', 'salary', 'appointment', 'education', 'status', 'status-snapshot'], true)) {
-            abort_unless($user && ($user->hasPermission('employee_histories.read') || $user->getEffectiveRole() === 'super_admin'), 403);
+            abort_unless($user && $user->hasPermission('employee_histories.read'), 403);
         }
         if ($type === 'discipline') {
-            abort_unless($user && ($user->hasPermission('discipline_records.read') || $user->getEffectiveRole() === 'super_admin'), 403);
+            abort_unless($user && $user->hasPermission('discipline_records.read'), 403);
         }
         $download = $action->execute($employee, $type, $history);
 

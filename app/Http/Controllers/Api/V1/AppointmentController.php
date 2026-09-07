@@ -33,7 +33,7 @@ class AppointmentController extends Controller
         $data = $request->safe()->except(['file_sk']);
         $file = $request->file('file_sk');
         $warning = null;
-        $canCreateDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->getEffectiveRole() === 'super_admin';
+        $canCreateDoc = $request->user()?->hasPermission('dokumen_sk.create');
         if ($file instanceof UploadedFile && ! $canCreateDoc) {
             $file = null;
             $warning = 'Data pengangkatan berhasil disimpan, tetapi berkas SK tidak diunggah karena Anda tidak memiliki permission dokumen_sk.create.';

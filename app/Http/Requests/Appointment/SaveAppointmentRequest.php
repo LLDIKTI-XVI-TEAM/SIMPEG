@@ -15,8 +15,7 @@ class SaveAppointmentRequest extends FormRequest
             return false;
         }
 
-        return $user->getEffectiveRole() === 'super_admin'
-            || $user->hasPermission('employee_histories.create')
+        return $user->hasPermission('employee_histories.create')
             || $user->hasPermission('employee_histories.update')
             || $user->hasPermission('employees.update');
     }

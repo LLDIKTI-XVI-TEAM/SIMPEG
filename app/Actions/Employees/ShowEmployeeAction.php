@@ -17,10 +17,10 @@ class ShowEmployeeAction
     public function execute(Employee $employee): array
     {
         $user = request()->user();
-        $canReadFamilies = $user?->hasPermission('employee_families.read') || $user?->getEffectiveRole() === 'super_admin';
-        $canReadHistories = $user?->hasPermission('employee_histories.read') || $user?->getEffectiveRole() === 'super_admin';
-        $canReadDiscipline = $user?->hasPermission('discipline_records.read') || $user?->getEffectiveRole() === 'super_admin';
-        $canReadDocuments = $user?->hasPermission('dokumen_sk.read') || $user?->getEffectiveRole() === 'super_admin';
+        $canReadFamilies = $user?->hasPermission('employee_families.read');
+        $canReadHistories = $user?->hasPermission('employee_histories.read');
+        $canReadDiscipline = $user?->hasPermission('discipline_records.read');
+        $canReadDocuments = $user?->hasPermission('dokumen_sk.read');
 
         // Bypass saat testing dengan disable auth
         if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {

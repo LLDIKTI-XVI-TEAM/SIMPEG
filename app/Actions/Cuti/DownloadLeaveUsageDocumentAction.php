@@ -28,6 +28,7 @@ final class DownloadLeaveUsageDocumentAction
 
         $record = LeaveUsageRecord::query()
             ->whereKey($usageId)
+            ->whereIn('employee_id', $this->authorization->employeeScope($actor)->select('employees.id'))
             ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
             ->firstOrFail();
         $document = LeaveUsageDocument::query()

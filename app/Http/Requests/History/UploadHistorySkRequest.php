@@ -15,8 +15,7 @@ class UploadHistorySkRequest extends FormRequest
         $user = $this->user();
 
         return $user !== null && (
-            $user->hasPermission('dokumen_sk.update') ||
-            $user->getEffectiveRole() === 'super_admin'
+            $user->hasPermission('dokumen_sk.update')
         );
     }
 

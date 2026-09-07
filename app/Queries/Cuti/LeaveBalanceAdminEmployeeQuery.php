@@ -8,6 +8,8 @@ use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
+use App\Models\User;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -15,12 +17,14 @@ use Illuminate\Database\Query\JoinClause;
 
 class LeaveBalanceAdminEmployeeQuery
 {
+    public function __construct(private readonly EmployeeDashboardScopeService $employeeScope) {}
+
     /**
      * Mengambil identitas pegawai dan projection tahun aktif dalam satu query detail.
      *
      * @return array{employee:?Employee,balance:?LeaveBalance,rule5Active:bool,activeReserved:int,dutyProtected:int}
      */
-    public function selectedWorkspace(string $employeeId, int $year): array
+    public function selectedWorkspace(string $employeeId, int $year, User $actor): array
     {
         $activeReservations = LeaveBalanceReservationEvent::query()
             ->selectRaw('COALESCE(SUM(leave_balance_reservation_events.amount), 0)')
@@ -39,7 +43,7 @@ class LeaveBalanceAdminEmployeeQuery
             ->where('leave_balance_ledger.source_year', $year)
             ->where('leave_balance_ledger.event_type', LeaveBalanceLedger::EVENT_DUTY_POSTPONEMENT_RECORDED);
 
-        $employee = Employee::query()
+        $employee = $this->employeeScope->for($actor)
             ->leftJoin('leave_balances as selected_balance', function (JoinClause $join) use ($year): void {
                 $join->on('selected_balance.employee_id', '=', 'employees.id')
                     ->where('selected_balance.tahun', $year);
@@ -112,9 +116,9 @@ class LeaveBalanceAdminEmployeeQuery
      *
      * @return Builder<Employee>
      */
-    private function populationQuery(string $search): Builder
+    private function populationQuery(string $search, User $actor): Builder
     {
-        $query = Employee::query();
+        $query = $this->employeeScope->for($actor);
         $search = trim($search);
 
         if ($search === '') {
@@ -135,9 +139,9 @@ class LeaveBalanceAdminEmployeeQuery
      *
      * @return Builder<Employee>
      */
-    private function rowsQuery(int $periode, string $search): Builder
+    private function rowsQuery(int $periode, string $search, User $actor): Builder
     {
-        return $this->populationQuery($search)
+        return $this->populationQuery($search, $actor)
             ->select(['employees.id', 'employees.nama_lengkap', 'employees.nip'])
             ->selectRaw(
                 'exists (select 1 from leave_usage_reconciliation_sets where leave_usage_reconciliation_sets.employee_id = employees.id and leave_usage_reconciliation_sets.balance_year = ? and leave_usage_reconciliation_sets.status = ?) as has_active_reconciliation',
@@ -190,9 +194,9 @@ class LeaveBalanceAdminEmployeeQuery
      *     has_active_reconciliation: bool
      * }>
      */
-    public function employeeRows(int $periode, string $status, string $search, int $perPage = 10): LengthAwarePaginator
+    public function employeeRows(int $periode, string $status, string $search, User $actor, int $perPage = 10): LengthAwarePaginator
     {
-        $query = $this->rowsQuery($periode, trim($search));
+        $query = $this->rowsQuery($periode, trim($search), $actor);
         $this->applyStatus($query, $status, $periode);
 
         return $query
@@ -219,10 +223,10 @@ class LeaveBalanceAdminEmployeeQuery
      *
      * @return array{perlu_tindakan: int, sudah_terdaftar: int, semua_pegawai: int}
      */
-    public function statusCounts(int $periode, string $search): array
+    public function statusCounts(int $periode, string $search, User $actor): array
     {
         // Satu agregasi menjaga hitungan status tidak menambah query kedua pada halaman administrasi.
-        $counts = $this->populationQuery($search)
+        $counts = $this->populationQuery($search, $actor)
             ->selectRaw(
                 'COUNT(*) AS total_count, COALESCE(SUM(CASE WHEN EXISTS (SELECT 1 FROM leave_usage_reconciliation_sets WHERE leave_usage_reconciliation_sets.employee_id = employees.id AND leave_usage_reconciliation_sets.balance_year = ? AND leave_usage_reconciliation_sets.status = ?) THEN 1 ELSE 0 END), 0) AS registered_count',
                 [$periode, LeaveUsageReconciliationSet::STATUS_ACTIVE],

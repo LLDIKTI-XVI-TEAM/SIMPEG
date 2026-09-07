@@ -59,6 +59,7 @@ class EmployeeExportDataService
                 'tanggal_lahir',
                 'tanggal_pensiun',
             ])
+            ->when(! $masked, fn (Builder $query) => $query->addSelect(['email_pribadi', 'no_hp']))
             ->with([
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,nama',

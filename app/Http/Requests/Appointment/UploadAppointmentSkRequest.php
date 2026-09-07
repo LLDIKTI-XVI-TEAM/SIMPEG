@@ -19,8 +19,7 @@ class UploadAppointmentSkRequest extends FormRequest
             return false;
         }
 
-        return $user->getEffectiveRole() === 'super_admin'
-            || $user->hasPermission('dokumen_sk.update');
+        return $user->hasPermission('dokumen_sk.update');
     }
 
     /**

@@ -13,8 +13,6 @@ final class PatenCapability
     /** @var list<string> */
     public const PERMISSION_NAMES = [
         'employees.read_self',
-        'employee_histories.read',
-        'employee_families.read',
         'notifications.read',
         'notifications.update',
         'hari_libur.read',

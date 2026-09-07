@@ -43,7 +43,7 @@ class SaveAppointmentAction
         $storedPath = null;
         if ($file instanceof UploadedFile) {
             $user = $request?->user() ?? auth()->user();
-            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create') || $user?->getEffectiveRole() === 'super_admin';
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
             if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
                 $canCreateDoc = true;
             }
