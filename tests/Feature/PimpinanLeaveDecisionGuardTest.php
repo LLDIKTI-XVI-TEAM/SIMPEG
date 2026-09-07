@@ -29,6 +29,7 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
         $this->actingAs(User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]))
             ->post(route('pimpinan.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
             ])
             ->assertForbidden();
@@ -40,16 +41,35 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
         $leave = $this->leaveWithActiveStep($approver);
         $user = User::factory()->pimpinan()->create(['employee_id' => $approver->id]);
 
-        foreach (['PERUBAHAN', 'DITANGGUHKAN', 'TIDAK_DISETUJUI'] as $decision) {
+        foreach (['DITANGGUHKAN', 'TIDAK_DISETUJUI'] as $decision) {
             $this->actingAs($user)
                 ->from(route('pimpinan.cuti.show', $leave))
                 ->post(route('pimpinan.cuti.decision', $leave), [
                     'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                    'revision_version' => $leave->fresh()->revision_version,
                     'keputusan' => $decision,
                 ])
                 ->assertRedirect(route('pimpinan.cuti.show', $leave))
                 ->assertSessionHasErrors('catatan');
         }
+    }
+
+    public function test_keputusan_perubahan_tidak_lagi_diterima(): void
+    {
+        $approver = Employee::factory()->create();
+        $leave = $this->leaveWithActiveStep($approver);
+        $user = User::factory()->pimpinan()->create(['employee_id' => $approver->id]);
+
+        $this->actingAs($user)
+            ->from(route('pimpinan.cuti.show', $leave))
+            ->post(route('pimpinan.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
+                'keputusan' => 'PERUBAHAN',
+                'catatan' => 'Flow ini sudah tidak aktif.',
+            ])
+            ->assertRedirect(route('pimpinan.cuti.show', $leave))
+            ->assertSessionHasErrors('keputusan');
     }
 
     public function test_terminal_leave_cannot_receive_another_decision(): void
@@ -61,6 +81,7 @@ class PimpinanLeaveDecisionGuardTest extends TestCase
             ->from(route('pimpinan.cuti.show', $leave))
             ->post(route('pimpinan.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
             ])
             ->assertRedirect(route('pimpinan.cuti.show', $leave))

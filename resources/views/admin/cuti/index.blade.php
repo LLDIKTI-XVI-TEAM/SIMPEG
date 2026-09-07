@@ -11,6 +11,8 @@
             // Pengembalian karena rollover tidak termasuk lima status yang warnanya ditetapkan resmi;
             // dibuat netral agar tidak menyerupai salah satu keputusan approval.
             'dikembalikan_karena_rollover' => 'muted',
+            'menunggu_pembatalan' => 'warning',
+            'dibatalkan' => 'danger',
             'perlu_perubahan' => 'info',
             'tidak_disetujui' => 'danger',
         ];
@@ -21,6 +23,8 @@
             'ditangguhkan' => 'Ditangguhkan',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
+            'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
+            'dibatalkan' => 'Dibatalkan',
             'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
@@ -39,7 +43,7 @@
             </div>
             <div class="flex shrink-0 items-center gap-3">
                 <x-ui.button
-                    href="{{ request()->fullUrl() }}"
+                    :href="request()->fullUrl()"
                     variant="secondary"
                     size="md"
                     aria-label="{{ $isPegawai ? 'Refresh riwayat pengajuan cuti' : 'Refresh monitoring cuti' }}"
@@ -119,10 +123,12 @@
                 <x-form.select id="filter-status" name="status" onchange="this.form.submit()">
                     <option value="">Semua Status</option>
                     <option value="menunggu" @selected($status === 'menunggu' || $status === 'pending')>Menunggu Keputusan</option>
+                    <option value="menunggu_pembatalan" @selected($status === 'menunggu_pembatalan')>Menunggu Keputusan Pembatalan</option>
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
                     <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
                     <option value="ditangguhkan_tugas_dinas" @selected($status === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
                     <option value="dikembalikan_karena_rollover" @selected($status === 'dikembalikan_karena_rollover')>Dikembalikan karena Rollover</option>
+                    <option value="dibatalkan" @selected($status === 'dibatalkan')>Dibatalkan</option>
                     <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perubahan</option>
                     <option value="tidak_disetujui" @selected($status === 'tidak_disetujui')>Tidak Disetujui</option>
                 </x-form.select>

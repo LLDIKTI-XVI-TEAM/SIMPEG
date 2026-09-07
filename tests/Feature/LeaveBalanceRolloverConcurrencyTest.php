@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cuti\RolloverLeaveBalanceAction;
+use App\Actions\Cuti\SubmitLeaveRequestAction;
 use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
@@ -15,8 +18,10 @@ use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use App\Services\Cuti\LeaveUsageReconciliationService;
+use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -62,6 +67,7 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
         parent::setUp();
         Carbon::setTestNow('2026-08-18 10:00:00');
         $this->seed(ReferenceSeeder::class);
+        $this->seed(RbacSeeder::class);
     }
 
     protected function tearDown(): void
@@ -179,6 +185,95 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
                 ->where('dedup_key', "{$fixture['employee']->id}:2027:rollover_applied")
                 ->count());
         } finally {
+            DB::statement('SELECT pg_advisory_unlock_all()');
+            $this->stopWorkers($processes);
+            $this->dropPauseTriggers();
+        }
+    }
+
+    public function test_penolakan_pembatalan_dan_rollover_tidak_deadlock_atau_menulis_marker_selama_hold(): void
+    {
+        $fixture = $this->createFixture();
+        $httpRequest = Request::create('/cuti', 'POST');
+        $httpRequest->setUserResolver(fn (): User => $fixture['actor']);
+        $leaveRequest = app(SubmitLeaveRequestAction::class)->execute(
+            $fixture['employee'],
+            [
+                'jenis_cuti_id' => $fixture['annual']->id,
+                'tanggal_mulai' => '2026-09-07',
+                'tanggal_selesai' => '2026-09-09',
+                'alasan' => 'Pengajuan yang akan ditahan saat rollover.',
+                'alamat_selama_cuti' => 'Alamat fixture hold rollover.',
+                'nomor_telepon' => '081234567890',
+            ],
+            $httpRequest,
+        );
+        $cancellation = LeaveCancellationRequest::query()->create([
+            'leave_request_id' => $leaveRequest->id,
+            'requested_by' => $fixture['actor']->id,
+            'reason' => 'Pembatalan menunggu keputusan saat rollover.',
+            'status' => LeaveCancellationRequest::STATUS_PENDING,
+            'resume_status' => 'menunggu_approval',
+        ]);
+        $leaveRequest->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
+        $adminEmployee = Employee::factory()->create();
+        $admin = User::factory()->adminKepegawaian()->create(['employee_id' => $adminEmployee->id]);
+        $processes = [];
+
+        try {
+            DB::beginTransaction();
+            Employee::query()->whereKey($fixture['employee']->id)->lockForUpdate()->firstOrFail();
+
+            $rollover = $this->startWorker('rollover-cancellation-hold', 'rollover', $fixture);
+            $processes[] = $rollover['process'];
+            $this->assertTrue($this->waitForDatabaseLock('simpeg_rollover_rollover_cancellation_hold', 30_000));
+
+            $reject = $this->startWorker('reject-cancellation-hold', 'reject_cancellation', $fixture, [
+                'actor_user_id' => $admin->id,
+                'cancellation_id' => $cancellation->id,
+            ]);
+            $processes[] = $reject['process'];
+            $this->assertTrue($this->waitForFile($reject['result'].'.started', 30_000));
+            $this->assertFalse(File::exists($reject['result']));
+
+            DB::commit();
+            $rolloverResult = $this->finishWorker($rollover);
+            $rejectResult = $this->finishWorker($reject);
+
+            $this->assertTrue($rolloverResult['ok'] ?? false, json_encode($rolloverResult, JSON_THROW_ON_ERROR));
+            $this->assertSame(0, $rolloverResult['summary']['processed'] ?? null);
+            $this->assertSame(1, $rolloverResult['summary']['failed'] ?? null);
+            $this->assertTrue($rejectResult['ok'] ?? false, json_encode($rejectResult, JSON_THROW_ON_ERROR));
+            $this->assertSame(LeaveCancellationRequest::STATUS_REJECTED, $cancellation->fresh()->status);
+            $this->assertSame('menunggu_approval', $leaveRequest->fresh()->status);
+            $this->assertDatabaseMissing('leave_balance_ledger', [
+                'dedup_key' => "{$fixture['employee']->id}:2027:rollover_applied",
+            ]);
+            $this->assertSame(3, (int) LeaveBalanceReservationEvent::query()
+                ->where('leave_request_id', $leaveRequest->id)
+                ->sum('amount'));
+
+            Carbon::setTestNow('2027-01-01 00:05:00');
+            $retry = app(RolloverLeaveBalanceAction::class)->execute(2026);
+
+            $this->assertSame(1, $retry['processed']);
+            $this->assertSame(0, $retry['failed']);
+            $this->assertSame(LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER, $leaveRequest->fresh()->status);
+            $this->assertSame(1, LeaveBalanceLedger::query()
+                ->where('dedup_key', "{$fixture['employee']->id}:2027:rollover_applied")
+                ->count());
+            $this->assertSame(1, LeaveBalanceReservationEvent::query()
+                ->where('leave_request_id', $leaveRequest->id)
+                ->where('dedup_key', "leave_reservation:{$leaveRequest->id}:released:rollover:2026")
+                ->count());
+            $this->assertSame(0, (int) LeaveBalanceReservationEvent::query()
+                ->where('leave_request_id', $leaveRequest->id)
+                ->sum('amount'));
+        } finally {
+            if (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+
             DB::statement('SELECT pg_advisory_unlock_all()');
             $this->stopWorkers($processes);
             $this->dropPauseTriggers();
@@ -485,6 +580,7 @@ SQL);
             'leave_proofs',
             'leave_approvals',
             'leave_request_steps',
+            'leave_cancellation_requests',
             'leave_requests',
             'leave_request_cases',
             'leave_balances',

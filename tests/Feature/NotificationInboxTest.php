@@ -228,6 +228,10 @@ class NotificationInboxTest extends TestCase
         $other = $this->notificationFor($otherEmployee, 'cuti.diajukan', 'Orang lain', false);
 
         $this->actingAs($user);
+        $this->get(route('notifications.index'))
+            ->assertOk()
+            ->assertDontSee('@js(', false)
+            ->assertSee('Tandai semua dibaca');
         $response = $this->patchJsonWithCsrf(self::ENDPOINT.'/tandai-semua-dibaca');
 
         $response->assertOk();

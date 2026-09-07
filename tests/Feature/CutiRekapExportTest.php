@@ -345,6 +345,8 @@ class CutiRekapExportTest extends TestCase
             'ditangguhkan' => 'Ditangguhkan',
             LeaveRequest::STATUS_DUTY_POSTPONED => 'Ditangguhkan karena Tugas Dinas',
             LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => 'Dikembalikan karena Rollover',
+            LeaveRequest::STATUS_CANCELLATION_PENDING => 'Menunggu Keputusan Pembatalan',
+            LeaveRequest::STATUS_CANCELLED => 'Dibatalkan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];
         $requests = [];
@@ -419,10 +421,10 @@ class CutiRekapExportTest extends TestCase
         ]))->assertOk();
         $rows = collect($response->viewData('usageRows')->items());
 
-        $this->assertCount(8, $rows);
+        $this->assertCount(10, $rows);
         $this->assertSame(1, $rows->where('id', $requests['disetujui']->id)->count());
         $this->assertSame(1, $rows->where('id', $manual->id)->count());
-        $this->assertSame(7, $rows->where('sourceType', 'leave_request')->count());
+        $this->assertSame(9, $rows->where('sourceType', 'leave_request')->count());
         $this->assertSame(1, $rows->where('sourceType', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)->count());
         $requestRows = $rows->where('sourceType', 'leave_request');
         foreach ($statuses as $status => $label) {
@@ -1055,6 +1057,8 @@ class CutiRekapExportTest extends TestCase
             'perlu perubahan' => ['perlu_perubahan', null, 'Perubahan'],
             'tidak disetujui' => ['tidak_disetujui', null, 'Tidak Disetujui'],
             'dikembalikan karena rollover' => [LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER, null, 'Dikembalikan karena Rollover'],
+            'menunggu keputusan pembatalan' => [LeaveRequest::STATUS_CANCELLATION_PENDING, null, 'Menunggu Keputusan Pembatalan'],
+            'dibatalkan' => [LeaveRequest::STATUS_CANCELLED, null, 'Dibatalkan'],
             'tahap aktif' => ['menunggu_approval', 'active', 'Menunggu Verifikator'],
             'fallback approver' => ['menunggu_approval', null, 'Menunggu Approver'],
         ];

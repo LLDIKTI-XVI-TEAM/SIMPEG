@@ -61,7 +61,8 @@ class RbacSeeder extends Seeder
             'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
             'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
-            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat ulang bukti/formulir cuti resmi setelah approval final'],
+            'cuti.cancellation.manage' => ['module' => 'cuti', 'description' => 'Memutuskan permohonan pembatalan cuti'],
+            'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
             'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
             'dokumen_sk.create' => ['module' => 'dokumen_sk', 'description' => 'Mengunggah dokumen dan SK pegawai (riwayat, status, pengangkatan, berkas tambahan)'],
@@ -86,7 +87,12 @@ class RbacSeeder extends Seeder
         // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
         // pada chain aktif. Pimpinan sengaja tidak menerima hak pengajuan cuti.
         $this->syncRolePermissions([
-            'super_admin' => array_keys($permissions),
+            'super_admin' => array_values(array_diff(array_keys($permissions), [
+                'cuti.create',
+                'cuti.balance.reconcile',
+                'cuti.manual.manage',
+                'cuti.cancellation.manage',
+            ])),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
@@ -130,6 +136,7 @@ class RbacSeeder extends Seeder
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
                 'cuti.proof.generate',
+                'cuti.cancellation.manage',
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [

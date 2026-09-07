@@ -177,8 +177,9 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
-            $currentVersion = $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z');
-            if ($currentVersion === null || ! hash_equals($this->leaveRequestVersion, $currentVersion)) {
+            // Timestamp dapat sama untuk dua revisi; counter mencegah job mengirim data pengajuan lama.
+            $currentVersion = (string) $leaveRequest->revision_version;
+            if (! hash_equals($this->leaveRequestVersion, $currentVersion)) {
                 $this->markSkipped('leave_request_version_changed');
 
                 return;
@@ -201,7 +202,6 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                 'cuti.ditunda' => 'ditangguhkan',
                 'cuti.ditangguhkan_tugas_dinas' => 'ditangguhkan_tugas_dinas',
                 'cuti.dikembalikan_karena_rollover' => 'dikembalikan_karena_rollover',
-                'cuti.perlu_perubahan' => 'perlu_perubahan',
                 'cuti.tidak_disetujui' => 'tidak_disetujui',
                 default => null,
             };
@@ -231,7 +231,6 @@ class SendWhatsAppNotificationJob implements ShouldBeEncrypted, ShouldQueue
                 $expectedApprovalAction = match ($this->eventKey) {
                     'cuti.ditunda' => 'POSTPONE',
                     'cuti.ditangguhkan_tugas_dinas' => LeaveApproval::ACTION_DUTY_POSTPONEMENT,
-                    'cuti.perlu_perubahan' => 'REQUEST_CHANGES',
                     'cuti.tidak_disetujui' => 'NOT_APPROVED',
                     default => null,
                 };

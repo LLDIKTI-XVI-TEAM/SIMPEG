@@ -277,7 +277,10 @@ class LegacyLeaveBalanceLedgerCutoverMigrationTest extends TestCase
             'no_sk' => 'SK-FIXTURE-LEGACY-CUTOVER',
             'tanggal_sk' => '2020-01-01',
         ]);
-        $request = LeaveRequest::query()->create([
+        // Fixture pra-cutover hanya memakai kolom historis, bukan default model runtime terbaru.
+        $requestId = (string) Str::uuid();
+        DB::table('leave_requests')->insert([
+            'id' => $requestId,
             'employee_id' => $employee->id,
             'jenis_cuti_id' => $annual->id,
             'tanggal_mulai' => '2026-06-08',
@@ -285,9 +288,11 @@ class LegacyLeaveBalanceLedgerCutoverMigrationTest extends TestCase
             'jumlah_hari_kerja' => 2,
             'alasan' => 'Pengajuan tahunan approved sebelum cutover.',
             'status' => 'disetujui',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        return [$employee, $request];
+        return [$employee, LeaveRequest::query()->findOrFail($requestId)];
     }
 
     /** @return array{Role, Role, Permission} */

@@ -193,6 +193,44 @@ class CutiExcelExportTest extends TestCase
         }
     }
 
+    public function test_excel_menampilkan_label_status_pembatalan_tanpa_token_internal(): void
+    {
+        $user = User::factory()->superAdmin()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Status Pembatalan']);
+        $menunggu = Employee::factory()->create(['nama_lengkap' => 'Pegawai Excel Menunggu Pembatalan']);
+        $dibatalkan = Employee::factory()->create(['nama_lengkap' => 'Pegawai Excel Dibatalkan']);
+        $this->createLeaveRequest(
+            $menunggu,
+            $jenis,
+            '2026-06-10',
+            LeaveRequest::STATUS_CANCELLATION_PENDING,
+        );
+        $this->createLeaveRequest(
+            $dibatalkan,
+            $jenis,
+            '2026-06-11',
+            LeaveRequest::STATUS_CANCELLED,
+        );
+
+        $spreadsheet = $this->loadWorkbook($this->actingAs($user)
+            ->get(route('cuti.laporan.excel', ['periode' => '2026-06']))
+            ->streamedContent());
+
+        try {
+            $detail = $spreadsheet->getSheetByName('Detail Cuti');
+            $this->assertNotNull($detail);
+            $rows = collect($detail->rangeToArray('A2:I3', null, true, false))->keyBy(2);
+
+            $this->assertSame('Menunggu Keputusan Pembatalan', $rows['Pegawai Excel Menunggu Pembatalan'][8]);
+            $this->assertSame('Dibatalkan', $rows['Pegawai Excel Dibatalkan'][8]);
+            $renderedValues = collect($detail->toArray())->flatten()->all();
+            $this->assertNotContains(LeaveRequest::STATUS_CANCELLATION_PENDING, $renderedValues);
+            $this->assertNotContains(LeaveRequest::STATUS_CANCELLED, $renderedValues);
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+        }
+    }
+
     public function test_excel_memakai_detail_source_aware_dan_ringkasan_hanya_fakta_aktif(): void
     {
         $user = User::factory()->superAdmin()->create();

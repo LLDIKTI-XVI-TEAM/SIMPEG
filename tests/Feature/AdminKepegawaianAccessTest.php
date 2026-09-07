@@ -52,6 +52,19 @@ class AdminKepegawaianAccessTest extends TestCase
         ] as $forbiddenRoute) {
             $response->assertDontSee('href="'.route($forbiddenRoute).'"', false);
         }
+
+        foreach ([
+            'data-pegawai',
+            'dokumen',
+            'cuti.rekap',
+            'cuti.cancellations.index',
+            'ews',
+            'laporan.pegawai',
+            'cuti.laporan',
+            'audit-log',
+        ] as $allowedRoute) {
+            $response->assertSee('href="'.route($allowedRoute).'"', false);
+        }
     }
 
     public function test_admin_kepegawaian_tidak_dapat_membuka_halaman_khusus_super_admin(): void
@@ -80,6 +93,7 @@ class AdminKepegawaianAccessTest extends TestCase
 
         $dashboard->assertOk();
         $dashboard->assertDontSee('Pengaturan Sistem');
+        $dashboard->assertDontSee('href="'.route('cuti.cancellations.index').'"', false);
 
         foreach ([
             'user-management',

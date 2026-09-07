@@ -26,6 +26,7 @@ class ApproveLeaveRequest extends FormRequest
     {
         return [
             'active_step_id' => ['required', 'uuid'],
+            'revision_version' => ['required', 'integer', 'min:1'],
             // Komentar opsional saat menyetujui; bila diisi disimpan sebagai catatan pada timeline approval.
             'komentar' => ['nullable', 'string', 'max:500'],
         ];
@@ -35,6 +36,7 @@ class ApproveLeaveRequest extends FormRequest
     {
         return [
             'active_step_id' => 'tahap persetujuan',
+            'revision_version' => 'versi pengajuan',
             'komentar' => 'komentar',
         ];
     }

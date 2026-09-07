@@ -220,6 +220,7 @@ class Rule5CutiBesarTest extends TestCase
             $large,
             $actor,
             $large->steps()->where('status', 'active')->valueOrFail('id'),
+            (int) $large->fresh()->revision_version,
             null,
             $request,
         );
@@ -243,7 +244,7 @@ class Rule5CutiBesarTest extends TestCase
         return [
             'menunggu approval' => ['menunggu_approval'],
             'ditangguhkan generik' => ['ditangguhkan'],
-            'perlu perubahan' => ['perlu_perubahan'],
+            'menunggu keputusan pembatalan' => [LeaveRequest::STATUS_CANCELLATION_PENDING],
         ];
     }
 

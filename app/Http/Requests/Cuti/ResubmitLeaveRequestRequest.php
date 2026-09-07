@@ -13,7 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Memvalidasi revisi pengajuan berstatus perlu_perubahan atau pengembalian rollover.
+ * Memvalidasi revisi awal sebelum tindakan approver atau pengembalian rollover.
  * Jenis cuti tetap terkunci; pemohon hanya boleh memperbaiki tanggal, alasan, dan lampiran.
  */
 class ResubmitLeaveRequestRequest extends FormRequest
@@ -32,6 +32,10 @@ class ResubmitLeaveRequestRequest extends FormRequest
                 'perlu_perubahan',
                 LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
             ], true);
+            && $this->user()?->employee_id === $leaveRequest->employee_id
+            && ($leaveRequest->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER
+                || ($leaveRequest->status === 'menunggu_approval'
+                    && $leaveRequest->approvals()->doesntExist()));
     }
 
     /**
@@ -62,6 +66,7 @@ class ResubmitLeaveRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'revision_version' => ['required', 'integer', 'min:1'],
             'tanggal_mulai' => ['required', 'date_format:Y-m-d'],
             'tanggal_selesai' => ['required', 'date_format:Y-m-d', 'after_or_equal:tanggal_mulai'],
             'alasan' => ['required', 'string', 'max:500'],
@@ -78,6 +83,7 @@ class ResubmitLeaveRequestRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'revision_version' => 'versi pengajuan',
             'tanggal_mulai' => 'tanggal mulai',
             'tanggal_selesai' => 'tanggal selesai',
             'alasan' => 'alasan',

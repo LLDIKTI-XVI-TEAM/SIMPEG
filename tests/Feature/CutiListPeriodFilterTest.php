@@ -259,6 +259,8 @@ class CutiListPeriodFilterTest extends TestCase
 
         foreach ([
             'menunggu_approval' => 'text-warning',
+            LeaveRequest::STATUS_CANCELLATION_PENDING => 'text-warning',
+            LeaveRequest::STATUS_CANCELLED => 'text-danger',
             'disetujui' => 'text-success',
             'perlu_perubahan' => 'text-info',
             'ditangguhkan' => 'text-orange',
@@ -387,6 +389,8 @@ class CutiListPeriodFilterTest extends TestCase
             'disetujui' => ['disetujui'],
             'tidak disetujui' => ['tidak_disetujui'],
             'dikembalikan karena rollover' => ['dikembalikan_karena_rollover'],
+            'menunggu keputusan pembatalan' => [LeaveRequest::STATUS_CANCELLATION_PENDING],
+            'dibatalkan' => [LeaveRequest::STATUS_CANCELLED],
         ];
     }
 

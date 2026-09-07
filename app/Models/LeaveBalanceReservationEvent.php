@@ -45,7 +45,7 @@ class LeaveBalanceReservationEvent extends Model
     private const ACTIVE_REQUEST_STATUSES = [
         'menunggu_approval',
         'ditangguhkan',
-        'perlu_perubahan',
+        'menunggu_pembatalan',
     ];
 
     protected $table = 'leave_balance_reservation_events';

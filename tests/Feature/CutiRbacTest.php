@@ -38,6 +38,7 @@ class CutiRbacTest extends TestCase
         'cuti.balance.read',
         'cuti.balance.reconcile',
         'cuti.manual.manage',
+        'cuti.cancellation.manage',
         'cuti.proof.generate',
         'cuti.kepala_lembaga_documents.manage',
     ];
@@ -92,6 +93,7 @@ class CutiRbacTest extends TestCase
     public function test_super_admin_memiliki_semua_permission_cuti(): void
     {
         $user = User::factory()->superAdmin()->create();
+        $excluded = ['cuti.create', 'cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.cancellation.manage'];
 
         foreach (self::CUTI_PERMISSIONS as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Super Admin harus memiliki {$permission}");
@@ -134,6 +136,8 @@ class CutiRbacTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasErrors(['balance_year']);
     }
+        foreach (['cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.cancellation.manage'] as $permissionName) {
+            $permission = Permission::query()->where('name', $permissionName)->firstOrFail();
 
     public function test_bukti_cuti_default_super_admin_dan_admin_namun_dapat_diberikan_ke_role_lain(): void
     {
@@ -223,6 +227,7 @@ class CutiRbacTest extends TestCase
 
         $response = $this->actingAs($user)->post(route('cuti.approve', $cuti), [
             'active_step_id' => $cuti->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $cuti->fresh()->revision_version,
         ]);
 
         $response->assertRedirect(route('cuti.approval'));

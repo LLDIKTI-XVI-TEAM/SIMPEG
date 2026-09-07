@@ -3,6 +3,7 @@
 namespace App\Actions\Cuti;
 
 use App\Data\Cuti\VerifierLeaveHistoryRow;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefHariLibur;
@@ -35,6 +36,9 @@ class BuildCutiDetailAction
      *     canDownloadFormulir: bool,
      *     canGenerateFormulir: bool,
      *     canResubmit: bool,
+     *     canRequestCancellation: bool,
+     *     latestCancellation: LeaveCancellationRequest|null,
+     *     isOwner: bool,
      *     isRolloverReturn: bool,
      *     targetBalance: array<string, mixed>|null,
      *     verifierContext: array{
@@ -47,7 +51,29 @@ class BuildCutiDetailAction
      */
     public function execute(LeaveRequest $cuti, User $user): array
     {
-        $cuti->load(['employee', 'jenisCuti', 'proof', 'approvals.approver', 'steps.approver']);
+        $isOwner = $cuti->employee_id === $user->employee_id;
+        $relations = [
+            'employee',
+            'jenisCuti',
+            'proof',
+            'approvals.approver',
+            'steps.approver',
+        ];
+
+        // Alasan pembatalan tidak dimuat untuk approver; status hold cukup dibaca dari request utama.
+        if ($isOwner) {
+            // Saat hold, pilih permohonan aktif karena timestamp setara dan UUID acak bukan urutan kronologis.
+            $relations['cancellationRequests'] = fn ($query) => $query
+                ->when(
+                    $cuti->status === LeaveRequest::STATUS_CANCELLATION_PENDING,
+                    fn ($query) => $query->where('status', LeaveCancellationRequest::STATUS_PENDING),
+                )
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->limit(1);
+        }
+
+        $cuti->load($relations);
 
         $stage = $this->approvals->pendingStage($cuti);
         $employeeId = $user->employee_id;
@@ -83,6 +109,11 @@ class BuildCutiDetailAction
         );
 
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
+        $latestCancellation = $isOwner ? $cuti->cancellationRequests->first() : null;
+        $canRequestCancellation = $isOwner
+            && $user->hasPermission('cuti.create')
+            && in_array($cuti->status, ['menunggu_approval', 'ditangguhkan'], true)
+            && $latestCancellation?->status !== 'pending';
         $isVerifierContext = $canAct || $canReadAll;
         $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $this->balancePreview->execute(
@@ -102,8 +133,11 @@ class BuildCutiDetailAction
             'canGenerateFormulir' => $canGenerateFormulir,
             'attachmentAvailable' => $this->attachmentDownloads->canReadAsGeneralActor($cuti, $user)
                 && $this->files->hasLeaveAttachment($cuti->lampiran_path, $cuti->employee_id),
-            'canResubmit' => in_array($cuti->status, ['perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER], true)
-                && $cuti->employee_id === $user->employee_id,
+            'canResubmit' => $isOwner && ($isRolloverReturn
+                || ($cuti->status === 'menunggu_approval' && $cuti->approvals->isEmpty())),
+            'canRequestCancellation' => $canRequestCancellation,
+            'latestCancellation' => $latestCancellation,
+            'isOwner' => $isOwner,
             'isRolloverReturn' => $isRolloverReturn,
             'targetBalance' => $targetBalance,
             'verifierContext' => $verifierContext,

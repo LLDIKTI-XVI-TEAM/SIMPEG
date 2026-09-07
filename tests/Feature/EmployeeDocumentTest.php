@@ -1024,6 +1024,8 @@ class EmployeeDocumentTest extends TestCase
 
     public function test_admin_cannot_upload_document_with_disallowed_mime_type(): void
     {
+        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();
@@ -1045,6 +1047,8 @@ class EmployeeDocumentTest extends TestCase
 
     public function test_admin_cannot_upload_document_larger_than_size_limit_without_creating_file(): void
     {
+        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
         $filesBeforeRequest = Storage::disk(Document::STORAGE_DISK)->allFiles();

@@ -87,6 +87,21 @@ class SubmitLeaveRequestAction
                 $this->configurationLock->acquire();
                 $lockedEmployee = $this->overlap->lockEmployee($employee);
 
+                // Satu workflow aktif harus selesai lebih dahulu agar snapshot approval dan reservasi tidak tumpang tindih.
+                if (LeaveRequest::query()
+                    ->where('employee_id', $lockedEmployee->id)
+                    ->whereIn('status', [
+                        'menunggu_approval',
+                        'ditangguhkan',
+                        LeaveRequest::STATUS_CANCELLATION_PENDING,
+                        LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+                    ])
+                    ->exists()) {
+                    throw ValidationException::withMessages([
+                        'tanggal_mulai' => 'Anda masih memiliki pengajuan cuti aktif yang harus diselesaikan terlebih dahulu.',
+                    ]);
+                }
+
                 try {
                     // Validasi lifecycle dan row lock approver harus bertahan sampai snapshot selesai
                     // agar perubahan status serentak tidak menyisipkan approver nonaktif ke request baru.
@@ -260,7 +275,7 @@ class SubmitLeaveRequestAction
             [
                 'leave_request_id' => $leaveRequest->id,
                 'leave_request_step_id' => $activeStep->id,
-                'leave_request_version' => $leaveRequest->updated_at?->utc()->format('Y-m-d\\TH:i:s.u\\Z'),
+                'leave_request_version' => (string) $leaveRequest->revision_version,
                 'url' => route('cuti.approval', [], false),
             ],
         );

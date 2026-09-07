@@ -21,6 +21,8 @@ class CutiReportStatusFormatter
             'ditangguhkan' => 'Ditangguhkan',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => 'Dikembalikan karena Rollover',
+            LeaveRequest::STATUS_CANCELLATION_PENDING => 'Menunggu Keputusan Pembatalan',
+            LeaveRequest::STATUS_CANCELLED => 'Dibatalkan',
             'perlu_perubahan' => 'Perubahan',
             'tidak_disetujui' => 'Tidak Disetujui',
         ];

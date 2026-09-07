@@ -129,6 +129,8 @@ class DisciplineRecordTest extends TestCase
 
     public function test_file_sk_string_rejects_cross_owner_wrong_category_and_unknown_path_before_mutation(): void
     {
+        Storage::fake(Document::STORAGE_DISK);
+
         $user = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
         $otherEmployee = Employee::factory()->create();
@@ -218,6 +220,8 @@ class DisciplineRecordTest extends TestCase
 
     public function test_service_menolak_file_sk_string_di_luar_dokumen_disiplin_milik_pegawai(): void
     {
+        Storage::fake(Document::STORAGE_DISK);
+
         $employee = Employee::factory()->create();
         $otherEmployee = Employee::factory()->create();
         $filesBefore = Storage::disk(Document::STORAGE_DISK)->allFiles();

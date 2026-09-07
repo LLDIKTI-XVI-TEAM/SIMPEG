@@ -23,10 +23,15 @@ use Throwable;
  */
 class RolloverLeaveBalanceAction
 {
-    private const ACTIVE_STATUSES = [
+    private const PROCESSABLE_STATUSES = [
         'menunggu_approval',
         'ditangguhkan',
-        'perlu_perubahan',
+    ];
+
+    private const LOCKED_STATUSES = [
+        'menunggu_approval',
+        'ditangguhkan',
+        LeaveRequest::STATUS_CANCELLATION_PENDING,
     ];
 
     public function __construct(
@@ -66,11 +71,22 @@ class RolloverLeaveBalanceAction
                 try {
                     DB::transaction(function () use ($candidate, $sourceYear, $targetYear): void {
                         // Scan awal mempertahankan pagar request -> employee untuk request yang sudah ada.
-                        $this->activeAnnualRequests($candidate->employee_id, $sourceYear, $targetYear)->get();
+                        $this->lockedAnnualRequests($candidate->employee_id, $sourceYear, $targetYear)->get();
                         $employee = Employee::query()->whereKey($candidate->employee_id)->lockForUpdate()->firstOrFail();
                         // Submit baru dapat belum terlihat pada scan awal lalu commit sebelum mutex pegawai didapat.
                         // Scan identik kedua menutup celah itu dan menjadi satu-satunya koleksi yang diproses.
-                        $requests = $this->activeAnnualRequests($employee->id, $sourceYear, $targetYear)->get();
+                        $lockedRequests = $this->lockedAnnualRequests($employee->id, $sourceYear, $targetYear)->get();
+
+                        // Hold pembatalan harus diselesaikan admin sebelum rollover mengubah reservasi atau saldo.
+                        if ($lockedRequests->contains('status', LeaveRequest::STATUS_CANCELLATION_PENDING)) {
+                            throw ValidationException::withMessages([
+                                'rollover' => 'Rollover ditunda karena permohonan pembatalan cuti masih menunggu keputusan.',
+                            ]);
+                        }
+
+                        $requests = $lockedRequests
+                            ->whereIn('status', self::PROCESSABLE_STATUSES)
+                            ->values();
                         $sourceBalance = LeaveBalance::query()
                             ->whereKey($candidate->id)
                             ->where('employee_id', $employee->id)
@@ -168,15 +184,15 @@ class RolloverLeaveBalanceAction
         return $result;
     }
 
-    /** Membentuk scan request aktif yang sama pada kedua sisi mutex pegawai. */
-    private function activeAnnualRequests(string $employeeId, int $sourceYear, int $targetYear): Builder
+    /** Membentuk scan request yang sama pada kedua sisi mutex pegawai, termasuk hold pembatalan. */
+    private function lockedAnnualRequests(string $employeeId, int $sourceYear, int $targetYear): Builder
     {
         return LeaveRequest::query()
             ->with('jenisCuti')
             ->where('employee_id', $employeeId)
             ->where('tanggal_mulai', '>=', "{$sourceYear}-01-01")
             ->where('tanggal_mulai', '<', "{$targetYear}-01-01")
-            ->whereIn('status', self::ACTIVE_STATUSES)
+            ->whereIn('status', self::LOCKED_STATUSES)
             // Rollover hanya untuk Cuti Tahunan resmi, bukan semua pengurang saldo.
             ->whereHas('jenisCuti', fn ($query) => $query->where('code', 'tahunan'))
             ->orderBy('id')

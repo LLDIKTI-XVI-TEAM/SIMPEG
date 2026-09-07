@@ -49,7 +49,6 @@ final class WhatsAppTemplatePayloadMapper
             'cuti.ditunda',
             'cuti.ditangguhkan_tugas_dinas',
             'cuti.dikembalikan_karena_rollover',
-            'cuti.perlu_perubahan',
             'cuti.tidak_disetujui' => $this->mapCutiStatus($eventKey, $recipient, $data),
 
             'ews.kenaikan_pangkat',
@@ -178,7 +177,6 @@ final class WhatsAppTemplatePayloadMapper
         $statusData = match ($eventKey) {
             'cuti.disetujui' => $this->resolveApprovalDecision($leaveRequest, $data, 'APPROVE', 'Disetujui', 'Permohonan cuti telah disetujui sesuai usulan.'),
             'cuti.ditunda' => $this->resolveApprovalDecision($leaveRequest, $data, 'POSTPONE', 'Ditangguhkan'),
-            'cuti.perlu_perubahan' => $this->resolveApprovalDecision($leaveRequest, $data, 'REQUEST_CHANGES', 'Perubahan'),
             'cuti.tidak_disetujui' => $this->resolveApprovalDecision($leaveRequest, $data, 'NOT_APPROVED', 'Tidak Disetujui'),
             'cuti.ditangguhkan_tugas_dinas' => $this->resolveDutyPostponementDecision($leaveRequest, $data),
             'cuti.dikembalikan_karena_rollover' => $this->resolveRolloverReturnDecision($data),

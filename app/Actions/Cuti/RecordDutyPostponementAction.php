@@ -39,6 +39,7 @@ class RecordDutyPostponementAction
         Employee $actor,
         User $actingUser,
         string $expectedActiveStepId,
+        int $expectedRevisionVersion,
         string $reason,
     ): LeaveRequest {
         // Identitas akun dan approver snapshot harus sama sebelum transaksi agar akun lain tidak dapat meminjam otoritas pegawai.
@@ -54,7 +55,7 @@ class RecordDutyPostponementAction
             ]);
         }
 
-        return DB::transaction(function () use ($leaveRequest, $actor, $actingUser, $expectedActiveStepId, $reason): LeaveRequest {
+        return DB::transaction(function () use ($leaveRequest, $actor, $actingUser, $expectedActiveStepId, $expectedRevisionVersion, $reason): LeaveRequest {
             $locked = LeaveRequest::query()
                 ->whereKey($leaveRequest->id)
                 ->lockForUpdate()
@@ -62,7 +63,7 @@ class RecordDutyPostponementAction
             $locked->load(['jenisCuti', 'employee']);
 
             if ($locked->status === LeaveRequest::STATUS_DUTY_POSTPONED) {
-                $this->assertExistingTerminalContract($locked, $actor, $actingUser, $expectedActiveStepId, $reason);
+                $this->assertExistingTerminalContract($locked, $actor, $actingUser, $expectedActiveStepId, $expectedRevisionVersion, $reason);
 
                 return $locked->refresh();
             }
@@ -90,6 +91,7 @@ class RecordDutyPostponementAction
             }
 
             $this->assertExpectedActiveStep($activeStep, $expectedActiveStepId);
+            $this->assertExpectedRevisionVersion($locked, $expectedRevisionVersion);
 
             $statusBefore = $locked->status;
             $actedAt = Carbon::now();
@@ -184,6 +186,7 @@ class RecordDutyPostponementAction
         Employee $actor,
         User $actingUser,
         string $expectedActiveStepId,
+        int $expectedRevisionVersion,
         string $reason,
     ): void {
         $terminalSteps = $request->steps()
@@ -245,6 +248,7 @@ class RecordDutyPostponementAction
         }
 
         $this->assertExpectedActiveStep($step, $expectedActiveStepId);
+        $this->assertExpectedRevisionVersion($request, $expectedRevisionVersion);
         $ledger = $ledgerRows->first();
         $release = $releaseRows->first();
         $approval = $approvalRows->first();
@@ -348,6 +352,16 @@ class RecordDutyPostponementAction
         if (strtolower($step->id) !== strtolower($expectedActiveStepId)) {
             throw ValidationException::withMessages([
                 'active_step_id' => 'Tahap persetujuan telah berubah. Muat ulang halaman sebelum mengirim keputusan.',
+            ])->errorBag('dutyPostponement');
+        }
+    }
+
+    /** Retry terminal hanya sah untuk versi request yang sama dengan keputusan pertama. */
+    private function assertExpectedRevisionVersion(LeaveRequest $leaveRequest, int $expectedRevisionVersion): void
+    {
+        if ($leaveRequest->revision_version !== $expectedRevisionVersion) {
+            throw ValidationException::withMessages([
+                'revision_version' => 'Pengajuan cuti telah diperbarui. Muat ulang halaman sebelum mengirim keputusan.',
             ])->errorBag('dutyPostponement');
         }
     }

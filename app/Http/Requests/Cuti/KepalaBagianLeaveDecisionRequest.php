@@ -16,7 +16,8 @@ class KepalaBagianLeaveDecisionRequest extends FormRequest
     {
         return [
             'active_step_id' => ['required', 'uuid'],
-            'keputusan' => ['required', Rule::in(['DISETUJUI', 'PERUBAHAN', 'DITANGGUHKAN', 'TIDAK_DISETUJUI'])],
+            'revision_version' => ['required', 'integer', 'min:1'],
+            'keputusan' => ['required', Rule::in(['DISETUJUI', 'DITANGGUHKAN', 'TIDAK_DISETUJUI'])],
             'catatan' => [Rule::requiredIf($this->input('keputusan') !== 'DISETUJUI'), 'nullable', 'string', 'min:5', 'max:500'],
         ];
     }

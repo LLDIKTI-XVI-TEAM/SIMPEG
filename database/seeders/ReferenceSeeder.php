@@ -259,7 +259,9 @@ class ReferenceSeeder extends Seeder
             'cuti.ditunda',
             'cuti.ditangguhkan_tugas_dinas',
             'cuti.dikembalikan_karena_rollover',
-            'cuti.perlu_perubahan',
+            'cuti.pembatalan_diajukan',
+            'cuti.pembatalan_disetujui',
+            'cuti.pembatalan_ditolak',
             'cuti.tidak_disetujui',
             'ews.kenaikan_pangkat',
             'ews.kgb',
@@ -288,6 +290,9 @@ class ReferenceSeeder extends Seeder
                 );
             }
         }
+
+        // Flow Perubahan tidak lagi aktif; seeder tidak boleh menghidupkan policy lama saat dijalankan ulang.
+        NotificationEventChannel::query()->where('event_key', 'cuti.perlu_perubahan')->delete();
 
         // Kegagalan scheduler dan hasil tindak lanjut EWS adalah alert internal yang
         // hanya memakai in-app; email tidak diaktifkan agar identitas channel setiap

@@ -62,7 +62,12 @@ class BuildPegawaiDashboardAction
 
             $cutiAktif = LeaveRequest::query()
                 ->where('employee_id', $employeeId)
-                ->whereIn('status', ['menunggu_approval', 'ditangguhkan', 'perlu_perubahan', LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER])
+                ->whereIn('status', [
+                    'menunggu_approval',
+                    'ditangguhkan',
+                    LeaveRequest::STATUS_CANCELLATION_PENDING,
+                    LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
+                ])
                 ->latest()
                 ->take(5)
                 ->get();

@@ -10,6 +10,7 @@ use App\Models\LeaveApprovalChainStep;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveBalanceReservationEvent;
+use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
@@ -35,6 +36,199 @@ use Tests\TestCase;
 class CutiFoundationSchemaTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_cancellation_request_schema_enforces_lifecycle_contract_on_postgresql(): void
+    {
+        // Fondasi ini memastikan hold pembatalan tidak dapat memiliki dua keputusan pending
+        // sekaligus dan data alasan/lanjutan workflow selalu konsisten di database.
+        $this->assertTrue(Schema::hasColumns('leave_cancellation_requests', [
+            'id',
+            'leave_request_id',
+            'requested_by',
+            'reason',
+            'status',
+            'resume_status',
+            'decided_by',
+            'decided_at',
+            'created_at',
+            'updated_at',
+        ]));
+        $this->assertTrue(Schema::hasColumn('leave_requests', 'revision_version'));
+
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Constraint pembatalan diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        $requester = User::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Kontrak Pembatalan',
+            'code' => 'kontrak_pembatalan',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-12-27',
+            'tanggal_selesai' => '2026-12-27',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Fixture pembatalan cuti.',
+            'status' => LeaveRequest::STATUS_CANCELLATION_PENDING,
+        ]);
+
+        $leaveRequest->refresh();
+        $this->assertSame(1, $leaveRequest->revision_version);
+        $this->assertSame('menunggu_pembatalan', $leaveRequest->status);
+        $auditConstraint = DB::table('pg_constraint')
+            ->where('conname', 'audit_logs_event_check')
+            ->value(DB::raw('pg_get_constraintdef(oid)'));
+        $this->assertIsString($auditConstraint);
+        $this->assertStringContainsString('LEAVE_CANCELLATION_REQUESTED', $auditConstraint);
+
+        $cancellation = LeaveCancellationRequest::create([
+            'leave_request_id' => $leaveRequest->id,
+            'requested_by' => $requester->id,
+            'reason' => 'Jadwal tugas berubah.',
+            'status' => LeaveCancellationRequest::STATUS_PENDING,
+            'resume_status' => 'menunggu_approval',
+        ]);
+
+        $this->assertSame($leaveRequest->id, $cancellation->leaveRequest->id);
+        $this->assertSame($requester->id, $cancellation->requester->id);
+        $this->assertNull($cancellation->decided_at);
+        $this->assertTrue($leaveRequest->cancellationRequests()->whereKey($cancellation->id)->exists());
+
+        $this->assertThrows(
+            fn () => DB::transaction(fn () => LeaveCancellationRequest::create([
+                'leave_request_id' => $leaveRequest->id,
+                'requested_by' => $requester->id,
+                'reason' => 'Permohonan pending kedua.',
+                'status' => LeaveCancellationRequest::STATUS_PENDING,
+                'resume_status' => 'menunggu_approval',
+            ])),
+            QueryException::class,
+        );
+
+        $this->assertThrows(
+            fn () => DB::transaction(fn () => LeaveCancellationRequest::create([
+                'leave_request_id' => $leaveRequest->id,
+                'requested_by' => $requester->id,
+                'reason' => '   ',
+                'status' => LeaveCancellationRequest::STATUS_REJECTED,
+                'resume_status' => 'menunggu_approval',
+                'decided_at' => now(),
+            ])),
+            QueryException::class,
+        );
+        $this->assertThrows(
+            fn () => DB::transaction(fn () => LeaveCancellationRequest::create([
+                'leave_request_id' => $leaveRequest->id,
+                'requested_by' => $requester->id,
+                'reason' => 'Resume status tidak dikenal.',
+                'status' => LeaveCancellationRequest::STATUS_REJECTED,
+                'resume_status' => 'status_tidak_dikenal',
+                'decided_at' => now(),
+            ])),
+            QueryException::class,
+        );
+        $this->assertThrows(
+            fn () => DB::transaction(fn () => LeaveCancellationRequest::create([
+                'leave_request_id' => $leaveRequest->id,
+                'requested_by' => $requester->id,
+                'reason' => 'Keputusan harus bertimestamp.',
+                'status' => LeaveCancellationRequest::STATUS_APPROVED,
+                'resume_status' => 'menunggu_approval',
+            ])),
+            QueryException::class,
+        );
+
+        $cancellation->update([
+            'status' => LeaveCancellationRequest::STATUS_REJECTED,
+            'decided_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('leave_cancellation_requests', [
+            'id' => LeaveCancellationRequest::create([
+                'leave_request_id' => $leaveRequest->id,
+                'requested_by' => $requester->id,
+                'reason' => 'Permohonan setelah penolakan.',
+                'status' => LeaveCancellationRequest::STATUS_PENDING,
+                'resume_status' => 'ditangguhkan',
+            ])->id,
+            'status' => LeaveCancellationRequest::STATUS_PENDING,
+        ]);
+
+        $this->assertThrows(
+            fn () => DB::transaction(fn () => DB::table('leave_requests')
+                ->where('id', $leaveRequest->id)
+                ->update(['revision_version' => 0])),
+            QueryException::class,
+        );
+    }
+
+    public function test_cancellation_history_blocks_lifecycle_and_table_rollback_after_request_resumes(): void
+    {
+        if (DB::getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Proteksi rollback pembatalan diverifikasi khusus pada PostgreSQL.');
+        }
+
+        $employee = Employee::factory()->create();
+        $requester = User::factory()->create();
+        $jenisCuti = RefJenisCuti::create([
+            'nama' => 'Cuti Bukti Rollback Pembatalan',
+            'code' => 'bukti_rollback_pembatalan',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $leaveRequest = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenisCuti->id,
+            'tanggal_mulai' => '2026-12-29',
+            'tanggal_selesai' => '2026-12-29',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Request sudah kembali berjalan setelah pembatalan ditolak.',
+            'status' => 'menunggu_approval',
+        ]);
+        $leaveRequest->refresh();
+
+        $cancellation = LeaveCancellationRequest::create([
+            'leave_request_id' => $leaveRequest->id,
+            'requested_by' => $requester->id,
+            'reason' => 'Perubahan jadwal yang kemudian ditolak.',
+            'status' => LeaveCancellationRequest::STATUS_REJECTED,
+            'resume_status' => 'menunggu_approval',
+            'decided_at' => now(),
+        ]);
+
+        $lifecycleMigration = require database_path('migrations/2026_09_03_000001_add_leave_cancellation_lifecycle_to_leave_requests.php');
+        $tableMigration = require database_path('migrations/2026_09_03_000000_create_leave_cancellation_requests_table.php');
+        $accessMigration = require database_path('migrations/2026_09_03_000002_add_leave_cancellation_access_and_notification_policies.php');
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($lifecycleMigration, 'down'),
+            RuntimeException::class,
+        );
+        $this->assertTrue(Schema::hasColumn('leave_requests', 'revision_version'));
+        $this->assertDatabaseHas('leave_cancellation_requests', ['id' => $cancellation->id]);
+
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($tableMigration, 'down'),
+            RuntimeException::class,
+        );
+        $this->assertTrue(Schema::hasTable('leave_cancellation_requests'));
+        $this->assertDatabaseHas('leave_cancellation_requests', ['id' => $cancellation->id]);
+
+        AuditLog::create([
+            'event' => 'LEAVE_CANCELLATION_REQUESTED',
+            'auditable_type' => 'LeaveCancellationRequest',
+            'auditable_id' => $cancellation->id,
+        ]);
+        $this->assertThrows(
+            fn () => $this->invokeMigrationMethod($accessMigration, 'down'),
+            RuntimeException::class,
+        );
+    }
 
     public function test_duty_postponement_domain_tokens_are_dedicated(): void
     {

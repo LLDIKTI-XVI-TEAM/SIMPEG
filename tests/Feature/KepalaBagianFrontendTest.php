@@ -59,6 +59,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('id="kabag-dashboard-decision-description"', false)
             ->assertSee('@keydown.escape.window="if (confirmOpen) { if (!isSubmitting) confirmOpen = false }"', false)
             ->assertSee('name="active_step_id"', false)
+            ->assertSee('name="revision_version"', false)
             ->assertSee('x-bind:value="selectedActiveStepId"', false)
             ->assertSee($activeStepId, false)
             ->assertDontSee('@keydown.escape.window="if (!isSubmitting) confirmOpen = false"', false);
@@ -166,6 +167,30 @@ class KepalaBagianFrontendTest extends TestCase
 
         foreach ($response->json('Cuti') as $item) {
             $this->assertStringStartsWith(url('/kepala-bagian/cuti/'), $item['url']);
+        }
+    }
+
+    public function test_global_search_cuti_menampilkan_status_pembatalan_yang_tepat(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $directReport = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Status Pembatalan',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($directReport, $kepalaBagian);
+
+        foreach ([
+            LeaveRequest::STATUS_CANCELLATION_PENDING => 'Menunggu Keputusan Pembatalan',
+            LeaveRequest::STATUS_CANCELLED => 'Dibatalkan',
+        ] as $status => $label) {
+            $leave->forceFill(['status' => $status])->save();
+
+            $response = $this->actingAs($user)
+                ->getJson(url('/kepala-bagian/search').'?q='.urlencode('Bawahan Status Pembatalan'))
+                ->assertOk()
+                ->assertJsonCount(1, 'Cuti');
+
+            $this->assertStringEndsWith($label, $response->json('Cuti.0.subtitle'));
         }
     }
 
@@ -332,8 +357,12 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('id="kabag-approval-confirmation-description"', false)
             ->assertSee('@keydown.escape.window="if (confirmOpen) { confirmOpen = false }"', false)
             ->assertSee('name="active_step_id"', false)
+            ->assertSee('name="revision_version"', false)
             ->assertSee('value="'.$activeStepId.'"', false)
             ->assertSee('required', false)
+            ->assertDontSee('value="PERUBAHAN"', false)
+            ->assertDontSee('Minta Perubahan')
+            ->assertDontSee('memilih Perubahan')
             ->assertDontSee('Simulasi');
 
         $this->assertMatchesRegularExpression(
@@ -344,6 +373,22 @@ class KepalaBagianFrontendTest extends TestCase
         $this->actingAs($user)
             ->get(route('kepala-bagian.cuti.show', $hiddenLeave))
             ->assertForbidden();
+
+        $visibleLeave->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.show', $visibleLeave))
+            ->assertOk()
+            ->assertSee('Menunggu Keputusan Pembatalan')
+            ->assertDontSee('Menunggu Keputusan</p>', false)
+            ->assertDontSee('animate-pulse', false)
+            ->assertDontSee('Status tidak tersedia');
+
+        $visibleLeave->forceFill(['status' => LeaveRequest::STATUS_CANCELLED])->save();
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.show', $visibleLeave))
+            ->assertOk()
+            ->assertSee('Dibatalkan')
+            ->assertDontSee('Status tidak tersedia');
     }
 
     public function test_leave_index_defaults_to_menunggu_approval_status(): void
@@ -538,6 +583,47 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('Dikembalikan karena Rollover');
     }
 
+    public function test_leave_index_filters_and_labels_cancellation_lifecycle(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $pendingEmployee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Hold Kepala Bagian',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $cancelledEmployee = Employee::factory()->create([
+            'nama_lengkap' => 'Pemohon Batal Kepala Bagian',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $pending = $this->leaveWithActiveStep($pendingEmployee, $kepalaBagian);
+        $pending->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
+        $cancelled = $this->leaveWithActiveStep($cancelledEmployee, $kepalaBagian);
+        $cancelled->forceFill(['status' => LeaveRequest::STATUS_CANCELLED])->save();
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => LeaveRequest::STATUS_CANCELLATION_PENDING]))
+            ->assertOk()
+            ->assertSee('Pemohon Hold Kepala Bagian')
+            ->assertSee('Menunggu Keputusan Pembatalan')
+            ->assertDontSee('Pemohon Batal Kepala Bagian');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.cuti.index', ['status' => LeaveRequest::STATUS_CANCELLED]))
+            ->assertOk()
+            ->assertSee('Pemohon Batal Kepala Bagian')
+            ->assertSee('Dibatalkan')
+            ->assertDontSee('Pemohon Hold Kepala Bagian');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $pendingEmployee))
+            ->assertOk()
+            ->assertSee('Menunggu Keputusan Pembatalan');
+
+        $this->actingAs($user)
+            ->get(route('kepala-bagian.bawahan.show', $cancelledEmployee))
+            ->assertOk()
+            ->assertSee('Dibatalkan');
+    }
+
     public function test_detail_pending_step_explains_waiting_role(): void
     {
         $fixture = $this->dutyPostponementFixture();
@@ -558,14 +644,16 @@ class KepalaBagianFrontendTest extends TestCase
             ->from(route('kepala-bagian.cuti.show', $leave))
             ->post(route('kepala-bagian.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'PERUBAHAN',
             ])
             ->assertRedirect(route('kepala-bagian.cuti.show', $leave))
-            ->assertSessionHasErrors('catatan');
+            ->assertSessionHasErrors('keputusan');
 
         $this->actingAs($user)
             ->post(route('kepala-bagian.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Diteruskan ke tahapan berikutnya.',
             ])
@@ -587,6 +675,32 @@ class KepalaBagianFrontendTest extends TestCase
             'auditable_type' => 'LeaveRequest',
             'auditable_id' => $leave->id,
         ]);
+    }
+
+    public function test_keputusan_dari_form_lama_menampilkan_pesan_hold_pembatalan(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $leave = $this->leaveWithActiveStep(
+            Employee::factory()->create(['kepala_bagian_id' => $kepalaBagian->id]),
+            $kepalaBagian,
+        );
+        $leave->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
+
+        $this->actingAs($user)
+            ->from(route('kepala-bagian.cuti.show', $leave))
+            ->followingRedirects()
+            ->post(route('kepala-bagian.cuti.decision', $leave), [
+                'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $leave->revision_version,
+                'keputusan' => 'DISETUJUI',
+            ])
+            ->assertOk()
+            ->assertSee('Proses persetujuan ditahan sampai Admin Kepegawaian memutuskan permohonan pembatalan.')
+            ->assertDontSee('Periksa kembali data keputusan di bawah ini.')
+            ->assertDontSee('Simpan Keputusan');
+
+        $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $leave->fresh()->status);
+        $this->assertDatabaseMissing('leave_approvals', ['leave_request_id' => $leave->id]);
     }
 
     public function test_form_keputusan_kepala_bagian_memiliki_label_focus_dan_relasi_error_yang_aksesibel(): void
@@ -614,7 +728,8 @@ class KepalaBagianFrontendTest extends TestCase
             ->followingRedirects()
             ->post(route('kepala-bagian.cuti.decision', $leave), [
                 'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
-                'keputusan' => 'PERUBAHAN',
+                'revision_version' => $leave->fresh()->revision_version,
+                'keputusan' => 'DITANGGUHKAN',
                 'catatan' => 'abcd',
             ])
             ->assertOk()
@@ -631,6 +746,7 @@ class KepalaBagianFrontendTest extends TestCase
         $this->actingAs($fixture['user'])
             ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ])
             ->assertRedirect(route('kepala-bagian.cuti.show', $fixture['leave']))
@@ -662,6 +778,7 @@ class KepalaBagianFrontendTest extends TestCase
                 ->from(route('kepala-bagian.cuti.show', $fixture['leave']))
                 ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                     'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                    'revision_version' => $fixture['leave']->fresh()->revision_version,
                     'alasan' => $reason,
                 ])
                 ->assertRedirect(route('kepala-bagian.cuti.show', $fixture['leave']))
@@ -689,6 +806,7 @@ class KepalaBagianFrontendTest extends TestCase
         $this->actingAs($user)
             ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ])
             ->assertForbidden();
@@ -703,6 +821,7 @@ class KepalaBagianFrontendTest extends TestCase
         $this->actingAs($fixture['user'])
             ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ])
             ->assertForbidden();
@@ -767,6 +886,7 @@ class KepalaBagianFrontendTest extends TestCase
         $this->actingAs($fixture['user'])
             ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ]);
 
@@ -836,6 +956,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->followingRedirects()
             ->post(route('kepala-bagian.cuti.penangguhan-tugas-dinas', $fixture['leave']), [
                 'active_step_id' => $fixture['leave']->steps()->where('status', 'active')->valueOrFail('id'),
+                'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'abcd',
             ])
             ->assertOk()

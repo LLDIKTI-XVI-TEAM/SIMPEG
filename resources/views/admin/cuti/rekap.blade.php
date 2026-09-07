@@ -10,6 +10,8 @@
             'ditangguhkan' => 'text-warning',
             'ditangguhkan_tugas_dinas' => 'text-warning',
             'dikembalikan_karena_rollover' => 'text-warning',
+            'menunggu_pembatalan' => 'text-warning',
+            'dibatalkan' => 'text-danger',
             'perlu_perubahan' => 'text-danger',
             'tidak_disetujui' => 'text-danger',
         ];

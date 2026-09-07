@@ -34,7 +34,7 @@ class ApproveLeaveAction
      * Menyetujui pengajuan dengan aktor manusia eksplisit dan transaksi fail-closed.
      * File PDF baru dikompensasi bila transaksi database atau notifikasi gagal.
      */
-    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, ?string $komentar, Request $request): LeaveRequest
+    public function execute(LeaveRequest $leaveRequest, Employee $actor, string $expectedActiveStepId, int $expectedRevisionVersion, ?string $komentar, Request $request): LeaveRequest
     {
         $requestUser = $request->user();
 
@@ -53,6 +53,7 @@ class ApproveLeaveAction
                 $request,
                 $requestUser,
                 $expectedActiveStepId,
+                $expectedRevisionVersion,
                 &$newDocumentPath,
                 &$newDocumentRecoveryTaskId,
             ): LeaveRequest {
@@ -73,6 +74,7 @@ class ApproveLeaveAction
                     $lockedBefore,
                     $actor,
                     $expectedActiveStepId,
+                    $expectedRevisionVersion,
                     $komentar,
                     $requestUser,
                     $request,
@@ -184,7 +186,7 @@ class ApproveLeaveAction
             [
                 'leave_request_id' => $leaveRequest->id,
                 'leave_request_step_id' => $nextStep->id,
-                'leave_request_version' => $leaveRequest->updated_at?->utc()->format('Y-m-d\TH:i:s.u\Z'),
+                'leave_request_version' => (string) $leaveRequest->revision_version,
                 'url' => route('cuti.approval', [], false),
             ],
         );

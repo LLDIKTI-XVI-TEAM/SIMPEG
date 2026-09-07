@@ -647,6 +647,7 @@ class WhatsAppTemplatePayloadMapperTest extends TestCase
         $this->assertNull($this->mapper->map('ews.scheduler_failed', $employee, []));
         $this->assertNull($this->mapper->map('import_pegawai', $employee, []));
         $this->assertNull($this->mapper->map('auth.login', $employee, []));
+        $this->assertNull($this->mapper->map('cuti.perlu_perubahan', $employee, []));
     }
 
     public function test_konfigurasi_dapat_memecah_template_per_event_tanpa_mengubah_domain_code(): void
