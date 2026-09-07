@@ -70,64 +70,6 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            $canAdministerLeaveBalance = $activeRole === 'admin_kepegawaian'
-                && (($layoutCapabilities['cuti.balance.reconcile'] ?? false)
-                    || ($layoutCapabilities['cuti.manual.manage'] ?? false));
-            $canViewEmployeeStatistics = $layoutCapabilities['employees.read'] ?? false;
-            $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
-                && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
-
-            // Menu terlarang/dikunci untuk masing-masing role
-            $lockedMenus = [
-                'super_admin' => [],
-                'admin_kepegawaian' => [
-                    'user-management',
-                    'rbac',
-                    'data-master',
-                    'hari-libur',
-                    'ews.config',
-                ],
-                'pimpinan' => [
-                    'audit-log',
-                    'user-management',
-                    'rbac',
-                    'ews.config',
-                ],
-                'kepala_bagian' => [
-                    'data-pegawai',
-                    'pegawai.import',
-                    'hari-libur',
-                    'dokumen',
-                    'audit-log',
-                    'user-management',
-                    'rbac',
-                    'data-master',
-                    'laporan',
-                    'laporan.pegawai',
-                    'cuti.laporan',
-                    'cuti.rekap',
-                    'ews',
-                    'ews.config',
-                ],
-
-                'pegawai' => [
-                    'data-pegawai',
-                    'pegawai.import',
-                    'dokumen',
-                    'cuti.rekap',
-                    'ews',
-                    'ews.config',
-                    'laporan',
-                    'laporan.pegawai',
-                    'cuti.laporan',
-                    'user-management',
-                    'rbac',
-                    'data-master',
-                    'hari-libur',
-                    'audit-log',
-                ],
-            ];
-
             // Dashboard mengikuti role efektif (tiap role punya beranda sendiri).
             $dashboardRoute = match ($activeRole) {
                 'pimpinan' => 'pimpinan.dashboard',
@@ -187,6 +129,8 @@
                         // RBAC: dikontrol dari Role & Permission admin (employees.export)
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up',
                          'permission' => 'employees.export'],
+                        ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar',
+                         'permission' => 'employees.read'],
                         // RBAC: dikontrol dari Role & Permission admin (employee_histories.export)
                         ['label' => 'Riwayat Kepangkatan', 'route' => 'laporan.kepangkatan', 'icon' => 'document-chart-bar',
                          'permission' => 'employee_histories.export'],
@@ -218,33 +162,12 @@
                         // RBAC: dikontrol dari Role & Permission admin (cuti.read_all)
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down',
                          'permission' => 'cuti.read_all'],
+                        ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge',
+                         'permission' => 'cuti.cancellation.manage'],
                         // RBAC: dikontrol dari Role & Permission admin (cuti.configure)
                         ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth',
                          'permission' => 'cuti.configure'],
                     ]
-                    'items' => array_filter([
-                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
-                        $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
-                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
-                        ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                        $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
-                    ])
-                ],
-                [
-                    'group' => 'Cuti',
-                    'items' => array_filter([
-                        $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
-                        ['label' => in_array($activeRole, ['pegawai'], true) ? 'Pengajuan Cuti' : 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
-                        ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        $canAdministerLeaveBalance
-                            ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
-                            : null,
-                        $canManageLeaveCancellations
-                            ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
-                            : null,
-                        ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
-                        $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
-                    ])
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
@@ -310,6 +233,8 @@
                         'items' => [
                             ['label' => 'Persetujuan Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                            ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge',
+                             'permission' => 'cuti.cancellation.manage'],
                         ]
                     ],
                     [
@@ -321,13 +246,14 @@
                     ],
                     [
                         'group' => 'Laporan',
-                        'items' => array_filter([
+                        'items' => [
                             ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
-                            $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
+                            ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar',
+                             'permission' => 'employees.read'],
                             ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
                             ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
-                        ])
+                        ]
                     ]
                 ];
             }
@@ -351,6 +277,8 @@
                         'items' => [
                             ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'],
                             ['label' => 'Pengajuan Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
+                            ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge',
+                             'permission' => 'cuti.cancellation.manage'],
                         ],
                     ],
                     [
@@ -362,9 +290,10 @@
                     ],
                     [
                         'group' => 'Laporan',
-                        'items' => array_filter([
-                            $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
-                        ]),
+                        'items' => [
+                            ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar',
+                             'permission' => 'employees.read'],
+                        ],
                     ],
                 ];
             }

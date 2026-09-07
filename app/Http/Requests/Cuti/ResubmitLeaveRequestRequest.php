@@ -28,11 +28,6 @@ class ResubmitLeaveRequestRequest extends FormRequest
             && $actor !== null
             && $actor->hasPermission('cuti.create')
             && $actor->employee_id === $leaveRequest->employee_id
-            && in_array($leaveRequest->status, [
-                'perlu_perubahan',
-                LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
-            ], true);
-            && $this->user()?->employee_id === $leaveRequest->employee_id
             && ($leaveRequest->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER
                 || ($leaveRequest->status === 'menunggu_approval'
                     && $leaveRequest->approvals()->doesntExist()));

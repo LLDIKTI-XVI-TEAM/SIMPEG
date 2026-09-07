@@ -136,9 +136,6 @@ class CutiRbacTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasErrors(['balance_year']);
     }
-        foreach (['cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.cancellation.manage'] as $permissionName) {
-            $permission = Permission::query()->where('name', $permissionName)->firstOrFail();
-
     public function test_bukti_cuti_default_super_admin_dan_admin_namun_dapat_diberikan_ke_role_lain(): void
     {
         $proof = Permission::query()->where('name', 'cuti.proof.generate')->firstOrFail();

@@ -133,7 +133,9 @@ class BuildCutiDetailAction
             'canGenerateFormulir' => $canGenerateFormulir,
             'attachmentAvailable' => $this->attachmentDownloads->canReadAsGeneralActor($cuti, $user)
                 && $this->files->hasLeaveAttachment($cuti->lampiran_path, $cuti->employee_id),
-            'canResubmit' => $isOwner && ($isRolloverReturn
+            'canResubmit' => $isOwner
+                && $user->hasPermission('cuti.create')
+                && ($isRolloverReturn
                 || ($cuti->status === 'menunggu_approval' && $cuti->approvals->isEmpty())),
             'canRequestCancellation' => $canRequestCancellation,
             'latestCancellation' => $latestCancellation,

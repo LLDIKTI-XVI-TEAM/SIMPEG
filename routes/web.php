@@ -383,8 +383,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
         ->middleware(['permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
-    Route::middleware(['permission:cuti.balance.reconcile'])
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.cancellation.manage'])
+    Route::middleware(['permission:cuti.cancellation.manage'])
         ->prefix('cuti/pembatalan')
         ->name('cuti.cancellations.')
         ->group(function (): void {
