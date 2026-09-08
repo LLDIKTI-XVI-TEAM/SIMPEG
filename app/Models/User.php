@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Support\Rbac\PatenCapability;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -133,6 +134,13 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
+        // Capability PATEN tidak bergantung pada pivot role_permissions.
+        // Keputusan final yang berorientasi record (mis. pemilik cuti atau
+        // approver tahap aktif) tetap ditegakkan lagi oleh Action/Service.
+        if (PatenCapability::isPermissionName($permission)) {
+            return $this->hasActiveEmployeeIdentity();
+        }
+
         $effectiveRole = $this->getEffectiveRole();
 
         if ($effectiveRole === null || $effectiveRole === '') {
@@ -143,6 +151,16 @@ class User extends Authenticatable
             ->where('name', $effectiveRole)
             ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
             ->exists();
+    }
+
+    /**
+     * Identitas pegawai aktif adalah prasyarat bersama capability PATEN.
+     * Status menggunakan predicate kanonis Employee::isActive() dan tidak
+     * pernah memakai nama role, claim SSO, maupun grant legacy.
+     */
+    private function hasActiveEmployeeIdentity(): bool
+    {
+        return $this->employee_id !== null && $this->employee()->first()?->isActive() === true;
     }
 
     /** Menentukan validitas hierarki target simulasi tanpa mengevaluasi permission. */

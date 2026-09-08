@@ -540,7 +540,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // Parameter memakai model binding ber-UUID agar id rusak berhenti sebagai 404
     // di layer route, bukan menjadi error database.
     Route::get('/hari-libur', [HariLiburController::class, 'index'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.read'])
+        ->middleware('permission:hari_libur.read')
         ->name('hari-libur');
     Route::post('/hari-libur', [HariLiburController::class, 'store'])
         ->middleware(['role:super_admin', 'permission:hari_libur.create'])
@@ -564,21 +564,20 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
     Route::get('/dashboard/cuti/create', [CutiController::class, 'create'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.create');
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.store');
     Route::post('/dashboard/cuti/{leaveRequest}/pembatalan', [LeaveCancellationController::class, 'store'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.cancellations.store')
         ->whereUuid('leaveRequest');
     Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.resubmit')
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
         ->name('cuti.formulir-pdf')
+        ->whereUuid('leaveRequest');
+    Route::post('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'generateFormulirPdf'])
+        ->name('cuti.formulir-pdf.generate')
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/lampiran', [CutiController::class, 'downloadAttachment'])
         ->name('cuti.attachment.download')

@@ -14,7 +14,7 @@ class RbacSeeder extends Seeder
         $roles = [
             'super_admin' => 'Super Admin — akses administrasi penuh dan fitur cuti pegawai',
             'admin_kepegawaian' => 'Admin Kepegawaian — kelola data pegawai, pantau cuti, dan ajukan cuti sendiri',
-            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, tanpa pengajuan cuti pribadi',
+            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, dan pengajuan cuti pribadi sesuai eligibility PATEN',
             'kepala_bagian' => 'Kepala Bagian — approval cuti bawahan dan pengajuan cuti sendiri',
             'pegawai' => 'Pegawai — read-only data sendiri, ajukan cuti, lihat notifikasi',
         ];
@@ -99,7 +99,8 @@ class RbacSeeder extends Seeder
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
         // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
-        // pada chain aktif. Pimpinan sengaja tidak menerima hak pengajuan cuti.
+        // pada chain aktif. Capability mandiri PATEN tetap dicantumkan untuk kompatibilitas data lama,
+        // tetapi runtime tidak memakai pivot sebagai sumber keputusan.
         $this->bootstrapRolePermissions([
             // Super Admin menerima default semua capability RBAC, tetapi tetap
             // dapat direvoke dari matrix setelah bootstrap.
@@ -160,7 +161,9 @@ class RbacSeeder extends Seeder
                 'ews.read',
                 'notifications.read',
                 'notifications.update',
-                // Pimpinan dapat memantau dan mengatur chain, tetapi tidak mengajukan cuti sendiri.
+                // Grant legacy dipertahankan, tetapi pengajuan mandiri diputus PATEN berdasarkan
+                // identitas pegawai aktif dan eligibility domain, bukan checkbox role.
+                'cuti.create',
                 'cuti.read_own',
                 'cuti.approve',
                 'cuti.read_all',

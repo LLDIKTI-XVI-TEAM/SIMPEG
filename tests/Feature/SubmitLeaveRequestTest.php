@@ -11,9 +11,11 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageRecord;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\StorageRecoveryTask;
 use App\Models\SupervisorAssignment;
@@ -210,6 +212,7 @@ class SubmitLeaveRequestTest extends TestCase
     {
         return [
             'admin kepegawaian' => ['admin_kepegawaian'],
+            'pimpinan' => ['pimpinan'],
             'kepala bagian' => ['kepala_bagian'],
             'pegawai' => ['pegawai'],
         ];
@@ -260,14 +263,20 @@ class SubmitLeaveRequestTest extends TestCase
         ]);
     }
 
-    public function test_pimpinan_tidak_dapat_membuka_form_atau_mengajukan_cuti(): void
+    public function test_pimpinan_aktif_dapat_membuka_form_dan_mengajukan_cuti_tanpa_grant_legacy(): void
     {
         $aktor = $this->makePemohon(role: 'pimpinan');
         $jenis = $this->jenisCuti('Cuti Pimpinan');
+        $permission = Permission::query()->where('name', 'cuti.create')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()->permissions()->detach($permission->id);
+        $this->reconcileAnnualProjection($aktor, 2026);
 
-        $this->actingAs($aktor['user'])->get(route('cuti.create'))->assertForbidden();
-        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))->assertForbidden();
-        $this->assertDatabaseCount('leave_requests', 0);
+        $this->actingAs($aktor['user'])->get(route('cuti.create'))->assertOk();
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+        ]);
     }
 
     public function test_pegawai_berhasil_mengajukan_cuti(): void

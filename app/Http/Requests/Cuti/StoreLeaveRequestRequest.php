@@ -25,13 +25,11 @@ class StoreLeaveRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Pengajuan cuti adalah self-service PATEN. Role Pimpinan tidak membuat
-        // pengajuan pribadi; aturan lifecycle/eligibility tetap divalidasi di bawah.
+        // Pengajuan adalah self-service PATEN: identity pegawai aktif menjadi
+        // gerbangnya. Role dan pivot RBAC tidak boleh mengubah eligibility.
         $actor = $this->user();
 
-        return $actor !== null && in_array($actor->getEffectiveRole(), [
-            'super_admin', 'admin_kepegawaian', 'kepala_bagian', 'pegawai',
-        ], true);
+        return $actor?->hasPermission('cuti.create') ?? false;
     }
 
     /**

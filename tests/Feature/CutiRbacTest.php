@@ -10,6 +10,7 @@ use App\Models\Permission;
 use App\Models\RefJenisCuti;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\Rbac\PatenCapability;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -114,8 +115,8 @@ class CutiRbacTest extends TestCase
 
     public function test_super_admin_memiliki_semua_permission_cuti(): void
     {
-        $user = User::factory()->superAdmin()->create();
-        $excluded = ['cuti.create', 'cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.cancellation.manage'];
+        $employee = Employee::factory()->create();
+        $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
 
         foreach (self::CUTI_PERMISSIONS as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Super Admin harus memiliki {$permission}");
@@ -158,22 +159,20 @@ class CutiRbacTest extends TestCase
             ->assertRedirect()
             ->assertSessionHasErrors(['balance_year']);
     }
-    public function test_bukti_cuti_default_super_admin_dan_admin_namun_dapat_diberikan_ke_role_lain(): void
+
+    public function test_capability_paten_tidak_bergantung_pada_pivot_role_permissions(): void
     {
-        $proof = Permission::query()->where('name', 'cuti.proof.generate')->firstOrFail();
-        $admin = User::factory()->adminKepegawaian()->create();
-        $superAdmin = User::factory()->superAdmin()->create();
+        $role = Role::query()->where('name', 'pimpinan')->firstOrFail();
+        $patenPermissions = Permission::query()
+            ->whereIn('name', PatenCapability::PERMISSION_NAMES)
+            ->pluck('id');
+        $role->permissions()->detach($patenPermissions);
 
-        $this->assertTrue($admin->hasPermission('cuti.proof.generate'));
-        $this->assertTrue($superAdmin->hasPermission('cuti.proof.generate'));
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
-        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $roleName) {
-            $role = Role::query()->where('name', $roleName)->firstOrFail();
-            $user = User::factory()->state(['role' => $roleName])->create();
-            $this->assertFalse($user->hasPermission('cuti.proof.generate'));
-
-            $role->permissions()->syncWithoutDetaching([$proof->id]);
-            $this->assertTrue($user->fresh()->hasPermission('cuti.proof.generate'));
+        foreach (PatenCapability::PERMISSION_NAMES as $permission) {
+            $this->assertTrue($user->hasPermission($permission), "PATEN {$permission} tidak boleh bergantung pivot legacy");
         }
     }
 
@@ -189,6 +188,7 @@ class CutiRbacTest extends TestCase
     {
         return [
             'admin kepegawaian' => ['admin_kepegawaian'],
+            'pimpinan' => ['pimpinan'],
             'kepala bagian' => ['kepala_bagian'],
             'pegawai' => ['pegawai'],
         ];
@@ -197,14 +197,16 @@ class CutiRbacTest extends TestCase
     #[DataProvider('rolePemohonProvider')]
     public function test_role_self_service_memiliki_permission_cuti_create(string $role): void
     {
-        $user = User::factory()->state(['role' => $role])->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->state(['role' => $role])->create(['employee_id' => $employee->id]);
 
         $this->assertTrue($user->hasPermission('cuti.create'), "role {$role} harus memiliki cuti.create");
     }
 
     public function test_pegawai_mendapat_akses_pengajuan_pembacaan_sendiri_dan_saldo(): void
     {
-        $user = User::factory()->pegawai()->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
 
         $this->assertTrue($user->hasPermission('cuti.create'));
         $this->assertTrue($user->hasPermission('cuti.read_own'));
@@ -218,6 +220,8 @@ class CutiRbacTest extends TestCase
     {
         $approver = Employee::factory()->create();
         $user = User::factory()->pegawai()->create(['employee_id' => $approver->id]);
+        $approvalPermission = Permission::query()->where('name', 'cuti.approve')->firstOrFail();
+        Role::query()->where('name', 'pegawai')->firstOrFail()->permissions()->detach($approvalPermission->id);
         $pemohon = Employee::factory()->create();
         $jenis = RefJenisCuti::create([
             'nama' => 'Cuti Sakit',
@@ -251,6 +255,7 @@ class CutiRbacTest extends TestCase
 
         $response->assertRedirect(route('cuti.approval'));
         $this->assertSame('disetujui', $cuti->fresh()->status);
+        $this->assertDatabaseHas('leave_proofs', ['leave_request_id' => $cuti->id]);
 
         $audit = AuditLog::query()
             ->where('auditable_type', 'LeaveRequest')
@@ -278,6 +283,84 @@ class CutiRbacTest extends TestCase
             'komentar' => null,
             'actor_role' => 'pegawai',
         ], $audit->new_values);
+    }
+
+    public function test_pemilik_tetap_membaca_pengajuan_sendiri_tanpa_grant_read_own_legacy(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $permission = Permission::query()->where('name', 'cuti.read_own')->firstOrFail();
+        Role::query()->where('name', 'pegawai')->firstOrFail()->permissions()->detach($permission->id);
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Milik Sendiri',
+            'code' => 'cuti_milik_sendiri_rbac',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $cuti = LeaveRequest::create([
+            'employee_id' => $employee->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-06',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Pengajuan milik sendiri.',
+            'status' => 'menunggu_approval',
+        ]);
+
+        $this->actingAs($user)->get(route('cuti.show', $cuti))
+            ->assertOk()
+            ->assertSee('Pengajuan milik sendiri.');
+    }
+
+    public function test_saldo_pribadi_tetap_terbuka_tanpa_permission_saldo_lintas_pegawai(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $permission = Permission::query()->where('name', 'cuti.balance.read')->firstOrFail();
+        Role::query()->where('name', 'pegawai')->firstOrFail()->permissions()->detach($permission->id);
+
+        $this->actingAs($user)->get(route('cuti.saldo'))->assertOk();
+        $this->assertFalse($user->fresh()->hasPermission('cuti.balance.read'));
+    }
+
+    public function test_non_approver_tetap_ditolak_meski_mempunyai_grant_legacy(): void
+    {
+        $assignedApprover = Employee::factory()->create();
+        $unassignedApprover = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $unassignedApprover->id]);
+        $permission = Permission::query()->where('name', 'cuti.approve')->firstOrFail();
+        Role::query()->where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([$permission->id]);
+        $pemohon = Employee::factory()->create();
+        $jenis = RefJenisCuti::create([
+            'nama' => 'Cuti Approver Tidak Sesuai',
+            'code' => 'cuti_non_approver_rbac',
+            'mengurangi_saldo_tahunan' => false,
+            'khusus_pns' => false,
+        ]);
+        $cuti = LeaveRequest::create([
+            'employee_id' => $pemohon->id,
+            'jenis_cuti_id' => $jenis->id,
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-06',
+            'jumlah_hari_kerja' => 1,
+            'alasan' => 'Tidak boleh diputus approver lain.',
+            'status' => 'menunggu_approval',
+        ]);
+        $step = LeaveRequestStep::create([
+            'leave_request_id' => $cuti->id,
+            'step_order' => 1,
+            'step_type' => 'verifikator',
+            'role_label' => 'Verifikator',
+            'approver_employee_id' => $assignedApprover->id,
+            'status' => 'active',
+            'is_final' => true,
+        ]);
+
+        $this->actingAs($user)->post(route('cuti.approve', $cuti), [
+            'active_step_id' => $step->id,
+            'revision_version' => $cuti->revision_version,
+        ])->assertForbidden();
+        $this->assertSame('menunggu_approval', $cuti->fresh()->status);
     }
 
     public function test_pegawai_yang_menjadi_approver_snapshot_bisa_membuka_detail_pengajuan(): void
@@ -319,18 +402,20 @@ class CutiRbacTest extends TestCase
 
     public function test_kepala_bagian_mendapat_default_pengajuan_monitoring_konfigurasi_dan_saldo(): void
     {
-        $user = User::factory()->kepalaBagian()->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->kepalaBagian()->create(['employee_id' => $employee->id]);
 
         foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read'] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Kepala Bagian harus memiliki {$permission}");
         }
     }
 
-    public function test_pimpinan_tidak_dapat_mengajukan_tetapi_bisa_monitor_konfigurasi_dan_melihat_saldo(): void
+    public function test_pimpinan_aktif_mendapat_capability_self_service_dan_permission_administratif_default(): void
     {
-        $user = User::factory()->pimpinan()->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
-        $this->assertFalse($user->hasPermission('cuti.create'));
+        $this->assertTrue($user->hasPermission('cuti.create'));
         foreach (['cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read'] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Pimpinan harus memiliki {$permission}");
         }
@@ -338,7 +423,8 @@ class CutiRbacTest extends TestCase
 
     public function test_admin_kepegawaian_memiliki_default_bukti_dan_administrasi_cuti(): void
     {
-        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
 
         foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read', 'cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.proof.generate'] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Admin Kepegawaian harus memiliki {$permission}");

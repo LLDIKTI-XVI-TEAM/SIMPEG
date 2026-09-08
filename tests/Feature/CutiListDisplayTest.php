@@ -408,7 +408,8 @@ class CutiListDisplayTest extends TestCase
 
     public function test_super_admin_melihat_cta_pengajuan_cuti(): void
     {
-        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
 
         $this->actingAs($user)->get(route('cuti'))
             ->assertOk()
