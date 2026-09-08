@@ -135,49 +135,49 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/pegawai/import-data', function () {
         return view('admin.pegawai.import');
-    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+    })->middleware('permission:employees.import')
         ->name('pegawai.import');
 
     Route::get('/pegawai/import/template/{type}', [EmployeeImportController::class, 'template'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import-template');
 
     // Import API endpoints (dipanggil via fetch dari blade, butuh session auth)
     Route::post('/api/pegawai/import/upload', [EmployeeImportController::class, 'upload'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.upload');
 
     Route::get('/api/pegawai/import/{batchId}/preview', [EmployeeImportController::class, 'preview'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.preview');
 
     Route::post('/api/pegawai/import/{batchId}/validate', [EmployeeImportController::class, 'validate'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.validate');
 
     // Pemetaan kolom disimpan sebagai state batch agar dipakai ulang oleh preview/validasi/eksekusi.
     Route::post('/api/pegawai/import/{batchId}/mapping', [EmployeeImportController::class, 'saveMapping'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.mapping');
 
     Route::post('/api/pegawai/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.execute');
 
     Route::get('/api/pegawai/import/{batchId}/status', [EmployeeImportController::class, 'status'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.status');
 
     Route::get('/pegawai/import/{batchId}/laporan', [EmployeeImportController::class, 'report'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.report');
 
     Route::get('/ews', [EwsController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware('permission:ews.read')
         ->name('ews');
     Route::get('/dashboard/ews-saya', [EwsController::class, 'myAlerts'])
         ->middleware(['role:pegawai'])
@@ -214,12 +214,12 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('rbac.update');
 
     Route::get('/data-master', [DataMasterController::class, 'index'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:reference_tables.manage')
         ->name('data-master');
 
     // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
     // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
-    Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
+    Route::prefix('data-master')->name('data-master.')->middleware('permission:reference_tables.manage')->group(function (): void {
         Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
             ->name('channel-notifikasi.index');
         Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
@@ -305,9 +305,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
-        ->middleware(['permission:cuti.balance.reconcile,cuti.manual.manage'])
+        ->middleware('permission:cuti.balance.read')
         ->name('cuti.saldo.administrasi');
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.cancellation.manage'])
+    Route::middleware('permission:cuti.cancellation.manage')
         ->prefix('cuti/pembatalan')
         ->name('cuti.cancellations.')
         ->group(function (): void {
@@ -349,7 +349,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.laporan.excel');
 
-    Route::middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.kepala_lembaga_documents.manage'])
+    Route::middleware('permission:cuti.kepala_lembaga_documents.manage')
         ->prefix('cuti/dokumen-kepala-lembaga')
         ->name('cuti.dokumen-kepala-lembaga.')
         ->group(function (): void {
@@ -369,10 +369,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         });
 
     Route::get('/konfigurasi', [EwsConfigController::class, 'index'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:ews.configure')
         ->name('ews.config');
     Route::post('/konfigurasi/update', [EwsConfigController::class, 'update'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:ews.configure')
         ->name('ews.config.update');
 
     Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
@@ -534,25 +534,25 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('cuti.show')
         ->whereUuid('id');
 
-    // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
-    // role:super_admin sebagai pagar kasar dan permission:cuti.configure sebagai gerbang aksi.
+    // Konfigurasi rantai approval adalah capability RBAC; domain validasi tetap berada
+    // di FormRequest dan Action, bukan allowlist role historis pada route.
     Route::get('/cuti/konfigurasi-approval', [CutiConfigController::class, 'index'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config');
     Route::post('/cuti/konfigurasi-approval', [CutiConfigController::class, 'update'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.update');
     Route::post('/cuti/konfigurasi-approval/backfill', [CutiConfigController::class, 'backfill'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.backfill');
     Route::post('/cuti/konfigurasi-approval/pybmc-global', [CutiConfigController::class, 'updateGlobalPybmc'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.pybmc-global');
     Route::post('/cuti/konfigurasi-approval/unit', [CutiConfigController::class, 'applyTemplateToUnit'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.unit-template.apply');
     Route::post('/cuti/konfigurasi-approval/pegawai/{employee}', [CutiConfigController::class, 'storeEmployeeChain'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.employee-chain.store')
         ->whereUuid('employee');
 
@@ -712,7 +712,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');
 
-            Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
+            Route::get('/ews', [PimpinanEwsController::class, 'index'])
+                ->middleware('permission:ews.read')
+                ->name('ews.index');
 
             Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
             Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])->name('laporan.kepangkatan.excel');
@@ -753,6 +755,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');
 
-            Route::get('/ews', [KepalaBagianEwsController::class, 'index'])->name('ews.index');
+            Route::get('/ews', [KepalaBagianEwsController::class, 'index'])
+                ->middleware('permission:ews.read')
+                ->name('ews.index');
         });
 });

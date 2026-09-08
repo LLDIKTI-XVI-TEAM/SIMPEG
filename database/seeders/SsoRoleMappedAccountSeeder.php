@@ -10,8 +10,9 @@ use Illuminate\Support\Str;
 class SsoRoleMappedAccountSeeder extends Seeder
 {
     /**
-     * Persona SSO UAT nyata (HANYA local/testing). Password autentikasi dikelola
-     * sepenuhnya oleh Keycloak dan tidak disimpan oleh seeder SIMPEG.
+     * Persona fixture SSO sintetis (HANYA local/testing). Password autentikasi dikelola
+     * sepenuhnya oleh Keycloak dan tidak disimpan oleh seeder SIMPEG. Akun UAT nyata
+     * dicatat pada runbook/private QA configuration, bukan source code.
      *
      * Auth callback TIDAK PERNAH membaca daftar ini sebagai otorisasi: role internal tetap ditentukan
      * aplikasi SIMPEG (role kosong pada pegawai valid → pegawai, role existing
@@ -21,27 +22,27 @@ class SsoRoleMappedAccountSeeder extends Seeder
      */
     public const UAT_ACCOUNTS = [
         [
-            'email' => 'dayensite@gmail.com',
+            'email' => 'super-admin@example.test',
             'username' => 'demo-klabat',
             'role' => 'super_admin',
         ],
         [
-            'email' => 'sitedayen@gmail.com',
+            'email' => 'admin-kepegawaian@example.test',
             'username' => 'demo-klabat-kepeg',
             'role' => 'admin_kepegawaian',
         ],
         [
-            'email' => 'dionkobi08@gmail.com',
+            'email' => 'pimpinan@example.test',
             'username' => 'demo-klabat-pimpinan',
             'role' => 'pimpinan',
         ],
         [
-            'email' => 'dayen6153@gmail.com',
+            'email' => 'kepala-bagian@example.test',
             'username' => 'demo-klabat-kabag',
             'role' => 'kepala_bagian',
         ],
         [
-            'email' => 'dionleonn05@gmail.com',
+            'email' => 'pegawai@example.test',
             'username' => 'demo-klabat-pegawai',
             'role' => 'pegawai',
         ],

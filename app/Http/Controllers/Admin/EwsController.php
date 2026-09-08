@@ -9,6 +9,7 @@ use App\Http\Requests\Ews\AdminEwsFilterRequest;
 use App\Http\Requests\Ews\UpdateEwsAlertFollowupRequest;
 use App\Models\EwsAlert;
 use App\Models\RefGolongan;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Illuminate\Http\Request;
 
 class EwsController extends Controller
@@ -16,14 +17,22 @@ class EwsController extends Controller
     /**
      * Menampilkan daftar EWS aktif dari alert database dengan filter dan eligibility.
      */
-    public function index(AdminEwsFilterRequest $request, ListActiveEwsAlertsAction $action)
+    public function index(
+        AdminEwsFilterRequest $request,
+        ListActiveEwsAlertsAction $action,
+        EmployeeDashboardScopeService $employeeScope,
+    )
     {
         $validated = $request->validated();
         $filterSearch = trim((string) ($validated['search'] ?? ''));
         $filterEvent = (string) ($validated['event'] ?? '');
         $filterStatus = (string) ($validated['status'] ?? '');
         $perPage = (int) ($validated['per_page'] ?? 10);
-        $data = $action->paginate($filterEvent, $filterStatus, $filterSearch, $perPage);
+        $actor = $request->user();
+        $scope = $actor !== null && in_array($actor->getEffectiveRole(), ['kepala_bagian', 'pegawai'], true)
+            ? $employeeScope->for($actor)
+            : null;
+        $data = $action->paginate($filterEvent, $filterStatus, $filterSearch, $perPage, employeeScope: $scope);
 
         return view('admin.ews.aktif', [
             'alerts' => $data['alerts'],

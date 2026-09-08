@@ -73,21 +73,35 @@ class RbacSeeder extends Seeder
             'ews.configure' => ['module' => 'ews', 'description' => 'Mengonfigurasi parameter dan threshold EWS'],
         ];
 
+        $newRoleNames = [];
         foreach ($roles as $name => $description) {
-            Role::updateOrCreate(['name' => $name], [
+            $role = Role::firstOrNew(['name' => $name]);
+            $isNewRole = ! $role->exists;
+            $role->fill([
                 'guard_name' => 'web',
                 'description' => $description,
             ]);
+            $role->save();
+            if ($isNewRole) {
+                $newRoleNames[] = $name;
+            }
         }
 
+        $newPermissionNames = [];
         foreach ($permissions as $name => $attributes) {
-            Permission::updateOrCreate(['name' => $name], $attributes);
+            $permission = Permission::firstOrNew(['name' => $name]);
+            $isNewPermission = ! $permission->exists;
+            $permission->fill($attributes);
+            $permission->save();
+            if ($isNewPermission) {
+                $newPermissionNames[] = $name;
+            }
         }
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
         // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
         // pada chain aktif. Pimpinan sengaja tidak menerima hak pengajuan cuti.
-        $this->syncRolePermissions([
+        $this->bootstrapRolePermissions([
             // Super Admin menerima default semua capability RBAC, tetapi tetap
             // dapat direvoke dari matrix setelah bootstrap.
             'super_admin' => array_values(array_diff(array_keys($permissions), PatenCapability::PERMISSION_NAMES)),
@@ -178,16 +192,21 @@ class RbacSeeder extends Seeder
                 'employee_families.read',
                 'employee_histories.read',
             ],
-        ]);
+        ], $newRoleNames, $newPermissionNames);
     }
 
     /**
-     * Menyinkronkan mapping role-permission secara idempoten.
-     * Memakai sync agar seeder aman dijalankan ulang tanpa menduplikasi pivot.
+     * Menanam default hanya untuk role atau permission yang baru dibuat.
+     *
+     * Matrix operator adalah sumber otorisasi efektif. Seeder ulang tidak boleh
+     * mencabut grant non-default maupun menanam kembali grant default yang telah
+     * direvoke operator.
      *
      * @param  array<string, list<string>>  $mapping
+     * @param  list<string>  $newRoleNames
+     * @param  list<string>  $newPermissionNames
      */
-    private function syncRolePermissions(array $mapping): void
+    private function bootstrapRolePermissions(array $mapping, array $newRoleNames, array $newPermissionNames): void
     {
         foreach ($mapping as $roleName => $permissionNames) {
             $role = Role::where('name', $roleName)->firstOrFail();
@@ -196,12 +215,20 @@ class RbacSeeder extends Seeder
             // deploy, tetapi bukan lagi grant role pada bootstrap baru.
             $permissionNames = array_values(array_diff($permissionNames, PatenCapability::PERMISSION_NAMES));
 
+            $namesToAttach = in_array($roleName, $newRoleNames, true)
+                ? $permissionNames
+                : array_values(array_intersect($permissionNames, $newPermissionNames));
+
+            if ($namesToAttach === []) {
+                continue;
+            }
+
             $permissionIds = Permission::query()
-                ->whereIn('name', $permissionNames)
+                ->whereIn('name', $namesToAttach)
                 ->pluck('id')
                 ->all();
 
-            $role->permissions()->sync($permissionIds);
+            $role->permissions()->syncWithoutDetaching($permissionIds);
         }
     }
 }

@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,5 +54,40 @@ class EmployeeApiScopeTest extends TestCase
                 ->getJson("/api/v1/pegawai/{$target->id}/riwayat-kepangkatan")
                 ->assertOk();
         }
+    }
+
+    public function test_grant_employee_read_pada_pegawai_tetap_hanya_mengizinkan_target_milik_sendiri(): void
+    {
+        $ownEmployee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $pegawai = User::factory()->pegawai()->create(['employee_id' => $ownEmployee->id]);
+        $permission = Permission::query()->where('name', 'employees.read')->firstOrFail();
+        Role::query()->where('name', 'pegawai')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$ownEmployee->id}/table-row")
+            ->assertOk();
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$otherEmployee->id}/table-row")
+            ->assertForbidden();
+    }
+
+    public function test_grant_riwayat_pada_kabag_tetap_hanya_mengizinkan_bawahan_langsung(): void
+    {
+        $kabagEmployee = Employee::factory()->create();
+        $directReport = Employee::factory()->create(['kepala_bagian_id' => $kabagEmployee->id]);
+        $unrelatedEmployee = Employee::factory()->create();
+        $kabag = User::factory()->kepalaBagian()->create(['employee_id' => $kabagEmployee->id]);
+        $permission = Permission::query()->where('name', 'employee_histories.read')->firstOrFail();
+        Role::query()->where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $this->actingAs($kabag)
+            ->getJson("/api/v1/pegawai/{$directReport->id}/riwayat-kepangkatan")
+            ->assertOk();
+        $this->actingAs($kabag)
+            ->getJson("/api/v1/pegawai/{$unrelatedEmployee->id}/riwayat-kepangkatan")
+            ->assertForbidden();
     }
 }

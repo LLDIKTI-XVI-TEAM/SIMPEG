@@ -58,8 +58,9 @@ class ListActiveEwsAlertsAction
         int $perPage,
         ?string $employeeId = null,
         ?array $employeeIds = null,
+        ?Builder $employeeScope = null,
     ): array {
-        $query = $this->query($filterEvent, $filterStatus, $search, $employeeId, $employeeIds);
+        $query = $this->query($filterEvent, $filterStatus, $search, $employeeId, $employeeIds, $employeeScope);
         $summary = $this->summary(clone $query);
         $thresholdMap = $this->thresholdMap($this->configValues());
         $alerts = $query
@@ -115,6 +116,7 @@ class ListActiveEwsAlertsAction
         ?string $search,
         ?string $employeeId,
         ?array $employeeIds,
+        ?Builder $employeeScope = null,
     ): Builder {
         // Predicate aktif tetap berasal dari relasi status canonical dan gagal tertutup.
         $query = EwsAlert::query()
@@ -128,6 +130,10 @@ class ListActiveEwsAlertsAction
             $employeeIds === []
                 ? $query->whereRaw('1 = 0')
                 : $query->whereIn('employee_id', $employeeIds);
+        }
+
+        if ($employeeScope !== null) {
+            $query->whereIn('employee_id', $employeeScope->select('id'));
         }
 
         $status = $this->statusFromFilter($filterStatus);

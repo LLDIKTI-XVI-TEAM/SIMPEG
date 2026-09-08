@@ -19,7 +19,6 @@ final class PatenCapability
         'cuti.create',
         'cuti.read_own',
         'cuti.approve',
-        'cuti.balance.read',
         'cuti.proof.generate',
     ];
 

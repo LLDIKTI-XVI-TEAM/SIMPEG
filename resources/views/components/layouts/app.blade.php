@@ -70,11 +70,13 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            $canAdministerLeaveBalance = ($layoutCapabilities['cuti.balance.reconcile'] ?? false)
-                || ($layoutCapabilities['cuti.manual.manage'] ?? false);
+            $canAdministerLeaveBalance = $layoutCapabilities['cuti.balance.read'] ?? false;
             $canViewEmployeeStatistics = $layoutCapabilities['employees.read'] ?? false;
-            $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
-                && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
+            $canManageLeaveCancellations = $layoutCapabilities['cuti.cancellation.manage'] ?? false;
+            $canConfigureLeave = $layoutCapabilities['cuti.configure'] ?? false;
+            $canManageReferenceTables = $layoutCapabilities['reference_tables.manage'] ?? false;
+            $canReadEws = $layoutCapabilities['ews.read'] ?? false;
+            $canConfigureEws = $layoutCapabilities['ews.configure'] ?? false;
 
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
@@ -159,7 +161,7 @@
                             ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
                             : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
-                        $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
+                        $canConfigureLeave ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
                     ])
                 ],
                 [
@@ -168,20 +170,20 @@
                         $activeRole === 'kepala_bagian' ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
                         ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         $activeRole === 'pegawai' ? ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle'] : null,
-                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
-                        ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
+                        $canReadEws ? ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'] : null,
+                        $canConfigureEws ? ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'] : null,
                         $activeRole === 'super_admin' ? ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal'] : null,
                     ])
                 ],
                 [
                     'group' => 'Administrasi Sistem',
-                    'items' => [
+                    'items' => array_filter([
                         ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
-                        ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
+                        $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
-                    ]
+                    ])
                 ]
             ];
 
@@ -207,14 +209,21 @@
                             $canAdministerLeaveBalance
                                 ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
                                 : null,
+                            $canManageLeaveCancellations
+                                ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
+                                : null,
+                            $canConfigureLeave
+                                ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth']
+                                : null,
                         ])
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
                             ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
-                        ]
+                            $canConfigureEws ? ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'] : null,
+                        ])
                     ],
                     [
                         'group' => 'Laporan',
@@ -225,7 +234,13 @@
                             ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ])
-                    ]
+                    ],
+                    [
+                        'group' => 'Administrasi Sistem',
+                        'items' => array_filter([
+                            $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
+                        ]),
+                    ],
                 ];
             }
 
@@ -251,19 +266,32 @@
                             $canAdministerLeaveBalance
                                 ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
                                 : null,
+                            $canManageLeaveCancellations
+                                ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
+                                : null,
+                            $canConfigureLeave
+                                ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth']
+                                : null,
                         ]),
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
                             ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
-                        ],
+                            $canConfigureEws ? ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'] : null,
+                        ]),
                     ],
                     [
                         'group' => 'Laporan',
                         'items' => array_filter([
                             $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
+                        ]),
+                    ],
+                    [
+                        'group' => 'Administrasi Sistem',
+                        'items' => array_filter([
+                            $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
                         ]),
                     ],
                 ];
@@ -282,7 +310,15 @@
                     $visibleItems = [];
                     foreach ($group['items'] as $menu) {
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                        $isLocked    = in_array($menu['route'], $myLockedMenus);
+                        $delegatedCapabilityRoutes = [
+                            'data-master' => $canManageReferenceTables,
+                            'ews' => $canReadEws,
+                            'ews.config' => $canConfigureEws,
+                            'cuti.config' => $canConfigureLeave,
+                            'cuti.cancellations.index' => $canManageLeaveCancellations,
+                        ];
+                        $isLocked = in_array($menu['route'], $myLockedMenus)
+                            && ! ($delegatedCapabilityRoutes[$menu['route']] ?? false);
                         if ($routeExists && !$isLocked) {
                             $visibleItems[] = $menu;
                         }

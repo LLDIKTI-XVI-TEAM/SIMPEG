@@ -50,7 +50,10 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminEmployeeMutationMiddleware('employees.create'))
             ->name('check-identity');
         Route::post('/import', [EmployeeImportController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employees.import'))
+            // Import tidak menunjuk rekam pegawai existing; employee.scope hanya
+            // berlaku pada target record agar UUID tidak dapat memperluas scope.
+            // Capability import tetap ditegakkan permission secara backend.
+            ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.import'])
             ->name('import.store');
         Route::delete('/{employee}', [EmployeeController::class, 'destroy'])
             ->middleware($adminEmployeeMutationMiddleware('employees.deactivate'))

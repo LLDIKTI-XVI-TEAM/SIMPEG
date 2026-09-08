@@ -90,6 +90,28 @@ class CutiRbacTest extends TestCase
         ]);
     }
 
+    public function test_reseed_tidak_menimpa_grant_dan_revoke_matrix_operator(): void
+    {
+        $permission = Permission::query()->where('name', 'employees.export')->firstOrFail();
+        $superAdmin = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $kepalaBagian = Role::query()->where('name', 'kepala_bagian')->firstOrFail();
+
+        // Operator mencabut default Super Admin lalu mendelegasikan capability ke Kabag.
+        $superAdmin->permissions()->detach($permission->id);
+        $kepalaBagian->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $this->seed(RbacSeeder::class);
+
+        $this->assertDatabaseMissing('role_permissions', [
+            'role_id' => $superAdmin->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertDatabaseHas('role_permissions', [
+            'role_id' => $kepalaBagian->id,
+            'permission_id' => $permission->id,
+        ]);
+    }
+
     public function test_super_admin_memiliki_semua_permission_cuti(): void
     {
         $user = User::factory()->superAdmin()->create();
