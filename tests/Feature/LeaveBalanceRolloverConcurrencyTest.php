@@ -17,7 +17,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\SimpegNotification;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
-use App\Services\Cuti\LeaveUsageReconciliationService;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -382,13 +382,11 @@ class LeaveBalanceRolloverConcurrencyTest extends TestCase
             ],
         ]);
         $admin = User::factory()->adminKepegawaian()->create();
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+        app(LeaveBalanceRecalculationService::class)->recalculate(
             $employee,
             2026,
-            [2024 => 0, 2025 => 0, 2026 => 0],
-            Carbon::parse('2026-08-18'),
-            'Rekonsiliasi fixture race rollover.',
             $admin,
+            'Membentuk projection fixture race rollover.',
         );
 
         return [
@@ -558,20 +556,13 @@ DROP TRIGGER IF EXISTS leave_balance_ledger_no_update_delete ON leave_balance_le
 DROP TRIGGER IF EXISTS leave_balance_ledger_no_truncate ON leave_balance_ledger;
 DROP TRIGGER IF EXISTS audit_logs_append_only ON audit_logs;
 DROP TRIGGER IF EXISTS audit_logs_append_only_truncate ON audit_logs;
-DROP TRIGGER IF EXISTS leave_usage_membership_validate ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_update_delete ON leave_usage_reconciliation_memberships;
-DROP TRIGGER IF EXISTS leave_usage_membership_no_truncate ON leave_usage_reconciliation_memberships;
 DROP TRIGGER IF EXISTS leave_usage_record_no_delete ON leave_usage_records;
 DROP TRIGGER IF EXISTS leave_usage_record_no_truncate ON leave_usage_records;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_delete ON leave_usage_reconciliation_sets;
-DROP TRIGGER IF EXISTS leave_usage_reconciliation_no_truncate ON leave_usage_reconciliation_sets;
 SQL);
 
         foreach ([
             'leave_usage_documents',
-            'leave_usage_reconciliation_memberships',
             'leave_usage_records',
-            'leave_usage_reconciliation_sets',
             'leave_balance_ledger',
             'leave_balance_reservation_events',
             'audit_logs',

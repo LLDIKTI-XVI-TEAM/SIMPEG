@@ -7,7 +7,6 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
@@ -77,7 +76,6 @@ class EmployeeAppointmentLeaveBalanceBoundedReplayTest extends TestCase
             ->orderBy('tahun')
             ->pluck('tahun')
             ->all());
-        $this->assertSame(0, LeaveUsageReconciliationSet::query()->whereBelongsTo($employee)->count());
 
         $response = $this->updateAppointment($employee, $actor, '2023-06-01');
         $response
@@ -96,6 +94,34 @@ class EmployeeAppointmentLeaveBalanceBoundedReplayTest extends TestCase
             ->where('auditable_type', 'LeaveBalance')
             ->whereIn('auditable_id', $balanceIds)
             ->count());
+    }
+
+    public function test_koreksi_tmt_dengan_eligibility_sama_mempertahankan_carry_tanpa_row_predecessor(): void
+    {
+        [$employee, $appointment, $actor] = $this->employeeWithAppointment('2020-01-01');
+        app(LeaveBalanceRecalculationService::class)->recalculate(
+            $employee,
+            2026,
+            $actor,
+            'Membentuk saldo awal tanpa fakta pemakaian.',
+        );
+        $balance = $employee->leaveBalances()->sole();
+        $before = $balance->getAttributes();
+        $beforeLedger = LeaveBalanceLedger::query()->where('employee_id', $employee->id)->count();
+        $beforeAudit = AuditLog::query()->where('auditable_id', $balance->id)->count();
+        $this->assertSame(24, $balance->sisa);
+
+        $this->updateAppointment($employee, $actor, '2020-06-01')
+            ->assertSessionHasNoErrors()
+            ->assertSessionMissing('error')
+            ->assertRedirect();
+
+        $this->assertSame('2020-06-01', $appointment->fresh()->tmt_pengangkatan?->toDateString());
+        $this->assertSame($before, $balance->fresh()->getAttributes());
+        $this->assertSame([2026], $employee->leaveBalances()->pluck('tahun')->all());
+        $this->assertSame(0, $employee->leaveUsageRecords()->count());
+        $this->assertSame($beforeLedger, LeaveBalanceLedger::query()->where('employee_id', $employee->id)->count());
+        $this->assertSame($beforeAudit, AuditLog::query()->where('auditable_id', $balance->id)->count());
     }
 
     public function test_koreksi_tmt_membangun_predecessor_virtual_tanpa_carry_sebelum_anniversary(): void
@@ -484,7 +510,7 @@ class EmployeeAppointmentLeaveBalanceBoundedReplayTest extends TestCase
             ->where('tahun', 2010)
             ->sole();
         $this->assertSame(1, $historical->terpakai);
-        $this->assertSame(11, $historical->sisa);
+        $this->assertSame(23, $historical->sisa);
         $this->assertDatabaseHas('leave_balance_ledger', [
             'employee_id' => $employee->id,
             'tahun' => 2010,

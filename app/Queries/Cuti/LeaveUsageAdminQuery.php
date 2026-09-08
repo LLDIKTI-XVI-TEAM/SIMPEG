@@ -58,7 +58,6 @@ class LeaveUsageAdminQuery
                 'employee_id',
                 'leave_type_id',
                 'source_type',
-                'reconciliation_set_id',
                 'leave_request_id',
                 'leave_request_case_id',
                 'usage_year',

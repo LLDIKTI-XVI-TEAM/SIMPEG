@@ -7,14 +7,12 @@ use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveRequest;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\Cuti\LeaveUsageRecordService;
 use App\Support\Cuti\CutiInstitution;
 use Carbon\CarbonImmutable;
@@ -47,18 +45,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private const BALANCE_YEAR = 2026;
 
-    private const RECONCILIATION_NOTE = '[QA Phase 7 Browser] Catatan pemakaian tahunan fixture.';
-
-    private const RECONCILIATION_CORRECTION_REASON = 'Selaraskan ulang fakta pemakaian fixture browser QA.';
-
     private const MANUAL_USAGE_NOTE = '[QA Phase 7 Browser] Cuti manual dengan snapshot persetujuan.';
-
-    /** @var array<int, int> */
-    private const RECONCILIATION_USAGE = [
-        2024 => 12,
-        2025 => 12,
-        2026 => 2,
-    ];
 
     /** @var array<string, string> */
     private const REQUEST_IDS = [
@@ -408,10 +395,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             $approver,
             $kepalaLembaga,
         );
-        $approvedFact = app(LeaveUsageRecordService::class)->recordApprovedRequest($approvedRequest, $admin);
-
-        // Fakta pengajuan harus ada lebih dulu agar snapshot rekonsiliasi membekukan pemakaian yang telah dihitung.
-        $this->ensureAnnualReconciliation($normalEmployee, $approvedFact, $admin);
+        app(LeaveUsageRecordService::class)->recordApprovedRequest($approvedRequest, $admin);
 
         // Status non-final dibuat langsung karena hanya menjadi variasi tampilan browser QA.
         $pendingRequest = $this->createRequest(
@@ -642,107 +626,6 @@ class PhaseSevenBrowserQaSeeder extends Seeder
                 [2, 'kepala_bagian', 'simpeg_employee', $inactiveApprover->id, $inactiveApprover->nama_lengkap, 'approved'],
                 [3, 'pybmc', 'external_official', null, 'Kepala Lembaga Arsip QA', 'final_approved'],
             ];
-    }
-
-    /**
-     * Membentuk projection QA dari satu snapshot fakta tiga tahun dengan aktor manusia eksplisit.
-     * Snapshot identik tidak diganti agar rerun tidak menambah fact, ledger, atau audit duplikat.
-     */
-    private function ensureAnnualReconciliation(
-        Employee $employee,
-        LeaveUsageRecord $approvedFact,
-        User $admin,
-    ): void {
-        $active = LeaveUsageReconciliationSet::query()
-            ->with(['records' => fn ($query) => $query->orderBy('usage_year')])
-            ->where('employee_id', $employee->id)
-            ->where('status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->first();
-
-        if ($active !== null && $this->matchesQaReconciliation($active, $approvedFact)) {
-            return;
-        }
-
-        $reconciledAt = CarbonImmutable::create(
-            self::BALANCE_YEAR,
-            12,
-            31,
-            12,
-            0,
-            0,
-            config('app.timezone'),
-        );
-        $service = app(LeaveUsageReconciliationService::class);
-
-        if ($active === null) {
-            $service->createAnnualReconciliationSet(
-                $employee,
-                self::BALANCE_YEAR,
-                self::RECONCILIATION_USAGE,
-                $reconciledAt,
-                self::RECONCILIATION_NOTE,
-                $admin,
-            );
-
-            return;
-        }
-
-        if ($active->balance_year !== self::BALANCE_YEAR) {
-            throw new \RuntimeException('Catatan pemakaian aktif fixture QA memakai tahun saldo yang tidak didukung.');
-        }
-
-        $service->replaceAnnualReconciliationSet(
-            $active,
-            self::RECONCILIATION_USAGE,
-            $reconciledAt,
-            self::RECONCILIATION_NOTE,
-            self::RECONCILIATION_CORRECTION_REASON,
-            $admin,
-        );
-    }
-
-    /**
-     * No-op hanya aman bila snapshot tiga tahun juga membekukan tepat satu fakta pengajuan QA.
-     * Membership yang hilang harus memicu replacement agar projection tidak menghitung dua kali.
-     */
-    private function matchesQaReconciliation(
-        LeaveUsageReconciliationSet $set,
-        LeaveUsageRecord $approvedFact,
-    ): bool {
-        if ($set->balance_year !== self::BALANCE_YEAR || $set->records->count() !== 3) {
-            return false;
-        }
-
-        $usage = $set->records
-            ->filter(fn (LeaveUsageRecord $record): bool => $record->source_type === LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION
-                && $record->record_status === LeaveUsageRecord::STATUS_ACTIVE)
-            ->mapWithKeys(fn (LeaveUsageRecord $record): array => [
-                $record->usage_year => $record->workdays,
-            ])
-            ->all();
-
-        if ($usage !== self::RECONCILIATION_USAGE
-            || $approvedFact->employee_id !== $set->employee_id
-            || $approvedFact->source_type !== LeaveUsageRecord::SOURCE_APPROVED_REQUEST
-            || $approvedFact->record_status !== LeaveUsageRecord::STATUS_ACTIVE
-            || $approvedFact->usage_year !== self::BALANCE_YEAR
-            || $approvedFact->workdays !== self::RECONCILIATION_USAGE[self::BALANCE_YEAR]
-        ) {
-            return false;
-        }
-
-        $annualFact = $set->records->first(
-            fn (LeaveUsageRecord $record): bool => $record->usage_year === self::BALANCE_YEAR
-                && $record->source_type === LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION
-                && $record->record_status === LeaveUsageRecord::STATUS_ACTIVE,
-        );
-        $membership = $set->memberships()->get();
-
-        return $annualFact instanceof LeaveUsageRecord
-            && $membership->count() === 1
-            && $membership->sole()->annual_reconciliation_record_id === $annualFact->id
-            && $membership->sole()->itemized_usage_record_id === $approvedFact->id
-            && $membership->sole()->included_workdays === $approvedFact->workdays;
     }
 
     private function createRequest(

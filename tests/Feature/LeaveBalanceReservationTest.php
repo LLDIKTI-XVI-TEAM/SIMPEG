@@ -440,7 +440,7 @@ class LeaveBalanceReservationTest extends TestCase
         $this->assertSame(9, $preview['saldo_dapat_diajukan']);
 
         $workspace = app(LeaveBalanceAdminEmployeeQuery::class)
-            ->selectedWorkspace($aktor['employee']->id, 2026);
+            ->selectedWorkspace($aktor['employee']->id, 2026, $aktor['user']);
         $this->assertSame(3, $workspace['activeReserved']);
 
         app(LeaveBalanceRecalculationService::class)->recalculateForDatabaseUpgrade(
@@ -584,8 +584,10 @@ class LeaveBalanceReservationTest extends TestCase
         ]);
 
         $balance = LeaveBalance::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
-        $this->assertSame(7, $balance->sisa);
+        $this->assertSame(13, $balance->sisa);
         $this->assertSame(5, $balance->terpakai);
+        $this->assertSame(1, $balance->sisa_n1);
+        $this->assertSame(12, $balance->sisa_tahun_berjalan);
         $fact = LeaveUsageRecord::query()
             ->where('leave_request_id', $leaveRequest->id)
             ->sole();
@@ -654,7 +656,7 @@ class LeaveBalanceReservationTest extends TestCase
             ->where('leave_request_id', $annual->id)
             ->sum('amount'));
         $balance = LeaveBalance::query()->where('employee_id', $aktor['employee']->id)->firstOrFail();
-        $this->assertSame(12, $balance->sisa);
+        $this->assertSame(18, $balance->sisa);
         $this->assertSame(0, $balance->terpakai);
         $this->assertDatabaseMissing('leave_usage_records', [
             'leave_request_id' => $annual->id,
@@ -685,7 +687,7 @@ class LeaveBalanceReservationTest extends TestCase
 
         $this->assertDatabaseCount('leave_requests', 1);
         $this->assertDatabaseCount('leave_balance_reservation_events', 0);
-        $this->assertSame(12, LeaveBalance::query()
+        $this->assertSame(18, LeaveBalance::query()
             ->where('employee_id', $aktor['employee']->id)
             ->where('tahun', 2026)
             ->value('sisa'));

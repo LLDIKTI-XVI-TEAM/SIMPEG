@@ -33,7 +33,6 @@ use App\Http\Controllers\Admin\KepalaLembagaSupportingDocumentController;
 use App\Http\Controllers\Admin\LaporanController;
 use App\Http\Controllers\Admin\LeaveBalanceController;
 use App\Http\Controllers\Admin\LeaveCancellationController;
-use App\Http\Controllers\Admin\LeaveUsageController;
 use App\Http\Controllers\Admin\ManualLeaveUsageController;
 use App\Http\Controllers\Admin\NotificationChannelController;
 use App\Http\Controllers\Admin\NotificationController;
@@ -306,7 +305,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
-        ->middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile,cuti.manual.manage'])
+        ->middleware(['permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
     Route::middleware(['role:admin_kepegawaian', 'permission:cuti.cancellation.manage'])
         ->prefix('cuti/pembatalan')
@@ -317,22 +316,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('cancellation')
                 ->name('decide');
         });
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.balance.reconcile'])
-        ->prefix('cuti/rekonsiliasi-tahunan')
-        ->name('cuti.reconciliation.')
-        ->group(function (): void {
-            Route::post('/{employee}', [LeaveUsageController::class, 'reconcile'])
-                ->whereUuid('employee')
-                ->name('store');
-            Route::post('/{reconciliation}/koreksi', [LeaveUsageController::class, 'correct'])
-                ->whereUuid('reconciliation')
-                ->name('correct');
-            Route::get('/{reconciliation}/dokumen/{document}/unduh', [LeaveUsageController::class, 'downloadDocument'])
-                ->whereUuid('reconciliation')
-                ->whereUuid('document')
-                ->name('document.download');
-        });
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.manual.manage'])
+    Route::middleware(['permission:cuti.manual.manage'])
         ->prefix('cuti/pemakaian-manual')
         ->name('cuti.manual.')
         ->group(function (): void {

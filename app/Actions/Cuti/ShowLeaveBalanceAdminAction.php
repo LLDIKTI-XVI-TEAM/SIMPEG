@@ -2,11 +2,12 @@
 
 namespace App\Actions\Cuti;
 
+use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveUsageExternalApprovalStep;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
+use App\Models\RefJenisCuti;
 use App\Models\User;
 use App\Queries\Cuti\CurrentApprovalChainPreviewQuery;
 use App\Queries\Cuti\LeaveBalanceAdminEmployeeQuery;
@@ -14,9 +15,8 @@ use App\Queries\Cuti\LeaveUsageAdminQuery;
 use App\Queries\Cuti\ManualLeaveCaseOptionQuery;
 use App\Services\Cuti\AnnualLeaveBusinessClock;
 use App\Services\Cuti\LeaveBalanceService;
-use Illuminate\Database\Query\JoinClause;
-use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Str;
 
 class ShowLeaveBalanceAdminAction
 {
@@ -35,8 +35,15 @@ class ShowLeaveBalanceAdminAction
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function execute(array $filters): array
+    public function execute(array $filters, User $actor): array
     {
+        // Guard membaca matrix terbaru; cache capability UI tidak boleh meloloskan revoke dalam request yang sama.
+        // Permission rekonsiliasi existing hanya membuka read model; mutasi manual memerlukan grant tersendiri.
+        $canManageManual = $actor->hasPermission('cuti.manual.manage');
+        if (! $canManageManual && ! $actor->hasPermission('cuti.balance.reconcile')) {
+            throw new AuthorizationException('Anda tidak memiliki izin membaca administrasi pemakaian cuti.');
+        }
+
         // Tahun administrasi mengikuti kalender bisnis WITA, bukan timezone proses atau parameter klien.
         $periode = (string) $this->businessClock->currentYear();
         $filters['periode'] = $periode;
@@ -45,8 +52,8 @@ class ShowLeaveBalanceAdminAction
         $search = trim($this->stringFilter($filters, 'search') ?? '');
         $tab = $this->stringFilter($filters, 'tab') ?? 'pendaftaran';
         $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 10;
-        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search, $perPage);
-        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search);
+        $employeeRows = $this->employeeQuery->employeeRows((int) $periode, $status, $search, $actor, $perPage);
+        $statusCounts = $this->employeeQuery->statusCounts((int) $periode, $search, $actor);
 
         $workspace = $pegawaiId === null
             ? [
@@ -56,7 +63,7 @@ class ShowLeaveBalanceAdminAction
                 'activeReserved' => 0,
                 'dutyProtected' => 0,
             ]
-            : $this->employeeQuery->selectedWorkspace($pegawaiId, (int) $periode);
+            : $this->employeeQuery->selectedWorkspace($pegawaiId, (int) $periode, $actor);
         $selectedEmployee = $workspace['employee'];
         $selectedBalance = $workspace['balance'];
         $rule5Active = $workspace['rule5Active'];
@@ -66,14 +73,22 @@ class ShowLeaveBalanceAdminAction
             $workspace['activeReserved'],
             $workspace['dutyProtected'],
         );
-        $balanceReconciliation = $this->balanceReconciliation(
+        $usageSummary = $this->usageSummary(
             $selectedEmployee?->id,
             (int) $periode,
-            $tab === 'riwayat',
         );
         $usageFilters = $this->usageFilters($filters);
         $leaveTypeOptions = $this->usageQuery->leaveTypeOptions($this->stringFilter($filters, 'leave_type'));
         $editUsageId = $this->stringFilter($filters, 'edit_usage');
+        if ($editUsageId !== null) {
+            // Kepemilikan diperiksa terpisah dari status/filter histori agar redirect koreksi atau pembatalan tetap dapat dibaca.
+            abort_if($selectedEmployee === null || ! Str::isUuid($editUsageId), 404);
+            abort_unless(LeaveUsageRecord::query()
+                ->whereKey($editUsageId)
+                ->where('employee_id', $selectedEmployee->id)
+                ->where('source_type', LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL)
+                ->exists(), 404);
+        }
         $usageRowsUseScalarType = $tab === 'manual' && $editUsageId === null;
         // Form catat manual tetap merender jenis dan dokumen histori, tetapi tidak membaca relasi pegawai/request yang tidak dipakai.
         $usageRows = $this->usageQuery->paginate(
@@ -115,15 +130,14 @@ class ShowLeaveBalanceAdminAction
                 ])
                 ->values()
                 ->all();
-        // Error validasi selalu menang; koreksi mengambil snapshot persisted, sedangkan create sengaja mulai kosong.
-        $initialApprovalSteps = session()->hasOldInput('approval_steps')
-            ? old('approval_steps')
-            : ($editableApprovalSteps ?? []);
-        [$canReconcile, $canManageManual] = $this->uiCapabilities();
         // Preview dan opsi hanya diperlukan saat panel manual dibuka agar tab administrasi lain tidak memuat query tambahan.
         $manualWorkspaceActive = $canManageManual
             && $selectedEmployee !== null
             && ($tab === 'manual' || $editableUsage !== null);
+        // Error validasi selalu menang; koreksi mengambil snapshot persisted, sedangkan create sengaja mulai kosong.
+        $initialApprovalSteps = $manualWorkspaceActive && session()->hasOldInput('approval_steps')
+            ? $this->restoreApprovalLabels(old('approval_steps'), $editableApprovalSteps ?? [])
+            : ($editableApprovalSteps ?? []);
         // Koreksi memakai snapshot historis pada cutover berikutnya, bukan current chain; jangan memuat preview konfigurasi saat editor aktif.
         $currentApprovalChainPreview = $manualWorkspaceActive && $editableUsage === null
             ? $this->approvalChainPreviewQuery->forEmployee($selectedEmployee?->id)
@@ -168,7 +182,7 @@ class ShowLeaveBalanceAdminAction
             'selectedBalance',
             'rule5Active',
             'balanceSummary',
-            'balanceReconciliation',
+            'usageSummary',
             'usageFilters',
             'leaveTypeOptions',
             'usageRows',
@@ -178,7 +192,6 @@ class ShowLeaveBalanceAdminAction
             'manualAction',
             'editableApprovalSteps',
             'initialApprovalSteps',
-            'canReconcile',
             'canManageManual',
             'manualWorkspaceActive',
             'currentApprovalChainPreview',
@@ -186,6 +199,38 @@ class ShowLeaveBalanceAdminAction
             'ledgerRows',
             'rolloverRows',
         );
+    }
+
+    /**
+     * Form lama hanya membawa UUID, bukan label. Pulihkan identitas minimum secara bounded;
+     * label kiriman klien tidak dipercaya dan nama snapshot koreksi tidak diganti profil terbaru.
+     *
+     * @param  list<array<string, mixed>>  $persistedSteps
+     * @return list<array<string, mixed>>
+     */
+    private function restoreApprovalLabels(mixed $oldSteps, array $persistedSteps): array
+    {
+        $steps = collect(is_array($oldSteps) ? $oldSteps : [])->take(10)
+            ->filter(fn (mixed $step): bool => is_array($step))->values();
+        $ids = $steps->where('approver_source', 'simpeg_employee')->pluck('approver_employee_id')
+            ->filter(fn (mixed $id): bool => is_string($id) && Str::isUuid($id))->unique()->values()->all();
+        $labels = $ids === [] ? collect() : Employee::query()->whereIn('id', $ids)
+            ->get(['id', 'nama_lengkap', 'nip'])
+            ->mapWithKeys(fn (Employee $employee): array => [$employee->id => "{$employee->nama_lengkap} - NIP {$employee->nip}"]);
+        $snapshots = collect($persistedSteps)->where('approver_source', 'simpeg_employee');
+
+        return $steps->map(function (array $step) use ($labels, $snapshots): array {
+            $step['approver_label'] = '';
+            $id = $step['approver_employee_id'] ?? null;
+            if (($step['approver_source'] ?? null) === 'simpeg_employee' && is_string($id)) {
+                // Ikuti writer: satu snapshot dikonsumsi per UUID, bukan berdasarkan peran atau indeks tahap.
+                $key = $snapshots->search(fn (array $snapshot): bool => $snapshot['approver_employee_id'] === $id);
+                $snapshot = $key === false ? null : $snapshots->pull($key);
+                $step['approver_label'] = $snapshot['approver_label'] ?? $labels->get($id, '');
+            }
+
+            return $step;
+        })->all();
     }
 
     /**
@@ -239,136 +284,38 @@ class ShowLeaveBalanceAdminAction
     }
 
     /**
-     * UI memakai satu pembacaan permission; route, FormRequest, dan Action mutation tetap gate otoritatif.
+     * Ringkasan ini bersifat read-only dan hanya menjumlahkan fakta aktif yang telah tercatat.
+     * Tidak ada snapshot agregat maupun fallback angka nol yang dipersistensikan.
      *
-     * @return array{bool,bool}
+     * @return array{n2:int,n1:int,current:int}
      */
-    private function uiCapabilities(): array
+    private function usageSummary(?string $employeeId, int $periode): array
     {
-        $actor = auth()->user();
-        $effectiveRole = $actor instanceof User ? $actor->getEffectiveRole() : null;
-
-        if (! $actor instanceof User || $effectiveRole !== 'admin_kepegawaian') {
-            return [false, false];
-        }
-
-        $permissions = DB::table('roles')
-            ->join('role_permissions', 'role_permissions.role_id', '=', 'roles.id')
-            ->join('permissions', 'permissions.id', '=', 'role_permissions.permission_id')
-            ->where('roles.name', $effectiveRole)
-            ->whereIn('permissions.name', ['cuti.balance.reconcile', 'cuti.manual.manage'])
-            ->pluck('permissions.name');
-
-        return [
-            $permissions->contains('cuti.balance.reconcile'),
-            $permissions->contains('cuti.manual.manage'),
-        ];
-    }
-
-    /**
-     * Menyajikan set aktif dan tiga fakta pemakaian exact-year tanpa fallback ke projection atau ledger legacy.
-     *
-     * @return array{reconciled:bool, current_year_reconciled:bool, balance_year:?int, set_id:?string, usage:?array{n2:int,n1:int,current:int}, actor_id:?string, reconciled_at:mixed, note:?string, history:list<array<string,mixed>>|Paginator}
-     */
-    private function balanceReconciliation(?string $employeeId, int $periode, bool $includeHistory): array
-    {
-        $empty = [
-            'reconciled' => false,
-            'current_year_reconciled' => false,
-            'balance_year' => null,
-            'set_id' => null,
-            'usage' => null,
-            'actor_id' => null,
-            'reconciled_at' => null,
-            'note' => null,
-            'history' => [],
-        ];
+        $summary = ['n2' => 0, 'n1' => 0, 'current' => 0];
 
         if ($employeeId === null) {
-            return $empty;
+            return $summary;
         }
 
-        // Tiga inner join exact-year membuat snapshot tidak lengkap gagal tertutup dalam satu query.
-        $set = LeaveUsageReconciliationSet::query()
-            ->from('leave_usage_reconciliation_sets as reconciliation_sets')
-            ->join('leave_usage_records as usage_n2', function (JoinClause $join): void {
-                $this->joinActiveAnnualUsage($join, 'usage_n2', 'reconciliation_sets.balance_year - 2');
-            })
-            ->join('leave_usage_records as usage_n1', function (JoinClause $join): void {
-                $this->joinActiveAnnualUsage($join, 'usage_n1', 'reconciliation_sets.balance_year - 1');
-            })
-            ->join('leave_usage_records as usage_current', function (JoinClause $join): void {
-                $this->joinActiveAnnualUsage($join, 'usage_current', 'reconciliation_sets.balance_year');
-            })
-            ->select([
-                'reconciliation_sets.id',
-                'reconciliation_sets.balance_year',
-                'reconciliation_sets.recorded_by',
-                'reconciliation_sets.reconciled_at',
-                'reconciliation_sets.administrative_note',
-                'usage_n2.workdays as usage_n2',
-                'usage_n1.workdays as usage_n1',
-                'usage_current.workdays as usage_current',
-            ])
-            ->where('reconciliation_sets.employee_id', $employeeId)
-            ->where('reconciliation_sets.status', LeaveUsageReconciliationSet::STATUS_ACTIVE)
-            ->first();
-
-        if (! $set instanceof LeaveUsageReconciliationSet) {
-            return $empty;
+        $annualTypeId = RefJenisCuti::query()->where('code', 'tahunan')->value('id');
+        if ($annualTypeId === null) {
+            return $summary;
         }
 
-        $history = [];
-        if ($includeHistory) {
-            // Riwayat lintas tahun tetap bounded dan dapat dinavigasi. Hanya metadata
-            // aman yang diteruskan; path, disk, dan nama internal file tidak dibawa ke view.
-            $history = LeaveUsageReconciliationSet::query()
-                ->select(['id', 'balance_year', 'status', 'reconciled_at'])
-                ->with(['documents:id,leave_usage_reconciliation_set_id,original_name,mime_type,size_bytes,created_at'])
-                ->where('employee_id', $employeeId)
-                ->whereIn('status', [LeaveUsageReconciliationSet::STATUS_ACTIVE, LeaveUsageReconciliationSet::STATUS_SUPERSEDED])
-                ->orderByDesc('reconciled_at')
-                ->orderByDesc('id')
-                ->simplePaginate(20, ['*'], 'page_reconciliation_history')
-                ->withQueryString();
-            $history->setCollection($history->getCollection()->map(fn (LeaveUsageReconciliationSet $item): array => [
-                'id' => $item->id,
-                'balance_year' => (int) $item->balance_year,
-                'status' => $item->status,
-                'reconciled_at' => $item->reconciled_at,
-                'documents' => $item->documents->map(fn ($document): array => [
-                    'id' => $document->id,
-                    'original_name' => $document->original_name,
-                    'mime_type' => $document->mime_type,
-                    'size_bytes' => $document->size_bytes,
-                ])->all(),
-            ]));
-        }
+        $totals = LeaveUsageRecord::query()
+            ->selectRaw('usage_year, SUM(workdays) as total_workdays')
+            ->where('employee_id', $employeeId)
+            ->where('leave_type_id', $annualTypeId)
+            ->where('record_status', LeaveUsageRecord::STATUS_ACTIVE)
+            ->whereBetween('usage_year', [$periode - 2, $periode])
+            ->groupBy('usage_year')
+            ->pluck('total_workdays', 'usage_year');
 
         return [
-            'reconciled' => true,
-            'current_year_reconciled' => (int) $set->balance_year === $periode,
-            'balance_year' => (int) $set->balance_year,
-            'set_id' => $set->id,
-            'usage' => [
-                'n2' => (int) $set->getAttribute('usage_n2'),
-                'n1' => (int) $set->getAttribute('usage_n1'),
-                'current' => (int) $set->getAttribute('usage_current'),
-            ],
-            'actor_id' => $set->recorded_by,
-            'reconciled_at' => $set->reconciled_at,
-            'note' => $set->administrative_note,
-            'history' => $history,
+            'n2' => (int) ($totals[$periode - 2] ?? 0),
+            'n1' => (int) ($totals[$periode - 1] ?? 0),
+            'current' => (int) ($totals[$periode] ?? 0),
         ];
-    }
-
-    /** Mengikat satu fakta rekonsiliasi aktif ke set dan tahun yang tepat. */
-    private function joinActiveAnnualUsage(JoinClause $join, string $alias, string $yearExpression): void
-    {
-        $join->on("{$alias}.reconciliation_set_id", '=', 'reconciliation_sets.id')
-            ->where("{$alias}.source_type", LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION)
-            ->where("{$alias}.record_status", LeaveUsageRecord::STATUS_ACTIVE)
-            ->whereColumn("{$alias}.usage_year", DB::raw($yearExpression));
     }
 
     /** @param array<string, mixed> $filters */

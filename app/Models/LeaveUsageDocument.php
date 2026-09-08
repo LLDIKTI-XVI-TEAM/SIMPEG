@@ -17,7 +17,6 @@ class LeaveUsageDocument extends Model
 
     protected $fillable = [
         'leave_usage_record_id',
-        'leave_usage_reconciliation_set_id',
         'original_name',
         'stored_name',
         'path',
@@ -48,12 +47,6 @@ class LeaveUsageDocument extends Model
     public function usageRecord(): BelongsTo
     {
         return $this->belongsTo(LeaveUsageRecord::class, 'leave_usage_record_id');
-    }
-
-    /** @return BelongsTo<LeaveUsageReconciliationSet, $this> */
-    public function reconciliationSet(): BelongsTo
-    {
-        return $this->belongsTo(LeaveUsageReconciliationSet::class, 'leave_usage_reconciliation_set_id');
     }
 
     /** @return BelongsTo<User, $this> */

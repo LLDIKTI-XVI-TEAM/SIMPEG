@@ -6,6 +6,7 @@ use App\Actions\Cuti\ShowLeaveBalanceAdminAction;
 use App\Actions\Cuti\ShowMyLeaveBalanceAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\LeaveBalanceAdminPageRequest;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class LeaveBalanceController extends Controller
@@ -13,7 +14,10 @@ class LeaveBalanceController extends Controller
     /** Menampilkan administrasi saldo dengan data yang disusun Action agar controller tetap tipis. */
     public function administrasi(LeaveBalanceAdminPageRequest $request, ShowLeaveBalanceAdminAction $action)
     {
-        return view('admin.cuti.administrasi-saldo', $action->execute($request->validated()));
+        /** @var User $actor */
+        $actor = $request->user();
+
+        return view('admin.cuti.administrasi-saldo', $action->execute($request->validated(), $actor));
     }
 
     /**

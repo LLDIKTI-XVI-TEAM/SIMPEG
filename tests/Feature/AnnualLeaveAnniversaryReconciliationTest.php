@@ -82,6 +82,33 @@ class AnnualLeaveAnniversaryReconciliationTest extends TestCase
             ->value('jatah_awal'));
     }
 
+    public function test_recovery_anniversary_terlewat_membentuk_carry_saat_tahun_sudah_berganti(): void
+    {
+        $employee = $this->employeeWithAppointment('2025-12-31');
+        Carbon::setTestNow('2026-12-30 10:00:00');
+        app(LeaveBalanceRecalculationService::class)->recalculateForSystem(
+            $employee,
+            2026,
+            'Baseline sebelum anniversary.',
+            'SIMPEG Scheduler',
+        );
+        $this->assertSame(0, $employee->leaveBalances()->where('tahun', 2026)->sole()->jatah_awal);
+        Carbon::setTestNow('2027-01-01 00:20:00');
+
+        $this->runReconciler();
+
+        $this->assertDatabaseHas('leave_balances', [
+            'employee_id' => $employee->id,
+            'tahun' => 2027,
+            'jatah_awal' => 12,
+            'sisa_n2' => 0,
+            'sisa_n1' => 6,
+            'sisa_tahun_berjalan' => 12,
+            'sisa' => 18,
+        ]);
+        $this->assertSame(0, $employee->leaveUsageRecords()->count());
+    }
+
     public function test_reconciler_membuat_projection_pegawai_eligible_tanpa_baseline_tahun_berjalan(): void
     {
         Carbon::setTestNow('2026-08-25 00:20:00');
@@ -94,9 +121,11 @@ class AnnualLeaveAnniversaryReconciliationTest extends TestCase
             'tahun' => 2026,
             'jatah_awal' => 12,
             'sisa_tahun_berjalan' => 12,
-            'sisa' => 12,
+            'sisa_n2' => 6,
+            'sisa_n1' => 6,
+            'sisa' => 24,
         ]);
-        $this->assertSame(12, app(LeaveBalanceService::class)->availableFor($employee, 2026));
+        $this->assertSame(24, app(LeaveBalanceService::class)->availableFor($employee, 2026));
     }
 
     /**
@@ -121,7 +150,7 @@ class AnnualLeaveAnniversaryReconciliationTest extends TestCase
                 'tahun' => 2026,
                 'jatah_awal' => 12,
                 'sisa_tahun_berjalan' => 12,
-                'sisa' => 12,
+                'sisa' => 24,
             ]);
         } finally {
             date_default_timezone_set($originalPhpTimezone);
@@ -404,7 +433,7 @@ SQL);
                 'tahun' => 2026,
                 'jatah_awal' => 12,
                 'sisa_tahun_berjalan' => 12,
-                'sisa' => 12,
+                'sisa' => 24,
             ]);
         } finally {
             date_default_timezone_set($originalPhpTimezone);

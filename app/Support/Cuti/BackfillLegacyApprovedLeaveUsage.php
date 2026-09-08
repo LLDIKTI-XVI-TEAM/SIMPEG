@@ -437,7 +437,6 @@ SQL, self::REPLAY_TABLE, self::REPLAY_TABLE), [$employeeId, $year]);
             'employee_id' => $candidate->employee_id,
             'leave_type_id' => $candidate->leave_type_id,
             'source_type' => LeaveUsageRecord::SOURCE_APPROVED_REQUEST,
-            'reconciliation_set_id' => null,
             'leave_request_id' => $candidate->request_id,
             'leave_request_case_id' => $candidate->leave_request_case_id,
             'usage_year' => (int) substr((string) $candidate->start_date, 0, 4),

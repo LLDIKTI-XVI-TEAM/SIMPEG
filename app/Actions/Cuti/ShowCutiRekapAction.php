@@ -46,9 +46,8 @@ class ShowCutiRekapAction
             : Employee::query()->select(['id', 'nama_lengkap', 'nip'])->find($pegawaiId);
         $unitOptions = $this->rekapQuery->unitOptions($unit);
         $jenisOptions = $this->rekapQuery->leaveTypeOptions($jenisId);
-        $canAdministerBalance = $actor?->getEffectiveRole() === 'admin_kepegawaian'
-            && ($this->capabilities->allows($actor, 'cuti.balance.reconcile')
-                || $this->capabilities->allows($actor, 'cuti.manual.manage'));
+        $canAdministerBalance = $this->capabilities->allows($actor, 'cuti.balance.reconcile')
+            || $this->capabilities->allows($actor, 'cuti.manual.manage');
 
         return compact(
             'summary', 'leaveBalances', 'usageRows',

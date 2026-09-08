@@ -14,8 +14,6 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
-use App\Models\LeaveUsageReconciliationMembership;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
@@ -23,7 +21,6 @@ use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\Cuti\LeaveBalanceService;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\Cuti\LeaveUsageRecordService;
 use Database\Seeders\ReferenceSeeder;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -69,7 +66,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
         User::factory()->create(['role' => 'super_admin']);
         User::factory()->create(['role' => 'admin_kepegawaian']);
         $legacyBefore = $this->legacyEventCount($fixture['employee']);
-        $sourceFacts = $this->factAndSetSnapshot($fixture['employee']);
+        $sourceFacts = $this->usageFactSnapshot($fixture['employee']);
 
         app(RolloverLeaveBalanceAction::class)->execute(2026);
 
@@ -138,7 +135,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             ->sole();
         $this->assertSystemAudit($replayAudit);
         $this->assertSame(18, $replayAudit->new_values['after']['sisa'] ?? null);
-        $this->assertSame($sourceFacts, $this->factAndSetSnapshot($fixture['employee']));
+        $this->assertSame($sourceFacts, $this->usageFactSnapshot($fixture['employee']));
         $this->assertSame($legacyBefore, $this->legacyEventCount($fixture['employee']));
     }
 
@@ -190,7 +187,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
         $source = $this->balance($fixture['employee'], 2026);
         $this->reserve($request, $source, $fixture['actor'], 3);
         $before = $this->effectSnapshot($fixture['employee'], $request);
-        $sentinelFacts = $this->factAndSetSnapshot($fixture['employee']);
+        $sentinelFacts = $this->usageFactSnapshot($fixture['employee']);
         $dispatcher = clone AuditLog::getEventDispatcher();
         $queueFake = Queue::getFacadeRoot();
         config([
@@ -224,7 +221,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
                 'marker_audit' => AuditLog::query()->where('auditable_id', $target->id)->where('event', 'LEAVE_ROLLOVER_APPLIED')->count(),
                 'notification' => SimpegNotification::query()->where('user_id', $fixture['employee']->id)->where('type', 'cuti.dikembalikan_karena_rollover')->count(),
                 'queued_email' => DB::table('jobs')->count(),
-                'facts_unchanged' => $sentinelFacts === $this->factAndSetSnapshot($fixture['employee']),
+                'facts_unchanged' => $sentinelFacts === $this->usageFactSnapshot($fixture['employee']),
             ];
 
             throw new RuntimeException('Simulasi audit marker rollover gagal.');
@@ -272,7 +269,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             'facts_unchanged' => true,
         ], $observed);
         $this->assertSame($before, $this->effectSnapshot($fixture['employee'], $request));
-        $this->assertSame($sentinelFacts, $this->factAndSetSnapshot($fixture['employee']));
+        $this->assertSame($sentinelFacts, $this->usageFactSnapshot($fixture['employee']));
         $this->assertDatabaseCount('jobs', 0);
         Queue::assertNothingPushed();
     }
@@ -618,13 +615,32 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
         Carbon::setTestNow('2026-12-31 10:00:00');
 
         try {
-            app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+            $annual = RefJenisCuti::query()->where('code', 'tahunan')->firstOrFail();
+            foreach ($usage as $year => $workdays) {
+                if ($workdays <= 0) {
+                    continue;
+                }
+
+                $date = sprintf('%d-06-01', $year);
+                LeaveUsageRecord::query()->create([
+                    'employee_id' => $employee->id,
+                    'leave_type_id' => $annual->id,
+                    'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
+                    'usage_year' => $year,
+                    'effective_date' => $date,
+                    'start_date' => $date,
+                    'end_date' => $date,
+                    'workdays' => $workdays,
+                    'administrative_note' => 'Fixture fakta manual rollover.',
+                    'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
+                    'recorded_by' => $actor->id,
+                ]);
+            }
+            app(LeaveBalanceRecalculationService::class)->recalculate(
                 $employee,
                 2026,
-                $usage,
-                Carbon::parse('2026-12-31 10:00:00'),
-                'Rekonsiliasi fixture rollover berbasis fakta.',
                 $actor,
+                'Membentuk projection fixture rollover dari fakta tunggal.',
             );
             $this->assertDatabaseMissing('leave_balances', ['employee_id' => $employee->id, 'tahun' => 2027]);
         } finally {
@@ -806,12 +822,11 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             ->where('auditable_id', $target->id)
             ->sole();
         $this->assertSystemAudit($markerAudit);
-        $this->assertSame(6, LeaveBalanceLedger::query()
+        $this->assertSame(1, LeaveBalanceLedger::query()
             ->where('employee_id', $employee->id)
             ->where('tahun', 2027)
             ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED)
-            ->sole()
-            ->amount);
+            ->count());
     }
 
     private function balance(Employee $employee, int $year): LeaveBalance
@@ -859,15 +874,9 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function factAndSetSnapshot(Employee $employee): array
+    private function usageFactSnapshot(Employee $employee): array
     {
-        $setIds = LeaveUsageReconciliationSet::query()->where('employee_id', $employee->id)->orderBy('id')->pluck('id');
-
-        return [
-            'sets' => LeaveUsageReconciliationSet::query()->whereIn('id', $setIds)->orderBy('id')->get()->toArray(),
-            'facts' => LeaveUsageRecord::query()->where('employee_id', $employee->id)->orderBy('id')->get()->toArray(),
-            'memberships' => LeaveUsageReconciliationMembership::query()->whereIn('reconciliation_set_id', $setIds)->orderBy('id')->get()->toArray(),
-        ];
+        return LeaveUsageRecord::query()->where('employee_id', $employee->id)->orderBy('id')->get()->toArray();
     }
 
     /** @return array<string, mixed> */
@@ -879,7 +888,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             'reservations' => LeaveBalanceReservationEvent::query()->where('employee_id', $employee->id)->orderBy('id')->get()->toArray(),
             'balances' => LeaveBalance::query()->where('employee_id', $employee->id)->orderBy('tahun')->get()->toArray(),
             'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->id)->orderBy('id')->get()->toArray(),
-            'facts_and_set' => $this->factAndSetSnapshot($employee),
+            'usage_facts' => $this->usageFactSnapshot($employee),
             'audits' => AuditLog::query()->orderBy('id')->get()->toArray(),
             'notifications' => SimpegNotification::query()->where('user_id', $employee->id)->orderBy('id')->get()->toArray(),
             'queued_rollover_emails' => $this->queuedRolloverEmails(),
@@ -899,7 +908,7 @@ class LeaveBalanceRolloverCutoverTest extends TestCase
             'reservations' => LeaveBalanceReservationEvent::query()->where('employee_id', $employee->id)->orderBy('id')->get()->toArray(),
             'balances' => LeaveBalance::query()->where('employee_id', $employee->id)->orderBy('tahun')->get()->toArray(),
             'ledger' => LeaveBalanceLedger::query()->where('employee_id', $employee->id)->orderBy('id')->get()->toArray(),
-            'facts_and_set' => $this->factAndSetSnapshot($employee),
+            'usage_facts' => $this->usageFactSnapshot($employee),
             'proofs' => LeaveProof::query()->where('leave_request_id', $request->id)->orderBy('id')->get()->toArray(),
             'audits' => AuditLog::query()->orderBy('id')->get()->toArray(),
             'notifications' => SimpegNotification::query()->where('user_id', $employee->id)->orderBy('id')->get()->toArray(),

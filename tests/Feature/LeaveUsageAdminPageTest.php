@@ -2,27 +2,21 @@
 
 namespace Tests\Feature;
 
-use App\Models\Appointment;
+use App\Actions\Cuti\StoreManualLeaveUsageAction;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
-use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\LeaveUsageDocument;
-use App\Models\LeaveUsageReconciliationSet;
 use App\Models\LeaveUsageRecord;
 use App\Models\Permission;
 use App\Models\RefJenisCuti;
-use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\StorageRecoveryTask;
 use App\Models\User;
 use App\Queries\Cuti\CurrentApprovalChainPreviewQuery;
-use App\Services\Cuti\LeaveBalanceReservationService;
-use App\Services\Cuti\LeaveBalanceService;
-use App\Services\Cuti\LeaveUsageReconciliationService;
 use App\Services\StorageRecoveryService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -32,9 +26,8 @@ use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class LeaveUsageAdminPageTest extends TestCase
@@ -45,19 +38,11 @@ class LeaveUsageAdminPageTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow('2026-08-19 10:00:00');
         $this->seed(ReferenceSeeder::class);
         $this->seed(RbacSeeder::class);
     }
 
-    protected function tearDown(): void
-    {
-        Carbon::setTestNow();
-
-        parent::tearDown();
-    }
-
-    public function test_workspace_merender_form_fakta_dan_manual_tanpa_input_saldo_legacy_atau_hari_client(): void
+    public function test_workspace_menampilkan_ringkasan_baca_saja_dan_editor_cuti_luar_simpeg(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Form Fakta']);
@@ -68,6 +53,11 @@ class LeaveUsageAdminPageTest extends TestCase
 
         $queue->assertOk();
         $queue->assertSee('Catat cuti eksternal', false);
+        $queue->assertDontSee('withActiveTab(@js', false);
+        $queue->assertSee('Belum Ada Fakta (', false);
+        $queue->assertSee('Memiliki Fakta (', false);
+        $queue->assertDontSee('Perlu Tindakan (', false);
+        $queue->assertDontSee('Sudah Terdaftar (', false);
         $queue->assertSee(route('cuti.saldo.administrasi', [
             'status' => 'semua_pegawai',
             'pegawai' => $employee->id,
@@ -99,17 +89,17 @@ class LeaveUsageAdminPageTest extends TestCase
         $initial->assertOk();
         $initial->assertSee('Administrasi Pemakaian Cuti', false);
         $initial->assertSee('manual-external-approval-', false);
-        $initial->assertSee('Catat Pemakaian Tahunan', false);
-        $initial->assertSee('Keterangan atau sumber data', false);
-        $initial->assertSee('Simpan Pemakaian Tahunan', false);
+        $initial->assertDontSee('Catat Pemakaian Tahunan', false);
+        $initial->assertDontSee('Keterangan atau sumber data', false);
+        $initial->assertDontSee('Simpan Pemakaian Tahunan', false);
         $initial->assertSee('Cuti di Luar SIMPEG', false);
-        $initial->assertSee('Perbaiki Data Pemakaian', false);
+        $initial->assertDontSee('Perbaiki Data Pemakaian', false);
+        $initial->assertSee('Ringkasan pemakaian tahunan baca-saja', false);
         $initial->assertDontSee('Rekonsiliasi Pemakaian Tahunan', false);
         $initial->assertDontSee('Keterangan rekonsiliasi', false);
         $initial->assertDontSee('Simpan Rekonsiliasi', false);
         $initial->assertSee('id="tab-manual"', false);
         $initial->assertSee('aria-controls="panel-manual"', false);
-        $initial->assertSee(route('cuti.reconciliation.store', $employee), false);
         $manualUrl = route('cuti.saldo.administrasi', [
             'pegawai' => $employee->id,
             'status' => 'semua_pegawai',
@@ -118,7 +108,7 @@ class LeaveUsageAdminPageTest extends TestCase
         $initial->assertDontSee('Muat Editor Cuti Eksternal', false);
         $initial->assertDontSee(route('cuti.manual.store', $employee), false);
         foreach (['usage_n2', 'usage_n1', 'usage_current'] as $field) {
-            $initial->assertSee('name="'.$field.'"', false);
+            $initial->assertDontSee('name="'.$field.'"', false);
         }
         $initial->assertDontSee('Pendaftaran saldo awal', false);
         $initial->assertDontSee('Daftarkan saldo awal', false);
@@ -149,62 +139,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $manual->assertDontSee('name="jumlah_hari_kerja"', false);
         $manual->assertDontSee('Administrasi Saldo Cuti', false);
 
-        $set = $this->reconciliation($employee, $admin, [2024 => 0, 2025 => 0, 2026 => 0]);
-        $history = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
-            'pegawai' => $employee->id,
-            'status' => 'semua_pegawai',
-            'tab' => 'riwayat',
-        ]));
-
-        $history->assertOk();
-        $history->assertSee('Perbaiki Data Pemakaian', false);
-        $history->assertSee('Riwayat perubahan dan bukti', false);
-        $history->assertSee('Perbaikan mengganti data pemakaian tiga tahun dan memicu hitung ulang.', false);
-        $history->assertSee(route('cuti.reconciliation.correct', $set), false);
-        foreach (['usage_n2', 'usage_n1', 'usage_current', 'correction_reason', 'dokumen'] as $field) {
-            $history->assertSee('name="'.$field.'"', false);
-        }
-        foreach (['saldo', 'delta', 'koreksi_administratif'] as $field) {
-            $history->assertDontSee('name="'.$field.'"', false);
-        }
-        $history->assertDontSee('Koreksi Saldo', false);
-        $history->assertDontSee('Koreksi Rekonsiliasi', false);
-        $history->assertSee('value="0"', false);
-    }
-
-    public function test_workspace_tahun_baru_menawarkan_pencatatan_tahun_berjalan_dan_koreksi_set_historis_aktif(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Koreksi Historis']);
-        $set = $this->reconciliation($employee, $admin, [2024 => 1, 2025 => 2, 2026 => 3]);
-        Carbon::setTestNow('2027-02-03 10:00:00');
-
-        $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
-            'pegawai' => $employee->id,
-            'status' => 'semua_pegawai',
-            'tab' => 'riwayat',
-        ]));
-
-        $response->assertOk();
-        $response->assertSee(route('cuti.reconciliation.store', $employee), false);
-        $response->assertSee(route('cuti.reconciliation.correct', $set), false);
-        $response->assertSee('name="balance_year" value="2027"', false);
-        $response->assertSee('name="balance_year" value="2026"', false);
-        $response->assertSee('Fakta pemakaian tahun 2027', false);
-        $response->assertSee('Fakta pemakaian tahun 2024', false);
-        $response->assertSee('Fakta pemakaian tahun 2025', false);
-        $response->assertSee('Fakta pemakaian tahun 2026', false);
-
-        $document = new DOMDocument;
-        @$document->loadHTML($response->getContent());
-        $historyTab = (new DOMXPath($document))->query('//*[@id="tab-riwayat"]')->item(0);
-
-        $this->assertInstanceOf(DOMElement::class, $historyTab);
-        $this->assertSame('false', $historyTab->getAttribute('aria-disabled'));
-        $this->assertSame("selectTab('riwayat')", $historyTab->getAttribute('x-on:click'));
-        $this->assertSame('false', $historyTab->getAttribute('x-on:click.prevent'));
-        $this->assertStringNotContainsString('cursor-not-allowed', $historyTab->getAttribute('class'));
-        $response->assertDontSee('id="riwayat-locked-message"', false);
     }
 
     public function test_antrean_administrasi_memakai_per_page_tervalidasi_dan_mempertahankan_filter(): void
@@ -301,10 +235,120 @@ class LeaveUsageAdminPageTest extends TestCase
         $initial->assertDontSee(route('cuti.manual.store', $employee), false);
 
         $this->actingAs($admin)
-            ->get($manualUrl)
+            ->get(route('cuti.saldo.administrasi', [
+                'pegawai' => $employee->id,
+                'status' => 'semua_pegawai',
+                'tab' => 'manual',
+            ]))
             ->assertOk()
+            ->assertSee('Catat Cuti di Luar SIMPEG', false)
             ->assertSee(route('cuti.manual.store', $employee), false)
-            ->assertSee('Simpan Cuti Eksternal', false);
+            ->assertSee('enctype="multipart/form-data"', false)
+            ->assertDontSee('name="jumlah_hari_kerja"', false);
+    }
+
+    public function test_editor_manual_disembunyikan_bila_permission_manual_dicabut(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $permission = Permission::query()->where('name', 'cuti.manual.manage')->sole();
+        $role = Role::query()->where('name', 'admin_kepegawaian')->sole();
+        $role->permissions()->detach($permission->id);
+
+        $this->actingAs($admin)
+            ->get(route('cuti.saldo.administrasi', [
+                'pegawai' => $employee->id,
+                'status' => 'semua_pegawai',
+                'tab' => 'manual',
+            ]))
+            ->assertOk()
+            ->assertDontSee(route('cuti.manual.store', $employee), false)
+            ->assertDontSee('Simpan Cuti Eksternal', false);
+    }
+
+    /** @return array<string, array{bool, bool}> */
+    public static function manualValidationSurfaces(): array
+    {
+        return [
+            'pencatatan' => [false, false],
+            'perbaikan' => [true, false],
+            'perbaikan dengan tahap tambahan orang yang sama' => [true, true],
+        ];
+    }
+
+    #[DataProvider('manualValidationSurfaces')]
+    public function test_validasi_manual_memulihkan_label_approver_dari_identitas_otoritatif(bool $correction, bool $addedStage): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $approver = Employee::factory()->create(['nama_lengkap' => 'Pejabat pada keputusan awal']);
+        $payload = [
+            'leave_type_id' => RefJenisCuti::query()->where('code', 'sakit')->value('id'),
+            'tanggal_mulai' => '2026-03-02',
+            'tanggal_selesai' => '2026-03-03',
+            'alasan' => 'Keputusan eksternal untuk pengujian form.',
+            'approval_steps' => array_map(fn (array $step): array => [
+                ...$step,
+                'approver_source' => 'simpeg_employee',
+                'approver_employee_id' => $approver->id,
+                'approver_name' => null,
+                'approver_position' => null,
+                'approver_institution' => null,
+            ], $this->validManualApprovalPayload()),
+        ];
+        $record = $correction
+            ? app(StoreManualLeaveUsageAction::class)->execute($employee->id, $payload, null, $admin)
+            : null;
+        $snapshot = $record?->externalApprovalSteps()->orderBy('step_order')->get()->toArray();
+        $approver->update(['nama_lengkap' => 'Nama profil terbaru']);
+        $url = route('cuti.saldo.administrasi', array_filter([
+            'pegawai' => $employee->id,
+            'status' => 'semua_pegawai',
+            'tab' => 'manual',
+            'edit_usage' => $record?->id,
+        ]));
+        $payload['alasan'] = '';
+        $payload['correction_reason'] = 'Perbaikan untuk pengujian form.';
+        if ($addedStage) {
+            // Writer mempertahankan satu snapshot per UUID secara berurutan, termasuk saat perannya berubah.
+            array_unshift($payload['approval_steps'], [...$payload['approval_steps'][0], 'step_type' => 'verifier']);
+        }
+        $payload['approval_steps'][0]['approver_label'] = 'Nama palsu dari browser';
+
+        $this->actingAs($admin)->from($url)
+            ->post($record ? route('cuti.manual.correct', $record) : route('cuti.manual.store', $employee), $payload)
+            ->assertSessionHasErrors('alasan');
+        $response = $this->get($url)->assertOk();
+        $steps = $response->viewData('initialApprovalSteps');
+
+        $this->assertCount($addedStage ? 3 : 2, $steps);
+        foreach ($steps as $index => $step) {
+            $this->assertSame($approver->id, $step['approver_employee_id']);
+            $this->assertStringContainsString($correction && $index < 2 ? 'Pejabat pada keputusan awal' : 'Nama profil terbaru', $step['approver_label'] ?? '');
+            $this->assertStringNotContainsString('Nama palsu', $step['approver_label'] ?? '');
+        }
+        $this->assertSame($record ? 1 : 0, $employee->leaveUsageRecords()->count());
+        if ($record) {
+            $this->assertSame($snapshot, $record->externalApprovalSteps()->orderBy('step_order')->get()->toArray());
+        }
+    }
+
+    public function test_pemulihan_label_membatasi_input_lama_dan_menolak_uuid_rusak(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $steps = array_fill(0, 12, [
+            'step_type' => 'verifier', 'approver_source' => 'simpeg_employee',
+            'approver_employee_id' => 'bukan-uuid', 'approver_label' => 'Nama tidak terverifikasi',
+        ]);
+
+        $response = $this->actingAs($admin)->withSession(['_old_input' => ['approval_steps' => $steps]])
+            ->get(route('cuti.saldo.administrasi', ['pegawai' => $employee->id, 'tab' => 'manual']))
+            ->assertOk();
+
+        $restored = $response->viewData('initialApprovalSteps');
+        $this->assertCount(10, $restored);
+        $this->assertSame(array_fill(0, 10, ''), array_column($restored, 'approver_label'));
     }
 
     public function test_workspace_menyediakan_preview_chain_current_dengan_satu_chain_valid_tanpa_menulis_data(): void
@@ -596,108 +640,6 @@ class LeaveUsageAdminPageTest extends TestCase
             });
     }
 
-    public function test_workspace_merender_ringkasan_ketersediaan_projection_sebagai_nilai_baca_saja(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create([
-            'nama_lengkap' => 'Pegawai Ringkasan Saldo',
-            'jenis_pegawai_id' => RefJenisPegawai::query()->where('nama', 'PNS')->value('id'),
-        ]);
-        Appointment::create([
-            'employee_id' => $employee->id,
-            'jenis_pengangkatan' => 'PNS',
-            'tmt_pengangkatan' => '2020-01-01',
-        ]);
-        $type = $this->annualType();
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-            $employee,
-            2026,
-            [2024 => 0, 2025 => 0, 2026 => 5],
-            Carbon::parse('2026-08-19'),
-            'Catatan pemakaian tahunan untuk ringkasan saldo.',
-            $admin,
-        );
-        $projection = LeaveBalance::query()
-            ->whereBelongsTo($employee)
-            ->where('tahun', 2026)
-            ->sole();
-        $this->assertSame([24, 19, 1, 6, 12, 5, 6], [
-            $projection->jatah_awal + $projection->carry_over,
-            $projection->sisa,
-            $projection->sisa_n2,
-            $projection->sisa_n1,
-            $projection->sisa_tahun_berjalan,
-            $projection->terpakai,
-            $projection->hangus,
-        ]);
-        $activeRequest = LeaveRequest::query()->create([
-            'employee_id' => $employee->id,
-            'jenis_cuti_id' => $type->id,
-            'tanggal_mulai' => '2026-09-01',
-            'tanggal_selesai' => '2026-09-02',
-            'jumlah_hari_kerja' => 2,
-            'alasan' => 'Pengajuan aktif dengan alokasi saldo.',
-            'status' => 'menunggu_approval',
-        ]);
-        $dutyRequest = LeaveRequest::query()->create([
-            'employee_id' => $employee->id,
-            'jenis_cuti_id' => $type->id,
-            'tanggal_mulai' => '2026-10-05',
-            'tanggal_selesai' => '2026-10-07',
-            'jumlah_hari_kerja' => 3,
-            'alasan' => 'Hak dilindungi karena tugas dinas.',
-            'status' => LeaveRequest::STATUS_DUTY_POSTPONED,
-        ]);
-
-        app(LeaveBalanceReservationService::class)->reserveForNewRequest($activeRequest, $admin);
-        app(LeaveBalanceService::class)->recordDutyPostponement(
-            $dutyRequest,
-            $admin,
-            'Cuti ditunda karena penugasan instansi.',
-        );
-
-        $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
-            'pegawai' => $employee->id,
-            'status' => 'semua_pegawai',
-        ]));
-
-        $response->assertOk();
-        $response->assertSee('Status data pemakaian', false);
-        $response->assertSee('Catatan pemakaian tahunan aktif', false);
-        $response->assertDontSee('Status rekonsiliasi', false);
-        $response->assertDontSee('Fakta rekonsiliasi aktif', false);
-        $response->assertViewHas('balanceSummary', [
-            'total_hak' => 24,
-            'saldo_aktual' => 19,
-            'dialokasikan_aktif' => 2,
-            'dilindungi_penangguhan_dinas' => 3,
-            'saldo_dapat_diajukan' => 14,
-        ]);
-        foreach ([
-            'total_hak' => ['Total hak', 24],
-            'saldo_aktual' => ['Saldo aktual', 19],
-            'dialokasikan_aktif' => ['Dialokasikan aktif', 2],
-            'dilindungi_penangguhan_dinas' => ['Dilindungi penangguhan dinas', 3],
-            'saldo_dapat_diajukan' => ['Saldo dapat diajukan', 14],
-        ] as $key => [$label, $value]) {
-            $response->assertSee($label, false);
-            $response->assertSee('data-balance-value="'.$key.'">'.$value.' hari</dd>', false);
-            $response->assertDontSee('name="'.$key.'"', false);
-        }
-        $response->assertSeeInOrder([
-            'Hak N-2 (2024)',
-            '1 hari',
-            'Hak N-1 (2025)',
-            '6 hari',
-            'Hak tahun berjalan (2026)',
-            '12 hari',
-            'Terpakai',
-            '5 hari',
-            'Hangus',
-            '6 hari',
-        ], false);
-    }
-
     public function test_history_merender_sumber_status_dokumen_privat_dan_aksi_hanya_untuk_manual_aktif(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
@@ -729,7 +671,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $document = LeaveUsageDocument::query()->forceCreate([
             'id' => '00000000-0000-4000-8000-000000000714',
             'leave_usage_record_id' => $active->id,
-            'leave_usage_reconciliation_set_id' => null,
             'original_name' => 'bukti-cuti-eksternal.pdf',
             'stored_name' => 'nama-rahasia.pdf',
             'path' => 'cuti/pemakaian/nama-rahasia.pdf',
@@ -796,118 +737,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $cancellation->assertDontSee('Buka koreksi', false);
     }
 
-    public function test_dokumen_koreksi_hanya_menampilkan_metadata_aman_dan_diunduh_admin_berotorisasi_dengan_header_privat(): void
-    {
-        Storage::fake(LeaveUsageDocument::STORAGE_DISK);
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Bukti Koreksi']);
-        $set = $this->reconciliation($employee, $admin, [2024 => 1, 2025 => 2, 2026 => 3]);
-        $storedName = '00000000-0000-4000-8000-000000000901.pdf';
-        $path = LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/'.$storedName;
-        Storage::disk(LeaveUsageDocument::STORAGE_DISK)->put($path, 'bukti koreksi privat');
-        $documentMetadata = [
-            'leave_usage_record_id' => null,
-            'leave_usage_reconciliation_set_id' => $set->id,
-            'original_name' => 'rekap-koreksi.pdf',
-            'disk' => LeaveUsageDocument::STORAGE_DISK,
-            'mime_type' => 'application/pdf',
-            'size_bytes' => 20,
-            'uploaded_by' => $admin->id,
-        ];
-        $document = LeaveUsageDocument::query()->forceCreate([
-            ...$documentMetadata,
-            'id' => '00000000-0000-4000-8000-000000000901',
-            'stored_name' => $storedName,
-            'path' => $path,
-        ]);
-        $this->adoptUsageDocumentArtifact($document, $employee->id, 'bukti koreksi privat');
-
-        $url = route('cuti.reconciliation.document.download', [$set, $document]);
-        $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
-            'pegawai' => $employee->id,
-            'status' => 'semua_pegawai',
-            'tab' => 'riwayat',
-        ]))
-            ->assertOk()
-            ->assertSee('rekap-koreksi.pdf', false)
-            ->assertSee($url, false)
-            ->assertDontSee($storedName, false)
-            ->assertDontSee($path, false);
-
-        $download = $this->actingAs($admin)->get($url);
-        $download
-            ->assertOk()
-            ->assertDownload('rekap-koreksi.pdf')
-            ->assertHeader('Pragma', 'no-cache')
-            ->assertHeader('X-Content-Type-Options', 'nosniff');
-        foreach (['private', 'no-store', 'max-age=0'] as $directive) {
-            $this->assertStringContainsString($directive, (string) $download->headers->get('Cache-Control'));
-        }
-
-        $this->actingAs(User::factory()->pegawai()->create())->get($url)->assertForbidden();
-        Auth::logout();
-        $this->get($url)->assertRedirect('/login');
-
-        $otherSet = $this->reconciliation(Employee::factory()->create(), $admin, [2024 => 0, 2025 => 0, 2026 => 0]);
-        $this->actingAs($admin)->get(route('cuti.reconciliation.document.download', [$otherSet, $document]))->assertNotFound();
-
-        $pathTraversalDocument = LeaveUsageDocument::query()->forceCreate([
-            ...$documentMetadata,
-            'id' => '00000000-0000-4000-8000-000000000902',
-            'stored_name' => $storedName,
-            'path' => '../'.$storedName,
-        ]);
-        $this->actingAs($admin)
-            ->get(route('cuti.reconciliation.document.download', [$set, $pathTraversalDocument]))
-            ->assertNotFound();
-
-        $nestedStoredName = '00000000-0000-4000-8000-000000000903.pdf';
-        $nestedSameOwner = LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/nested/'.$nestedStoredName;
-        Storage::disk(LeaveUsageDocument::STORAGE_DISK)->put($nestedSameOwner, 'nested correction document');
-        $nestedDocument = LeaveUsageDocument::query()->forceCreate([
-            ...$documentMetadata,
-            'id' => '00000000-0000-4000-8000-000000000903',
-            'stored_name' => $nestedStoredName,
-            'path' => $nestedSameOwner,
-        ]);
-        $this->actingAs($admin)
-            ->get(route('cuti.reconciliation.document.download', [$set, $nestedDocument]))
-            ->assertNotFound();
-    }
-
-    public function test_unduh_bukti_rekonsiliasi_menolak_artifact_adopted_yang_byte_nya_berubah(): void
-    {
-        Storage::fake(LeaveUsageDocument::STORAGE_DISK);
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-        $set = $this->reconciliation($employee, $admin, [2024 => 1, 2025 => 2, 2026 => 3]);
-        $storedName = '00000000-0000-4000-8000-000000000904.pdf';
-        $path = LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/'.$storedName;
-        $originalBytes = 'bukti rekonsiliasi asli';
-        Storage::disk(LeaveUsageDocument::STORAGE_DISK)->put($path, $originalBytes);
-        $document = LeaveUsageDocument::query()->forceCreate([
-            'id' => '00000000-0000-4000-8000-000000000904',
-            'leave_usage_record_id' => null,
-            'leave_usage_reconciliation_set_id' => $set->id,
-            'original_name' => 'rekap-integritas.pdf',
-            'stored_name' => $storedName,
-            'path' => $path,
-            'disk' => LeaveUsageDocument::STORAGE_DISK,
-            'mime_type' => 'application/pdf',
-            'size_bytes' => strlen($originalBytes),
-            'uploaded_by' => $admin->id,
-        ]);
-        $task = $this->adoptUsageDocumentArtifact($document, $employee->id, $originalBytes);
-        Storage::disk(LeaveUsageDocument::STORAGE_DISK)->put($path, 'bukti rekonsiliasi telah diubah');
-
-        $this->actingAs($admin)
-            ->get(route('cuti.reconciliation.document.download', [$set, $document]))
-            ->assertNotFound()
-            ->assertDontSee('bukti rekonsiliasi telah diubah');
-
-        $this->assertSame(StorageRecoveryTask::STATUS_MANUAL_REVIEW, $task->fresh()->status);
-    }
-
     public function test_kontrol_manual_hilang_bila_permission_manual_dicabut_tanpa_membuka_bypass_role(): void
     {
         $admin = User::factory()->adminKepegawaian()->create();
@@ -963,7 +792,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $response = $this->actingAs($admin)->get($url);
 
         $response->assertOk();
-        $response->assertSee(route('cuti.reconciliation.store', $employee), false);
         $response->assertDontSee(e($manualUrl), false);
         $response->assertDontSee(route('cuti.manual.store', $employee), false);
         $response->assertDontSee('Catat cuti eksternal', false);
@@ -1190,7 +1018,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $document = LeaveUsageDocument::query()->forceCreate([
             'id' => '00000000-0000-4000-8000-000000000201',
             'leave_usage_record_id' => $sameTimeHigherId->id,
-            'leave_usage_reconciliation_set_id' => null,
             'original_name' => 'bukti-riwayat.pdf',
             'stored_name' => 'rahasia-tersimpan.pdf',
             'path' => 'cuti/pemakaian/rahasia-tersimpan.pdf',
@@ -1377,179 +1204,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertLessThanOrEqual(22, $largeQueryCount);
     }
 
-    public function test_tidak_ada_rekonsiliasi_dibedakan_dari_rekonsiliasi_eksplisit_bernilai_nol(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-        $without = Employee::factory()->create();
-        $withZero = Employee::factory()->create();
-        $type = $this->annualType();
-
-        $withoutData = $this->actingAs($admin)
-            ->get(route('cuti.saldo.administrasi', ['pegawai' => $without->id, 'status' => 'semua_pegawai']))
-            ->assertOk()
-            ->viewData('balanceReconciliation');
-        $this->assertFalse($withoutData['reconciled']);
-        $this->assertNull($withoutData['usage']);
-
-        $set = LeaveUsageReconciliationSet::query()->forceCreate([
-            'id' => '00000000-0000-4000-8000-000000000601',
-            'employee_id' => $withZero->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-19',
-            'status' => LeaveUsageReconciliationSet::STATUS_ACTIVE,
-            'administrative_note' => 'Nol eksplisit untuk tiga tahun.',
-            'recorded_by' => $admin->id,
-        ]);
-        foreach ([2024, 2025, 2026] as $year) {
-            LeaveUsageRecord::query()->forceCreate([
-                'id' => sprintf('00000000-0000-4000-8000-%012d', 600 + $year),
-                'employee_id' => $withZero->id,
-                'leave_type_id' => $type->id,
-                'source_type' => LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION,
-                'reconciliation_set_id' => $set->id,
-                'leave_request_id' => null,
-                'leave_request_case_id' => null,
-                'usage_year' => $year,
-                'effective_date' => "{$year}-12-31",
-                'start_date' => null,
-                'end_date' => null,
-                'workdays' => 0,
-                'administrative_note' => 'Nol eksplisit.',
-                'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
-                'recorded_by' => $admin->id,
-            ]);
-        }
-
-        $zeroData = $this->actingAs($admin)
-            ->get(route('cuti.saldo.administrasi', ['pegawai' => $withZero->id, 'status' => 'semua_pegawai']))
-            ->assertOk()
-            ->viewData('balanceReconciliation');
-        $this->assertTrue($zeroData['reconciled']);
-        $this->assertSame(['n2' => 0, 'n1' => 0, 'current' => 0], $zeroData['usage']);
-    }
-
-    public function test_tab_riwayat_memuat_riwayat_dokumen_terbatas_tanpa_melewati_anggaran_query(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-        $set = $this->reconciliation($employee, $admin, [2024 => 0, 2025 => 0, 2026 => 0]);
-        LeaveUsageDocument::query()->forceCreate([
-            'id' => '00000000-0000-4000-8000-000000000951',
-            'leave_usage_record_id' => null,
-            'leave_usage_reconciliation_set_id' => $set->id,
-            'original_name' => 'riwayat.pdf',
-            'stored_name' => '00000000-0000-4000-8000-000000000951.pdf',
-            'path' => LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/00000000-0000-4000-8000-000000000951.pdf',
-            'disk' => LeaveUsageDocument::STORAGE_DISK,
-            'mime_type' => 'application/pdf',
-            'size_bytes' => 1,
-            'uploaded_by' => $admin->id,
-        ]);
-        $url = route('cuti.saldo.administrasi', ['pegawai' => $employee->id, 'status' => 'semua_pegawai', 'tab' => 'riwayat']);
-
-        $this->actingAs($admin);
-        $this->assertLessThanOrEqual(24, $this->pageQueryCount($url));
-        $this->actingAs($admin)->get($url)
-            ->assertOk()
-            ->assertSee('riwayat.pdf', false);
-    }
-
-    public function test_tab_riwayat_tetap_menemukan_dokumen_tahun_lama_setelah_set_tahun_baru_aktif(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-        $oldSet = $this->reconciliation($employee, $admin, [2024 => 0, 2025 => 0, 2026 => 0]);
-        $document = LeaveUsageDocument::query()->forceCreate([
-            'id' => '00000000-0000-4000-8000-000000000952',
-            'leave_usage_record_id' => null,
-            'leave_usage_reconciliation_set_id' => $oldSet->id,
-            'original_name' => 'bukti-perbaikan-2026.pdf',
-            'stored_name' => '00000000-0000-4000-8000-000000000952.pdf',
-            'path' => LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/00000000-0000-4000-8000-000000000952.pdf',
-            'disk' => LeaveUsageDocument::STORAGE_DISK,
-            'mime_type' => 'application/pdf',
-            'size_bytes' => 1,
-            'uploaded_by' => $admin->id,
-        ]);
-        Carbon::setTestNow('2027-01-02 08:00:00');
-
-        try {
-            $newSet = app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
-                $employee,
-                2027,
-                [2025 => 0, 2026 => 0, 2027 => 0],
-                now(),
-                'Snapshot tahun baru.',
-                $admin,
-            );
-            $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
-                'pegawai' => $employee->id,
-                'status' => 'semua_pegawai',
-                'tab' => 'riwayat',
-            ]));
-        } finally {
-            Carbon::setTestNow('2026-08-19 10:00:00');
-        }
-
-        $response->assertOk()
-            ->assertSee('bukti-perbaikan-2026.pdf', false)
-            ->assertSee('2026', false)
-            ->assertSee(route('cuti.reconciliation.document.download', [$oldSet, $document]), false)
-            ->assertSee(route('cuti.reconciliation.correct', $newSet), false)
-            ->assertDontSee($document->stored_name, false)
-            ->assertDontSee($document->path, false);
-    }
-
-    public function test_tab_riwayat_menyediakan_pagination_untuk_bukti_yang_melebihi_dua_puluh_set(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-        $activeSet = $this->reconciliation($employee, $admin, [2024 => 0, 2025 => 0, 2026 => 0]);
-        $oldest = null;
-
-        foreach (range(1, 20) as $index) {
-            $set = LeaveUsageReconciliationSet::query()->forceCreate([
-                'employee_id' => $employee->id,
-                'balance_year' => 2025,
-                'reconciled_at' => Carbon::parse('2025-01-01')->addDays($index),
-                'status' => LeaveUsageReconciliationSet::STATUS_SUPERSEDED,
-                'administrative_note' => "Versi historis {$index}.",
-                'recorded_by' => $admin->id,
-            ]);
-            $oldest ??= $set;
-        }
-        $document = LeaveUsageDocument::query()->forceCreate([
-            'leave_usage_record_id' => null,
-            'leave_usage_reconciliation_set_id' => $oldest->id,
-            'original_name' => 'bukti-halaman-kedua.pdf',
-            'stored_name' => '00000000-0000-4000-8000-000000000954.pdf',
-            'path' => LeaveUsageDocument::PATH_PREFIX.'/'.$employee->id.'/00000000-0000-4000-8000-000000000954.pdf',
-            'disk' => LeaveUsageDocument::STORAGE_DISK,
-            'mime_type' => 'application/pdf',
-            'size_bytes' => 1,
-            'uploaded_by' => $admin->id,
-        ]);
-        $base = [
-            'pegawai' => $employee->id,
-            'status' => 'semua_pegawai',
-            'tab' => 'riwayat',
-        ];
-
-        $firstPage = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', $base));
-        $firstPage->assertOk()
-            ->assertDontSee('bukti-halaman-kedua.pdf', false)
-            ->assertSee('page_reconciliation_history=2', false);
-
-        $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
-            ...$base,
-            'page_reconciliation_history' => 2,
-        ]))
-            ->assertOk()
-            ->assertSee('bukti-halaman-kedua.pdf', false)
-            ->assertSee(route('cuti.reconciliation.document.download', [$oldest, $document]), false)
-            ->assertSee(route('cuti.reconciliation.correct', $activeSet), false);
-    }
-
     public function test_api_saldo_pribadi_mempertahankan_shape_koleksi_dan_hanya_mengembalikan_seratus_terbaru_secara_stabil(): void
     {
         $employee = Employee::factory()->create();
@@ -1586,43 +1240,6 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertArrayNotHasKey('current_page', $response->json());
     }
 
-    /** @param array<int, int> $usage */
-    private function reconciliation(Employee $employee, User $actor, array $usage): LeaveUsageReconciliationSet
-    {
-        $set = LeaveUsageReconciliationSet::query()->forceCreate([
-            'id' => (string) str()->uuid(),
-            'employee_id' => $employee->id,
-            'balance_year' => 2026,
-            'reconciled_at' => '2026-08-19',
-            'status' => LeaveUsageReconciliationSet::STATUS_ACTIVE,
-            'administrative_note' => 'Rekonsiliasi fixture antarmuka.',
-            'recorded_by' => $actor->id,
-        ]);
-        $type = $this->annualType();
-
-        foreach ($usage as $year => $workdays) {
-            LeaveUsageRecord::query()->forceCreate([
-                'id' => (string) str()->uuid(),
-                'employee_id' => $employee->id,
-                'leave_type_id' => $type->id,
-                'source_type' => LeaveUsageRecord::SOURCE_ANNUAL_RECONCILIATION,
-                'reconciliation_set_id' => $set->id,
-                'leave_request_id' => null,
-                'leave_request_case_id' => null,
-                'usage_year' => $year,
-                'effective_date' => $year === 2026 ? '2026-08-19' : "{$year}-12-31",
-                'start_date' => null,
-                'end_date' => null,
-                'workdays' => $workdays,
-                'administrative_note' => 'Fakta rekonsiliasi fixture.',
-                'record_status' => LeaveUsageRecord::STATUS_ACTIVE,
-                'recorded_by' => $actor->id,
-            ]);
-        }
-
-        return $set;
-    }
-
     /** @param array<string, mixed> $overrides */
     private function usage(Employee $employee, RefJenisCuti $type, string $id, array $overrides = []): LeaveUsageRecord
     {
@@ -1631,7 +1248,6 @@ class LeaveUsageAdminPageTest extends TestCase
             'employee_id' => $employee->id,
             'leave_type_id' => $type->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
-            'reconciliation_set_id' => null,
             'leave_request_id' => null,
             'leave_request_case_id' => null,
             'usage_year' => 2026,

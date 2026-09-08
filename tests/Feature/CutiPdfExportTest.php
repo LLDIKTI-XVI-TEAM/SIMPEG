@@ -287,7 +287,9 @@ class CutiPdfExportTest extends TestCase
         $now = now();
         $details = [];
 
-        foreach (range(1, 500) as $index) {
+        // 499 pengajuan SIMPEG + 1 fakta manual = 500 detail.
+        // Satu baris ringkasan fakta menghasilkan total ekspor 501.
+        foreach (range(1, 499) as $index) {
             $details[] = [
                 'id' => fake()->uuid(),
                 'employee_id' => $pegawai->id,
@@ -303,11 +305,12 @@ class CutiPdfExportTest extends TestCase
         }
 
         LeaveRequest::query()->insert($details);
-        LeaveBalance::create([
-            'employee_id' => $pegawai->id,
-            'tahun' => 2026,
-            'terpakai' => 1,
-            'sisa' => 11,
+        // Ringkasan tahunan hanya membaca fakta pemakaian final aktif.
+        // Saldo material tidak lagi menjadi sumber agregat laporan.
+        $this->createUsage($pegawai, $tahunan, [
+            'start_date' => '2026-06-11',
+            'end_date' => '2026-06-11',
+            'effective_date' => '2026-06-11',
         ]);
 
         $filters = ['pegawai' => $pegawai->id, 'periode' => '2026'];
@@ -352,7 +355,6 @@ class CutiPdfExportTest extends TestCase
             'employee_id' => $employee->id,
             'leave_type_id' => $jenis->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
-            'reconciliation_set_id' => null,
             'leave_request_id' => null,
             'leave_request_case_id' => null,
             'usage_year' => 2026,

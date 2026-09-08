@@ -17,7 +17,7 @@ use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\SimpegNotification;
 use App\Models\User;
-use App\Services\Cuti\LeaveUsageReconciliationService;
+use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\LeaveApprovalService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -66,6 +66,9 @@ class LeaveApprovalEngineTest extends TestCase
         $employee = Employee::factory()->create();
 
         if ($eligible) {
+            $employee->forceFill([
+                'jenis_pegawai_id' => RefJenisPegawai::firstOrCreate(['nama' => 'PNS'])->id,
+            ])->save();
             Appointment::create([
                 'employee_id' => $employee->id,
                 'jenis_pengangkatan' => 'PNS',
@@ -193,7 +196,7 @@ class LeaveApprovalEngineTest extends TestCase
 
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->first();
         $this->assertSame(3, $balance->terpakai);
-        $this->assertSame(9, $balance->sisa);
+        $this->assertSame(21, $balance->sisa);
     }
 
     public function test_keputusan_dengan_revision_version_lama_ditolak_tanpa_menyentuh_tahap_aktif(): void
@@ -244,11 +247,11 @@ class LeaveApprovalEngineTest extends TestCase
 
         $balance = LeaveBalance::where('employee_id', $pemohon['employee']->id)->where('tahun', 2026)->firstOrFail();
         $this->assertSame(8, $balance->terpakai);
-        $this->assertSame(4, $balance->sisa);
+        $this->assertSame(16, $balance->sisa);
         $this->assertSame(0, $balance->sisa_n2);
-        $this->assertSame(0, $balance->sisa_n1);
-        $this->assertSame(4, $balance->sisa_tahun_berjalan);
-        $this->assertSame(8, $balance->terpakai_tahun_berjalan);
+        $this->assertSame(4, $balance->sisa_n1);
+        $this->assertSame(12, $balance->sisa_tahun_berjalan);
+        $this->assertSame(0, $balance->terpakai_tahun_berjalan);
         $fact = LeaveUsageRecord::query()->where('leave_request_id', $cuti->id)->sole();
         $this->assertSame(LeaveUsageRecord::SOURCE_APPROVED_REQUEST, $fact->source_type);
         $this->assertSame(8, $fact->workdays);
@@ -374,14 +377,12 @@ class LeaveApprovalEngineTest extends TestCase
             'tanggal_sk' => '2020-01-01',
         ]);
         $jenis = $this->jenisCuti('Cuti Tahunan');
-        $reconciliationActor = User::factory()->adminKepegawaian()->create();
-        app(LeaveUsageReconciliationService::class)->createAnnualReconciliationSet(
+        $recalculationActor = User::factory()->adminKepegawaian()->create();
+        app(LeaveBalanceRecalculationService::class)->recalculate(
             $pemohon['employee'],
             2026,
-            [2024 => 12, 2025 => 12, 2026 => 0],
-            now(config('app.timezone')),
-            'Fixture fakta pemakaian untuk regresi penundaan generik.',
-            $reconciliationActor,
+            $recalculationActor,
+            'Membentuk projection untuk regresi penundaan generik.',
         );
         $balance = LeaveBalance::query()
             ->where('employee_id', $pemohon['employee']->id)
@@ -440,8 +441,10 @@ class LeaveApprovalEngineTest extends TestCase
             ->where('employee_id', $pemohon['employee']->id)
             ->where('event_type', LeaveBalanceLedger::EVENT_CARRY_OVER_GRANTED)
             ->sole();
-        $this->assertSame(6, $carry->amount);
+        $this->assertSame(12, $carry->amount);
+        $this->assertSame(6, $carry->metadata['n2']);
         $this->assertSame(6, $carry->metadata['n1']);
+        $this->assertSame(0, $carry->metadata['duty_postponed_carried']);
         $this->assertSame(1, SimpegNotification::query()->where('type', 'cuti.ditunda')->count());
     }
 
