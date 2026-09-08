@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Middleware\PreserveNotificationPollingFlash;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,admin_kepegawaian,pimpinan,kepala_bagian,pegawai'])
@@ -8,10 +9,10 @@ Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:super_admin,
     ->name('notifikasi.')
     ->group(function (): void {
         Route::get('/', [NotificationController::class, 'index'])
-            ->middleware('permission:notifications.read')
+            ->middleware(['permission:notifications.read', PreserveNotificationPollingFlash::class])
             ->name('index');
         Route::get('/jumlah-belum-dibaca', [NotificationController::class, 'unreadCount'])
-            ->middleware('permission:notifications.read')
+            ->middleware(['permission:notifications.read', PreserveNotificationPollingFlash::class])
             ->name('jumlah-belum-dibaca');
         Route::patch('/tandai-semua-dibaca', [NotificationController::class, 'markAllAsRead'])
             ->middleware('permission:notifications.update')

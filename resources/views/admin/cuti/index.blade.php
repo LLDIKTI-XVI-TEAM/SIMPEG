@@ -7,6 +7,7 @@
             'menunggu_approval' => 'warning',
             'disetujui' => 'success',
             'ditangguhkan' => 'orange',
+            'ditangguhkan_administratif' => 'orange',
             'ditangguhkan_tugas_dinas' => 'orange',
             // Pengembalian karena rollover tidak termasuk lima status yang warnanya ditetapkan resmi;
             // dibuat netral agar tidak menyerupai salah satu keputusan approval.
@@ -21,6 +22,7 @@
             'menunggu_approval' => 'Menunggu',
             'disetujui' => 'Disetujui',
             'ditangguhkan' => 'Ditangguhkan',
+            'ditangguhkan_administratif' => 'Ditangguhkan (Administratif)',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
             'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
@@ -127,6 +129,7 @@
                     <option value="disetujui" @selected($status === 'disetujui')>Disetujui</option>
                     <option value="ditunda" @selected($status === 'ditunda' || $status === 'ditangguhkan')>Ditangguhkan</option>
                     <option value="ditangguhkan_tugas_dinas" @selected($status === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
+                    <option value="ditangguhkan_administratif" @selected($status === 'ditangguhkan_administratif')>Ditangguhkan (Administratif)</option>
                     <option value="dikembalikan_karena_rollover" @selected($status === 'dikembalikan_karena_rollover')>Dikembalikan karena Rollover</option>
                     <option value="dibatalkan" @selected($status === 'dibatalkan')>Dibatalkan</option>
                     <option value="perlu_perubahan" @selected($status === 'perlu_perubahan')>Perubahan</option>

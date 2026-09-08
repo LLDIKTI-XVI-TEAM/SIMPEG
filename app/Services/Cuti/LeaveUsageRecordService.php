@@ -15,9 +15,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 final class LeaveUsageRecordService
 {
+    public const ADMINISTRATIVE_POSTPONEMENT_REASON = 'Pemakaian dibatalkan karena penangguhan administratif.';
+
     public function __construct(
         private readonly LeaveBalanceRecalculationService $recalculation,
         private readonly ManualExternalApprovalChainService $approvalChains,
@@ -396,6 +399,70 @@ final class LeaveUsageRecordService
 
             return $record->fresh();
         });
+    }
+
+    /**
+     * Pembalikan fakta resmi harus satu transaksi dengan keputusan pengajuan.
+     * Alasan privat tidak disalin ke ledger/fakta yang memiliki pembaca lebih luas.
+     */
+    public function reverseApprovedRequest(
+        LeaveRequest $leaveRequest,
+        User $actor,
+        ?Request $request = null,
+    ): LeaveUsageRecord {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('Pembalikan pemakaian wajib berada dalam transaksi keputusan cuti.');
+        }
+
+        $lockedRequest = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
+        $employee = Employee::query()->whereKey($lockedRequest->employee_id)->lockForUpdate()->firstOrFail();
+
+        if ($lockedRequest->status !== LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED
+            || $lockedRequest->administratively_postponed_at === null
+            || $lockedRequest->administratively_postponed_by !== $actor->id
+            || trim((string) $lockedRequest->administrative_postponement_reason) === '') {
+            throw ValidationException::withMessages([
+                'status' => 'Pemakaian hanya dapat dibatalkan bersama keputusan penangguhan administratif.',
+            ])->errorBag('administrativePostponement');
+        }
+
+        $record = LeaveUsageRecord::query()
+            ->where('leave_request_id', $lockedRequest->id)
+            ->lockForUpdate()
+            ->first();
+
+        // Fakta rusak atau tidak lengkap harus diperiksa, bukan dibuat ulang lalu dikreditkan.
+        if ($record === null
+            || $record->source_type !== LeaveUsageRecord::SOURCE_APPROVED_REQUEST
+            || $record->record_status !== LeaveUsageRecord::STATUS_ACTIVE
+            || $record->employee_id !== $lockedRequest->employee_id
+            || $record->leave_type_id !== $lockedRequest->jenis_cuti_id
+            || $record->leave_request_case_id !== $lockedRequest->leave_request_case_id
+            || $record->usage_year !== $lockedRequest->tanggal_mulai->year
+            || $record->effective_date?->toDateString() !== $lockedRequest->tanggal_mulai->toDateString()
+            || $record->start_date?->toDateString() !== $lockedRequest->tanggal_mulai->toDateString()
+            || $record->end_date?->toDateString() !== $lockedRequest->tanggal_selesai->toDateString()
+            || $record->workdays <= 0
+            || $record->workdays !== $lockedRequest->jumlah_hari_kerja) {
+            throw ValidationException::withMessages([
+                'usage_record' => 'Data pemakaian tidak sesuai dengan pengajuan. Periksa data sebelum menangguhkan cuti.',
+            ])->errorBag('administrativePostponement');
+        }
+
+        $before = $this->snapshot($record);
+        $reason = self::ADMINISTRATIVE_POSTPONEMENT_REASON;
+        $record->forceFill([
+            'record_status' => LeaveUsageRecord::STATUS_CANCELLED,
+            'correction_reason' => $reason,
+        ])->save();
+        $this->writeLedger(LeaveBalanceLedger::EVENT_USAGE_FACT_CANCELLED, $record, $actor, $reason);
+        $this->audit('usage_cancelled', $record, $actor, $reason, $before, $this->snapshot($record), $request);
+
+        if ($this->shouldReplayProjection($record)) {
+            $this->recalculation->recalculate($employee, $record->usage_year, $actor, $reason, $request);
+        }
+
+        return $record->fresh();
     }
 
     private function assertItemizedActive(LeaveUsageRecord $record): void

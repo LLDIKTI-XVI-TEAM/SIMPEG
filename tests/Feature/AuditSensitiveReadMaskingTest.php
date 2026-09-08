@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Support\Audit\AuditLogReadPayload;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -97,6 +98,27 @@ class AuditSensitiveReadMaskingTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('total', 1);
+    }
+
+    public function test_parent_hilang_dan_aktor_null_tetap_meredaksi_alasan_tanpa_mengubah_audit_domain_lain(): void
+    {
+        $reader = User::factory()->adminKepegawaian()->create();
+        $log = AuditLog::query()->create([
+            'event' => 'UPDATE', 'auditable_type' => 'LeaveRequest', 'auditable_id' => (string) Str::uuid(),
+            'old_values' => ['reason' => 'Alasan privat sebelumnya.'],
+            'new_values' => ['operation' => 'administrative_postponement', 'reason' => 'Alasan privat keputusan.'],
+        ]);
+        $other = AuditLog::query()->create([
+            'event' => 'UPDATE', 'auditable_type' => 'Setting', 'auditable_id' => (string) Str::uuid(),
+            'new_values' => ['reason' => 'Alasan konfigurasi biasa.'],
+        ]);
+        foreach ([$reader, null] as $actor) {
+            $payloads = app(AuditLogReadPayload::class)->forLogs(collect([$log, $other]), $actor);
+            $this->assertSame('[Alasan privat]', $payloads->get($log->id)['old_values']['reason']);
+            $this->assertSame('[Alasan privat]', $payloads->get($log->id)['new_values']['reason']);
+            $this->assertSame('Alasan konfigurasi biasa.', $payloads->get($other->id)['new_values']['reason']);
+        }
+        $this->assertSame('Alasan privat keputusan.', $log->fresh()->new_values['reason']);
     }
 
     /**

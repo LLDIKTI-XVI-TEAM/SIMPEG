@@ -462,6 +462,39 @@ class CutiListDisplayTest extends TestCase
         ]);
     }
 
+    public function test_status_administratif_terfilter_dan_terhitung_tanpa_membocorkan_alasan(): void
+    {
+        [$owner, $employee, $peer, $type] = $this->makePegawaiContext();
+        $leave = $this->createLeave($employee, $type, 'Cuti yang ditangguhkan secara administratif.', 'disetujui');
+        $this->createLeave($peer, $type, 'Persetujuan lain tetap berlaku.', 'disetujui');
+        $admin = User::factory()->adminKepegawaian()->create();
+        $reason = 'Catatan keputusan administratif privat.';
+        $leave->forceFill([
+            'status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED,
+            'administratively_postponed_at' => now(),
+            'administratively_postponed_by' => $admin->id,
+            'administrative_postponement_reason' => $reason,
+        ])->save();
+
+        foreach ([$owner, $admin] as $viewer) {
+            $this->actingAs($viewer)->get(route('cuti', ['status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED]))
+                ->assertOk()->assertSee('Ditangguhkan (Administratif)')->assertDontSee($reason)
+                ->assertViewHas('riwayatCuti', fn ($rows): bool => $rows->total() === 1 && $rows->first()['id'] === $leave->id)
+                ->assertViewHas('jumlahDitangguhkan', 1)->assertViewHas('jumlahMenunggu', 0);
+        }
+
+        $pimpinan = User::factory()->pimpinan()->create();
+        $this->actingAs($pimpinan)->get(route('pimpinan.cuti.index', ['status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED]))
+            ->assertOk()->assertSee('Ditangguhkan (Administratif)')->assertDontSee($reason)
+            ->assertViewHas('totalDitangguhkan', 1)->assertViewHas('menungguTindakanSaya', 0)
+            ->assertViewHas('leaves', fn ($rows): bool => $rows->total() === 1 && $rows->first()->id === $leave->id);
+        $this->get(route('pimpinan.cuti.show', $leave))->assertOk()
+            ->assertSee('Ditangguhkan (Administratif)')->assertDontSee($reason);
+
+        $this->actingAs($admin)->get(route('dashboard'))->assertOk()
+            ->assertViewHas('cutiDitangguhkan', 1)->assertViewHas('cutiMenunggu', 0);
+    }
+
     public function test_simulated_pegawai_is_scoped_to_own_leave_even_when_read_all_granted(): void
     {
         // Pegawai sengaja diberi cuti.read_all (salah konfigurasi) untuk memastikan pengaman

@@ -30,6 +30,7 @@
                     <option value="perlu_perubahan" @selected(($filters['status'] ?? '') === 'perlu_perubahan')>Perubahan</option>
                     <option value="ditangguhkan" @selected(($filters['status'] ?? '') === 'ditangguhkan')>Ditangguhkan</option>
                     <option value="ditangguhkan_tugas_dinas" @selected(($filters['status'] ?? '') === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
+                    <option value="ditangguhkan_administratif" @selected(($filters['status'] ?? '') === 'ditangguhkan_administratif')>Ditangguhkan (Administratif)</option>
                     <option value="dikembalikan_karena_rollover" @selected(($filters['status'] ?? '') === 'dikembalikan_karena_rollover')>Dikembalikan karena Rollover</option>
                     <option value="dibatalkan" @selected(($filters['status'] ?? '') === 'dibatalkan')>Dibatalkan</option>
                     <option value="tidak_disetujui" @selected(($filters['status'] ?? '') === 'tidak_disetujui')>Tidak Disetujui</option>
@@ -94,6 +95,7 @@
                             'tidak_disetujui' => ['label' => 'Tidak Disetujui', 'variant' => 'danger'],
                             'perlu_perubahan' => ['label' => 'Perubahan', 'variant' => 'info'],
                             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+                            'ditangguhkan_administratif' => ['label' => 'Ditangguhkan (Administratif)', 'variant' => 'warning'],
                             'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
                             'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
                             'menunggu_pembatalan' => ['label' => 'Menunggu Keputusan Pembatalan', 'variant' => 'warning'],

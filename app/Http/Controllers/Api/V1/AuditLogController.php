@@ -11,6 +11,6 @@ class AuditLogController extends Controller
 {
     public function index(Request $request, ListAuditLogsAction $action): JsonResponse
     {
-        return response()->json($action->execute($request->query()));
+        return response()->json($action->execute($request->query(), $request->user()));
     }
 }

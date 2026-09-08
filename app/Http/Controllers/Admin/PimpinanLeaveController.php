@@ -3,12 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\ListPimpinanLeavesAction;
+use App\Actions\Cuti\ShowPimpinanLeaveDetailAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\PimpinanLeaveFilterRequest;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
 use App\Models\RefUnitKerja;
-use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
 
 class PimpinanLeaveController extends Controller
@@ -29,27 +29,8 @@ class PimpinanLeaveController extends Controller
         ]));
     }
 
-    public function show(Request $request, LeaveRequest $leave, EmployeeFileStorageService $files)
+    public function show(Request $request, LeaveRequest $leave, ShowPimpinanLeaveDetailAction $detail)
     {
-        $leave->load([
-            'employee.leaveBalances',
-            'jenisCuti',
-            'steps.approver',
-            'approvals.approver',
-            'proof',
-        ]);
-        $activeStep = $leave->steps->firstWhere('status', 'active');
-        $canDecide = $activeStep !== null
-            && $activeStep->approver_employee_id === $request->user()?->employee_id
-            && in_array($leave->status, ['menunggu_approval', 'ditangguhkan'], true);
-        $attachmentAvailable = $files->hasLeaveAttachment($leave->lampiran_path, $leave->employee_id);
-
-        return view('pimpinan.cuti.show', [
-            'leave' => $leave,
-            'activeStep' => $activeStep,
-            'canDecide' => $canDecide,
-            'balances' => $leave->employee?->leaveBalances->keyBy('tahun') ?? collect(),
-            'attachmentAvailable' => $attachmentAvailable,
-        ]);
+        return view('pimpinan.cuti.show', $detail->execute($leave, $request->user()));
     }
 }

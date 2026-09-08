@@ -53,7 +53,7 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->seed(RbacSeeder::class);
 
         // Seeder gabungan mencakup permission operasional, cuti, data referensi, dan simulasi role.
-        $this->assertSame(42, Permission::count());
+        $this->assertSame(43, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -239,9 +239,9 @@ class RbacPermissionMiddlewareTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_role_middleware_blocks_pegawai_from_audit_logs(): void
+    public function test_pegawai_tanpa_permission_audit_ditolak(): void
     {
-        // Audit log adalah route admin; pegawai ditolak pada pagar role sebelum permission dicek.
+        // Role default tidak memberi permission audit; grant eksplisit tetap diperlukan.
         $user = User::factory()->pegawai()->create();
 
         $this->actingAs($user);

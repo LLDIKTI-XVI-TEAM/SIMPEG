@@ -25,6 +25,32 @@ class PimpinanDashboardDataTest extends TestCase
      */
     private const MARKUP_PANAH = '<span class="text-muted mx-1">';
 
+    public function test_penangguhan_administratif_masuk_ringkasan_bukan_antrean_aktif(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $actor = User::factory()->pimpinan()->create();
+        $type = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit', 'code' => 'sakit',
+            'mengurangi_saldo_tahunan' => false, 'khusus_pns' => false,
+        ]);
+        $leave = LeaveRequest::create([
+            'employee_id' => Employee::factory()->create()->id,
+            'jenis_cuti_id' => $type->id,
+            'tanggal_mulai' => now()->addWeek(), 'tanggal_selesai' => now()->addWeeks(2),
+            'jumlah_hari_kerja' => 5, 'alasan' => 'Cuti telah ditangguhkan administratif.', 'status' => 'disetujui',
+        ]);
+        $leave->forceFill([
+            'status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED,
+            'administratively_postponed_at' => now(), 'administratively_postponed_by' => $actor->id,
+            'administrative_postponement_reason' => 'Alasan yang tidak ditampilkan di dashboard.',
+        ])->save();
+
+        $this->actingAs($actor)->get(route('pimpinan.dashboard'))->assertOk()
+            ->assertViewHas('cutiDitunda', 1)->assertViewHas('cutiPending', 0)
+            ->assertViewHas('pendingLeaves', fn ($leaves): bool => $leaves->isEmpty())
+            ->assertDontSee('Alasan yang tidak ditampilkan di dashboard.');
+    }
+
     public function test_pimpinan_dashboard_renders_current_database_records_and_real_monitoring_links(): void
     {
         $this->seed(RbacSeeder::class);

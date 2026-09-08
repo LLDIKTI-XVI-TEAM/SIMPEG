@@ -102,6 +102,7 @@ class SearchKepalaBagianWorkspaceAction
             'disetujui' => 'Disetujui',
             'perlu_perubahan' => 'Perubahan',
             'ditangguhkan' => 'Ditangguhkan',
+            LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED => 'Ditangguhkan (Administratif)',
             LeaveRequest::STATUS_DUTY_POSTPONED => 'Ditangguhkan karena Tugas Dinas',
             LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => 'Dikembalikan karena Rollover',
             LeaveRequest::STATUS_CANCELLATION_PENDING => 'Menunggu Keputusan Pembatalan',

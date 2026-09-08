@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AdministrativeLeavePostponementController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\CutiConfigController;
 use App\Http\Controllers\Admin\CutiController;
@@ -499,6 +500,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware('permission:cuti.create')
         ->name('cuti.cancellations.store')
         ->whereUuid('leaveRequest');
+    Route::post('/cuti/{leaveRequest}/penangguhan-administratif', [AdministrativeLeavePostponementController::class, 'store'])
+        ->middleware('permission:cuti.administrative_postponement.manage')
+        ->whereUuid('leaveRequest')
+        ->name('cuti.penangguhan-administratif');
     Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
         ->middleware('permission:cuti.create')
         ->name('cuti.resubmit')
@@ -602,10 +607,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     });
 
     Route::get('/dashboard/audit', [AuditController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
+        ->middleware('permission:audit_logs.read')
         ->name('audit-log');
     Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
+        ->middleware('permission:audit_logs.read')
         ->name('audit-log.show')
         ->whereUuid('id');
 

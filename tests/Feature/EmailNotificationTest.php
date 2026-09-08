@@ -529,14 +529,31 @@ class EmailNotificationTest extends TestCase
     {
         Mail::fake();
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $leave = $this->makeApprovedLeaveRequest($employee);
         $this->setEventChannelPolicy('cuti.disetujui', 'email', true);
-        $job = new SendSimpegNotificationEmailJob($employee->id, 'cuti.disetujui', 'Judul Notifikasi', 'Isi notifikasi', ['url' => '/dashboard']);
+        $job = new SendSimpegNotificationEmailJob($employee->id, 'cuti.disetujui', 'Judul Notifikasi', 'Isi notifikasi', [
+            'leave_request_id' => $leave->id, 'url' => '/dashboard',
+        ]);
 
         app()->call([$job, 'handle']);
 
         Mail::assertSent(SimpegNotificationMail::class, function (SimpegNotificationMail $mail): bool {
             return $mail->hasTo('pegawai@example.test') && $mail->title === 'Judul Notifikasi';
         });
+    }
+
+    public function test_email_persetujuan_tanpa_pengajuan_yang_dapat_diverifikasi_dilewati(): void
+    {
+        Mail::fake();
+        $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $this->setEventChannelPolicy('cuti.disetujui', 'email', true);
+
+        foreach ([[], ['leave_request_id' => '00000000-0000-4000-8000-000000000001']] as $data) {
+            $job = new SendSimpegNotificationEmailJob($employee->id, 'cuti.disetujui', 'Pengajuan Cuti Disetujui', 'Cuti telah disetujui.', $data);
+            app()->call([$job, 'handle']);
+        }
+
+        Mail::assertNothingSent();
     }
 
     public function test_kegagalan_email_terminal_tercatat_di_failed_jobs_native(): void
@@ -558,6 +575,7 @@ class EmailNotificationTest extends TestCase
             );
         });
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
+        $leave = $this->makeApprovedLeaveRequest($employee);
         Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('SMTP gagal dengan password rahasia-test'));
 
         $job = new SendSimpegNotificationEmailJob(
@@ -565,6 +583,7 @@ class EmailNotificationTest extends TestCase
             'cuti.disetujui',
             'Pengajuan Cuti Disetujui',
             'Pengajuan cuti Anda telah disetujui sepenuhnya.',
+            ['leave_request_id' => $leave->id],
         );
         $job->tries = 1;
         Queue::connection('database')->push($job);
@@ -612,11 +631,13 @@ class EmailNotificationTest extends TestCase
         $this->enableEventChannels('cuti.disetujui');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
 
+        $leave = $this->makeApprovedLeaveRequest($employee);
         app(NotificationService::class)->createForEmployee(
             employee: $employee,
             type: 'cuti.disetujui',
             title: 'Pengajuan Cuti Disetujui',
             body: 'Pengajuan cuti telah disetujui.',
+            data: ['leave_request_id' => $leave->id],
         );
 
         $queuedJob = null;
@@ -640,11 +661,13 @@ class EmailNotificationTest extends TestCase
         $this->enableEventChannels('cuti.disetujui');
         $employee = Employee::factory()->create(['email' => 'pegawai@example.test']);
 
+        $leave = $this->makeApprovedLeaveRequest($employee);
         app(NotificationService::class)->createForEmployee(
             employee: $employee,
             type: 'cuti.disetujui',
             title: 'Pengajuan Cuti Disetujui',
             body: 'Pengajuan cuti telah disetujui.',
+            data: ['leave_request_id' => $leave->id],
         );
 
         $queuedJob = null;
@@ -797,6 +820,16 @@ class EmailNotificationTest extends TestCase
 
         // CTA email harus membuka halaman detail cuti internal, bukan fallback dashboard.
         $this->assertStringContainsString(url($detailPath), $html);
+    }
+
+    /** Menyiapkan keputusan final agar test delivery tidak bergantung pada konteks pengajuan yang hilang. */
+    private function makeApprovedLeaveRequest(Employee $employee): LeaveRequest
+    {
+        $leave = $this->makeLeaveRequestWithSteps($employee, [Employee::factory()->create()]);
+        $leave->steps()->update(['status' => 'approved', 'acted_at' => now()]);
+        $leave->update(['status' => 'disetujui']);
+
+        return $leave;
     }
 
     /**

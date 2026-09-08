@@ -62,9 +62,14 @@ class RbacSeeder extends Seeder
             'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
             'cuti.cancellation.manage' => ['module' => 'cuti', 'description' => 'Memutuskan permohonan pembatalan cuti'],
+            'cuti.administrative_postponement.manage' => ['module' => 'cuti', 'description' => 'Menangguhkan cuti yang disetujui secara administratif'],
             'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
         ];
+
+        // Assignment administratif yang sudah dikonfigurasi operator, termasuk pencabutan total, dipertahankan.
+        $administrativeRoles = Permission::query()->where('name', 'cuti.administrative_postponement.manage')
+            ->first()?->roles()->pluck('name')->all();
 
         foreach ($roles as $name => $description) {
             Role::updateOrCreate(['name' => $name], [
@@ -88,6 +93,7 @@ class RbacSeeder extends Seeder
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
                 'cuti.cancellation.manage',
+                'cuti.administrative_postponement.manage',
             ])),
             'admin_kepegawaian' => [
                 'employees.read',
@@ -120,6 +126,7 @@ class RbacSeeder extends Seeder
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
                 'cuti.cancellation.manage',
+                'cuti.administrative_postponement.manage',
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [
@@ -150,7 +157,7 @@ class RbacSeeder extends Seeder
                 'employee_families.read',
                 'employee_histories.read',
             ],
-        ]);
+        ], $administrativeRoles);
     }
 
     /**
@@ -158,11 +165,19 @@ class RbacSeeder extends Seeder
      * Memakai sync agar seeder aman dijalankan ulang tanpa menduplikasi pivot.
      *
      * @param  array<string, list<string>>  $mapping
+     * @param  list<string>|null  $administrativeRoles
      */
-    private function syncRolePermissions(array $mapping): void
+    private function syncRolePermissions(array $mapping, ?array $administrativeRoles): void
     {
         foreach ($mapping as $roleName => $permissionNames) {
             $role = Role::where('name', $roleName)->firstOrFail();
+
+            if ($administrativeRoles !== null) {
+                $permissionNames = array_values(array_diff($permissionNames, ['cuti.administrative_postponement.manage']));
+                if (in_array($roleName, $administrativeRoles, true)) {
+                    $permissionNames[] = 'cuti.administrative_postponement.manage';
+                }
+            }
 
             $permissionIds = Permission::query()
                 ->whereIn('name', $permissionNames)

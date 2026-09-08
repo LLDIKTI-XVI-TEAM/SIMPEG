@@ -579,6 +579,15 @@ class LeaveProofTest extends TestCase
 
         // Content checks
         $response->assertSee('LLDIKTI Wilayah XVI');
+        $response->assertSee('alt="Logo LLDIKTI Wilayah XVI"', false)
+            ->assertSee('img/dikti16-favicon-blue-150x150.png')
+            ->assertSee('Ringkasan cuti')
+            ->assertSee('Riwayat persetujuan')
+            ->assertSee('Cetak halaman verifikasi')
+            ->assertSee('Buka tautan verifikasi')
+            ->assertDontSee('Status cuti saat ini')
+            ->assertDontSee('Layanan publik')
+            ->assertDontSee('Mockup');
         $response->assertSee($fixture['pemohon_employee']->nama_lengkap);
         $response->assertSee('Cuti Tahunan');
         $response->assertSee($fixture['approver_employee']->nama_lengkap);
@@ -602,6 +611,46 @@ class LeaveProofTest extends TestCase
         $response->assertDontSee($proof->id);
     }
 
+    public function test_public_verification_shows_administrative_status_without_changing_approval_snapshot_or_exposing_reason(): void
+    {
+        $fixture = $this->makeFinalApprovedRequest();
+        $service = app(LeaveProofService::class);
+        $proof = $service->generateForApprovedRequest(
+            $fixture['request'], $fixture['approver_employee'], $fixture['approver_user'],
+        );
+        $snapshot = $proof->fresh()->getRawOriginal();
+        $steps = $fixture['request']->steps()->orderBy('step_order')->get()->toArray();
+        $approvals = $fixture['request']->approvals()->orderBy('stage')->get()->toArray();
+        $fixture['request']->fresh()->forceFill([
+            'status' => 'ditangguhkan_administratif',
+            'administratively_postponed_at' => Carbon::parse('2026-07-03 01:15:00', 'UTC')
+                ->setTimezone(config('app.timezone')),
+            'administratively_postponed_by' => $fixture['approver_user']->id,
+            'administrative_postponement_reason' => 'QA PRIVAT alasan administratif.',
+        ])->save();
+
+        $response = $this->get('/cuti/verifikasi/'.$proof->token);
+        $response->assertOk()
+            ->assertSee('Ditangguhkan (Administratif)')
+            ->assertSee('03 Juli 2026 09:15')
+            ->assertSee('tidak lagi berlaku')
+            ->assertSee('Persetujuan berikut merupakan histori sebelum penangguhan administratif.')
+            ->assertSee($fixture['approver_employee']->nama_lengkap)
+            ->assertDontSee('QA PRIVAT');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $data = $service->publicViewData($proof->fresh());
+        $this->assertSame('Ditangguhkan (Administratif)', $data['status_label']);
+        $this->assertStringNotContainsString('QA PRIVAT', json_encode($data, JSON_THROW_ON_ERROR));
+        $this->assertSame($snapshot, $proof->fresh()->getRawOriginal());
+        $this->assertSame($steps, $fixture['request']->steps()->orderBy('step_order')->get()->toArray());
+        $this->assertSame($approvals, $fixture['request']->approvals()->orderBy('stage')->get()->toArray());
+
+        $this->expectException(ValidationException::class);
+        $service->generateForApprovedRequest(
+            $fixture['request'], $fixture['approver_employee'], $fixture['approver_user'],
+        );
+    }
+
     public function test_public_verification_route_rejects_malformed_tokens_with_404(): void
     {
         $this->get('/cuti/verifikasi/short_token')->assertStatus(404);
@@ -611,7 +660,16 @@ class LeaveProofTest extends TestCase
     public function test_public_verification_route_returns_404_for_unknown_token(): void
     {
         $unknownToken = str_repeat('z', 64);
-        $this->get('/cuti/verifikasi/'.$unknownToken)->assertStatus(404);
+        $response = $this->get('/cuti/verifikasi/'.$unknownToken);
+        $response->assertStatus(404)
+            ->assertSee('Bukti tidak ditemukan')
+            ->assertSee('alt="Logo LLDIKTI Wilayah XVI"', false)
+            ->assertDontSee('Ringkasan cuti')
+            ->assertDontSee('Cetak halaman verifikasi')
+            ->assertDontSee('QR Code Verifikasi Bukti Cuti Publik')
+            ->assertDontSee('window.location')
+            ->assertDontSee('Status cuti saat ini');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }
 
     public function test_public_verification_route_with_non_final_leave_request_status_returns_404(): void
@@ -699,6 +757,19 @@ class LeaveProofTest extends TestCase
         $response->assertDontSee('Alasan Legacy Rahasia');
         $response->assertDontSee('Alasan Bahasa Indonesia Rahasia');
         $response->assertDontSee('Metadata Asing Rahasia');
+
+        $fixture['request']->forceFill([
+            'status' => 'ditangguhkan_administratif',
+            'administratively_postponed_at' => now(),
+            'administratively_postponed_by' => $fixture['approver_user']->id,
+            'administrative_postponement_reason' => 'QA PRIVAT alasan administratif.',
+        ])->save();
+        $this->get('/cuti/verifikasi/'.$proof->token)->assertOk()
+            ->assertSee('Ditangguhkan (Administratif)')
+            ->assertSee('Pegawai Legacy')
+            ->assertSee('Tidak diketahui')
+            ->assertDontSee('QA PRIVAT')
+            ->assertDontSee('Metadata Asing Rahasia');
     }
 
     public function test_public_verification_route_with_malformed_metadata_fields_returns_200_with_proper_fallbacks(): void

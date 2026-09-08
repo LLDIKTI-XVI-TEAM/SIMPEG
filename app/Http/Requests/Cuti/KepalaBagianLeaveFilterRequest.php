@@ -25,6 +25,7 @@ class KepalaBagianLeaveFilterRequest extends FormRequest
                 'disetujui',
                 'perlu_perubahan',
                 'ditangguhkan',
+                LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED,
                 'ditangguhkan_tugas_dinas',
                 LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER,
                 LeaveRequest::STATUS_CANCELLATION_PENDING,

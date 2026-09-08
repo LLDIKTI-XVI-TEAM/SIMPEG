@@ -3,7 +3,10 @@
 namespace App\Actions\Audit;
 
 use App\Models\AuditLog;
+use App\Models\User;
+use App\Services\Audit\AuditLogScope;
 use App\Support\Audit\AuditFilterValue;
+use App\Support\Audit\AuditLogReadPayload;
 use App\Support\Audit\AuditLogViewPayload;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +21,11 @@ use Illuminate\Support\Str;
  */
 class ListAuditLogPageAction
 {
+    public function __construct(
+        private readonly AuditLogReadPayload $payload,
+        private readonly AuditLogScope $scope,
+    ) {}
+
     /**
      * Batas jumlah baris per halaman. Nilai bawaan mengikuti kriteria halaman audit, sedangkan
      * batas atas menjaga permintaan buatan tangan tidak menarik seluruh tabel.
@@ -47,24 +55,25 @@ class ListAuditLogPageAction
      * @param  array<string, mixed>  $filters
      * @return array{auditLogs: LengthAwarePaginator<int, array<string, mixed>>, operatorOptions: list<string>, modulOptions: list<string>, eventOptions: list<string>, activeFilters: array<string, string>}
      */
-    public function execute(array $filters): array
+    public function execute(array $filters, ?User $actor = null): array
     {
         $activeFilters = self::normalizeFilters($filters);
 
-        $paginator = $this->baseQuery($activeFilters)
+        $paginator = $this->baseQuery($activeFilters, $actor)
             ->orderBy(
                 self::SORTABLE_COLUMNS[$activeFilters['sort']],
                 $activeFilters['direction'],
             )
             ->paginate(self::perPage($filters))
-            ->withQueryString()
-            ->through(fn (AuditLog $log): array => AuditLogViewPayload::forView($log));
+            ->withQueryString();
+        $payloads = $this->payload->forLogs($paginator->getCollection(), $actor);
+        $paginator->through(fn (AuditLog $log): array => AuditLogViewPayload::forView($log, $payloads->get($log->id)));
 
         return [
             'auditLogs' => $paginator,
-            'operatorOptions' => $this->distinctValues('user_name'),
-            'modulOptions' => $this->distinctValues('auditable_type'),
-            'eventOptions' => $this->distinctValues('event'),
+            'operatorOptions' => $this->distinctValues('user_name', $actor),
+            'modulOptions' => $this->distinctValues('auditable_type', $actor),
+            'eventOptions' => $this->distinctValues('event', $actor),
             'activeFilters' => $activeFilters,
         ];
     }
@@ -73,9 +82,9 @@ class ListAuditLogPageAction
      * @param  array<string, string>  $filters
      * @return Builder<AuditLog>
      */
-    private function baseQuery(array $filters): Builder
+    private function baseQuery(array $filters, ?User $actor): Builder
     {
-        $query = AuditLog::query();
+        $query = $this->scope->for($actor);
 
         if ($filters['q'] !== '') {
             $query->where(function (Builder $pencarian) use ($filters): void {
@@ -125,9 +134,9 @@ class ListAuditLogPageAction
      *
      * @return list<string>
      */
-    private function distinctValues(string $column): array
+    private function distinctValues(string $column, ?User $actor): array
     {
-        return AuditLog::query()
+        return $this->scope->for($actor)
             ->whereNotNull($column)
             ->distinct()
             ->reorder($column)

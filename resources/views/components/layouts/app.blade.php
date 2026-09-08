@@ -73,6 +73,7 @@
             $canAdministerLeaveBalance = ($layoutCapabilities['cuti.balance.reconcile'] ?? false)
                 || ($layoutCapabilities['cuti.manual.manage'] ?? false);
             $canViewEmployeeStatistics = $layoutCapabilities['employees.read'] ?? false;
+            $canReadAudit = $layoutCapabilities['audit_logs.read'] ?? false;
             $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
                 && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
 
@@ -87,7 +88,6 @@
                     'ews.config',
                 ],
                 'pimpinan' => [
-                    'audit-log',
                     'user-management',
                     'rbac',
                     'ews.config',
@@ -97,7 +97,6 @@
                     'pegawai.import',
                     'hari-libur',
                     'dokumen',
-                    'audit-log',
                     'user-management',
                     'rbac',
                     'data-master',
@@ -123,7 +122,6 @@
                     'rbac',
                     'data-master',
                     'hari-libur',
-                    'audit-log',
                 ],
             ];
 
@@ -275,12 +273,21 @@
                     $allMenuRoutes[] = $item['route'];
                 }
             }
+            if ($canReadAudit && !in_array('audit-log', $allMenuRoutes, true)) {
+                $menuGroups[] = [
+                    'group' => 'Administrasi Sistem',
+                    'items' => [['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list']],
+                ];
+            }
             @endphp
 
             @foreach($menuGroups as $group)
                 @php
                     $visibleItems = [];
                     foreach ($group['items'] as $menu) {
+                        if ($menu['route'] === 'audit-log' && !$canReadAudit) {
+                            continue;
+                        }
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
                         $isLocked    = in_array($menu['route'], $myLockedMenus);
                         if ($routeExists && !$isLocked) {

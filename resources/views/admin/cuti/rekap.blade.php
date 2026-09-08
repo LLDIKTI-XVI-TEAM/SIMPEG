@@ -8,6 +8,7 @@
             'menunggu_approval' => 'text-warning',
             'disetujui' => 'text-success',
             'ditangguhkan' => 'text-warning',
+            'ditangguhkan_administratif' => 'text-warning',
             'ditangguhkan_tugas_dinas' => 'text-warning',
             'dikembalikan_karena_rollover' => 'text-warning',
             'menunggu_pembatalan' => 'text-warning',

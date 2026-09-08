@@ -66,7 +66,7 @@ class AppServiceProvider extends ServiceProvider
         View::composer('components.layouts.app', function (ViewInstance $view): void {
             $authenticated = auth()->user();
             $actor = $authenticated instanceof User ? $authenticated : null;
-            $permissionNames = ['employees.read', 'cuti.balance.reconcile', 'cuti.manual.manage'];
+            $permissionNames = ['employees.read', 'cuti.balance.reconcile', 'cuti.manual.manage', 'audit_logs.read'];
 
             if (in_array($actor?->role, ['super_admin', 'admin_kepegawaian'], true)) {
                 $permissionNames = [

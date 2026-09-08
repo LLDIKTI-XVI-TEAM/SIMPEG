@@ -39,6 +39,11 @@ final class NotificationEventCatalog
             'group' => 'Cuti',
             'allowed_channels' => ['in_app', 'email', 'whatsapp_business'],
         ],
+        'cuti.ditangguhkan_administratif' => [
+            'label' => 'Cuti ditangguhkan secara administratif',
+            'group' => 'Cuti',
+            'allowed_channels' => ['in_app', 'email'],
+        ],
         'cuti.pembatalan_diajukan' => [
             'label' => 'Permohonan pembatalan cuti diajukan',
             'group' => 'Cuti',

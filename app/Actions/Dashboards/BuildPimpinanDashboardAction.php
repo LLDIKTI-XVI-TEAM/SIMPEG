@@ -103,7 +103,9 @@ class BuildPimpinanDashboardAction
                 ->whereYear('tanggal_mulai', $now->year)
                 ->whereMonth('tanggal_mulai', $now->month)
                 ->count(),
-            'cutiDitunda' => LeaveRequest::query()->where('status', 'ditangguhkan')->count(),
+            'cutiDitunda' => LeaveRequest::query()
+                ->whereIn('status', ['ditangguhkan', LeaveRequest::STATUS_DUTY_POSTPONED, LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED])
+                ->count(),
             'pendingLeaves' => $pendingLeaves,
             'totalEwsAktif' => $ews['total'],
             'ewsAktif' => $ews['alerts'],

@@ -83,7 +83,7 @@ class PimpinanLeaveProofTest extends TestCase
     {
         $this->get(route('cuti.verify', 'token-tidak-valid'))
             ->assertNotFound()
-            ->assertSee('Dokumen Tidak Ditemukan')
+            ->assertSee('Bukti tidak ditemukan')
             ->assertDontSee('NIK')
             ->assertDontSee('No. KK');
     }

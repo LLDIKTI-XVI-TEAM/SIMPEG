@@ -67,6 +67,7 @@ class NotificationEventChannelMigrationTest extends TestCase
     {
         $normalEvents = [
             'cuti.disetujui',
+            'cuti.ditangguhkan_administratif',
             'cuti.ditunda',
             'cuti.menunggu_persetujuan',
             'cuti.pembatalan_diajukan',
@@ -91,7 +92,7 @@ class NotificationEventChannelMigrationTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(28, $normalPolicies);
+        $this->assertCount(30, $normalPolicies);
         $this->assertTrue($normalPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
 
         foreach ($normalEvents as $eventKey) {
@@ -174,9 +175,10 @@ class NotificationEventChannelMigrationTest extends TestCase
         $this->assertTrue($followupPolicies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
         $this->assertTrue($followupPolicies->every(fn (object $policy): bool => $policy->code === 'in_app'));
 
-        // Agregat 45 = 37 kebijakan existing + 6 baris dari 6 event ews.followup.* (in_app saja)
-        // + 2 baris dari status_pegawai.dinonaktifkan (in_app + email).
-        $this->assertDatabaseCount('notification_event_channels', 45);
+        // Agregat 47 = 37 kebijakan existing + 6 baris dari 6 event ews.followup.* (in_app saja)
+        // + 2 baris dari status_pegawai.dinonaktifkan (in_app + email)
+        // + 2 baris dari cuti.ditangguhkan_administratif (in_app + email).
+        $this->assertDatabaseCount('notification_event_channels', 47);
 
         $orphanCount = DB::table('notification_event_channels')
             ->leftJoin('ref_notification_channels', 'ref_notification_channels.id', '=', 'notification_event_channels.notification_channel_id')
