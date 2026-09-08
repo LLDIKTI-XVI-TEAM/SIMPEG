@@ -24,18 +24,20 @@ return new class extends Migration
         // Mapping ambigu sengaja dibiarkan null agar tidak memberikan inbox seseorang
         // kepada akun yang dipilih secara arbitrer.
         DB::statement(<<<'SQL'
-            WITH unambiguous_users AS (
-                SELECT employee_id, MIN(id) AS id
+            WITH unambiguous_employees AS (
+                SELECT employee_id
                 FROM users
                 WHERE employee_id IS NOT NULL
                 GROUP BY employee_id
                 HAVING COUNT(*) = 1
             )
-            UPDATE notifications
-            SET recipient_user_id = unambiguous_users.id
-            FROM unambiguous_users
-            WHERE notifications.user_id = unambiguous_users.employee_id
-              AND notifications.recipient_user_id IS NULL
+            UPDATE notifications AS notification
+            SET recipient_user_id = user_account.id
+            FROM users AS user_account
+            INNER JOIN unambiguous_employees
+                ON unambiguous_employees.employee_id = user_account.employee_id
+            WHERE notification.user_id = user_account.employee_id
+              AND notification.recipient_user_id IS NULL
         SQL);
     }
 

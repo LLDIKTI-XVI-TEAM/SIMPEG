@@ -542,7 +542,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // Parameter memakai model binding ber-UUID agar id rusak berhenti sebagai 404
     // di layer route, bukan menjadi error database.
     Route::get('/hari-libur', [HariLiburController::class, 'index'])
-        ->middleware('permission:hari_libur.read')
+        ->middleware(['user.context.account', 'permission:hari_libur.read'])
         ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
         ->name('hari-libur');
     Route::post('/hari-libur', [HariLiburController::class, 'store'])
@@ -718,12 +718,12 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('revert-role');
 
     Route::get('/notifikasi', [NotificationController::class, 'index'])
-        ->middleware('permission:notifications.read')
+        ->middleware(['user.context.account', 'permission:notifications.read'])
         ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
         ->name('notifications.index');
 
     Route::redirect('/notifications', '/notifikasi')
-        ->middleware('permission:notifications.read')
+        ->middleware(['user.context.account', 'permission:notifications.read'])
         ->withoutMiddleware(EnsureActiveEmployeeAccount::class);
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])

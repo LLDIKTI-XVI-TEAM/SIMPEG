@@ -7,6 +7,7 @@ use App\Models\EwsAlert;
 use App\Models\NotificationEventChannel;
 use App\Models\Permission;
 use App\Models\RefNotificationChannel;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -135,6 +137,38 @@ class NotificationInboxTest extends TestCase
         $countResponse = $this->getJson(self::ENDPOINT.'/jumlah-belum-dibaca');
 
         $countResponse->assertOk()->assertJsonPath('data.unread_count', 1);
+    }
+
+    public function test_user_dengan_employee_nonaktif_diblokir_dari_inbox_notifikasi(): void
+    {
+        $status = RefStatusPegawai::query()->firstOrCreate(
+            ['kode' => 'NONAKTIF'],
+            [
+                'nama' => 'Nonaktif',
+                'kelompok' => 'Nonaktif',
+                'keterangan' => 'Status nonaktif untuk regression lifecycle.',
+                'is_default' => false,
+            ],
+        );
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => $status->nama,
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $this->actingAsUnmapped($user)
+            ->getJson(self::ENDPOINT)
+            ->assertRedirect(route('status-akun'));
+    }
+
+    public function test_user_dengan_referensi_employee_hilang_diblokir_dari_inbox_notifikasi(): void
+    {
+        $user = User::factory()->pegawai()->create();
+        $user->forceFill(['employee_id' => (string) Str::uuid()]);
+
+        $this->actingAsUnmapped($user)
+            ->getJson(self::ENDPOINT)
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_user_only_sees_own_notifications_with_unread_count(): void

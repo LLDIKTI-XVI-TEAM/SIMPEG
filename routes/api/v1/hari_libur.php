@@ -9,7 +9,7 @@ Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
     ->name('hari-libur.')
     ->group(function (): void {
         Route::get('/', [HariLiburController::class, 'index'])
-            ->middleware('permission:hari_libur.read')
+            ->middleware(['user.context.account', 'permission:hari_libur.read'])
             ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
             ->name('index');
         Route::post('/', [HariLiburController::class, 'store'])

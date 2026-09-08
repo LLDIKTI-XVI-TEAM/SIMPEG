@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\RefHariLibur;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\WorkdayCalculator;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -47,9 +49,29 @@ class HariLiburWebPageTest extends TestCase
 
     public function test_pegawai_tanpa_employee_tetap_dapat_membuka_halaman_hari_libur_sebagai_capability_paten(): void
     {
-        $this->actingAs(User::factory()->pegawai()->create())
+        $this->actingAsUnmapped(User::factory()->pegawai()->create(['employee_id' => null]))
             ->get(route('hari-libur'))
             ->assertOk();
+    }
+
+    public function test_pegawai_dengan_employee_nonaktif_tetap_diblokir_dari_hari_libur(): void
+    {
+        $employee = $this->employeeNonaktif();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $this->actingAsUnmapped($user)
+            ->get(route('hari-libur'))
+            ->assertRedirect(route('status-akun'));
+    }
+
+    public function test_pegawai_dengan_referensi_employee_hilang_tetap_diblokir_dari_hari_libur(): void
+    {
+        $user = User::factory()->pegawai()->create();
+        $user->forceFill(['employee_id' => (string) Str::uuid()]);
+
+        $this->actingAsUnmapped($user)
+            ->get(route('hari-libur'))
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_halaman_menampilkan_hari_libur_dari_database_bukan_data_statis(): void
@@ -552,6 +574,24 @@ class HariLiburWebPageTest extends TestCase
             'nama' => $nama,
             'tahun' => (int) Carbon::parse($tanggal)->format('Y'),
             'is_cuti_bersama' => $cutiBersama,
+        ]);
+    }
+
+    private function employeeNonaktif(): Employee
+    {
+        $status = RefStatusPegawai::query()->firstOrCreate(
+            ['kode' => 'NONAKTIF'],
+            [
+                'nama' => 'Nonaktif',
+                'kelompok' => 'Nonaktif',
+                'keterangan' => 'Status nonaktif untuk regression lifecycle.',
+                'is_default' => false,
+            ],
+        );
+
+        return Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => $status->nama,
         ]);
     }
 
