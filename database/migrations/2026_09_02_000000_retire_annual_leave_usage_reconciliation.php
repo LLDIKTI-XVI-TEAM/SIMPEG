@@ -13,15 +13,6 @@ return new class extends Migration
             return;
         }
 
-        $hasLegacyData = DB::table('leave_usage_reconciliation_sets')->exists()
-            || DB::table('leave_usage_reconciliation_memberships')->exists()
-            || DB::table('leave_usage_records')->where('source_type', 'annual_reconciliation')->exists()
-            || DB::table('leave_usage_documents')->whereNotNull('leave_usage_reconciliation_set_id')->exists();
-
-        if ($hasLegacyData) {
-            throw new LogicException('Retirement rekonsiliasi tahunan dihentikan: data legacy masih ada dan memerlukan migrasi data eksplisit.');
-        }
-
         DB::unprepared(<<<'SQL'
 DROP TRIGGER IF EXISTS leave_usage_record_lifecycle_contract ON leave_usage_records;
 DROP TRIGGER IF EXISTS leave_usage_reconciliation_lifecycle_contract ON leave_usage_reconciliation_sets;
@@ -126,6 +117,25 @@ EXECUTE FUNCTION remember_leave_usage_lifecycle_effect();
 SQL);
 
         DB::unprepared(<<<'SQL'
+-- Rekonsiliasi tahunan lama merupakan proyeksi agregat. Pindahkan dokumen
+-- set ke record ringkasan yang dipertahankan, lalu terminal-kan ringkasannya
+-- agar fakta itemized tetap menjadi satu-satunya sumber pemakaian aktif.
+DROP TRIGGER IF EXISTS leave_usage_document_restrict_update ON leave_usage_documents;
+DROP TRIGGER IF EXISTS leave_usage_record_restrict_update ON leave_usage_records;
+
+UPDATE leave_usage_documents AS document
+SET leave_usage_record_id = summary.record_id,
+    leave_usage_reconciliation_set_id = NULL
+FROM (
+    SELECT DISTINCT ON (reconciliation_set_id)
+        reconciliation_set_id,
+        id AS record_id
+    FROM leave_usage_records
+    WHERE source_type = 'annual_reconciliation'
+    ORDER BY reconciliation_set_id, usage_year, id
+) AS summary
+WHERE document.leave_usage_reconciliation_set_id = summary.reconciliation_set_id;
+
 DROP TABLE leave_usage_reconciliation_memberships;
 
 ALTER TABLE leave_usage_documents
@@ -144,6 +154,30 @@ ALTER TABLE leave_usage_records
 DROP INDEX IF EXISTS leave_usage_reconciliation_year_index;
 ALTER TABLE leave_usage_records
     DROP CONSTRAINT IF EXISTS leave_usage_reconciliation_year_unique;
+
+ALTER TABLE leave_usage_records
+    DROP CONSTRAINT IF EXISTS leave_usage_source_type_check,
+    DROP CONSTRAINT IF EXISTS leave_usage_workdays_check,
+    DROP CONSTRAINT IF EXISTS leave_usage_source_contract_check;
+
+UPDATE leave_usage_records
+SET source_type = 'manual_external',
+    reconciliation_set_id = NULL,
+    start_date = effective_date,
+    end_date = effective_date,
+    workdays = GREATEST(workdays, 1),
+    record_status = 'cancelled',
+    correction_reason = COALESCE(
+        NULLIF(BTRIM(correction_reason), ''),
+        'Migrasi ringkasan rekonsiliasi tahunan legacy; fakta itemized dipertahankan sebagai sumber kanonis.'
+    ),
+    administrative_note = CONCAT(
+        administrative_note,
+        CASE WHEN administrative_note = '' THEN '' ELSE E'\n' END,
+        '[Migrated from annual_reconciliation; excluded from active usage replay.]'
+    )
+WHERE source_type = 'annual_reconciliation';
+
 ALTER TABLE leave_usage_records
     DROP COLUMN reconciliation_set_id;
 
@@ -155,10 +189,6 @@ DROP FUNCTION IF EXISTS guard_leave_usage_reconciliation_update();
 DROP FUNCTION IF EXISTS guard_leave_usage_reconciliation_history();
 DROP FUNCTION IF EXISTS enforce_leave_usage_reconciliation_lifecycle_contract();
 
-ALTER TABLE leave_usage_records
-    DROP CONSTRAINT IF EXISTS leave_usage_source_type_check,
-    DROP CONSTRAINT IF EXISTS leave_usage_workdays_check,
-    DROP CONSTRAINT IF EXISTS leave_usage_source_contract_check;
 ALTER TABLE leave_usage_records
     ADD CONSTRAINT leave_usage_source_type_check
         CHECK (source_type IN ('approved_request', 'manual_external')),
@@ -176,6 +206,14 @@ ALTER TABLE leave_usage_records
                 AND start_date IS NOT NULL
                 AND end_date IS NOT NULL)
         );
+
+CREATE TRIGGER leave_usage_document_restrict_update
+BEFORE UPDATE ON leave_usage_documents
+FOR EACH ROW EXECUTE FUNCTION guard_leave_usage_document_update();
+
+CREATE TRIGGER leave_usage_record_restrict_update
+BEFORE UPDATE ON leave_usage_records
+FOR EACH ROW EXECUTE FUNCTION guard_leave_usage_record_update();
 SQL);
 
         DB::unprepared(<<<'SQL'

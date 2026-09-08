@@ -43,7 +43,12 @@ class SaveAppointmentAction
         $storedPath = null;
         if ($file instanceof UploadedFile) {
             $user = $request?->user() ?? auth()->user();
-            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
+            // Route/FormRequest memilih create vs update dari lifecycle berkas.
+            // Action hanya menerima kedua capability agar tidak membatalkan grant
+            // update yang sudah diverifikasi ketika SK lama sedang diganti.
+            $canCreateDoc = $user === null
+                || $user->hasPermission('dokumen_sk.create')
+                || $user->hasPermission('dokumen_sk.update');
             if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
                 $canCreateDoc = true;
             }
@@ -72,6 +77,34 @@ class SaveAppointmentAction
                     ->orderBy('id')
                     ->lockForUpdate()
                     ->first();
+
+                // FormRequest melakukan pemeriksaan awal, lalu ulangi setelah
+                // row terkunci agar dua request bersamaan tidak dapat mengubah
+                // lifecycle create/update maupun mengganti SK dengan grant yang
+                // hanya berlaku untuk upload pertama.
+                $actor = $request?->user();
+                if ($actor instanceof User) {
+                    $historyPermission = $appointment === null
+                        ? 'employee_histories.create'
+                        : 'employee_histories.update';
+                    if (! $actor->hasPermission($historyPermission)) {
+                        throw ValidationException::withMessages([
+                            'appointment' => 'Anda tidak memiliki permission '.$historyPermission.'.',
+                        ]);
+                    }
+
+                    if (filled($data['file_sk'] ?? null)) {
+                        $documentPermission = $appointment !== null && filled($appointment->file_sk)
+                            ? 'dokumen_sk.update'
+                            : 'dokumen_sk.create';
+                        if (! $actor->hasPermission($documentPermission)) {
+                            throw ValidationException::withMessages([
+                                'file_sk' => 'Anda tidak memiliki permission '.$documentPermission.'.',
+                            ]);
+                        }
+                    }
+                }
+
                 if ($appointment) {
                     $oldValues = $appointment->toArray();
                     $replacedPath = $appointment->file_sk;

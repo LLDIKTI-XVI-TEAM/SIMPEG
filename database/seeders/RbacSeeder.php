@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use App\Models\Role;
-use App\Support\Rbac\PatenCapability;
 use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
@@ -104,7 +103,7 @@ class RbacSeeder extends Seeder
         $this->bootstrapRolePermissions([
             // Super Admin menerima default semua capability RBAC, tetapi tetap
             // dapat direvoke dari matrix setelah bootstrap.
-            'super_admin' => array_values(array_diff(array_keys($permissions), PatenCapability::PERMISSION_NAMES)),
+            'super_admin' => array_keys($permissions),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
@@ -210,10 +209,6 @@ class RbacSeeder extends Seeder
     {
         foreach ($mapping as $roleName => $permissionNames) {
             $role = Role::where('name', $roleName)->firstOrFail();
-
-            // Permission legacy PATEN boleh masih ada pada tabel demi kompatibilitas
-            // deploy, tetapi bukan lagi grant role pada bootstrap baru.
-            $permissionNames = array_values(array_diff($permissionNames, PatenCapability::PERMISSION_NAMES));
 
             $namesToAttach = in_array($roleName, $newRoleNames, true)
                 ? $permissionNames

@@ -22,20 +22,24 @@ class DeleteDisciplineRecordAction
         $oldValues = $record->toArray();
         $recordId = $record->id;
 
-        DB::transaction(function () use ($record, $request, $oldValues, $recordId): void {
+        DB::transaction(function () use ($employee, $filePath, $record, $request, $oldValues, $recordId): void {
             $record->delete();
+
+            if ($filePath) {
+                // Mirror harus hilang dalam transaksi yang sama. Cleanup fisik
+                // setelah commit lalu melihat referensi yang benar-benar tersisa.
+                Document::where('employee_id', $employee->id)
+                    ->where('file_path', $filePath)
+                    ->where('jenis_dokumen', 'sk_hukuman_disiplin')
+                    ->delete();
+            }
 
             AuditService::log('DELETE', 'DisciplineRecord', $recordId, $oldValues, null, $request);
         });
 
         if ($filePath) {
-            // Hapus file fisik jika tidak lagi direferensikan oleh dokumen lain
+            // Hapus file fisik hanya setelah kedua referensi sudah terhapus.
             $this->files->deleteReplacedEmployeeDocumentFile($filePath);
-            // Hapus mirror dokumen jika ada
-            Document::where('employee_id', $employee->id)
-                ->where('file_path', $filePath)
-                ->where('jenis_dokumen', 'sk_hukuman_disiplin')
-                ->delete();
         }
     }
 }

@@ -46,6 +46,7 @@ use App\Http\Controllers\Admin\PimpinanLeaveDocumentController;
 use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
+use App\Http\Controllers\Admin\RbacEmployeeController;
 use App\Http\Controllers\Admin\SkRequirementController;
 use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
@@ -220,20 +221,24 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
     // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
     Route::prefix('data-master')->name('data-master.')->middleware('permission:reference_tables.manage')->group(function (): void {
-        Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
-            ->name('channel-notifikasi.index');
-        Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
-            ->name('channel-notifikasi.store');
-        Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
-        Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
-        Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
-        Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
-        Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
+        // Kanal notifikasi membawa konfigurasi sistem, bukan tabel referensi
+        // delegable. Tetap eksklusif untuk Super Admin.
+        Route::middleware('role:super_admin')->group(function (): void {
+            Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
+                ->name('channel-notifikasi.index');
+            Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
+                ->name('channel-notifikasi.store');
+            Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
+            Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
+            Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
+            Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
+            Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
+        });
 
         Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
         Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
@@ -376,23 +381,27 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('ews.config.update');
 
     Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/preview', [LaporanController::class, 'exportPegawaiPreview'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.preview');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.excel');
 
     Route::get('/laporan/export-pegawai/pdf', [LaporanController::class, 'exportPegawaiPdf'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.pdf');
 
+    Route::get('/laporan/export-pegawai/pdf-nominatif', [LaporanController::class, 'exportPegawaiNominatifPdf'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
+        ->name('laporan.pegawai.pdf-nominatif');
+
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.custom');
     Route::get('/pegawai', Index::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
@@ -455,6 +464,71 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('id')
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.assign-atasan');
+
+    // Surface detail canonical untuk role yang diberi capability melalui RBAC.
+    // Permission mengatur aksi, employee.scope mengatur record target: Pegawai
+    // hanya diri sendiri, Kabag bawahan aktif, sementara role global tetap luas.
+    Route::prefix('rbac/pegawai')->name('rbac.pegawai.')->group(function (): void {
+        Route::get('/create', Create::class)
+            ->middleware('permission:employees.create')
+            ->name('create');
+        Route::post('/', [PegawaiController::class, 'store'])
+            ->middleware('permission:employees.create')
+            ->name('store');
+        Route::get('/{employee}', [RbacEmployeeController::class, 'show'])
+            ->whereUuid('employee')
+            ->middleware(['permission:employees.read', 'employee.scope'])
+            ->name('show');
+        Route::get('/{id}/edit', Edit::class)
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('edit');
+        Route::post('/{id}', [PegawaiController::class, 'update'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('update');
+        Route::post('/{id}/delete', [PegawaiController::class, 'destroy'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.deactivate', 'employee.scope'])
+            ->name('destroy');
+        Route::post('/{id}/restore', [PegawaiController::class, 'restore'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.restore', 'employee.scope'])
+            ->name('restore');
+        Route::post('/{id}/kinerja-baik', [PegawaiController::class, 'updatePerformanceFlag'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('kinerja.update');
+        Route::post('/{id}/satyalancana-eligibility', [PegawaiController::class, 'updateSatyalancanaEligibility'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('satyalancana.update');
+        Route::post('/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('assign-atasan');
+        Route::get('/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope', 'throttle:60,1'])
+            ->name('supervisor-lookup');
+        Route::get('/{employee}/dokumen/{document}/unduh', [RbacEmployeeController::class, 'downloadDocument'])
+            ->whereUuid(['employee', 'document'])
+            ->middleware(['permission:employees.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('documents.download');
+        Route::get('/{employee}/hukuman-disiplin/{history}/unduh', [RbacEmployeeController::class, 'downloadDisciplineAttachment'])
+            ->whereUuid(['employee', 'history'])
+            ->middleware(['permission:employees.read', 'permission:discipline_records.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('discipline-attachments.download');
+        Route::get('/{employee}/status/{history}/unduh', [RbacEmployeeController::class, 'downloadStatusAttachment'])
+            ->whereUuid(['employee', 'history'])
+            ->middleware(['permission:employees.read', 'permission:employee_histories.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('status-attachments.download');
+        Route::get('/{employee}/attachment-riwayat/{type}/{history}/unduh', [RbacEmployeeController::class, 'downloadHistoryAttachment'])
+            ->whereUuid(['employee', 'history'])
+            ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'education'])
+            ->middleware(['permission:employees.read', 'permission:employee_histories.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('history-attachments.download');
+    });
 
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
         ->name('cuti.saldo');
@@ -624,11 +698,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // SWITCH & REVERT ROLE
     // =========================================================================
 
-    // Coarse gate route dibuat eksplisit: aksi switch hanya untuk Super Admin yang
-    // memiliki users.switch_role. FormRequest tetap menjadi mutation boundary dengan
-    // invariant yang sama (role asli super_admin + permission khusus).
+    // Permission asal dibaca oleh FormRequest agar setiap role berperingkat yang
+    // diberi grant dapat switch hanya ke role yang lebih rendah.
     Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
-        ->middleware(['role:super_admin', 'permission:users.switch_role'])
+        ->middleware('permission:users.switch_role')
         ->name('switch-role');
 
     // Jalur pemulihan hanya memerlukan autentikasi. Ia sengaja dikecualikan dari role efektif agar
@@ -649,7 +722,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware('permission:notifications.read');
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('pegawai.export');
 
     // =========================================================================

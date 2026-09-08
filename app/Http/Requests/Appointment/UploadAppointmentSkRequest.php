@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Appointment;
 
+use App\Models\Appointment;
+use App\Models\Employee;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -19,7 +21,19 @@ class UploadAppointmentSkRequest extends FormRequest
             return false;
         }
 
-        return $user->hasPermission('dokumen_sk.update');
+        $employee = $this->route('employee');
+        if (! $employee instanceof Employee) {
+            return false;
+        }
+
+        $appointment = Appointment::query()
+            ->where('employee_id', $employee->id)
+            ->orderBy('tmt_pengangkatan')
+            ->orderBy('id')
+            ->first();
+
+        return $appointment !== null
+            && $user->hasPermission(filled($appointment->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create');
     }
 
     /**

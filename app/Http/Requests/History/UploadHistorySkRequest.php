@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\History;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UploadHistorySkRequest extends FormRequest
@@ -12,11 +13,10 @@ class UploadHistorySkRequest extends FormRequest
             return true;
         }
 
-        $user = $this->user();
+        $history = $this->route('rank') ?? $this->route('position') ?? $this->route('kgb');
 
-        return $user !== null && (
-            $user->hasPermission('dokumen_sk.update')
-        );
+        return $history instanceof Model
+            && $this->user()?->hasPermission(filled($history->getAttribute('file_sk')) ? 'dokumen_sk.update' : 'dokumen_sk.create') === true;
     }
 
     public function rules(): array

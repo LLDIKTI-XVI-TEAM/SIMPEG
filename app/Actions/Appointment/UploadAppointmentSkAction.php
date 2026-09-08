@@ -4,6 +4,7 @@ namespace App\Actions\Appointment;
 
 use App\Models\Appointment;
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
@@ -37,6 +38,18 @@ class UploadAppointmentSkAction
                 if ($appointment === null) {
                     throw ValidationException::withMessages([
                         'appointment' => 'Simpan data pengangkatan lengkap terlebih dahulu sebelum mengunggah SK.',
+                    ]);
+                }
+
+                // Ulangi lifecycle check setelah row terkunci. FormRequest
+                // sengaja membedakan upload pertama (create) dan penggantian
+                // (update), tetapi state berkas dapat berubah di antara
+                // request masuk dan transaksi ini memperoleh lock.
+                $actor = $request?->user();
+                $permission = filled($appointment->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
+                if ($actor instanceof User && ! $actor->hasPermission($permission)) {
+                    throw ValidationException::withMessages([
+                        'file_sk' => 'Anda tidak memiliki permission '.$permission.'.',
                     ]);
                 }
 

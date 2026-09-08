@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Appointment;
 
+use App\Models\Appointment;
+use App\Models\Employee;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -10,14 +12,18 @@ class SaveAppointmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        $user = $this->user();
-        if (! $user) {
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            return true;
+        }
+
+        $employee = $this->route('employee');
+        if (! $employee instanceof Employee || ! ($user = $this->user())) {
             return false;
         }
 
-        return $user->hasPermission('employee_histories.create')
-            || $user->hasPermission('employee_histories.update')
-            || $user->hasPermission('employees.update');
+        $exists = Appointment::query()->where('employee_id', $employee->id)->exists();
+
+        return $user->hasPermission($exists ? 'employee_histories.update' : 'employee_histories.create');
     }
 
     /**
