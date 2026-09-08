@@ -5,7 +5,13 @@ namespace Tests\Feature;
 use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\PositionHistory;
+use App\Models\RankHistory;
+use App\Models\RefGolongan;
+use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
+use App\Models\RefUnitKerja;
+use App\Models\SalaryHistory;
 use App\Models\SkRequirement;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -210,7 +216,124 @@ class EmployeeProfileDocumentMatrixTest extends TestCase
             ->assertSee('SK-PPPK-PROFIL-001');
     }
 
-    public function test_document_status_uses_first_appointment_instead_of_latest_appointment(): void
+    public function test_document_status_uses_first_compatible_appointment(): void
+    {
+        $pns = RefJenisPegawai::query()->where('nama', 'PNS')->firstOrFail();
+        SkRequirement::query()
+            ->where('jenis_pegawai_id', $pns->id)
+            ->update(['is_wajib' => false]);
+        SkRequirement::query()
+            ->where('jenis_pegawai_id', $pns->id)
+            ->where('sk_key', 'sk_pengangkatan')
+            ->update(['is_wajib' => true]);
+
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pns->id]);
+        Appointment::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2010-01-01',
+            'no_sk' => 'SK-PENGANGKATAN-PERTAMA-PNS',
+            'tanggal_sk' => '2009-12-20',
+            'file_sk' => null,
+        ]);
+        $latestPath = 'appointments/sk/'.$employee->id.'-terbaru.pdf';
+        Appointment::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => 'SK-PENGANGKATAN-TERBARU-PNS',
+            'tanggal_sk' => '2019-12-20',
+            'file_sk' => $latestPath,
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($latestPath, 'SK pengangkatan terbaru');
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan')
+            ->assertJsonPath('document_status.tersedia_count', 0)
+            ->assertJsonPath('document_status.required_sks.0.nomor_sk', 'SK-PENGANGKATAN-PERTAMA-PNS')
+            ->assertJsonPath('document_status.required_sks.0.status', 'perlu_perbaikan')
+            ->assertJsonPath('document_status.required_sks.0.file_url', null);
+    }
+
+    public function test_list_table_row_and_status_dokumen_agree_on_appointment_compatibility(): void
+    {
+        $pns = RefJenisPegawai::query()->where('nama', 'PNS')->firstOrFail();
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $pns->id]);
+        $this->createCompleteHistories($employee, 'PNS', 'SK-PENGANGKATAN-KONSISTEN');
+
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
+            ->assertOk()
+            ->assertJsonPath('document_status.required_sks.0.nomor_sk', 'SK-PENGANGKATAN-KONSISTEN');
+
+        $this->actingAs($user)
+            ->getJson("/api/v1/pegawai/{$employee->id}/table-row")
+            ->assertOk()
+            ->assertJsonPath('employee.is_lengkap', 'lengkap');
+
+        $this->actingAs($user)
+            ->getJson('/api/v1/pegawai?search='.urlencode($employee->nip))
+            ->assertOk()
+            ->assertJsonPath('employees.data.0.is_lengkap', 'lengkap');
+    }
+
+    private function createCompleteHistories(Employee $employee, string $appointmentType, string $appointmentNoSk): void
+    {
+        $paths = [
+            'appointment' => "appointments/sk/{$employee->id}-konsisten.pdf",
+            'rank' => "ranks/sk/{$employee->id}-konsisten.pdf",
+            'position' => "positions/sk/{$employee->id}-konsisten.pdf",
+            'salary' => "salaries/sk/{$employee->id}-konsisten.pdf",
+        ];
+
+        Appointment::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => $appointmentType,
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => $appointmentNoSk,
+            'tanggal_sk' => '2019-12-20',
+            'file_sk' => $paths['appointment'],
+        ]);
+        RankHistory::query()->create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::where('kode', 'III/a')->firstOrFail()->id,
+            'tmt_pangkat' => '2026-01-01',
+            'no_sk' => 'SK-PANGKAT-KONSISTEN',
+            'tanggal_sk' => '2025-12-20',
+            'file_sk' => $paths['rank'],
+            'is_latest' => true,
+        ]);
+        PositionHistory::query()->create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Analis Kepegawaian',
+            'jenis_jabatan_id' => RefJenisJabatan::where('nama', 'Struktural')->firstOrFail()->id,
+            'unit_kerja_id' => RefUnitKerja::firstOrFail()->id,
+            'tmt_jabatan' => '2026-01-01',
+            'no_sk' => 'SK-JABATAN-KONSISTEN',
+            'tanggal_sk' => '2025-12-20',
+            'file_sk' => $paths['position'],
+            'is_latest' => true,
+        ]);
+        SalaryHistory::query()->create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2026-01-01',
+            'gaji_pokok' => 5000000,
+            'no_sk' => 'SK-KGB-KONSISTEN',
+            'tanggal_sk' => '2025-12-20',
+            'file_sk' => $paths['salary'],
+            'is_latest' => true,
+        ]);
+
+        foreach ($paths as $path) {
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'SK tersedia');
+        }
+    }
+
+    public function test_document_status_ignores_incompatible_appointment_type(): void
     {
         $pns = RefJenisPegawai::query()->where('nama', 'PNS')->firstOrFail();
         SkRequirement::query()
@@ -226,16 +349,16 @@ class EmployeeProfileDocumentMatrixTest extends TestCase
             'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'CPNS',
             'tmt_pengangkatan' => '2010-01-01',
-            'no_sk' => 'SK-PENGANGKATAN-PERTAMA',
+            'no_sk' => 'SK-PENGANGKATAN-CPNS-LAMA',
             'tanggal_sk' => '2009-12-20',
             'file_sk' => null,
         ]);
-        $latestPath = 'appointments/sk/'.$employee->id.'-terbaru.pdf';
+        $latestPath = 'appointments/sk/'.$employee->id.'-terbaru-pns.pdf';
         Appointment::query()->create([
             'employee_id' => $employee->id,
             'jenis_pengangkatan' => 'PNS',
             'tmt_pengangkatan' => '2020-01-01',
-            'no_sk' => 'SK-PENGANGKATAN-TERBARU',
+            'no_sk' => 'SK-PENGANGKATAN-PNS-VALID',
             'tanggal_sk' => '2019-12-20',
             'file_sk' => $latestPath,
         ]);
@@ -244,10 +367,9 @@ class EmployeeProfileDocumentMatrixTest extends TestCase
         $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->getJson("/api/v1/pegawai/{$employee->id}/status-dokumen")
             ->assertOk()
-            ->assertJsonPath('document_status.status_kelengkapan', 'perlu_perbaikan')
-            ->assertJsonPath('document_status.tersedia_count', 0)
-            ->assertJsonPath('document_status.required_sks.0.nomor_sk', 'SK-PENGANGKATAN-PERTAMA')
-            ->assertJsonPath('document_status.required_sks.0.status', 'perlu_perbaikan')
-            ->assertJsonPath('document_status.required_sks.0.file_url', null);
+            ->assertJsonPath('document_status.status_kelengkapan', 'lengkap')
+            ->assertJsonPath('document_status.tersedia_count', 1)
+            ->assertJsonPath('document_status.required_sks.0.nomor_sk', 'SK-PENGANGKATAN-PNS-VALID')
+            ->assertJsonPath('document_status.required_sks.0.status', 'tersedia');
     }
 }
