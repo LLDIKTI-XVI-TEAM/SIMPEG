@@ -11,8 +11,8 @@ class GetUnreadNotificationCountAction
     /**
      * Menghitung notifikasi belum dibaca milik pegawai aktif saja.
      */
-    public function execute(?string $employeeId): int
+    public function execute(?string $userId): int
     {
-        return $this->notifications->unreadCountForEmployee($employeeId);
+        return $this->notifications->unreadCountForUser($userId);
     }
 }

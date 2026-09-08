@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\HariLiburController;
+use App\Http\Middleware\EnsureActiveEmployeeAccount;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
@@ -8,6 +9,8 @@ Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
     ->name('hari-libur.')
     ->group(function (): void {
         Route::get('/', [HariLiburController::class, 'index'])
+            ->middleware('permission:hari_libur.read')
+            ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
             ->name('index');
         Route::post('/', [HariLiburController::class, 'store'])
             ->middleware('permission:hari_libur.create')

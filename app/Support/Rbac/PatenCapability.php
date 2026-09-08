@@ -11,19 +11,49 @@ namespace App\Support\Rbac;
 final class PatenCapability
 {
     /** @var list<string> */
-    public const PERMISSION_NAMES = [
+    public const EMPLOYEE_SELF_PERMISSION_NAMES = [
         'employees.read_self',
+        'cuti.create',
+        'cuti.read_own',
+    ];
+
+    /** @var list<string> */
+    public const USER_CONTEXT_PERMISSION_NAMES = [
         'notifications.read',
         'notifications.update',
         'hari_libur.read',
-        'cuti.create',
-        'cuti.read_own',
+    ];
+
+    /** @var list<string> */
+    public const RECORD_CONTEXT_PERMISSION_NAMES = [
         'cuti.approve',
         'cuti.proof.generate',
+    ];
+
+    /** @var list<string> */
+    public const PERMISSION_NAMES = [
+        ...self::EMPLOYEE_SELF_PERMISSION_NAMES,
+        ...self::USER_CONTEXT_PERMISSION_NAMES,
+        ...self::RECORD_CONTEXT_PERMISSION_NAMES,
     ];
 
     public static function isPermissionName(string $name): bool
     {
         return in_array($name, self::PERMISSION_NAMES, true);
+    }
+
+    public static function requiresActiveEmployee(string $name): bool
+    {
+        return in_array($name, self::EMPLOYEE_SELF_PERMISSION_NAMES, true);
+    }
+
+    public static function isUserContextCapability(string $name): bool
+    {
+        return in_array($name, self::USER_CONTEXT_PERMISSION_NAMES, true);
+    }
+
+    public static function requiresRecordContext(string $name): bool
+    {
+        return in_array($name, self::RECORD_CONTEXT_PERMISSION_NAMES, true);
     }
 }

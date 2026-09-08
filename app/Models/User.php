@@ -28,6 +28,24 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasUuid, Notifiable;
 
+    protected static function booted(): void
+    {
+        static::saved(function (self $user): void {
+            if ($user->employee_id === null) {
+                return;
+            }
+
+            // Saat SSO baru mengikat Employee ke User, inbox historis yang belum
+            // memiliki recipient dapat dipulihkan hanya bila mappingnya tunggal.
+            if (self::query()->where('employee_id', $user->employee_id)->count() === 1) {
+                SimpegNotification::query()
+                    ->where('user_id', $user->employee_id)
+                    ->whereNull('recipient_user_id')
+                    ->update(['recipient_user_id' => $user->id]);
+            }
+        });
+    }
+
     /**
      * Hierarki role SIMPEG: rank lebih kecil = role lebih rendah.
      * Switch role hanya boleh dari role ber-rank lebih tinggi menuju role
@@ -134,11 +152,19 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
-        // Capability PATEN tidak bergantung pada pivot role_permissions.
-        // Keputusan final yang berorientasi record (mis. pemilik cuti atau
-        // approver tahap aktif) tetap ditegakkan lagi oleh Action/Service.
-        if (PatenCapability::isPermissionName($permission)) {
+        // PATEN tidak menggunakan pivot role_permissions, namun prasyaratnya
+        // berbeda menurut konteks. Hak record seperti approval/proof tidak
+        // boleh direduksi menjadi boolean global pada User.
+        if (PatenCapability::requiresActiveEmployee($permission)) {
             return $this->hasActiveEmployeeIdentity();
+        }
+
+        if (PatenCapability::isUserContextCapability($permission)) {
+            return $this->exists && $this->getKey() !== null;
+        }
+
+        if (PatenCapability::requiresRecordContext($permission)) {
+            return false;
         }
 
         $effectiveRole = $this->getEffectiveRole();

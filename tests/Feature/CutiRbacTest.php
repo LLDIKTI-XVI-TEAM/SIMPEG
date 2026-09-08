@@ -8,6 +8,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Rbac\PatenCapability;
@@ -119,6 +120,10 @@ class CutiRbacTest extends TestCase
         $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
 
         foreach (self::CUTI_PERMISSIONS as $permission) {
+            if (PatenCapability::requiresRecordContext($permission)) {
+                continue;
+            }
+
             $this->assertTrue($user->hasPermission($permission), "Super Admin harus memiliki {$permission}");
         }
     }
@@ -171,8 +176,41 @@ class CutiRbacTest extends TestCase
         $employee = Employee::factory()->create();
         $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
-        foreach (PatenCapability::PERMISSION_NAMES as $permission) {
+        foreach ([
+            ...PatenCapability::EMPLOYEE_SELF_PERMISSION_NAMES,
+            ...PatenCapability::USER_CONTEXT_PERMISSION_NAMES,
+        ] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "PATEN {$permission} tidak boleh bergantung pivot legacy");
+        }
+
+        foreach (PatenCapability::RECORD_CONTEXT_PERMISSION_NAMES as $permission) {
+            $this->assertFalse($user->hasPermission($permission), "PATEN {$permission} harus diputus pada boundary record, bukan User global");
+        }
+    }
+
+    public function test_paten_memisahkan_lifecycle_employee_dari_capability_user_context(): void
+    {
+        $nonaktif = RefStatusPegawai::query()->firstOrCreate(
+            ['kode' => 'NONAKTIF'],
+            [
+                'nama' => 'Nonaktif',
+                'kelompok' => 'Nonaktif',
+                'keterangan' => 'Pegawai tidak aktif.',
+                'is_default' => false,
+            ],
+        );
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $nonaktif->id,
+            'status_aktif' => $nonaktif->nama,
+        ]);
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        foreach (PatenCapability::EMPLOYEE_SELF_PERMISSION_NAMES as $permission) {
+            $this->assertFalse($user->hasPermission($permission), "{$permission} harus fail-closed untuk Employee nonaktif.");
+        }
+
+        foreach (PatenCapability::USER_CONTEXT_PERMISSION_NAMES as $permission) {
+            $this->assertTrue($user->hasPermission($permission), "{$permission} tetap capability konteks User.");
         }
     }
 
@@ -211,7 +249,7 @@ class CutiRbacTest extends TestCase
         $this->assertTrue($user->hasPermission('cuti.create'));
         $this->assertTrue($user->hasPermission('cuti.read_own'));
         $this->assertTrue($user->hasPermission('cuti.balance.read'));
-        $this->assertTrue($user->hasPermission('cuti.approve'));
+        $this->assertFalse($user->hasPermission('cuti.approve'));
         $this->assertFalse($user->hasPermission('cuti.read_all'));
         $this->assertFalse($user->hasPermission('cuti.configure'));
     }
@@ -405,7 +443,7 @@ class CutiRbacTest extends TestCase
         $employee = Employee::factory()->create();
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $employee->id]);
 
-        foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read'] as $permission) {
+        foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.configure', 'cuti.balance.read'] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Kepala Bagian harus memiliki {$permission}");
         }
     }
@@ -416,7 +454,7 @@ class CutiRbacTest extends TestCase
         $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
         $this->assertTrue($user->hasPermission('cuti.create'));
-        foreach (['cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read'] as $permission) {
+        foreach (['cuti.read_own', 'cuti.read_all', 'cuti.configure', 'cuti.balance.read'] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Pimpinan harus memiliki {$permission}");
         }
     }
@@ -426,7 +464,7 @@ class CutiRbacTest extends TestCase
         $employee = Employee::factory()->create();
         $user = User::factory()->adminKepegawaian()->create(['employee_id' => $employee->id]);
 
-        foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.approve', 'cuti.configure', 'cuti.balance.read', 'cuti.balance.reconcile', 'cuti.manual.manage', 'cuti.proof.generate'] as $permission) {
+        foreach (['cuti.create', 'cuti.read_own', 'cuti.read_all', 'cuti.configure', 'cuti.balance.read', 'cuti.balance.reconcile', 'cuti.manual.manage'] as $permission) {
             $this->assertTrue($user->hasPermission($permission), "Admin Kepegawaian harus memiliki {$permission}");
         }
     }

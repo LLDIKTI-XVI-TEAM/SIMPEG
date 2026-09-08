@@ -9,10 +9,10 @@ class MarkAllNotificationsAsReadAction
     public function __construct(private readonly NotificationService $notifications) {}
 
     /**
-     * Menandai semua notifikasi belum dibaca milik pegawai aktif.
+     * Menandai semua notifikasi belum dibaca milik User penerima.
      */
-    public function execute(?string $employeeId): int
+    public function execute(?string $userId): int
     {
-        return $this->notifications->markAllAsReadForEmployee($employeeId);
+        return $this->notifications->markAllAsReadForUser($userId);
     }
 }

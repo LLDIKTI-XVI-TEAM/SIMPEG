@@ -54,6 +54,7 @@ use App\Http\Controllers\Auth\InactiveEmployeeAccountController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Middleware\EnsureActiveEmployeeAccount;
 use App\Livewire\Admin\Pegawai\Create;
 use App\Livewire\Admin\Pegawai\Edit;
 use App\Livewire\Admin\Pegawai\Index;
@@ -541,20 +542,21 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // di layer route, bukan menjadi error database.
     Route::get('/hari-libur', [HariLiburController::class, 'index'])
         ->middleware('permission:hari_libur.read')
+        ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
         ->name('hari-libur');
     Route::post('/hari-libur', [HariLiburController::class, 'store'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.create'])
+        ->middleware('permission:hari_libur.create')
         ->name('hari-libur.store');
     Route::get('/hari-libur/{hariLibur}/edit', [HariLiburController::class, 'edit'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->middleware('permission:hari_libur.update')
         ->whereUuid('hariLibur')
         ->name('hari-libur.edit');
     Route::put('/hari-libur/{hariLibur}', [HariLiburController::class, 'update'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->middleware('permission:hari_libur.update')
         ->whereUuid('hariLibur')
         ->name('hari-libur.update');
     Route::delete('/hari-libur/{hariLibur}', [HariLiburController::class, 'destroy'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.delete'])
+        ->middleware('permission:hari_libur.delete')
         ->whereUuid('hariLibur')
         ->name('hari-libur.destroy');
 
@@ -575,9 +577,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
         ->name('cuti.formulir-pdf')
-        ->whereUuid('leaveRequest');
-    Route::post('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'generateFormulirPdf'])
-        ->name('cuti.formulir-pdf.generate')
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/lampiran', [CutiController::class, 'downloadAttachment'])
         ->name('cuti.attachment.download')
@@ -675,10 +674,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     });
 
     Route::get('/dashboard/audit', [AuditController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
+        ->middleware('permission:audit_logs.read')
         ->name('audit-log');
     Route::get('/dashboard/audit/{id}', [AuditController::class, 'show'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:audit_logs.read'])
+        ->middleware('permission:audit_logs.read')
         ->name('audit-log.show')
         ->whereUuid('id');
 
@@ -715,10 +714,12 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/notifikasi', [NotificationController::class, 'index'])
         ->middleware('permission:notifications.read')
+        ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
         ->name('notifications.index');
 
     Route::redirect('/notifications', '/notifikasi')
-        ->middleware('permission:notifications.read');
+        ->middleware('permission:notifications.read')
+        ->withoutMiddleware(EnsureActiveEmployeeAccount::class);
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
         ->middleware(['permission:employees.read', 'permission:employees.export'])

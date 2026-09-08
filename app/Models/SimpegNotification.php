@@ -13,6 +13,8 @@ use Illuminate\Support\Carbon;
  * @property string $type
  * @property string $title
  * @property string $body
+ * @property string $user_id Employee penerima pada fakta domain legacy
+ * @property string|null $recipient_user_id User penerima inbox
  * @property string|null $ews_alert_id
  * @property array<string, mixed>|null $data
  * @property bool $is_read
@@ -27,6 +29,7 @@ class SimpegNotification extends Model
 
     protected $fillable = [
         'user_id',
+        'recipient_user_id',
         'ews_alert_id',
         'type',
         'title',
@@ -49,6 +52,31 @@ class SimpegNotification extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'user_id');
+    }
+
+    /** Penerima inbox; berbeda dari employee konteks fakta pada kolom user_id legacy. */
+    public function recipient(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recipient_user_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $notification): void {
+            if ($notification->recipient_user_id !== null || $notification->user_id === null) {
+                return;
+            }
+
+            $users = User::query()
+                ->where('employee_id', $notification->user_id)
+                ->orderBy('id')
+                ->limit(2)
+                ->get(['id']);
+
+            if ($users->count() === 1) {
+                $notification->recipient_user_id = $users->first()->id;
+            }
+        });
     }
 
     public function scopeUnread(Builder $query): Builder

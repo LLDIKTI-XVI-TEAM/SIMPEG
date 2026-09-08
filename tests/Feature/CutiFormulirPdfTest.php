@@ -7,11 +7,9 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
-use App\Models\Permission;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisJabatan;
 use App\Models\RefUnitKerja;
-use App\Models\Role;
 use App\Models\StorageRecoveryTask;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
@@ -53,26 +51,6 @@ class CutiFormulirPdfTest extends TestCase
         $this->actingAs($fixture['requester_user'])
             ->get($this->formUrl($fixture['leave_request']))
             ->assertOk();
-    }
-
-    public function test_owner_can_materialize_legacy_artifact_without_legacy_proof_grant(): void
-    {
-        Storage::fake('local');
-        $fixture = $this->makeOfficialFormFixture();
-        $operator = User::factory()->superAdmin()->create();
-        $fixture['proof']->update(['generated_by' => $operator->id]);
-        $proofPermission = Permission::query()->where('name', 'cuti.proof.generate')->firstOrFail();
-        Role::query()->where('name', 'pegawai')->firstOrFail()->permissions()->detach($proofPermission->id);
-
-        // Penerbitan artefak dokumen legacy mengikuti hak atas record approved,
-        // bukan checkbox proof pada role pemohon.
-        $this->actingAs($fixture['requester_user'])
-            ->post(route('cuti.formulir-pdf.generate', $fixture['leave_request']))
-            ->assertRedirect(route('cuti.show', $fixture['leave_request']));
-
-        $proof = $fixture['proof']->fresh();
-        $this->assertNotNull($proof->document_path);
-        Storage::disk('local')->assertExists($proof->document_path);
     }
 
     public function test_final_official_form_is_legal_portrait_pdf_attachment(): void

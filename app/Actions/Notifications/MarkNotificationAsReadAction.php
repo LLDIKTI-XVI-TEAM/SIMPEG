@@ -10,10 +10,10 @@ class MarkNotificationAsReadAction
     public function __construct(private readonly NotificationService $notifications) {}
 
     /**
-     * Menandai satu notifikasi sebagai dibaca hanya jika notifikasi milik pegawai aktif.
+     * Menandai satu notifikasi sebagai dibaca hanya jika milik User penerima.
      */
-    public function execute(string $notificationId, ?string $employeeId): ?SimpegNotification
+    public function execute(string $notificationId, ?string $userId): ?SimpegNotification
     {
-        return $this->notifications->markAsReadForEmployee($notificationId, $employeeId);
+        return $this->notifications->markAsReadForUser($notificationId, $userId);
     }
 }

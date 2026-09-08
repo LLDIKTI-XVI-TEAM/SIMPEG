@@ -6,6 +6,7 @@ use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Models\Employee;
 use App\Models\EwsAlert;
 use App\Models\SimpegNotification;
+use App\Models\User;
 use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationRecipientResolver;
 use App\Services\Notifications\WhatsApp\WhatsAppNotificationDispatcher;
@@ -48,6 +49,7 @@ class NotificationService
             foreach ($inAppRecipients as $recipient) {
                 $created = SimpegNotification::create([
                     'user_id' => $recipient->id,
+                    'recipient_user_id' => $this->recipientUserId($recipient),
                     'type' => $type,
                     'title' => $title,
                     'body' => $body,
@@ -97,6 +99,7 @@ class NotificationService
         }
 
         $attributes = [
+            'recipient_user_id' => $this->recipientUserId($employee),
             'ews_alert_id' => $alert->id,
             'type' => $type,
             'title' => $title,
@@ -251,14 +254,14 @@ class NotificationService
     /**
      * @return Collection<int, SimpegNotification>
      */
-    public function latestForEmployee(?string $employeeId, int $limit = 10): Collection
+    public function latestForUser(?string $userId, int $limit = 10): Collection
     {
-        if ($employeeId === null) {
+        if ($userId === null) {
             return new Collection;
         }
 
         return SimpegNotification::query()
-            ->where('user_id', $employeeId)
+            ->where('recipient_user_id', $userId)
             // Notifikasi yang sudah dibaca lebih dari 5 menit lalu tidak lagi ditampilkan di lonceng header.
             ->where(function ($query): void {
                 $query->where('is_read', false)
@@ -272,28 +275,28 @@ class NotificationService
             ->get();
     }
 
-    public function unreadCountForEmployee(?string $employeeId): int
+    public function unreadCountForUser(?string $userId): int
     {
-        if ($employeeId === null) {
+        if ($userId === null) {
             return 0;
         }
 
         return SimpegNotification::query()
-            ->where('user_id', $employeeId)
+            ->where('recipient_user_id', $userId)
             ->unread()
             ->count();
     }
 
-    public function markAsReadForEmployee(string $notificationId, ?string $employeeId): ?SimpegNotification
+    public function markAsReadForUser(string $notificationId, ?string $userId): ?SimpegNotification
     {
-        if ($employeeId === null) {
+        if ($userId === null) {
             return null;
         }
 
-        return DB::transaction(function () use ($notificationId, $employeeId): ?SimpegNotification {
+        return DB::transaction(function () use ($notificationId, $userId): ?SimpegNotification {
             $snapshot = SimpegNotification::query()
                 ->where('id', $notificationId)
-                ->where('user_id', $employeeId)
+                ->where('recipient_user_id', $userId)
                 ->first();
 
             if ($snapshot === null) {
@@ -310,7 +313,7 @@ class NotificationService
             // siklus notification -> alert terhadap scheduler.
             $notification = SimpegNotification::query()
                 ->where('id', $notificationId)
-                ->where('user_id', $employeeId)
+                ->where('recipient_user_id', $userId)
                 ->lockForUpdate()
                 ->first();
 
@@ -333,15 +336,15 @@ class NotificationService
         });
     }
 
-    public function markAllAsReadForEmployee(?string $employeeId): int
+    public function markAllAsReadForUser(?string $userId): int
     {
-        if ($employeeId === null) {
+        if ($userId === null) {
             return 0;
         }
 
-        return DB::transaction(function () use ($employeeId): int {
+        return DB::transaction(function () use ($userId): int {
             $snapshots = SimpegNotification::query()
-                ->where('user_id', $employeeId)
+                ->where('recipient_user_id', $userId)
                 ->unread()
                 ->get();
             $snapshotAlertIds = $snapshots
@@ -360,7 +363,7 @@ class NotificationService
                 ->keyBy('id');
             $notifications = SimpegNotification::query()
                 ->whereKey($snapshots->modelKeys())
-                ->where('user_id', $employeeId)
+                ->where('recipient_user_id', $userId)
                 ->unread()
                 ->orderBy('id')
                 ->lockForUpdate()
@@ -396,5 +399,16 @@ class NotificationService
         $alertId = $notification->ews_alert_id ?? $notification->data['ews_alert_id'] ?? null;
 
         return is_string($alertId) && $alertId !== '' ? $alertId : null;
+    }
+
+    private function recipientUserId(Employee $employee): ?string
+    {
+        $users = User::query()
+            ->where('employee_id', $employee->id)
+            ->orderBy('id')
+            ->limit(2)
+            ->get(['id']);
+
+        return $users->count() === 1 ? $users->first()->id : null;
     }
 }

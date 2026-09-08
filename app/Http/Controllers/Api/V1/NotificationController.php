@@ -14,14 +14,14 @@ class NotificationController extends Controller
 {
     public function index(Request $request, ListNotificationsAction $action): JsonResponse
     {
-        return response()->json($action->execute($request->user()?->employee_id));
+        return response()->json($action->execute($request->user()?->id));
     }
 
     public function unreadCount(Request $request, GetUnreadNotificationCountAction $action): JsonResponse
     {
         return response()->json([
             'data' => [
-                'unread_count' => $action->execute($request->user()?->employee_id),
+                'unread_count' => $action->execute($request->user()?->id),
             ],
         ]);
     }
@@ -31,7 +31,7 @@ class NotificationController extends Controller
         string $notificationId,
         MarkNotificationAsReadAction $action,
     ): JsonResponse {
-        $notification = $action->execute($notificationId, $request->user()?->employee_id);
+        $notification = $action->execute($notificationId, $request->user()?->id);
 
         if ($notification === null) {
             abort(404);
@@ -44,7 +44,7 @@ class NotificationController extends Controller
     {
         return response()->json([
             'data' => [
-                'updated' => $action->execute($request->user()?->employee_id),
+                'updated' => $action->execute($request->user()?->id),
             ],
         ]);
     }

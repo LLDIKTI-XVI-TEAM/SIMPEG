@@ -7,7 +7,6 @@ use App\Actions\Cuti\BuildCutiDetailAction;
 use App\Actions\Cuti\DeclineLeaveAction;
 use App\Actions\Cuti\DownloadLeaveAttachmentAction;
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
-use App\Actions\Cuti\GenerateLeaveProofAction;
 use App\Actions\Cuti\ListLeaveRequestsAction;
 use App\Actions\Cuti\ListPendingLeaveApprovalsAction;
 use App\Actions\Cuti\PostponeLeaveAction;
@@ -27,7 +26,6 @@ use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -37,34 +35,6 @@ class CutiController extends Controller
     public function formulirPdf(LeaveRequest $leaveRequest, DownloadOfficialLeavePdfAction $action): Response
     {
         return $action->execute($leaveRequest, request()->user());
-    }
-
-    /** Membentuk artefak PDF yang belum ada pada bukti legacy, tanpa mengubah keputusan approval atau token bukti. */
-    public function generateFormulirPdf(
-        LeaveRequest $leaveRequest,
-        Request $request,
-        DownloadOfficialLeavePdfAction $downloads,
-        GenerateLeaveProofAction $proofs,
-    ): RedirectResponse {
-        /** @var User $user */
-        $user = $request->user();
-        abort_unless($downloads->canDownload($leaveRequest, $user), 403);
-
-        $leaveRequest->loadMissing('proof.generatedBy');
-        abort_if($leaveRequest->proof === null, 404);
-
-        if ($leaveRequest->proof->document_path !== null) {
-            return redirect()->route('cuti.show', $leaveRequest)
-                ->with('success', 'Bukti formulir cuti sudah tersedia.');
-        }
-
-        $generator = $leaveRequest->proof->generatedBy;
-        abort_if($generator === null, 422, 'Penerbit awal bukti cuti tidak lagi tersedia sehingga artefak tidak dapat dibentuk ulang.');
-
-        $proofs->execute($leaveRequest, $generator);
-
-        return redirect()->route('cuti.show', $leaveRequest)
-            ->with('success', 'Bukti formulir cuti resmi berhasil dibentuk.');
     }
 
     public function rekap(ListCutiRekapRequest $request, ShowCutiRekapAction $action): View

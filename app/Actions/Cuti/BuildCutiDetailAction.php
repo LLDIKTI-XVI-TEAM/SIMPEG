@@ -34,7 +34,6 @@ class BuildCutiDetailAction
      *     canAct: bool,
      *     isVerifierContext: bool,
      *     canDownloadFormulir: bool,
-     *     canGenerateFormulir: bool,
      *     canResubmit: bool,
      *     canRequestCancellation: bool,
      *     latestCancellation: LeaveCancellationRequest|null,
@@ -90,8 +89,6 @@ class BuildCutiDetailAction
         $canAct = $isCurrentApprover
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
-        $canGenerateFormulir = $canDownloadFormulir
-            && $cuti->proof?->document_path === null;
         $canReadAll = $user->hasPermission('cuti.read_all');
         $canReadOwn = $user->employee_id !== null
             && $cuti->employee_id === $user->employee_id;
@@ -127,7 +124,6 @@ class BuildCutiDetailAction
             'canAct' => $canAct,
             'isVerifierContext' => $isVerifierContext,
             'canDownloadFormulir' => $canDownloadFormulir,
-            'canGenerateFormulir' => $canGenerateFormulir,
             'attachmentAvailable' => $this->attachmentDownloads->canReadAsGeneralActor($cuti, $user)
                 && $this->files->hasLeaveAttachment($cuti->lampiran_path, $cuti->employee_id),
             'canResubmit' => $isOwner

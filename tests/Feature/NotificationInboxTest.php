@@ -68,6 +68,7 @@ class NotificationInboxTest extends TestCase
     public function test_notification_service_creates_unread_notification_for_employee(): void
     {
         $employee = Employee::factory()->create();
+        $recipient = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
         $channel = RefNotificationChannel::query()->where('code', 'in_app')->firstOrFail();
         NotificationEventChannel::query()->create([
             'event_key' => 'cuti.diajukan',
@@ -88,6 +89,7 @@ class NotificationInboxTest extends TestCase
         $this->assertDatabaseHas('notifications', [
             'id' => $notification->id,
             'user_id' => $employee->id,
+            'recipient_user_id' => $recipient->id,
             'type' => 'cuti.diajukan',
             'title' => 'Pengajuan cuti diterima',
             'is_read' => false,
@@ -110,19 +112,29 @@ class NotificationInboxTest extends TestCase
         $response->assertNotFound();
     }
 
-    public function test_user_without_employee_mapping_is_blocked_from_notification_inbox(): void
+    public function test_user_without_employee_mapping_can_read_own_notification_inbox(): void
     {
         $user = User::factory()->pegawai()->create(['employee_id' => null]);
+        $employeeContext = Employee::factory()->create();
+        $notification = SimpegNotification::forceCreate([
+            'user_id' => $employeeContext->id,
+            'recipient_user_id' => $user->id,
+            'type' => 'system.account_pending',
+            'title' => 'Akun menunggu pemetaan',
+            'body' => 'Inbox tetap milik User penerima.',
+            'is_read' => false,
+        ]);
 
         $this->actingAsUnmapped($user);
 
         $response = $this->getJson(self::ENDPOINT);
 
-        $response->assertRedirect(route('status-akun'));
+        $response->assertOk()
+            ->assertJsonPath('data.0.id', $notification->id);
 
         $countResponse = $this->getJson(self::ENDPOINT.'/jumlah-belum-dibaca');
 
-        $countResponse->assertRedirect(route('status-akun'));
+        $countResponse->assertOk()->assertJsonPath('data.unread_count', 1);
     }
 
     public function test_user_only_sees_own_notifications_with_unread_count(): void
@@ -266,7 +278,7 @@ class NotificationInboxTest extends TestCase
         $this->assertNotNull($legacyAlert->refresh()->notification_acknowledged_at);
     }
 
-    public function test_permission_middleware_blocks_notification_update_without_permission(): void
+    public function test_notification_update_is_paten_and_does_not_depend_on_legacy_pivot(): void
     {
         $role = Role::where('name', 'pegawai')->firstOrFail();
         $permissionId = Permission::where('name', 'notifications.update')->firstOrFail()->id;
@@ -277,8 +289,8 @@ class NotificationInboxTest extends TestCase
         $this->actingAs($user);
         $response = $this->patchJsonWithCsrf(self::ENDPOINT."/{$notification->id}/tandai-dibaca");
 
-        $response->assertForbidden();
-        $this->assertFalse($notification->refresh()->is_read);
+        $response->assertOk();
+        $this->assertTrue($notification->refresh()->is_read);
     }
 
     public function test_old_notification_endpoints_are_not_available(): void

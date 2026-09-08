@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\RefJenisPegawai;
 use App\Models\Role;
@@ -221,10 +222,14 @@ class RbacPermissionMiddlewareTest extends TestCase
         $response->assertCreated();
     }
 
-    public function test_role_middleware_blocks_role_outside_hari_libur_allowlist(): void
+    public function test_hari_libur_mutation_requires_permission_bukan_allowlist_role(): void
     {
-        // Hari libur sengaja dibatasi super_admin sebelum cek permission aksi dijalankan.
-        $user = User::factory()->adminKepegawaian()->create();
+        $permission = Permission::query()->where('name', 'hari_libur.create')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()
+            ->permissions()
+            ->syncWithoutDetaching([$permission->id]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf('/api/v1/hari-libur', [
@@ -233,7 +238,7 @@ class RbacPermissionMiddlewareTest extends TestCase
             'tipe' => 'libur_nasional',
         ]);
 
-        $response->assertForbidden();
+        $response->assertCreated();
     }
 
     public function test_permission_enforced_even_when_route_role_allows(): void
@@ -263,15 +268,19 @@ class RbacPermissionMiddlewareTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_role_middleware_blocks_pegawai_from_audit_logs(): void
+    public function test_audit_logs_require_permission_bukan_allowlist_role(): void
     {
-        // Audit log adalah route admin; pegawai ditolak pada pagar role sebelum permission dicek.
-        $user = User::factory()->pegawai()->create();
+        $permission = Permission::query()->where('name', 'audit_logs.read')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()
+            ->permissions()
+            ->syncWithoutDetaching([$permission->id]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
         $this->actingAs($user);
         $response = $this->getJson('/api/v1/audit-log');
 
-        $response->assertForbidden();
+        $response->assertOk();
     }
 
     public function test_old_audit_logs_endpoint_is_not_available(): void
