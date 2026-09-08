@@ -101,7 +101,9 @@ class BuildAdminDashboardAction
                 ->whereYear('tanggal_mulai', $now->year)
                 ->whereMonth('tanggal_mulai', $now->month)
                 ->count(),
-            'cutiDitangguhkan' => LeaveRequest::query()->where('status', 'ditangguhkan')->count(),
+            'cutiDitangguhkan' => LeaveRequest::query()
+                ->whereIn('status', ['ditangguhkan', LeaveRequest::STATUS_DUTY_POSTPONED, LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED])
+                ->count(),
 
             // W4: Distribusi golongan
             'distribusiGolongan' => $employees['rank_distribution'],

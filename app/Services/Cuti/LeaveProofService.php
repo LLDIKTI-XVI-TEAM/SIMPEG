@@ -66,8 +66,8 @@ class LeaveProofService
         ?User $generatedByUser = null,
         ?Request $httpRequest = null,
     ): LeaveProof {
-        // Guard fail-closed: bukti final hanya untuk pengajuan yang benar-benar sudah disetujui penuh.
-        if ($leaveRequest->status !== 'disetujui') {
+        // Baca status tersimpan agar instance approved yang usang tidak menerbitkan bukti setelah penangguhan.
+        if (LeaveRequest::query()->whereKey($leaveRequest->id)->value('status') !== 'disetujui') {
             throw ValidationException::withMessages([
                 'status' => 'Bukti cuti hanya dapat diterbitkan untuk pengajuan yang sudah disetujui final.',
             ]);
@@ -109,10 +109,10 @@ class LeaveProofService
     }
 
     /**
-     * Menyusun data tampilan publik hanya dari snapshot metadata bukti.
+     * Menyusun data persetujuan publik dari snapshot, dengan status administratif terkini yang dibatasi.
      *
-     * Sengaja tidak membaca relasi/model mentah agar tampilan verifikasi tidak pernah membocorkan data
-     * di luar snapshot yang sudah dibekukan. Allow-list ini menjadi batas privasi: metadata legacy atau kunci
+     * Relasi pengajuan hanya membaca status dan waktu; alasan serta aktor administratif tidak ikut dimuat.
+     * Allow-list ini menjadi batas privasi: metadata legacy atau kunci
      * yang tidak dikenal tidak boleh diteruskan ke tampilan publik. Token disertakan karena memang identitas
      * publik pada URL verifikasi. Menormalkan format tanggal dan status timeline agar tahan terhadap data malformed legacy.
      *
@@ -120,6 +120,10 @@ class LeaveProofService
      */
     public function publicViewData(LeaveProof $proof): array
     {
+        $proof->loadMissing('leaveRequest:id,status,administratively_postponed_at');
+        $leaveRequest = $proof->leaveRequest;
+        $administrativelyPostponed = $leaveRequest?->status === LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED;
+
         // Salin metadata dan pastikan tipenya berupa array guna menepis risiko korupsi tipe data legacy.
         $metadata = $proof->metadata;
         if (! is_array($metadata)) {
@@ -180,7 +184,13 @@ class LeaveProofService
             'employee_name' => $this->normalizePublicText($metadata['employee_name'] ?? null),
             'leave_type' => $this->normalizePublicText($metadata['leave_type'] ?? null),
             'workday_count' => $this->normalizeCount($metadata['workday_count'] ?? 0),
-            'status_label' => $this->normalizePublicText($metadata['status_label'] ?? null, 'Disetujui', true),
+            'status_label' => $administrativelyPostponed
+                ? 'Ditangguhkan (Administratif)'
+                : $this->normalizePublicText($metadata['status_label'] ?? null, 'Disetujui', true),
+            'is_administratively_postponed' => $administrativelyPostponed,
+            'administratively_postponed_at_label' => $administrativelyPostponed
+                ? $this->formatPublicDate($leaveRequest->getRawOriginal('administratively_postponed_at'), true)
+                : null,
             'token' => $proof->token,
             'start_date_label' => $startDateLabel,
             'end_date_label' => $endDateLabel,
@@ -295,16 +305,17 @@ class LeaveProofService
 
     /**
      * Mencari bukti cuti berdasarkan token verifikasi atau gagal dengan 404.
-     * Mengunci pencarian hanya pada pengajuan cuti yang berstatus 'disetujui' (final).
+     * Bukti persetujuan terdahulu tetap sah sebagai histori setelah penangguhan administratif.
      *
      * @throws ModelNotFoundException
      */
-    public function findApprovedByTokenOrFail(string $token): LeaveProof
+    public function findIssuedByTokenOrFail(string $token): LeaveProof
     {
         return LeaveProof::query()
             ->where('token', $token)
+            ->with('leaveRequest:id,status,administratively_postponed_at')
             ->whereHas('leaveRequest', function ($query) {
-                $query->where('status', 'disetujui');
+                $query->whereIn('status', ['disetujui', LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED]);
             })
             ->firstOrFail();
     }

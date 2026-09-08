@@ -3,6 +3,7 @@
 namespace App\Support\Audit;
 
 use App\Models\AuditLog;
+use App\Models\User;
 
 /**
  * Bentuk data audit untuk permukaan tampilan.
@@ -53,8 +54,9 @@ class AuditLogViewPayload
     /**
      * @return array<string, mixed>
      */
-    public static function forView(AuditLog $log): array
+    public static function forView(AuditLog $log, ?array $payload = null): array
     {
+        $payload ??= app(AuditLogReadPayload::class)->forLogs(collect([$log]), null)->get($log->id);
         $module = class_basename($log->auditable_type);
         $recordId = $log->auditable_id
             ?? data_get($log->new_values, 'key')
@@ -72,9 +74,15 @@ class AuditLogViewPayload
             'record_id' => (string) $recordId,
             'ip_address' => $log->ip_address ?: '-',
             'user_agent' => $log->user_agent ?: '-',
-            'old_values' => $log->old_values,
-            'new_values' => $log->new_values,
+            'old_values' => $payload['old_values'],
+            'new_values' => $payload['new_values'],
         ];
+    }
+
+    /** Detail satu record tetap memakai redaksi dan scope yang sama dengan daftar/API audit. */
+    public static function forReader(AuditLog $log, ?User $actor): array
+    {
+        return self::forView($log, app(AuditLogReadPayload::class)->forLogs(collect([$log]), $actor)->get($log->id));
     }
 
     private static function categoryFor(string $module, string $event): string

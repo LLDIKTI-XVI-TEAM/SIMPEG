@@ -8,6 +8,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefHariLibur;
 use App\Models\User;
+use App\Services\Cuti\AdministrativeLeavePostponementAccess;
 use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
 use Illuminate\Support\Carbon;
@@ -23,6 +24,8 @@ class BuildCutiDetailAction
         private readonly BuildVerifierLeaveContextAction $verifierContext,
         private readonly EmployeeFileStorageService $files,
         private readonly DownloadLeaveAttachmentAction $attachmentDownloads,
+        private readonly BuildAdministrativeLeavePostponementContextAction $administrativeContext,
+        private readonly AdministrativeLeavePostponementAccess $administrativeAccess,
     ) {}
 
     /**
@@ -95,11 +98,14 @@ class BuildCutiDetailAction
 
         // Snapshot approver lama tetap boleh membaca pengajuan untuk kebutuhan audit,
         // tetapi tidak memperoleh izin bertindak setelah tahapnya selesai.
+        // Pengelola administratif dalam scope perlu membuka keputusan sebelum dan setelah mutasi;
+        // akses ini tidak menambah hak unduh dokumen atau monitoring global.
         abort_if(
             ! $canReadAll
             && ! $canReadOwn
             && ! $isAnySnapshotApprover
-            && ! $canDownloadFormulir,
+            && ! $canDownloadFormulir
+            && ! $this->administrativeAccess->canManage($cuti, $user),
             403,
         );
 
@@ -120,6 +126,7 @@ class BuildCutiDetailAction
             : null;
 
         return [
+            ...$this->administrativeContext->execute($cuti, $user),
             'cuti' => $cuti,
             'canAct' => $canAct,
             'isVerifierContext' => $isVerifierContext,

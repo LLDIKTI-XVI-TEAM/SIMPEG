@@ -4,6 +4,7 @@
             'menunggu_approval' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
             'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+            'ditangguhkan_administratif' => ['label' => 'Ditangguhkan (Administratif)', 'variant' => 'warning'],
             'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
             'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
             'menunggu_pembatalan' => ['label' => 'Menunggu Keputusan Pembatalan', 'variant' => 'warning'],
@@ -71,6 +72,10 @@
                 </div>
             @endif
         </div>
+
+        @if ($canAdministrativelyPostpone)
+            <x-ui.button href="{{ route('cuti.show', $leave) }}" variant="warning">Buka Penangguhan Administratif</x-ui.button>
+        @endif
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -391,6 +396,7 @@
                         @empty
                             <p class="text-sm text-muted">Timeline approval belum tersedia.</p>
                         @endforelse
+                        @include('admin.cuti.partials.administrative-postponement-timeline')
                     </x-ui.timeline>
                 </x-ui.card>
 

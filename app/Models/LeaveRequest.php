@@ -22,6 +22,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon $tanggal_mulai
  * @property Carbon $tanggal_selesai
  * @property Carbon|null $created_at
+ * @property Carbon|null $administratively_postponed_at
+ * @property string|null $administratively_postponed_by
+ * @property string|null $administrative_postponement_reason
+ * @property-read User|null $administrativelyPostponedBy
  * @property-read Employee|null $employee
  * @property-read RefJenisCuti|null $jenisCuti
  * @property-read LeaveRequestCase|null $leaveRequestCase
@@ -44,6 +48,8 @@ class LeaveRequest extends Model
 
     public const STATUS_CANCELLED = 'dibatalkan';
 
+    public const STATUS_ADMINISTRATIVELY_POSTPONED = 'ditangguhkan_administratif';
+
     // Default model menjaga payload notifikasi pertama memiliki versi sebelum reload dari database.
     protected $attributes = [
         'revision_version' => 1,
@@ -65,6 +71,14 @@ class LeaveRequest extends Model
         'rollover_target_year',
     ];
 
+    // Keputusan dan identitas aktor hanya dibuka melalui payload detail yang sudah diotorisasi.
+    protected $hidden = [
+        'administratively_postponed_at',
+        'administratively_postponed_by',
+        'administrative_postponement_reason',
+        'administrativelyPostponedBy',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -74,6 +88,7 @@ class LeaveRequest extends Model
             'rollover_source_year' => 'integer',
             'rollover_target_year' => 'integer',
             'revision_version' => 'integer',
+            'administratively_postponed_at' => 'datetime',
         ];
     }
 
@@ -81,6 +96,12 @@ class LeaveRequest extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function administrativelyPostponedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'administratively_postponed_by');
     }
 
     /** @return BelongsTo<RefJenisCuti, $this> */

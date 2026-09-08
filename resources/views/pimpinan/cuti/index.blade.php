@@ -4,6 +4,7 @@
             'menunggu_approval' => 'info',
             'disetujui' => 'success',
             'ditangguhkan' => 'warning',
+            'ditangguhkan_administratif' => 'warning',
             'ditangguhkan_tugas_dinas' => 'warning',
             'dikembalikan_karena_rollover' => 'warning',
             'menunggu_pembatalan' => 'warning',
@@ -16,6 +17,7 @@
             'menunggu_approval' => 'Menunggu',
             'disetujui' => 'Disetujui',
             'ditangguhkan' => 'Ditangguhkan',
+            'ditangguhkan_administratif' => 'Ditangguhkan (Administratif)',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
             'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
@@ -105,6 +107,7 @@
                         <option value="disetujui" @selected(($filters['status'] ?? '') === 'disetujui')>Disetujui</option>
                         <option value="ditangguhkan" @selected(($filters['status'] ?? '') === 'ditangguhkan')>Ditangguhkan</option>
                         <option value="ditangguhkan_tugas_dinas" @selected(($filters['status'] ?? '') === 'ditangguhkan_tugas_dinas')>Ditangguhkan karena Tugas Dinas</option>
+                        <option value="ditangguhkan_administratif" @selected(($filters['status'] ?? '') === 'ditangguhkan_administratif')>Ditangguhkan (Administratif)</option>
                         <option value="dikembalikan_karena_rollover" @selected(($filters['status'] ?? '') === 'dikembalikan_karena_rollover')>Dikembalikan karena Rollover</option>
                         <option value="dibatalkan" @selected(($filters['status'] ?? '') === 'dibatalkan')>Dibatalkan</option>
                         <option value="perubahan" @selected(($filters['status'] ?? '') === 'perubahan')>Perubahan</option>

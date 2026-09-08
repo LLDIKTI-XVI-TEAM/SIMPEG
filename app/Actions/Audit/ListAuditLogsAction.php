@@ -3,11 +3,19 @@
 namespace App\Actions\Audit;
 
 use App\Models\AuditLog;
+use App\Models\User;
+use App\Services\Audit\AuditLogScope;
 use App\Support\Audit\AuditFilterValue;
+use App\Support\Audit\AuditLogReadPayload;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListAuditLogsAction
 {
+    public function __construct(
+        private readonly AuditLogReadPayload $payload,
+        private readonly AuditLogScope $scope,
+    ) {}
+
     /**
      * Mengambil audit log immutable dengan filter yang sudah tersedia di endpoint lama.
      *
@@ -16,11 +24,11 @@ class ListAuditLogsAction
      * sebagai galat peladen alih-alih hasil kosong.
      *
      * @param  array<string, mixed>  $filters
-     * @return LengthAwarePaginator<int, AuditLog>
+     * @return LengthAwarePaginator<int, array<array-key, mixed>>
      */
-    public function execute(array $filters): LengthAwarePaginator
+    public function execute(array $filters, ?User $actor = null): LengthAwarePaginator
     {
-        $query = AuditLog::query()->orderByDesc('created_at');
+        $query = $this->scope->for($actor)->orderByDesc('created_at');
 
         $event = AuditFilterValue::text($filters['event'] ?? null);
         $from = AuditFilterValue::date($filters['from'] ?? null);
@@ -50,6 +58,9 @@ class ListAuditLogsAction
 
         $perPage = min((int) ($filters['per_page'] ?? 10), 100);
 
-        return $query->paginate($perPage);
+        $paginator = $query->paginate($perPage);
+        $payloads = $this->payload->forLogs($paginator->getCollection(), $actor);
+
+        return $paginator->through(fn (AuditLog $log): array => $payloads->get($log->id));
     }
 }

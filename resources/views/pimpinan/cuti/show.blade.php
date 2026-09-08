@@ -4,6 +4,7 @@
             'menunggu_approval' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
             'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+            'ditangguhkan_administratif' => ['label' => 'Ditangguhkan (Administratif)', 'variant' => 'warning'],
             'ditangguhkan_tugas_dinas' => ['label' => 'Ditangguhkan karena Tugas Dinas', 'variant' => 'warning'],
             'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
             'menunggu_pembatalan' => ['label' => 'Menunggu Keputusan Pembatalan', 'variant' => 'warning'],
@@ -34,6 +35,10 @@
                 ['label' => 'Detail Pengajuan'],
             ]" />
         </div>
+
+        @if ($canAdministrativelyPostpone)
+            <x-ui.button href="{{ route('cuti.show', $leave) }}" variant="warning">Buka Penangguhan Administratif</x-ui.button>
+        @endif
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div class="space-y-6 lg:col-span-2">
@@ -107,7 +112,7 @@
                                 @endif
                             </dd>
                         </div>
-                        @if ($leave->status === 'disetujui' && $leave->proof?->document_path)
+                        @if (in_array($leave->status, ['disetujui', 'ditangguhkan_administratif'], true) && $leave->proof?->document_path)
                             <div>
                                 <dt class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Dokumen Cuti</dt>
                                 <dd class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -326,6 +331,7 @@
                         @empty
                             <p class="text-sm text-muted">Timeline approval belum tersedia.</p>
                         @endforelse
+                        @include('admin.cuti.partials.administrative-postponement-timeline')
                     </x-ui.timeline>
                 </x-ui.card>
 

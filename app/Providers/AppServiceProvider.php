@@ -76,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
                 'reference_tables.manage',
                 'ews.read',
                 'ews.configure',
+                'audit_logs.read',
             ];
 
             $view->with(

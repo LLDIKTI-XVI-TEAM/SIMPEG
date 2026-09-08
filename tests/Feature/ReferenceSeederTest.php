@@ -160,6 +160,7 @@ class ReferenceSeederTest extends TestCase
         $expectedEvents = [
             'cuti.dikembalikan_karena_rollover',
             'cuti.disetujui',
+            'cuti.ditangguhkan_administratif',
             'cuti.ditunda',
             'cuti.menunggu_persetujuan',
             'cuti.pembatalan_diajukan',
@@ -187,7 +188,7 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        $this->assertCount(32, $policies);
+        $this->assertCount(34, $policies);
         $this->assertSame($expectedEvents, $policies->pluck('event_key')->unique()->values()->all());
         $this->assertSame(['email', 'in_app'], $policies->pluck('code')->unique()->sort()->values()->all());
         $this->assertTrue($policies->every(fn (object $policy): bool => (bool) $policy->is_enabled));
@@ -220,10 +221,11 @@ class ReferenceSeederTest extends TestCase
                 'ref_notification_channels.code',
             ]);
 
-        // 47 = 37 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
+        // 49 = 37 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
         // + 2 baris status_pegawai.diubah (in_app + email)
-        // + 2 baris status_pegawai.dinonaktifkan (in_app + email).
-        $this->assertDatabaseCount('notification_event_channels', 47);
+        // + 2 baris status_pegawai.dinonaktifkan (in_app + email)
+        // + 2 baris cuti.ditangguhkan_administratif (in_app + email).
+        $this->assertDatabaseCount('notification_event_channels', 49);
         $this->assertCount(1, $policies);
         $this->assertSame('in_app', $policies->sole()->code);
         $this->assertTrue((bool) $policies->sole()->is_enabled);
@@ -261,10 +263,11 @@ class ReferenceSeederTest extends TestCase
 
         $this->seedReferenceData();
 
-        // 47 = 37 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
+        // 49 = 37 kebijakan existing + 6 baris event ews.followup.* (in_app saja)
         // + 2 baris status_pegawai.diubah (in_app + email)
-        // + 2 baris status_pegawai.dinonaktifkan (in_app + email).
-        $this->assertDatabaseCount('notification_event_channels', 47);
+        // + 2 baris status_pegawai.dinonaktifkan (in_app + email)
+        // + 2 baris cuti.ditangguhkan_administratif (in_app + email).
+        $this->assertDatabaseCount('notification_event_channels', 49);
         $this->assertDatabaseHas('notification_event_channels', [
             'event_key' => 'ews.satyalancana',
             'notification_channel_id' => $emailChannelId,

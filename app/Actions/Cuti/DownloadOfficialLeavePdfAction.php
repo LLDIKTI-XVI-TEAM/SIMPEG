@@ -20,11 +20,17 @@ class DownloadOfficialLeavePdfAction
     ) {}
 
     /**
-     * Memusatkan otorisasi rekam formulir resmi agar snapshot approver lama tetap berhak mengaksesnya.
+     * Memeriksa ketersediaan unduhan dan hak akses, termasuk approver pada snapshot persetujuan.
      */
     public function canDownload(LeaveRequest $leaveRequest, ?User $user): bool
     {
         $leaveRequest->loadMissing(['proof', 'steps:id,leave_request_id,approver_employee_id']);
+
+        // Setelah penangguhan administratif, PDF tanpa artefak asli tidak boleh dibuat ulang.
+        if ($leaveRequest->status === LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED
+            && $leaveRequest->proof?->document_path === null) {
+            return false;
+        }
 
         return $this->canDownloadLoaded($leaveRequest, $user);
     }
@@ -32,7 +38,8 @@ class DownloadOfficialLeavePdfAction
     /** Mengevaluasi hak unduh setelah relasi minimum formulir resmi sudah tersedia. */
     private function canDownloadLoaded(LeaveRequest $leaveRequest, ?User $user): bool
     {
-        if ($leaveRequest->status !== 'disetujui' || $leaveRequest->proof === null || $user === null) {
+        if (! in_array($leaveRequest->status, ['disetujui', LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED], true)
+            || $leaveRequest->proof === null || $user === null) {
             return false;
         }
 
@@ -56,7 +63,8 @@ class DownloadOfficialLeavePdfAction
     {
         $leaveRequest->loadMissing(['proof', 'steps:id,leave_request_id,approver_employee_id']);
 
-        if ($leaveRequest->status !== 'disetujui' || $leaveRequest->proof === null) {
+        if (! in_array($leaveRequest->status, ['disetujui', LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED], true)
+            || $leaveRequest->proof === null) {
             abort(404);
         }
 
@@ -71,6 +79,9 @@ class DownloadOfficialLeavePdfAction
                 'Formulir_Cuti_'.$leaveRequest->id.'.pdf',
             );
         }
+
+        // Bukti administratif hanya boleh memakai byte persetujuan asli, bukan data hidup sesudah keputusan.
+        abort_if($leaveRequest->status === LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED, 404);
 
         // Proof legacy belum memiliki artifact privat sehingga tetap memakai render dinamis yang kompatibel.
         $response = Pdf::loadView('admin.cuti.pdf.formulir-cuti', $this->viewData($leaveRequest))

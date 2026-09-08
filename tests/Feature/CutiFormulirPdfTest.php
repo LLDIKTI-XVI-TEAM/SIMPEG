@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\DownloadOfficialLeavePdfAction;
+use App\Actions\Cuti\GenerateLeaveProofAction;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveProof;
@@ -22,6 +23,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Tests\TestCase;
@@ -253,6 +255,85 @@ class CutiFormulirPdfTest extends TestCase
                 );
             $this->assertSame($storedBytes, $this->responseBytes($response), $scenario);
         }
+    }
+
+    public function test_administratively_postponed_proof_keeps_original_bytes_for_authorized_readers_only(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $leave = $fixture['leave_request'];
+        $bytes = "%PDF-1.4\n% bukti persetujuan terdahulu\n%%EOF\n";
+        $path = 'leave-proofs/'.$leave->id.'/00000000-0000-4000-8000-000000000f01.pdf';
+        Storage::disk('local')->put($path, $bytes);
+        $fixture['proof']->update(['document_path' => $path, 'document_mime' => 'application/pdf']);
+        $this->adoptStoredProofArtifact($leave, $path, $bytes);
+        $snapshot = $fixture['proof']->fresh()->getRawOriginal();
+        $viewer = User::factory()->pimpinan()->create();
+        $this->postponeOfficialFormFixture($leave, $viewer);
+
+        foreach ([$fixture['requester_user'], ...$fixture['approver_users'], $viewer] as $reader) {
+            $this->actingAs($reader)->get(route('cuti.show', $leave))->assertOk()
+                ->assertSee('aria-label="Unduh Formulir Cuti (PDF)"', false);
+            $response = $this->actingAs($reader)->get($this->formUrl($leave))->assertOk();
+            $this->assertSame($bytes, $this->responseBytes($response));
+            $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        }
+        foreach (['pimpinan.cuti.document.show', 'pimpinan.cuti.document.download'] as $routeName) {
+            $response = $this->actingAs($viewer)->get(route($routeName, $leave))->assertOk();
+            $this->assertSame($bytes, $this->responseBytes($response));
+        }
+        $this->actingAs($this->makeUnrelatedUser())->get($this->formUrl($leave))->assertForbidden();
+        $this->assertSame($snapshot, $fixture['proof']->fresh()->getRawOriginal());
+        $this->assertSame(hash('sha256', $bytes), hash('sha256', Storage::disk('local')->get($path)));
+    }
+
+    public function test_proof_generator_rechecks_current_status_before_accepting_stale_approved_request(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $leave = $fixture['leave_request'];
+        $actor = $fixture['requester_user'];
+        $bytes = "%PDF-1.4\n% persetujuan awal\n%%EOF\n";
+        $path = 'leave-proofs/'.$leave->id.'/00000000-0000-4000-8000-000000000f01.pdf';
+        Storage::disk('local')->put($path, $bytes);
+        $fixture['proof']->update([
+            'document_path' => $path, 'document_mime' => 'application/pdf', 'generated_by' => $actor->id,
+        ]);
+        $this->adoptStoredProofArtifact($leave, $path, $bytes);
+        $this->postponeOfficialFormFixture($leave->fresh(), $actor);
+        $this->assertSame('disetujui', $leave->status);
+
+        $this->expectException(ValidationException::class);
+        app(GenerateLeaveProofAction::class)->execute($leave, $actor);
+    }
+
+    public function test_administratively_postponed_proof_without_artifact_does_not_regenerate_pdf(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->makeOfficialFormFixture();
+        $this->postponeOfficialFormFixture($fixture['leave_request'], $fixture['requester_user']);
+        $snapshot = $fixture['proof']->fresh()->getRawOriginal();
+
+        foreach ([$fixture['requester_user'], ...$fixture['approver_users'], User::factory()->adminKepegawaian()->create()] as $reader) {
+            $this->actingAs($reader)->get($this->formUrl($fixture['leave_request']))->assertNotFound();
+            $this->get(route('cuti.show', $fixture['leave_request']))->assertOk()
+                ->assertDontSee('Unduh Formulir Cuti (PDF)', false)
+                ->assertDontSee($this->formUrl($fixture['leave_request']), false);
+        }
+
+        $this->assertSame($snapshot, $fixture['proof']->fresh()->getRawOriginal());
+        $this->assertSame([], Storage::disk('local')->allFiles('leave-proofs'));
+    }
+
+    /** Fixture pembacaan historis memakai transisi sah tanpa menjalankan ulang workflow saldo. */
+    private function postponeOfficialFormFixture(LeaveRequest $leave, User $actor): void
+    {
+        $leave->forceFill([
+            'status' => 'ditangguhkan_administratif',
+            'administratively_postponed_at' => '2026-08-01 09:15:00+08:00',
+            'administratively_postponed_by' => $actor->id,
+            'administrative_postponement_reason' => 'QA PRIVAT alasan administratif.',
+        ])->save();
     }
 
     public function test_official_form_fails_closed_when_adopted_stored_artifact_bytes_change(): void

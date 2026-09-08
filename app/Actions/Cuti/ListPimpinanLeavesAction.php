@@ -99,7 +99,7 @@ class ListPimpinanLeavesAction
             'totalMenunggu' => (clone $baseQuery)->where('status', 'menunggu_approval')->count(),
             'totalDisetujui' => (clone $baseQuery)->where('status', 'disetujui')->count(),
             'totalDitangguhkan' => (clone $baseQuery)
-                ->whereIn('status', ['ditangguhkan', LeaveRequest::STATUS_DUTY_POSTPONED])
+                ->whereIn('status', ['ditangguhkan', LeaveRequest::STATUS_DUTY_POSTPONED, LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED])
                 ->count(),
         ];
     }

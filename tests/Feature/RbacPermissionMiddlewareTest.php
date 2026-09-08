@@ -283,6 +283,17 @@ class RbacPermissionMiddlewareTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_pegawai_tanpa_permission_audit_ditolak(): void
+    {
+        // Role default tidak memberi permission audit; grant eksplisit tetap diperlukan.
+        $user = User::factory()->pegawai()->create();
+
+        $this->actingAs($user);
+        $response = $this->getJson('/api/v1/audit-log');
+
+        $response->assertForbidden();
+    }
+
     public function test_old_audit_logs_endpoint_is_not_available(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

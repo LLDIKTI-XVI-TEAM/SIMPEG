@@ -19,6 +19,7 @@ class CutiReportStatusFormatter
         $official = [
             'disetujui' => 'Disetujui melalui SIMPEG',
             'ditangguhkan' => 'Ditangguhkan',
+            LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED => 'Ditangguhkan (Administratif)',
             'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
             LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER => 'Dikembalikan karena Rollover',
             LeaveRequest::STATUS_CANCELLATION_PENDING => 'Menunggu Keputusan Pembatalan',

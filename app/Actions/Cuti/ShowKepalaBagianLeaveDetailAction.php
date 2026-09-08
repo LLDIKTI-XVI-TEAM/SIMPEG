@@ -14,6 +14,7 @@ class ShowKepalaBagianLeaveDetailAction
     public function __construct(
         private readonly KepalaBagianScopeService $scope,
         private readonly EmployeeFileStorageService $files,
+        private readonly BuildAdministrativeLeavePostponementContextAction $administrativeContext,
     ) {}
 
     /**
@@ -41,6 +42,7 @@ class ShowKepalaBagianLeaveDetailAction
         $activeStep = $leave->steps->firstWhere('status', 'active');
 
         return [
+            ...$this->administrativeContext->execute($leave, $actor),
             'leave' => $leave,
             'activeStep' => $activeStep,
             'canDecide' => $activeStep !== null

@@ -51,6 +51,15 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
             return;
         }
 
+        // Persetujuan yang menunggu delivery tidak lagi berlaku setelah penangguhan administratif.
+        if ($this->eventKey === 'cuti.disetujui'
+            && ! LeaveRequest::query()
+                ->whereKey($this->data['leave_request_id'] ?? null)
+                ->where('status', 'disetujui')
+                ->exists()) {
+            return;
+        }
+
         // Status dapat tetap sama setelah revisi; hanya versi dan tahap milik approver aktif yang boleh meminta tindakan.
         if (in_array($this->eventKey, ['cuti.pengajuan_baru', 'cuti.menunggu_persetujuan'], true)
             && ! LeaveRequest::query()

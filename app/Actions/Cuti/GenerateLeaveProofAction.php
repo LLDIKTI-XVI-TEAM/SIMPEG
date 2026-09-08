@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Cuti\LeaveProofDocumentStorageService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -27,6 +28,13 @@ class GenerateLeaveProofAction
      */
     public function execute(LeaveRequest $leaveRequest, User $generatedBy): array
     {
+        // Model pemanggil bisa usang; keputusan administratif tersimpan tidak boleh menerbitkan PDF pengganti.
+        if (LeaveRequest::query()->whereKey($leaveRequest->id)->value('status') !== 'disetujui') {
+            throw ValidationException::withMessages([
+                'status' => 'Bukti cuti hanya dapat diterbitkan untuk pengajuan yang sudah disetujui final.',
+            ]);
+        }
+
         $proof = LeaveProof::query()->where('leave_request_id', $leaveRequest->id)->firstOrFail();
 
         if ($proof->generated_by !== $generatedBy->id) {

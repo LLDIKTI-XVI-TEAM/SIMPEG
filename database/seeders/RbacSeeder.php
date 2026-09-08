@@ -62,6 +62,7 @@ class RbacSeeder extends Seeder
             'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
             'cuti.cancellation.manage' => ['module' => 'cuti', 'description' => 'Memutuskan permohonan pembatalan cuti'],
+            'cuti.administrative_postponement.manage' => ['module' => 'cuti', 'description' => 'Menangguhkan cuti yang disetujui secara administratif'],
             'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
             'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
@@ -101,6 +102,8 @@ class RbacSeeder extends Seeder
         // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
         // pada chain aktif. Capability mandiri PATEN tetap dicantumkan untuk kompatibilitas data lama,
         // tetapi runtime tidak memakai pivot sebagai sumber keputusan.
+        // Permission penangguhan administratif mengikuti bootstrap non-destruktif yang sama;
+        // perubahan grant operator tidak boleh ditimpa saat seeder dijalankan ulang.
         $this->bootstrapRolePermissions([
             // Super Admin menerima default semua capability RBAC, tetapi tetap
             // dapat direvoke dari matrix setelah bootstrap.
@@ -149,6 +152,7 @@ class RbacSeeder extends Seeder
                 'cuti.manual.manage',
                 'cuti.proof.generate',
                 'cuti.cancellation.manage',
+                'cuti.administrative_postponement.manage',
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [

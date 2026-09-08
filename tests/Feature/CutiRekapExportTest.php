@@ -307,6 +307,26 @@ class CutiRekapExportTest extends TestCase
             ->assertDontSee('perlu_perubahan', false);
     }
 
+    public function test_rekap_dan_laporan_mempertahankan_status_administratif_tanpa_alasan_keputusan(): void
+    {
+        $reader = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create();
+        $type = RefJenisCuti::create(['nama' => 'Cuti Administratif Uji Laporan']);
+        $leave = $this->createLeaveRequest($employee, $type, '2026-06-15', 'disetujui');
+        $leave->forceFill([
+            'status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED,
+            'administratively_postponed_at' => now(), 'administratively_postponed_by' => $reader->id,
+            'administrative_postponement_reason' => 'Alasan privat tidak boleh masuk laporan.',
+        ])->save();
+
+        foreach (['cuti.rekap', 'cuti.laporan'] as $routeName) {
+            $this->actingAs($reader)->get(route($routeName, ['pegawai' => $employee->id, 'periode' => '2026']))
+                ->assertOk()->assertSee('Ditangguhkan (Administratif)')
+                ->assertDontSee('Alasan privat tidak boleh masuk laporan.')
+                ->assertDontSee('Menunggu Approver');
+        }
+    }
+
     public function test_filter_periode_tidak_dikenal_ditolak_dan_filter_kosong_tetap_memakai_default(): void
     {
         $user = User::factory()->superAdmin()->create();

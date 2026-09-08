@@ -6,7 +6,7 @@
             $status = $cuti->status;
             $statusVariant = match ($status) {
                 'disetujui' => 'success',
-                'ditangguhkan', 'ditangguhkan_tugas_dinas' => 'warning',
+                'ditangguhkan', 'ditangguhkan_tugas_dinas', 'ditangguhkan_administratif' => 'warning',
                 'dikembalikan_karena_rollover' => 'warning',
                 'menunggu_pembatalan' => 'warning',
                 'dibatalkan' => 'danger',
@@ -17,6 +17,7 @@
             $statusLabel = match ($status) {
                 'menunggu_approval' => 'Menunggu Keputusan',
                 'ditangguhkan' => 'Ditangguhkan',
+                'ditangguhkan_administratif' => 'Ditangguhkan (Administratif)',
                 'ditangguhkan_tugas_dinas' => 'Ditangguhkan karena Tugas Dinas',
                 'dikembalikan_karena_rollover' => 'Dikembalikan karena Rollover',
                 'menunggu_pembatalan' => 'Menunggu Keputusan Pembatalan',
@@ -52,6 +53,16 @@
         @error('status')
             <x-ui.alert variant="danger" title="Tindakan belum dapat diproses">{{ $message }}</x-ui.alert>
         @enderror
+
+        @if ($errors->administrativePostponement->any())
+            <x-ui.alert variant="danger" title="Penangguhan belum dapat disimpan">
+                <ul class="list-inside list-disc space-y-1">
+                    @foreach ($errors->administrativePostponement->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+        @endif
 
         {{-- Detail Card --}}
         <x-ui.card padding="lg" class="space-y-6">
@@ -212,6 +223,7 @@
                             :pulse="$step->status === 'active' && ! in_array($status, ['ditangguhkan', 'menunggu_pembatalan'], true)"
                         />
                     @endforeach
+                    @include('admin.cuti.partials.administrative-postponement-timeline')
                 </x-ui.timeline>
             </div>
 
@@ -267,6 +279,7 @@
                     </div>
                 </div>
             @endif
+            @include('admin.cuti.partials.administrative-postponement-form')
             <div class="border-t border-border pt-6 space-y-4"
                    x-data="{ decisionForm: {{ $errors->dutyPostponement->hasAny(['alasan', 'active_step_id', 'revision_version']) ? "'dutyPostponement'" : 'null' }}, lastTrigger: null,
                      open(key, ev) { this.lastTrigger = ev?.currentTarget ?? null; this.decisionForm = key; this.$nextTick(() => document.getElementById(key === 'dutyPostponement' ? 'alasan-duty-postponement' : `komentar-${key}`)?.focus()); },

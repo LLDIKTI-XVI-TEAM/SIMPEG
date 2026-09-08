@@ -194,6 +194,35 @@ class KepalaBagianFrontendTest extends TestCase
         }
     }
 
+    public function test_penangguhan_administratif_tampil_pada_search_dan_detail_tanpa_alasan_privat(): void
+    {
+        [$user, $kepalaBagian] = $this->kepalaBagian();
+        $employee = Employee::factory()->create([
+            'nama_lengkap' => 'Bawahan Penangguhan Administratif',
+            'kepala_bagian_id' => $kepalaBagian->id,
+        ]);
+        $leave = $this->leaveWithActiveStep($employee, $kepalaBagian);
+        $leave->steps()->update(['status' => 'approved', 'acted_at' => now()]);
+        $leave->forceFill(['status' => 'disetujui'])->save();
+        $leave->forceFill([
+            'status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED,
+            'administratively_postponed_at' => now(), 'administratively_postponed_by' => $user->id,
+            'administrative_postponement_reason' => 'Alasan privat tidak boleh dibuka oleh monitoring.',
+        ])->save();
+
+        $response = $this->actingAs($user)
+            ->getJson(url('/kepala-bagian/search').'?q='.urlencode('Bawahan Penangguhan Administratif'))
+            ->assertOk()->assertJsonCount(1, 'Cuti');
+        $this->assertStringEndsWith('Ditangguhkan (Administratif)', $response->json('Cuti.0.subtitle'));
+
+        $this->get(route('kepala-bagian.cuti.show', $leave))->assertOk()
+            ->assertSee('Ditangguhkan (Administratif)')->assertViewHas('canDecide', false)
+            ->assertDontSee('Alasan privat tidak boleh dibuka oleh monitoring.')
+            ->assertDontSee('Buka Penangguhan Administratif');
+        $this->get(route('kepala-bagian.cuti.index', ['status' => LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED]))
+            ->assertOk()->assertSee('Bawahan Penangguhan Administratif')->assertSee('Ditangguhkan (Administratif)');
+    }
+
     public function test_employee_pages_are_limited_to_direct_reports(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();

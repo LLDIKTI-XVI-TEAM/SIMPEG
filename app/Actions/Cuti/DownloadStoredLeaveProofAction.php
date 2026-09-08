@@ -11,7 +11,7 @@ final class DownloadStoredLeaveProofAction
 {
     public function __construct(private readonly LeaveProofDocumentStorageService $documents) {}
 
-    /** Mengunduh PDF privat yang telah terikat ke pengajuan final tanpa membuka path storage. */
+    /** Mengunduh PDF persetujuan asli, termasuk histori administratif, tanpa membuka path storage. */
     public function execute(
         LeaveRequest $leaveRequest,
         bool $inline,
@@ -21,7 +21,7 @@ final class DownloadStoredLeaveProofAction
         $proof = $leaveRequest->proof;
 
         abort_if(
-            $leaveRequest->status !== 'disetujui'
+            ! in_array($leaveRequest->status, ['disetujui', LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED], true)
             || $proof === null
             || ! $this->documents->isValidExistingDocument(
                 $leaveRequest->id,

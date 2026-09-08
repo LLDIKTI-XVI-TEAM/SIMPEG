@@ -9,6 +9,8 @@ use App\Models\RefJenisCuti;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 /**
@@ -23,6 +25,82 @@ class CutiDetailTimelineTest extends TestCase
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+    }
+
+    public function test_detail_final_menawarkan_penangguhan_administratif_hanya_kepada_pengelola_berizin(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $response = $this->actingAs($admin)->get(route('cuti.show', $leave))
+            ->assertOk()
+            ->assertSee('Tangguhkan secara Administratif')
+            ->assertSee('name="alasan"', false)
+            ->assertSee('maxlength="500"', false)
+            ->assertSee('Seluruh periode cuti akan dibatalkan');
+
+        $this->assertSame(1, preg_match('/<dl id="administrative-target-summary"[^>]*>(.*?)<\/dl>/s', $response->getContent(), $summary));
+        $this->assertStringContainsString(e($leave->employee->nama_lengkap), $summary[1]);
+        $this->assertStringContainsString($leave->tanggal_mulai->translatedFormat('d F Y'), $summary[1]);
+        $this->assertStringContainsString('2 hari kerja', $summary[1]);
+
+        $reader = User::factory()->superAdmin()->create();
+        $this->actingAs($reader)->get(route('cuti.show', $leave))
+            ->assertOk()->assertDontSee('Tangguhkan secara Administratif');
+
+        $leave->forceFill(['tanggal_mulai' => now()->toDateString()])->save();
+        $this->actingAs($admin)->get(route('cuti.show', $leave))
+            ->assertOk()->assertDontSee('Tangguhkan secara Administratif');
+    }
+
+    public function test_detail_administratif_memisahkan_alasan_privat_dari_monitoring_dan_error_form_lama(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $admin = User::factory()->adminKepegawaian()->create();
+        $reason = 'Instruksi penangguhan administratif yang bersifat privat.';
+        $leave->forceFill([
+            'status' => 'ditangguhkan_administratif',
+            'administratively_postponed_at' => now(),
+            'administratively_postponed_by' => $admin->id,
+            'administrative_postponement_reason' => $reason,
+        ])->save();
+
+        $owner = User::factory()->pegawai()->create(['employee_id' => $leave->employee_id]);
+        foreach ([$owner, $admin] as $viewer) {
+            $this->actingAs($viewer)->get(route('cuti.show', $leave))
+                ->assertOk()->assertSee('Ditangguhkan (Administratif)')->assertSee($reason)
+                ->assertDontSee('Tangguhkan secara Administratif');
+        }
+
+        $reader = User::factory()->superAdmin()->create();
+        $this->actingAs($reader)->get(route('cuti.show', $leave))
+            ->assertOk()->assertSee('Ditangguhkan (Administratif)')->assertDontSee($reason);
+
+        $errors = new ViewErrorBag;
+        $errors->put('administrativePostponement', new MessageBag([
+            'status' => 'Status pengajuan sudah berubah. Muat ulang halaman.',
+        ]));
+        $this->actingAs($admin)->withSession(['errors' => $errors])->get(route('cuti.show', $leave))
+            ->assertOk()->assertSee('Status pengajuan sudah berubah. Muat ulang halaman.')
+            ->assertDontSee('Periksa kembali data penangguhan di formulir');
+    }
+
+    private function administrativePostponementFixture(): LeaveRequest
+    {
+        $type = RefJenisCuti::create([
+            'nama' => 'Cuti Sakit', 'code' => 'sakit',
+            'mengurangi_saldo_tahunan' => false, 'khusus_pns' => false,
+        ]);
+
+        return LeaveRequest::create([
+            'employee_id' => Employee::factory()->create()->id,
+            'jenis_cuti_id' => $type->id,
+            'tanggal_mulai' => now()->addWeek()->toDateString(),
+            'tanggal_selesai' => now()->addWeek()->addDay()->toDateString(),
+            'jumlah_hari_kerja' => 2,
+            'alasan' => 'Pengajuan uji presentasi keputusan administratif.',
+            'status' => 'disetujui',
+        ]);
     }
 
     public function test_detail_timeline_renders_dynamic_steps_including_skipped_and_acted(): void

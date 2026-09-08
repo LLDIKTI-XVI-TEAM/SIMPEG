@@ -82,6 +82,7 @@
                             'menunggu_approval' => ['label' => 'Menunggu Keputusan', 'variant' => 'warning'],
                             'disetujui' => ['label' => 'Disetujui', 'variant' => 'success'],
                             'ditangguhkan' => ['label' => 'Ditangguhkan', 'variant' => 'warning'],
+                            'ditangguhkan_administratif' => ['label' => 'Ditangguhkan (Administratif)', 'variant' => 'warning'],
                             'dikembalikan_karena_rollover' => ['label' => 'Dikembalikan karena Rollover', 'variant' => 'warning'],
                             'menunggu_pembatalan' => ['label' => 'Menunggu Keputusan Pembatalan', 'variant' => 'warning'],
                             'dibatalkan' => ['label' => 'Dibatalkan', 'variant' => 'danger'],
