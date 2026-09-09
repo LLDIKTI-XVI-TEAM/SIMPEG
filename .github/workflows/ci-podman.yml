@@ -54,6 +54,12 @@ jobs:
       - name: Start Podman services
         run: podman compose up -d --build app db
 
+      - name: Inspect Podman containers
+        run: |
+          podman ps -a
+          podman logs simpeg_app 2>&1 | tail -n 30 || true
+          podman logs simpeg_postgres 2>&1 | tail -n 5 || true
+
       - name: Wait for PostgreSQL
         run: |
           for attempt in $(seq 1 60); do
