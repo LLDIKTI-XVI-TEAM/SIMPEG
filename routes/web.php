@@ -83,9 +83,9 @@ Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
     ->name('cuti.verify');
 
 if (app()->environment(['local', 'testing'])) {
-    Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
-    Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
-
+    // Jalur demo/dev-login dihapus: seluruh login wajib melalui identitas
+    // Keycloak asli. Handler demo (defaultDemoLogin/demoLogin) sudah tidak ada
+    // sehingga registrasi route-nya dihapus agar tidak berakhir 500.
     Route::get('/map-dummy-employee', function () {
         $user = auth()->user();
         if ($user) {

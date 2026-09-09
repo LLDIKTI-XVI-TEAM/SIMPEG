@@ -10,19 +10,31 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureEmployeeApiScope
 {
-    /** Role ber-permission boleh memakai surface API pegawai lintas pegawai. */
+    /** Role ber-permission boleh memakai surface pegawai lintas pegawai. */
     private const MANAGER_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
+
+    /**
+     * Role yang boleh memakai endpoint API mentah lintas pegawai.
+     * Pimpinan sengaja tidak termasuk: payload mentah memuat NIK dan relasi
+     * penuh, sedangkan Pimpinan wajib memakai surface khusus yang payload-nya
+     * sudah dibatasi.
+     */
+    private const STRICT_MANAGER_ROLES = ['super_admin', 'admin_kepegawaian'];
 
     /**
      * RBAC menentukan aksi yang boleh dilakukan, sedangkan middleware ini
      * menentukan rekam pegawai mana yang boleh menjadi target API. Pegawai
      * hanya boleh memakai endpoint generik ini untuk data miliknya sendiri.
-     * Pimpinan tetap memakai surface khusus yang sudah dibatasi payload-nya.
      * Kepala Bagian dibatasi pada bawahan langsung via KepalaBagianScopeService.
+     *
+     * Mode `strict` dipakai endpoint API mentah (payload NIK/relasi penuh):
+     * Pimpinan ditolak (403) dan wajib memakai surface khusus yang dimasking.
+     * Halaman web memakai mode default karena controller-nya menyajikan
+     * payload yang sudah dibatasi per role.
      *
      * @param  Closure(Request): Response  $next
      */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, ?string $mode = null): Response
     {
         $user = $request->user();
         $effectiveRole = $user?->getEffectiveRole();
@@ -31,7 +43,9 @@ class EnsureEmployeeApiScope
             abort(403);
         }
 
-        if (in_array($effectiveRole, self::MANAGER_ROLES, true)) {
+        $managers = $mode === 'strict' ? self::STRICT_MANAGER_ROLES : self::MANAGER_ROLES;
+
+        if (in_array($effectiveRole, $managers, true)) {
             return $next($request);
         }
 

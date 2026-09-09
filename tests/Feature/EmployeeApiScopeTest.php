@@ -56,6 +56,21 @@ class EmployeeApiScopeTest extends TestCase
         }
     }
 
+    public function test_pimpinan_ditolak_pada_endpoint_keluarga_mentah_lintas_pegawai(): void
+    {
+        // Payload keluarga admin memuat NIK; Pimpinan wajib memakai surface
+        // khusus yang dimasking, bukan endpoint API mentah lintas pegawai.
+        $target = Employee::factory()->create();
+        $pimpinan = User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]);
+
+        $this->actingAs($pimpinan)
+            ->getJson("/api/v1/pegawai/{$target->id}/keluarga")
+            ->assertForbidden();
+        $this->actingAs($pimpinan)
+            ->getJson("/api/v1/pegawai/{$target->id}/riwayat-kepangkatan")
+            ->assertForbidden();
+    }
+
     public function test_grant_employee_read_pada_pegawai_tetap_hanya_mengizinkan_target_milik_sendiri(): void
     {
         $ownEmployee = Employee::factory()->create();

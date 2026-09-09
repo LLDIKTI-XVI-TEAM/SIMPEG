@@ -23,6 +23,11 @@ $employeeGroupMiddleware = $disableEmployeeApiAuth
 $adminEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
     ? []
     : ['permission:'.$permission, 'employee.scope'];
+// Endpoint baca mentah (payload NIK/relasi penuh): Pimpinan ditolak via mode
+// strict dan wajib memakai surface khusus yang dimasking.
+$strictEmployeeReadMiddleware = static fn (string $permission = 'employees.read'): array => $disableEmployeeApiAuth
+    ? []
+    : ['permission:'.$permission, 'employee.scope:strict'];
 // Permission menjaga aksi; employee.scope menjaga batas record sesuai role/ownership.
 // Tidak ada role allowlist agar matriks RBAC menjadi sumber kebenaran mutasi.
 $adminEmployeeMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
@@ -37,7 +42,7 @@ $adminSubModuleMutationMiddleware = static fn (string $permission): array => $di
 Route::middleware($employeeGroupMiddleware)
     ->prefix('pegawai')
     ->name('pegawai.')
-    ->group(function () use ($adminEmployeeMutationMiddleware, $adminSubModuleMutationMiddleware, $adminEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
+    ->group(function () use ($adminEmployeeMutationMiddleware, $adminSubModuleMutationMiddleware, $adminEmployeeReadMiddleware, $strictEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
         Route::get('/', [EmployeeController::class, 'index'])
             // Daftar dipakai oleh halaman pemantauan Pimpinan dan tidak menerima UUID target;
             // pembatasan employee.scope diterapkan pada endpoint yang menunjuk satu rekam pegawai.
@@ -67,7 +72,7 @@ Route::middleware($employeeGroupMiddleware)
             ->name('restore');
         Route::get('/{employee}/keluarga', [EmployeeFamilyController::class, 'index'])
             // Payload keluarga Admin memuat NIK; role Pimpinan tetap memakai view yang dimasking.
-            ->middleware($adminEmployeeReadMiddleware('employee_families.read'))
+            ->middleware($strictEmployeeReadMiddleware('employee_families.read'))
             ->whereUuid('employee')
             ->name('keluarga.index');
         Route::post('/{employee}/keluarga', [EmployeeFamilyController::class, 'store'])
@@ -85,7 +90,7 @@ Route::middleware($employeeGroupMiddleware)
 
         // Payload JSON Admin memuat relasi mentah dan metadata berkas; Pimpinan memakai surface khusus yang dimasking.
         Route::get('/{employee}', [EmployeeController::class, 'show'])
-            ->middleware($adminEmployeeReadMiddleware())
+            ->middleware($strictEmployeeReadMiddleware())
             ->whereUuid('employee')
             ->name('show');
         Route::get('/{employee}/table-row', [EmployeeController::class, 'tableRow'])
@@ -97,7 +102,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid('employee')
             ->name('update');
         Route::get('/{employee}/disiplin', [DisciplineRecordController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('discipline_records.read'))
+            ->middleware($strictEmployeeReadMiddleware('discipline_records.read'))
             ->whereUuid('employee')
             ->name('disiplin.index');
         Route::post('/{employee}/disiplin', [DisciplineRecordController::class, 'store'])
@@ -113,7 +118,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid(['employee', 'discipline'])
             ->name('disiplin.upload-sk');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('dokumen_sk.read'))
+            ->middleware($strictEmployeeReadMiddleware('dokumen_sk.read'))
             ->whereUuid('employee')
             ->name('arsip-dokumen.index');
         Route::post('/{employee}/berkas-lainnya', [EmployeeDocumentController::class, 'storeBerkasLainnya'])
@@ -131,11 +136,11 @@ Route::middleware($employeeGroupMiddleware)
             ->scopeBindings()
             ->name('berkas-lainnya.destroy');
         Route::get('/{employee}/status-dokumen', [EmployeeController::class, 'documentStatus'])
-            ->middleware($adminEmployeeReadMiddleware('dokumen_sk.read'))
+            ->middleware($strictEmployeeReadMiddleware('dokumen_sk.read'))
             ->whereUuid('employee')
             ->name('status-dokumen');
         Route::get('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
+            ->middleware($strictEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
             ->name('riwayat-kepangkatan.index');
         Route::post('/{employee}/riwayat-kepangkatan', [RankHistoryController::class, 'store'])
@@ -147,7 +152,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid(['employee', 'rank'])
             ->name('riwayat-kepangkatan.upload-sk');
         Route::get('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
+            ->middleware($strictEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
             ->name('riwayat-jabatan.index');
         Route::post('/{employee}/riwayat-jabatan', [PositionHistoryController::class, 'store'])
@@ -159,7 +164,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid(['employee', 'position'])
             ->name('riwayat-jabatan.upload-sk');
         Route::get('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
+            ->middleware($strictEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
             ->name('riwayat-kgb.index');
         Route::post('/{employee}/riwayat-kgb', [KgbHistoryController::class, 'store'])
@@ -171,7 +176,7 @@ Route::middleware($employeeGroupMiddleware)
             ->whereUuid(['employee', 'kgb'])
             ->name('riwayat-kgb.upload-sk');
         Route::get('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'index'])
-            ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
+            ->middleware($strictEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
             ->name('riwayat-pendidikan.index');
         Route::post('/{employee}/riwayat-pendidikan', [EducationHistoryController::class, 'store'])

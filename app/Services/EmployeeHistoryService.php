@@ -65,6 +65,7 @@ class EmployeeHistoryService
 
             if ($history->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $history->id,
                     'jenis_dokumen' => 'sk_pangkat',
                     'nama_dokumen' => 'SK Kenaikan Pangkat '.$golongan->kode,
                     'nomor_dokumen' => $history->no_sk,
@@ -170,6 +171,7 @@ class EmployeeHistoryService
 
             if ($history->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $history->id,
                     'jenis_dokumen' => 'sk_jabatan',
                     'nama_dokumen' => 'SK Kenaikan Jabatan '.$jabatan->nama,
                     'nomor_dokumen' => $history->no_sk,
@@ -216,6 +218,7 @@ class EmployeeHistoryService
 
             if ($history->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $history->id,
                     'jenis_dokumen' => 'sk_kgb',
                     'nama_dokumen' => 'SK KGB TMT '.($history->tmt_kgb ? $history->tmt_kgb->format('d-m-Y') : ''),
                     'nomor_dokumen' => $history->no_sk,
@@ -313,6 +316,7 @@ class EmployeeHistoryService
 
             if ($record->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $record->id,
                     'jenis_dokumen' => 'sk_hukuman_disiplin',
                     'nama_dokumen' => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
                     'nomor_dokumen' => $record->no_sk,

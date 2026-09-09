@@ -31,7 +31,7 @@ class UploadDisciplineRecordSkAction
 
                 $employee->documents()->updateOrCreate([
                     'jenis_dokumen' => 'sk_hukuman_disiplin',
-                    'nomor_dokumen' => $record->no_sk,
+                    'history_id' => $record->id,
                 ], [
                     'nama_dokumen' => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
                     'tanggal_dokumen' => $record->tanggal_sk,

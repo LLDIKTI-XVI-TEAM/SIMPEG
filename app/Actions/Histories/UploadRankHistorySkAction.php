@@ -32,7 +32,7 @@ class UploadRankHistorySkAction
 
                 $employee->documents()->updateOrCreate([
                     'jenis_dokumen' => 'sk_pangkat',
-                    'nomor_dokumen' => $history->no_sk,
+                    'history_id' => $history->id,
                 ], [
                     'nama_dokumen' => 'SK Kenaikan Pangkat '.($history->golongan?->kode ?? ''),
                     'tanggal_dokumen' => $history->tanggal_sk,
