@@ -54,11 +54,18 @@ jobs:
       - name: Start Podman services
         run: podman compose up -d --build app db
 
-      - name: Inspect Podman containers
+      - name: Verify Podman services are running
+        # podman-compose 1.0.6 mengembalikan exit 0 walau service gagal start,
+        # sehingga gate eksplisit ini wajib ada sebelum langkah exec.
         run: |
           podman ps -a
-          podman logs simpeg_app 2>&1 | tail -n 30 || true
-          podman logs simpeg_postgres 2>&1 | tail -n 5 || true
+          for container in simpeg_app simpeg_postgres; do
+            if ! podman ps --format '{{.Names}} {{.Status}}' | grep -q "^${container} Up"; then
+              echo "Container ${container} tidak berjalan:"
+              podman logs "${container}" 2>&1 | tail -n 30 || true
+              exit 1
+            fi
+          done
 
       - name: Wait for PostgreSQL
         run: |
