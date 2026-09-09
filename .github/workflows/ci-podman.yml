@@ -84,6 +84,7 @@ jobs:
       - name: Prepare application environment
         run: |
           test -f .env || cp .env.example .env
+          podman compose exec -T -e COMPOSER_ALLOW_SUPERUSER=1 app composer install --prefer-dist --no-interaction --no-progress
           podman compose exec -T app php artisan key:generate --force
 
       - name: Create test databases (base + per-process)
