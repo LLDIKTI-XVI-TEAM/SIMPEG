@@ -263,9 +263,11 @@ class RbacPermissionMiddlewareTest extends TestCase
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf('/api/v1/hari-libur', [
-            'tanggal' => '2026-01-01',
-            'nama' => 'Tahun Baru Masehi',
-            'tipe' => 'libur_nasional',
+            // 2026-01-01 sudah dised ReferenceSeeder; pakai tanggal bebas
+            // agar hook unik-tanggal tidak mengaburkan asersi permission.
+            'tanggal' => '2026-06-15',
+            'nama' => 'Cuti Bersama Pengujian',
+            'tipe' => 'cuti_bersama',
         ]);
 
         $response->assertCreated();

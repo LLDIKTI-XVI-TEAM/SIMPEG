@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -479,7 +481,20 @@ class CutiDetailTimelineTest extends TestCase
             ->assertOk()
             ->assertSee(route('cuti.approve', $leaveRequest->id), false);
 
+        // cuti.read_all membuka detail untuk monitoring; bertindak tetap dibatasi
+        // approver aktif (asersi tombol di atas).
         $this->actingAs($unrelatedUser)
+            ->get(route('cuti.show', $leaveRequest->id))
+            ->assertOk();
+
+        // Tanpa read_all (dan tanpa relasi lain ke pengajuan), pihak yang tidak
+        // terkait tetap ditolak.
+        Role::query()->where('name', 'kepala_bagian')->sole()->permissions()->detach(
+            Permission::query()->where('name', 'cuti.read_all')->sole()->id
+        );
+        $outsiderEmployee = Employee::factory()->create();
+        $outsider = User::factory()->kepalaBagian()->create(['employee_id' => $outsiderEmployee->id]);
+        $this->actingAs($outsider)
             ->get(route('cuti.show', $leaveRequest->id))
             ->assertForbidden();
     }

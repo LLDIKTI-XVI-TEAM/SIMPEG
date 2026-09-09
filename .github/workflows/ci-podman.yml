@@ -1,0 +1,121 @@
+name: CI Podman
+
+# Varian CI untuk runner self-hosted ber-podman. Langkah orde-nya mengikuti
+# urutan yang ditetapkan: frontend dulu, lalu gerbang PHP, lalu suite
+# paralel memakai seluruh CPU (nproc), serial, dan guarded-destructive.
+# Database per proses paratest (TEST_TOKEN) dibuat di muka agar worker tidak
+# saling migrate:fresh pada database yang sama.
+on:
+  pull_request:
+    branches: [development, main]
+  push:
+    branches: [development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa-podman:
+    name: Frontend + Pint + PHPStan + Test (Podman)
+    runs-on: self-hosted
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # 1. Instal dependency frontend.
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # 2. Test JavaScript.
+      - name: Run JavaScript tests
+        run: npm run test:js
+
+      # 3. Build production (manifest Vite dibutuhkan view Blade saat test).
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Start Podman services
+        run: podman compose up -d --build app db
+
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in $(seq 1 60); do
+            # DB maintenance default mengikuti POSTGRES_DB pada compose.yml.
+            if podman compose exec -T db pg_isready -U "${DB_USERNAME:-simpeg}" -d "${DB_MAINTENANCE_DB:-simpeg}"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "PostgreSQL tidak siap setelah 120 detik."
+          exit 1
+        env:
+          DB_USERNAME: simpeg
+
+      - name: Prepare application environment
+        run: |
+          test -f .env || cp .env.example .env
+          podman compose exec -T app php artisan key:generate --force
+
+      - name: Create test databases (base + per-process)
+        run: sh docker/ci/create-test-databases.sh "$(nproc)"
+        env:
+          DB_DATABASE: simpeg_test
+          DB_USERNAME: simpeg
+
+      # 4. Bersihkan cache konfigurasi.
+      - name: Clear config cache
+        run: podman compose exec -T app php -d memory_limit=-1 artisan config:clear
+
+      # 5. Pint seluruh project.
+      - name: Run Pint format check
+        run: podman compose exec -T app php -d memory_limit=-1 vendor/bin/pint --test
+
+      # 6. PHPStan tanpa batas memori.
+      - name: Run PHPStan static analysis
+        run: podman compose exec -T app php -d memory_limit=-1 vendor/bin/phpstan analyse --memory-limit=-1
+
+      # 7. Test paralel memakai seluruh CPU yang tersedia bagi container.
+      - name: Run safe Laravel tests in parallel
+        run: >-
+          podman compose exec -T -e APP_ENV=testing -e DB_CONNECTION=pgsql
+          -e DB_DATABASE=simpeg_test -e DB_URL= app sh -lc
+          'php -d memory_limit=-1 artisan test --parallel --processes="$(nproc)"
+          --recreate-databases --exclude-group=serial --exclude-group=guarded-destructive'
+
+      # 8. Test serial.
+      - name: Run serial Laravel tests
+        run: >-
+          podman compose exec -T -e APP_ENV=testing -e DB_CONNECTION=pgsql
+          -e DB_DATABASE=simpeg_test -e DB_URL= app
+          php -d memory_limit=-1 artisan test --group=serial
+          --exclude-group=guarded-destructive
+
+      # 9. Test guarded-destructive, terakhir.
+      - name: Run guarded destructive migration tests
+        run: >-
+          podman compose exec -T -e APP_ENV=testing -e DB_CONNECTION=pgsql
+          -e DB_DATABASE=simpeg_test -e DB_URL=
+          -e SIMPEG_ALLOW_DESTRUCTIVE_MIGRATION_TESTS=true app
+          php -d memory_limit=-1 artisan test --group=guarded-destructive
+          --fail-on-skipped
+
+      - name: Stop Podman services
+        if: always()
+        run: podman compose down -v

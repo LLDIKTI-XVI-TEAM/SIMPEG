@@ -55,19 +55,22 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('pimpinan');
         $employee = Employee::factory()->create();
 
-        $this->get(route('dokumen'))->assertOk();
-        $this->get(route('pegawai.show', $employee->id))
-            ->assertRedirect(route('rbac.pegawai.show', $employee->id));
+        // Pimpinan dikecualikan dari arsip lintas pegawai (canBrowseArchive).
+        $this->get(route('dokumen'))->assertForbidden();
+        // Route pegawai.show digerbang role admin; pimpinan ditolak sebelum
+        // redirect internal ke surface RBAC.
+        $this->get(route('pegawai.show', $employee->id))->assertForbidden();
     }
 
-    public function test_pimpinan_receives_archive_link_when_document_permission_is_active(): void
+    public function test_pimpinan_does_not_receive_archive_link_even_with_document_permission(): void
     {
         $this->actingAsRole('pimpinan');
 
+        // Sidebar pimpinan sengaja tidak memuat arsip: Pimpinan dikecualikan
+        // dari central archive lintas pegawai meski memegang dokumen_sk.read.
         $this->get(route('pimpinan.dashboard'))
             ->assertOk()
-            ->assertSee('href="'.route('dokumen').'"', false)
-            ->assertSee('Dokumen &amp; SK', false);
+            ->assertDontSee('href="'.route('dokumen').'"', false);
     }
 
     public function test_admin_kepegawaian_can_upload_berkas_lainnya(): void

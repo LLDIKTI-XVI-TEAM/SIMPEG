@@ -13,7 +13,7 @@ class ListDocumentsRequest extends FormRequest
             return true;
         }
 
-        return DocumentAuthorization::canViewArchive($this->user());
+        return DocumentAuthorization::canBrowseArchive($this->user());
     }
 
     public function rules(): array

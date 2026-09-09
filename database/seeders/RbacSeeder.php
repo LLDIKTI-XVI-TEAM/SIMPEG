@@ -106,8 +106,14 @@ class RbacSeeder extends Seeder
         // perubahan grant operator tidak boleh ditimpa saat seeder dijalankan ulang.
         $this->bootstrapRolePermissions([
             // Super Admin menerima default semua capability RBAC, tetapi tetap
-            // dapat direvoke dari matrix setelah bootstrap.
-            'super_admin' => array_keys($permissions),
+            // dapat direvoke dari matrix setelah bootstrap. Penangguhan cuti
+            // administratif dikecualikan: default produk hanya Admin Kepegawaian
+            // (lihat migrasi 2026_09_06_000002); operator dapat memberikannya
+            // eksplisit bila dibutuhkan.
+            'super_admin' => array_values(array_diff(
+                array_keys($permissions),
+                ['cuti.administrative_postponement.manage']
+            )),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',

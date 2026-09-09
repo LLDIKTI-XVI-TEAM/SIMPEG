@@ -191,6 +191,11 @@ class User extends Authenticatable
      * Role internal sah adalah role efektif yang terdaftar pada tabel roles.
      * Berlaku untuk seluruh evaluasi PATEN/RBAC agar role kosong/tidak valid
      * selalu fail-closed sesuai kontrak Issue #6.
+     *
+     * Role kanonis (ROLE_RANKS) tidak memerlukan query: FK cascade pada
+     * role_permissions menjamin tidak ada mapping yatim bila row role dihapus,
+     * sehingga hasil pemeriksaan identik dengan query database. Role non-kanonis
+     * tetap diverifikasi ke database untuk mendukung role kustom.
      */
     private function hasValidInternalRole(): bool
     {
@@ -198,6 +203,10 @@ class User extends Authenticatable
 
         if (! is_string($role) || $role === '') {
             return false;
+        }
+
+        if (isset(self::ROLE_RANKS[$role])) {
+            return true;
         }
 
         return Role::query()->where('name', $role)->exists();

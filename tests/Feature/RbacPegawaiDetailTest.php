@@ -83,11 +83,12 @@ class RbacPegawaiDetailTest extends TestCase
         $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeSelf))->assertForbidden();
         $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeOther))->assertForbidden();
 
-        // Dengan grant employees.read (A1-pegawai) → bypass self-only, bisa semua via /rbac
+        // Grant employees.read TIDAK bypass self-only: scope pegawai tetap milik
+        // sendiri (pengetatan 295b9a1b menghapus bypass A1).
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
         $user->refresh();
         $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeSelf))->assertOk();
-        $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeOther))->assertOk();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $employeeOther))->assertForbidden();
     }
 
     public function test_kepala_bagian_can_access_bawahan_via_rbac_but_not_other(): void
@@ -108,12 +109,13 @@ class RbacPegawaiDetailTest extends TestCase
         $this->actingAs($user)->get(route('rbac.pegawai.show', $bawahan))->assertForbidden();
         $this->actingAs($user)->get(route('rbac.pegawai.show', $other))->assertForbidden();
 
-        // Dengan employees.read (A1, manual grant) → bypass bawahan-only, bisa semua via /rbac
+        // Grant employees.read TIDAK bypass bawahan-only: scope kabag tetap bawahan
+        // langsung (pengetatan 295b9a1b menghapus bypass A1).
         Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
         $user->refresh();
         $this->actingAs($user)->get(route('rbac.pegawai.show', $bawahan))->assertOk();
-        $this->actingAs($user)->get(route('rbac.pegawai.show', $other))->assertOk();
-        $this->actingAs($user)->get(route('rbac.pegawai.show', $kabag))->assertOk();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $other))->assertForbidden();
+        $this->actingAs($user)->get(route('rbac.pegawai.show', $kabag))->assertForbidden();
     }
 
     public function test_rbac_detail_hides_histories_without_permission(): void
@@ -284,11 +286,12 @@ class RbacPegawaiDetailTest extends TestCase
         $pimpinan->refresh();
         $this->actingAs($pimpinan)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertForbidden();
 
-        // Pegawai dengan employees.read (A1) kini bypass self-only → bisa download milik orang lain
+        // Grant TIDAK bypass self-only: pegawai tetap hanya boleh mengunduh
+        // milik sendiri (pengetatan 295b9a1b menghapus bypass A1).
         $pegawaiUser = User::factory()->pegawai()->create();
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id, Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id, Permission::where('name', 'employee_histories.read')->firstOrFail()->id]);
         $pegawaiUser->refresh();
-        $this->actingAs($pegawaiUser)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertOk();
+        $this->actingAs($pegawaiUser)->get(route('rbac.pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $history]))->assertForbidden();
 
         // Tanpa employees.read tetap forbidden (self-only) - detach dulu karena role sudah di-grant di atas
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->detach(Permission::where('name', 'employees.read')->firstOrFail()->id);
@@ -298,13 +301,15 @@ class RbacPegawaiDetailTest extends TestCase
         Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([Permission::where('name', 'employees.read')->firstOrFail()->id]);
     }
 
-    public function test_dashboard_pegawai_legacy_redirect(): void
+    public function test_pegawai_show_routes_are_role_scoped(): void
     {
+        // Route dashboard.pegawai.show sudah dihapus; halaman detail kini
+        // memakai pegawai.show (admin) dan rbac.pegawai.show (RBAC).
         $employee = $this->employeeWithReferences();
         $superAdmin = User::factory()->superAdmin()->create();
         $admin = User::factory()->adminKepegawaian()->create();
 
-        $this->actingAs($superAdmin)->get(route('dashboard.pegawai.show', $employee))->assertRedirect(route('pegawai.show', $employee));
-        $this->actingAs($admin)->get(route('dashboard.pegawai.show', $employee))->assertRedirect(route('rbac.pegawai.show', $employee));
+        $this->actingAs($superAdmin)->get(route('pegawai.show', ['id' => $employee->id]))->assertOk();
+        $this->actingAs($admin)->get(route('rbac.pegawai.show', $employee))->assertOk();
     }
 }

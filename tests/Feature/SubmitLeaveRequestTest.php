@@ -163,7 +163,12 @@ class SubmitLeaveRequestTest extends TestCase
 
                 LeaveUsageRecord::query()->create([
                     'employee_id' => $aktor['employee']->id,
-                    'leave_type_id' => RefJenisCuti::query()->where('code', 'tahunan')->value('id'),
+                    // setUp file ini hanya seed RBAC; pastikan tipe tahunan ada
+                    // agar fixture tidak menabrak NOT NULL leave_type_id.
+                    'leave_type_id' => RefJenisCuti::query()->firstOrCreate(
+                        ['code' => 'tahunan'],
+                        ['nama' => 'Cuti Tahunan', 'mengurangi_saldo_tahunan' => true, 'khusus_pns' => false],
+                    )->id,
                     'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
                     'leave_request_id' => null,
                     'leave_request_case_id' => null,

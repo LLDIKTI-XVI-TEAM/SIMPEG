@@ -84,11 +84,13 @@ class EmployeeDocumentBackendAccessTest extends TestCase
         $this->getJson('/api/v1/dokumen')->assertForbidden();
     }
 
-    public function test_admin_without_employees_update_cannot_mutate_berkas_lainnya(): void
+    public function test_admin_without_dokumen_update_cannot_mutate_berkas_lainnya(): void
     {
-        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
-        $permissionId = Permission::where('name', 'employees.update')->firstOrFail()->id;
-        $role->permissions()->detach($permissionId);
+        // Regime granular: mutasi berkas digerbang dokumen_sk.update, bukan
+        // employees.update.
+        $role = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
+        $permissionIds = Permission::query()->whereIn('name', ['dokumen_sk.update', 'dokumen_sk.delete'])->pluck('id');
+        $role->permissions()->detach($permissionIds);
 
         $this->actingAsRole('admin_kepegawaian');
         $document = $this->createBerkas();

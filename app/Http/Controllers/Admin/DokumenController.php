@@ -25,7 +25,7 @@ class DokumenController extends Controller
 {
     public function index(Request $request, ListDocumentsPageAction $action)
     {
-        abort_unless(DocumentAuthorization::canViewArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+        abort_unless(DocumentAuthorization::canBrowseArchive($request->user()), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
         return view('admin.dokumen.index', $action->execute($request->user()));
     }
@@ -33,7 +33,7 @@ class DokumenController extends Controller
     public function show(Request $request, string $id, ShowDocumentPageAction $action)
     {
         $user = $request->user();
-        abort_unless(DocumentAuthorization::canViewArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+        abort_unless(DocumentAuthorization::canBrowseArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
         $payload = $action->execute($id);
         if ($user !== null && $user->getEffectiveRole() === 'kepala_bagian') {
@@ -73,7 +73,7 @@ class DokumenController extends Controller
     public function download(Request $request, string $id, PrepareDocumentDownloadAction $action)
     {
         $user = $request->user();
-        abort_unless(DocumentAuthorization::canViewArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
+        abort_unless(DocumentAuthorization::canBrowseArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
         if ($user !== null && $user->getEffectiveRole() === 'kepala_bagian') {
             $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');

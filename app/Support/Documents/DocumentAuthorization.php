@@ -21,6 +21,33 @@ class DocumentAuthorization
         return $user->hasPermission('dokumen_sk.read');
     }
 
+    /**
+     * Syarat membuka arsip terpusat (halaman + API daftar).
+     *
+     * Pimpinan dikecualikan dari arsip lintas pegawai meski memegang grant
+     * (keputusan stakeholder). Kepala Bagian/Pegawai ter-scope bawahan/milik
+     * sendiri oleh controller/action sehingga cukup membawa dokumen_sk.read;
+     * role tak ter-scope wajib juga memegang employees.read.
+     */
+    public static function canBrowseArchive(?User $user): bool
+    {
+        if ($user === null || ! $user->hasPermission('dokumen_sk.read')) {
+            return false;
+        }
+
+        $role = $user->getEffectiveRole();
+
+        if ($role === 'pimpinan') {
+            return false;
+        }
+
+        if (in_array($role, ['kepala_bagian', 'pegawai'], true)) {
+            return true;
+        }
+
+        return $user->hasPermission('employees.read');
+    }
+
     public static function canManage(?User $user): bool
     {
         if ($user === null) {

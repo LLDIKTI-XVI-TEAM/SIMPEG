@@ -14,7 +14,6 @@ use App\Models\User;
 use App\Support\Rbac\PatenCapability;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -146,23 +145,19 @@ class CutiRbacTest extends TestCase
         $this->assertDatabaseMissing('role_permissions', ['role_id' => $pimpinanRole->id, 'permission_id' => $permission->id]);
     }
 
-    public function test_pimpinan_dengan_permission_reconcile_dapat_mencapai_boundary_rekonsiliasi(): void
+    public function test_pimpinan_dengan_permission_reconcile_dapat_membuka_administrasi_saldo(): void
     {
         $permission = Permission::query()->where('name', 'cuti.balance.reconcile')->firstOrFail();
         Role::query()->where('name', 'pimpinan')->firstOrFail()
             ->permissions()->syncWithoutDetaching([$permission->id]);
         $pimpinan = User::factory()->pimpinan()->create();
 
-        // Payload sengaja tidak lengkap: bila gate role tidak lagi memblokir, FormRequest
-        // mengembalikan validasi (redirect), bukan halaman 403 "Tidak Mendapatkan Akses".
+        // Alur rekonsiliasi dilebur ke administrasi saldo pada refactor sumber
+        // tunggal cuti; route cuti.reconciliation.store sudah tidak ada.
+        // Boundary reconcile kini diwakili halaman administrasi (bukan 403).
         $this->actingAs($pimpinan)
             ->get(route('cuti.saldo.administrasi'))
             ->assertOk();
-
-        $this->actingAs($pimpinan)
-            ->post(route('cuti.reconciliation.store', (string) Str::uuid()))
-            ->assertRedirect()
-            ->assertSessionHasErrors(['balance_year']);
     }
 
     public function test_capability_paten_tidak_bergantung_pada_pivot_role_permissions(): void

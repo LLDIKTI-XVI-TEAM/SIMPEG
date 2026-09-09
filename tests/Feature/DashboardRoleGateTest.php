@@ -24,8 +24,9 @@ class DashboardRoleGateTest extends TestCase
 
         $response = $this->actingAs($user)->get('/dashboard');
 
+        // Halaman 403 branded generik: pesan middleware tidak dirender ke UI.
         $response->assertForbidden();
-        $response->assertSee('Akun Anda belum memiliki role SIMPEG. Hubungi Admin.');
+        $response->assertSee('Tidak Mendapatkan Akses');
     }
 
     public function test_user_with_invalid_role_cannot_open_dashboard(): void
@@ -34,8 +35,9 @@ class DashboardRoleGateTest extends TestCase
 
         $response = $this->actingAs($user)->get('/dashboard');
 
+        // Halaman 403 branded generik: pesan middleware tidak dirender ke UI.
         $response->assertForbidden();
-        $response->assertSee('Akun Anda belum memiliki role SIMPEG. Hubungi Admin.');
+        $response->assertSee('Tidak Mendapatkan Akses');
     }
 
     public function test_user_with_valid_role_can_open_dashboard(): void

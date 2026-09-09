@@ -182,6 +182,9 @@ class EmployeeAppointmentTest extends TestCase
             'file_sk' => $oldPath,
         ]);
         $employee->documents()->create([
+            // Mirror modern selalu membawa history_id; tanpa itu updateOrCreate
+            // tidak lagi menemukan row ini (key identitas riwayat).
+            'history_id' => $appointment->id,
             'jenis_dokumen' => 'sk_pengangkatan',
             'nama_dokumen' => 'SK Pengangkatan PPPK',
             'nomor_dokumen' => $appointment->no_sk,
@@ -234,13 +237,15 @@ class EmployeeAppointmentTest extends TestCase
         $admin = User::factory()->adminKepegawaian()->create();
         $employee = Employee::factory()->create();
 
+        // FormRequest menolak di authorize (403) sebelum action sempat berjalan,
+        // sehingga validasi 422 milik action tidak tercapai — kontraknya tetap
+        // sama: ditolak dan tidak ada pengangkatan palsu yang dibuat.
         $response = $this->actingAs($admin)
             ->postJson("/api/v1/pegawai/{$employee->id}/pengangkatan/upload-sk", [
                 'file_sk' => UploadedFile::fake()->create('sk.pdf', 500, 'application/pdf'),
             ]);
 
-        $response->assertUnprocessable()
-            ->assertJsonValidationErrors(['appointment']);
+        $response->assertForbidden();
         $this->assertDatabaseMissing('appointments', ['employee_id' => $employee->id]);
     }
 }

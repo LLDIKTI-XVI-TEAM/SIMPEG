@@ -89,7 +89,10 @@ return [
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'laravel'),
+            // Saat suite berjalan paralel (paratest menyetel TEST_TOKEN per worker),
+            // tiap proses memakai database sendiri agar migrate:fresh tidak saling
+            // menghapus. Tanpa TEST_TOKEN (serial, lokal, production) nama tidak berubah.
+            'database' => env('DB_DATABASE', 'laravel').env('TEST_TOKEN', ''),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8'),
