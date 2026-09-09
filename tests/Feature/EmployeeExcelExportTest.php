@@ -155,7 +155,7 @@ class EmployeeExcelExportTest extends TestCase
 
         $foreignRows = $this->exportedRows($this->actingAs($user)->get(route('pegawai.export', [
             'ids' => [$bawahan->id, $lainnya->id],
-        ]));
+        ])));
         $this->assertCount(2, $foreignRows);
         $this->assertSame('Bawahan Export', $foreignRows[1][1]);
     }

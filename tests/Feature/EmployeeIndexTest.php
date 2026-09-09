@@ -126,11 +126,11 @@ class EmployeeIndexTest extends TestCase
         $other = Employee::factory()->create(['nama_lengkap' => 'Dashboard Other Unik']);
         $user = User::factory()->adminKepegawaian()->create(['employee_id' => $self->id]);
 
-        $summary = app(\App\Queries\Dashboards\ActiveEmployeeSummaryQuery::class)->execute($user);
+        $summary = app(ActiveEmployeeSummaryQuery::class)->execute($user);
         $this->assertSame(1, $summary['total']);
 
         $superAdmin = User::factory()->superAdmin()->create(['employee_id' => $other->id]);
-        $summarySuper = app(\App\Queries\Dashboards\ActiveEmployeeSummaryQuery::class)->execute($superAdmin);
+        $summarySuper = app(ActiveEmployeeSummaryQuery::class)->execute($superAdmin);
         $this->assertSame(2, $summarySuper['total']);
     }
 

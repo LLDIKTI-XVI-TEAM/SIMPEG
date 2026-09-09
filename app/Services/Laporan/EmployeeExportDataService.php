@@ -3,17 +3,17 @@
 namespace App\Services\Laporan;
 
 use App\Models\Employee;
-use App\Models\User;
 use App\Models\EwsConfig;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\User;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use App\Services\Employees\EmployeeDashboardScopeService;
 
 class EmployeeExportDataService
 {

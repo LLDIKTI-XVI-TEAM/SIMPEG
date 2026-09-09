@@ -10,7 +10,9 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\LeaveApprovalService;
@@ -368,10 +370,10 @@ class LeaveCancellationWorkflowTest extends TestCase
         $fixture = $this->makeLeaveFixture();
         $cancellation = $this->createPendingCancellation($fixture['leave'], $fixture['ownerUser']);
         $pimpinan = User::factory()->pimpinan()->create();
-        $permission = \App\Models\Permission::query()
+        $permission = Permission::query()
             ->where('name', 'cuti.cancellation.manage')
             ->firstOrFail();
-        \App\Models\Role::query()
+        Role::query()
             ->where('name', 'pimpinan')
             ->firstOrFail()
             ->permissions()

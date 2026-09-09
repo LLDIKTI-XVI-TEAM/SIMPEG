@@ -46,7 +46,7 @@ class PegawaiDokumenScopeTest extends TestCase
     {
         $self = Employee::factory()->create(['nama_lengkap' => 'Pegawai Self']);
         $other = Employee::factory()->create(['nama_lengkap' => 'Pegawai Other']);
-        $this->grantDokumenRead('pegawai');
+        $this->grantDokumenRead();
         $user = User::factory()->create(['role' => 'pegawai', 'employee_id' => $self->id]);
 
         $docSelf = Document::create([

@@ -53,12 +53,11 @@ class RbacPermissionMiddlewareTest extends TestCase
         // Issue #6: authenticated tidak sama dengan authorized. Role internal
         // kosong/tidak valid harus ditolak sebelum evaluasi PATEN maupun RBAC,
         // termasuk capability user-context dan employee-self.
-        $employee = Employee::factory()->create();
-
         foreach ([null, '', 'role_tidak_terdaftar'] as $invalidRole) {
+            // Satu employee aktif per user: users.employee_id unik.
             $user = User::factory()->create([
                 'role' => $invalidRole,
-                'employee_id' => $employee->id,
+                'employee_id' => Employee::factory()->create()->id,
             ]);
 
             foreach (['notifications.read', 'notifications.update', 'hari_libur.read'] as $permission) {

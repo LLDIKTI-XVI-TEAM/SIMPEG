@@ -13,6 +13,7 @@ use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefProgramStudi;
 use App\Models\RefUnitKerja;
+use App\Models\User;
 use App\Services\EmployeeDocumentStatusService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Employees\EmployeeProfilePresentation;

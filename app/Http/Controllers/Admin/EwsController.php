@@ -21,8 +21,7 @@ class EwsController extends Controller
         AdminEwsFilterRequest $request,
         ListActiveEwsAlertsAction $action,
         EmployeeDashboardScopeService $employeeScope,
-    )
-    {
+    ) {
         $validated = $request->validated();
         $filterSearch = trim((string) ($validated['search'] ?? ''));
         $filterEvent = (string) ($validated['event'] ?? '');

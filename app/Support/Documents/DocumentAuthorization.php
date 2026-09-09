@@ -58,5 +58,4 @@ class DocumentAuthorization
 
         return $user->hasPermission('dokumen_sk.delete');
     }
-
 }
