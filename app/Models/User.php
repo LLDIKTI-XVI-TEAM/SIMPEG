@@ -152,6 +152,14 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
+        // Issue #6: authenticated tidak sama dengan authorized. Role internal
+        // yang kosong/tidak valid selalu fail-closed sebelum evaluasi PATEN
+        // maupun RBAC; PATEN tidak boleh bergantung pada pivot, tetapi tetap
+        // mensyaratkan identitas role internal yang sah.
+        if (! $this->hasValidInternalRole()) {
+            return false;
+        }
+
         // PATEN tidak menggunakan pivot role_permissions, namun prasyaratnya
         // berbeda menurut konteks. Hak record seperti approval/proof tidak
         // boleh direduksi menjadi boolean global pada User.
@@ -177,6 +185,22 @@ class User extends Authenticatable
             ->where('name', $effectiveRole)
             ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
             ->exists();
+    }
+
+    /**
+     * Role internal sah adalah role efektif yang terdaftar pada tabel roles.
+     * Berlaku untuk seluruh evaluasi PATEN/RBAC agar role kosong/tidak valid
+     * selalu fail-closed sesuai kontrak Issue #6.
+     */
+    private function hasValidInternalRole(): bool
+    {
+        $role = $this->getEffectiveRole();
+
+        if (! is_string($role) || $role === '') {
+            return false;
+        }
+
+        return Role::query()->where('name', $role)->exists();
     }
 
     /**

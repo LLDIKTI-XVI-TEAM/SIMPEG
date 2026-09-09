@@ -48,6 +48,37 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertFalse($user->hasPermission('employees.create'));
     }
 
+    public function test_invalid_internal_role_is_fail_closed_for_paten_capabilities(): void
+    {
+        // Issue #6: authenticated tidak sama dengan authorized. Role internal
+        // kosong/tidak valid harus ditolak sebelum evaluasi PATEN maupun RBAC,
+        // termasuk capability user-context dan employee-self.
+        $employee = Employee::factory()->create();
+
+        foreach ([null, '', 'role_tidak_terdaftar'] as $invalidRole) {
+            $user = User::factory()->create([
+                'role' => $invalidRole,
+                'employee_id' => $employee->id,
+            ]);
+
+            foreach (['notifications.read', 'notifications.update', 'hari_libur.read'] as $permission) {
+                $this->assertFalse(
+                    $user->hasPermission($permission),
+                    "Role invalid harus fail-closed untuk PATEN user-context {$permission}."
+                );
+            }
+
+            foreach (['employees.read_self', 'cuti.create', 'cuti.read_own'] as $permission) {
+                $this->assertFalse(
+                    $user->hasPermission($permission),
+                    "Role invalid harus fail-closed untuk PATEN employee {$permission}."
+                );
+            }
+
+            $this->assertFalse($user->hasPermission('employees.create'));
+        }
+    }
+
     public function test_permission_records_are_seeded_idempotently(): void
     {
         // Re-seed tidak boleh menduplikasi permission (updateOrCreate + sync).
