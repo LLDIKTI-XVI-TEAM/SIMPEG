@@ -353,7 +353,7 @@ class PegawaiController extends Controller
                     ->orderByDesc('tmt_jabatan'),
                 'salaryHistories:id,employee_id,no_sk,tanggal_sk,tmt_kgb,file_sk,is_latest,created_at',
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                    ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
                     ->orderByDesc('tmt_pengangkatan')
                     ->orderByDesc('created_at'),
                 'documents:id,employee_id,jenis_dokumen,nama_dokumen,nomor_dokumen,tanggal_dokumen,file_path,keterangan,created_at',

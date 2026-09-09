@@ -23,6 +23,7 @@ use App\Services\Employees\TmtCalculatorService;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
+use Database\Seeders\SkRequirementSeeder;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -317,6 +318,28 @@ class EmployeeUpdateTest extends TestCase
         $this->assertSame('2030-01-01', $employee->fresh()->tanggal_pensiun?->toDateString());
     }
 
+    #[DataProvider('appointmentTypeProvider')]
+    public function test_web_update_keeps_complete_document_status_for_matching_appointment_type(string $appointmentType): void
+    {
+        $this->seed(SkRequirementSeeder::class);
+        Storage::fake(Document::STORAGE_DISK);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $jenisPegawai = RefJenisPegawai::query()->where('nama', $appointmentType)->firstOrFail();
+        $employee = Employee::factory()->create(['jenis_pegawai_id' => $jenisPegawai->id]);
+        $this->createCompleteDocumentHistories($employee, $appointmentType);
+
+        $response = $this->actingAs($user)->post(
+            route('pegawai.update', $employee->id),
+            $this->validPayload($employee, ['nama_lengkap' => "Pegawai {$appointmentType} Diperbarui"]),
+        );
+
+        $response->assertRedirect(route('data-pegawai'))
+            ->assertSessionHas('edited_employee_data', fn (array $data): bool => $data['is_lengkap'] === 'lengkap'
+                && $data['dokumen_tersedia_count'] === 4
+                && $data['dokumen_total_wajib'] === 4);
+    }
+
     public function test_edit_page_loads_current_inactive_program_studi(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -564,6 +587,71 @@ class EmployeeUpdateTest extends TestCase
             'jenis_pegawai_id' => $employee->jenis_pegawai_id ?: RefJenisPegawai::where('nama', 'PNS')->firstOrFail()->id,
             'tanggal_lahir' => Carbon::parse($employee->tanggal_lahir)->format('Y-m-d'),
         ], $overrides);
+    }
+
+    /**
+     * Status dokumen pasca-edit harus memakai riwayat lengkap agar snapshot
+     * cache tabel tidak menghilangkan SK Pengangkatan yang sudah sesuai.
+     */
+    private function createCompleteDocumentHistories(Employee $employee, string $appointmentType): void
+    {
+        $paths = [
+            'appointment' => "appointments/sk/{$employee->id}-{$appointmentType}.pdf",
+            'rank' => "ranks/sk/{$employee->id}-{$appointmentType}.pdf",
+            'position' => "positions/sk/{$employee->id}-{$appointmentType}.pdf",
+            'salary' => "salaries/sk/{$employee->id}-{$appointmentType}.pdf",
+        ];
+
+        Appointment::query()->create([
+            'employee_id' => $employee->id,
+            'jenis_pengangkatan' => $appointmentType,
+            'tmt_pengangkatan' => '2020-01-01',
+            'no_sk' => "SK-PENGANGKATAN-{$appointmentType}",
+            'tanggal_sk' => '2019-12-20',
+            'file_sk' => $paths['appointment'],
+        ]);
+        RankHistory::query()->create([
+            'employee_id' => $employee->id,
+            'golongan_id' => RefGolongan::query()->where('kode', 'III/a')->firstOrFail()->id,
+            'tmt_pangkat' => '2021-01-01',
+            'no_sk' => 'SK-PANGKAT-LENGKAP',
+            'tanggal_sk' => '2020-12-20',
+            'file_sk' => $paths['rank'],
+            'is_latest' => true,
+        ]);
+        PositionHistory::query()->create([
+            'employee_id' => $employee->id,
+            'nama_jabatan' => 'Analis Kepegawaian',
+            'jenis_jabatan_id' => RefJenisJabatan::query()->where('nama', 'Struktural')->firstOrFail()->id,
+            'unit_kerja_id' => RefUnitKerja::query()->firstOrFail()->id,
+            'tmt_jabatan' => '2022-01-01',
+            'no_sk' => 'SK-JABATAN-LENGKAP',
+            'tanggal_sk' => '2021-12-20',
+            'file_sk' => $paths['position'],
+            'is_latest' => true,
+        ]);
+        SalaryHistory::query()->create([
+            'employee_id' => $employee->id,
+            'tmt_kgb' => '2023-01-01',
+            'gaji_pokok' => 5000000,
+            'no_sk' => 'SK-KGB-LENGKAP',
+            'tanggal_sk' => '2022-12-20',
+            'file_sk' => $paths['salary'],
+            'is_latest' => true,
+        ]);
+
+        foreach ($paths as $path) {
+            Storage::disk(Document::STORAGE_DISK)->put($path, 'SK tersedia');
+        }
+    }
+
+    /** @return array<string, array{0: string}> */
+    public static function appointmentTypeProvider(): array
+    {
+        return [
+            'PNS' => ['PNS'],
+            'CPNS' => ['CPNS'],
+        ];
     }
 
     public function test_admin_kepegawaian_can_update_employee_with_histories_via_web_form(): void
