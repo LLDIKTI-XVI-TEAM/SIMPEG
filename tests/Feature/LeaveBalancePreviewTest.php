@@ -15,6 +15,7 @@ use App\Services\Cuti\LeaveBalanceRecalculationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -39,11 +40,20 @@ class LeaveBalancePreviewTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_pegawai_menerima_preview_saldo_milik_sendiri_pada_tahun_tanggal_mulai(): void
+    public static function rolePemohonProvider(): array
+    {
+        return [
+            'pegawai' => ['pegawai'],
+            'pimpinan' => ['pimpinan'],
+        ];
+    }
+
+    #[DataProvider('rolePemohonProvider')]
+    public function test_pegawai_menerima_preview_saldo_milik_sendiri_pada_tahun_tanggal_mulai(string $role): void
     {
         $employee = $this->employeeWithAppointment('2024-01-01');
         $otherEmployee = $this->employeeWithAppointment('2024-01-01');
-        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $user = User::factory()->create(['employee_id' => $employee->id, 'role' => $role]);
         $admin = User::factory()->adminKepegawaian()->create();
         RefJenisCuti::query()->create([
             'nama' => 'Cuti Tahunan',
@@ -75,7 +85,8 @@ class LeaveBalancePreviewTest extends TestCase
             'hangus' => 0,
         ]);
 
-        $response = $this->actingAs($user)->getJson(route('api.v1.cuti.balance-preview', [
+        $this->actingAs($user)->get(route('cuti.create'))->assertOk();
+        $response = $this->getJson(route('api.v1.cuti.balance-preview', [
             'tanggal_mulai' => '2027-08-04',
             // Parameter asing harus diabaikan; data scope selalu berasal dari sesi login.
             'employee_id' => $otherEmployee->id,

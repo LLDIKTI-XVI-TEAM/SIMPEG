@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\RefHariLibur;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * Menguji endpoint kalkulasi hari kerja yang dipakai form pengajuan cuti.
- * Memastikan kalkulasi benar, peringatan muncul, dan gerbang RBAC (permission cuti.create) ditegakkan.
+ * Memastikan kalkulasi benar, peringatan muncul, dan identitas PATEN pemohon ditegakkan.
  */
 class CalculateWorkdaysTest extends TestCase
 {
@@ -23,14 +25,16 @@ class CalculateWorkdaysTest extends TestCase
     {
         parent::setUp();
 
-        // Seed RBAC agar permission cuti.create tersedia untuk middleware permission.
+        // Role internal tetap harus terdaftar walaupun self-service tidak memakai pivot permission.
         $this->seed(RbacSeeder::class);
     }
 
     public static function rolePemohonProvider(): array
     {
         return [
+            'super admin' => ['super_admin'],
             'admin kepegawaian' => ['admin_kepegawaian'],
+            'pimpinan' => ['pimpinan'],
             'kepala bagian' => ['kepala_bagian'],
             'pegawai' => ['pegawai'],
         ];
@@ -88,13 +92,41 @@ class CalculateWorkdaysTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_pimpinan_tidak_dapat_menghitung_untuk_pengajuan_cuti(): void
+    public function test_role_tidak_terdaftar_tidak_dapat_menghitung_untuk_pengajuan_cuti(): void
     {
-        $user = User::factory()->pimpinan()->create();
+        $user = User::factory()->create(['role' => 'role_tidak_terdaftar']);
 
         $this->actingAs($user)
             ->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09')
             ->assertForbidden();
+        $this->getJson(route('api.v1.cuti.balance-preview', ['tanggal_mulai' => '2026-01-05']))
+            ->assertForbidden();
+    }
+
+    public function test_kalkulasi_menolak_akun_tanpa_identitas_pegawai(): void
+    {
+        $user = User::factory()->pimpinan()->create(['employee_id' => null]);
+
+        $this->actingAsUnmapped($user)
+            ->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09')
+            ->assertRedirect(route('status-akun'));
+    }
+
+    public function test_endpoint_form_cuti_menolak_pegawai_nonaktif(): void
+    {
+        $status = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->sole();
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => 'Non-Aktif',
+        ]);
+        $this->assertFalse($employee->fresh()->isActive());
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
+
+        $this->actingAs($user)
+            ->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09')
+            ->assertRedirect(route('status-akun'));
+        $this->getJson(route('api.v1.cuti.balance-preview', ['tanggal_mulai' => '2026-01-05']))
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_tamu_diarahkan_ke_login(): void

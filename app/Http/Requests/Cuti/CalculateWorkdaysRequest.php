@@ -13,12 +13,8 @@ class CalculateWorkdaysRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Kalkulasi adalah bagian dari self-service pengajuan cuti PATEN.
-        $actor = $this->user();
-
-        return $actor !== null && in_array($actor->getEffectiveRole(), [
-            'super_admin', 'admin_kepegawaian', 'kepala_bagian', 'pegawai',
-        ], true);
+        // Kalkulasi mengikuti identitas PATEN pengajuan, bukan allowlist role atau pivot RBAC.
+        return $this->user()?->hasPermission('cuti.create') ?? false;
     }
 
     /**

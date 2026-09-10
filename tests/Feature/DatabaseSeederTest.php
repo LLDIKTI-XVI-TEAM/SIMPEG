@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\Employee;
+use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
@@ -69,6 +70,23 @@ class DatabaseSeederTest extends TestCase
             ->where('employee_id', $employee->employee_id)
             ->where('tahun', 2026)
             ->sole();
+
+        $chain = LeaveApprovalChain::query()
+            ->where('employee_id', $employee->employee_id)
+            ->where('is_active', true)
+            ->sole();
+        $this->assertSame('Atasan Langsung', $chain->steps()
+            ->where('step_type', 'kepala_bagian')->sole()->role_label);
+        $requests = LeaveRequest::query()
+            ->with('steps')
+            ->where('employee_id', $employee->employee_id)
+            ->where('alasan', 'like', '[QA Phase 7 Browser]%')
+            ->get();
+        $this->assertCount(5, $requests);
+        foreach ($requests as $request) {
+            $this->assertSame('Atasan Langsung', $request->steps
+                ->sole('step_type', 'kepala_bagian')->role_label);
+        }
 
         $this->assertSame(1, LeaveUsageRecord::query()
             ->where('employee_id', $employee->employee_id)
@@ -190,6 +208,15 @@ class DatabaseSeederTest extends TestCase
             ->where('email', 'qa-phase7-approver-nonaktif@example.test')
             ->sole();
         $preview = app(CurrentApprovalChainPreviewQuery::class);
+
+        foreach ([$validEmployee, $invalidEmployee] as $previewEmployee) {
+            $chain = LeaveApprovalChain::query()
+                ->where('employee_id', $previewEmployee->id)
+                ->where('is_active', true)
+                ->sole();
+            $this->assertSame('Atasan Langsung', $chain->steps()
+                ->where('step_type', 'kepala_bagian')->sole()->role_label);
+        }
 
         $this->assertSame('NONAKTIF', $inactiveApprover->statusPegawai?->kode);
         $this->assertSame('Nonaktif', $inactiveApprover->statusPegawai?->kelompok);
