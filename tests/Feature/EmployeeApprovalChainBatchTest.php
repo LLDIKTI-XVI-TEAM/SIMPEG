@@ -644,7 +644,7 @@ class EmployeeApprovalChainBatchTest extends TestCase
                 break;
             case 'version': $payload['version'] = 2;
                 break;
-            case 'actor': $payload['actor_id'] = User::factory()->pegawai()->create()->id;
+            case 'actor': $payload['actor_id'] = User::factory()->superAdmin()->create()->id;
                 break;
             case 'expiry': $payload['expires_at'] = now()->timestamp;
                 break;
@@ -781,8 +781,7 @@ class EmployeeApprovalChainBatchTest extends TestCase
     public function test_apply_replay_dua_aktor_dan_nol_target_eligible_tidak_menggandakan_mutasi(): void
     {
         [$actor, $target, $pybmc] = $this->fixture();
-        $otherActor = User::factory()->adminKepegawaian()->create();
-        $this->grant('admin_kepegawaian');
+        $otherActor = User::factory()->superAdmin()->create();
         $draft = $this->draft([$target->id], $pybmc->id);
         $token = $this->previewToken($actor, $draft);
         $otherToken = $this->previewToken($otherActor, $draft);

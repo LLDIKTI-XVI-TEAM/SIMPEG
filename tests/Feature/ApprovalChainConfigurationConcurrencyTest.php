@@ -572,11 +572,7 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
         $fixture = $this->buatFixtureChainDenganSnapshot();
         $actor = $fixture['actor'];
         $actorEmployee = Employee::factory()->create();
-        $actor->update([
-            'role' => 'admin_kepegawaian',
-            'employee_id' => $actorEmployee->id,
-            'keycloak_id' => (string) Str::uuid(),
-        ]);
+        $actor->update(['employee_id' => $actorEmployee->id, 'keycloak_id' => (string) Str::uuid()]);
         $mappingAdmin = User::factory()->superAdmin()->create();
         $mappingRequest = Request::create('/mapping', 'POST');
         $mappingRequest->setUserResolver(fn (): User => $mappingAdmin);
