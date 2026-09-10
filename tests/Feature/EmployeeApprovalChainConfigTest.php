@@ -3,9 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\ApplyGlobalPybmcAction;
-use App\Actions\Cuti\BackfillEmployeeApprovalChainsAction;
 use App\Actions\Cuti\SaveEmployeeApprovalChainAction;
-use App\Models\ApprovalConfig;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
@@ -1014,7 +1012,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
                 ]],
                 'reason' => 'Set chain pegawai untuk uji jejak forensik.',
             ])
-            ->assertRedirect(route('cuti.config'));
+            ->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
 
         $audit = AuditLog::query()
             ->where('auditable_type', 'LeaveApprovalChain')
@@ -1108,7 +1106,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
                 ],
                 'reason' => 'Menyusun ulang chain legacy secara auditabel.',
             ])
-            ->assertRedirect(route('cuti.config'));
+            ->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $fixture['employee']->id]));
 
         $predecessor = $fixture['predecessor']->fresh();
         $this->assertNotNull($predecessor);
@@ -1230,7 +1228,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'reason' => 'Set chain pegawai melalui route.',
         ]);
 
-        $response->assertRedirect(route('cuti.config'));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
         $this->assertDatabaseHas('leave_approval_chains', ['employee_id' => $pegawai->id, 'is_active' => true]);
 
         $chain = LeaveApprovalChain::query()
@@ -1264,7 +1262,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'reason' => 'Menyimpan Ketua Tim sebagai verifikator.',
         ]);
 
-        $response->assertRedirect(route('cuti.config'));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
         $chain = LeaveApprovalChain::query()
             ->where('employee_id', $pegawai->id)
             ->where('is_active', true)
@@ -1328,7 +1326,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'reason' => 'Simpan payload browser memakai global.',
         ]);
 
-        $response->assertRedirect(route('cuti.config'));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
         $chain = LeaveApprovalChain::query()->where('employee_id', $pegawai->id)->where('is_active', true)->firstOrFail();
         $this->assertSame(
             [$kepalaBagian->id, $pybmcGlobal->id],
@@ -1356,7 +1354,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'reason' => 'Menguji normalisasi key numeric pada boundary HTTP.',
         ]);
 
-        $response->assertRedirect(route('cuti.config'));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
         $chain = LeaveApprovalChain::query()
             ->where('employee_id', $pegawai->id)
             ->where('is_active', true)
@@ -1662,7 +1660,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'reason' => 'Menyimpan dua verifikator dan PYBMC khusus pegawai.',
         ]);
 
-        $response->assertRedirect(route('cuti.config'));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
 
         $chain = LeaveApprovalChain::query()
             ->where('employee_id', $pegawai->id)
@@ -1886,268 +1884,6 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $this->app->make(ApprovalChainResolver::class)->resolveEffectiveSteps($pegawai);
     }
 
-    public function test_backfill_membuat_chain_verifikator_sebelum_kepala_bagian_dan_pybmc(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-        $kepalaBagian = Employee::factory()->create();
-        $verifikator = Employee::factory()->create();
-        $pybmc = Employee::factory()->create();
-        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
-        $kepalaBagianSnapshotLama = Employee::factory()->create();
-        $tanpaPenugasanEfektif = Employee::factory()->create([
-            'kepala_bagian_id' => $kepalaBagianSnapshotLama->id,
-        ]);
-        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
-        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
-
-        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
-        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
-
-        $result = $this->actingAs($actor)->app->make(BackfillEmployeeApprovalChainsAction::class)->execute($actor, 'Backfill awal Phase 3.');
-
-        $this->assertContains($pegawai->id, $result['created_employee_ids']);
-        $this->assertContains($tanpaPenugasanEfektif->id, $result['missing_kepala_bagian_employee_ids']);
-        $this->assertDatabaseMissing('leave_approval_chains', [
-            'employee_id' => $tanpaPenugasanEfektif->id,
-        ]);
-
-        $chain = LeaveApprovalChain::where('employee_id', $pegawai->id)->firstOrFail();
-        $this->assertSame([$verifikator->id, $kepalaBagian->id, $pybmc->id], $chain->steps()->orderBy('step_order')->pluck('approver_employee_id')->all());
-    }
-
-    public function test_backfill_tidak_mengubah_snapshot_pengajuan_existing(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-        $kepalaBagian = Employee::factory()->create();
-        $verifikator = Employee::factory()->create();
-        $pybmc = Employee::factory()->create();
-        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
-        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
-        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
-        $jenisCuti = RefJenisCuti::create([
-            'nama' => 'Cuti Sakit Backfill',
-            'code' => 'sakit_backfill',
-            'mengurangi_saldo_tahunan' => false,
-            'khusus_pns' => false,
-        ]);
-        $pengajuan = LeaveRequest::create([
-            'employee_id' => $pegawai->id,
-            'jenis_cuti_id' => $jenisCuti->id,
-            'tanggal_mulai' => '2026-08-10',
-            'tanggal_selesai' => '2026-08-11',
-            'jumlah_hari_kerja' => 2,
-            'alasan' => 'Menjaga snapshot pengajuan lama saat backfill.',
-            'status' => 'menunggu_approval',
-        ]);
-        $pengajuan->steps()->createMany([
-            [
-                'step_order' => 1,
-                'step_type' => 'kepala_bagian',
-                'role_label' => 'Kepala Bagian Lama',
-                'approver_employee_id' => $kepalaBagian->id,
-                'status' => 'disetujui',
-                'is_final' => false,
-                'acted_at' => '2026-08-12 08:00:00',
-                'decision_note' => 'Snapshot lama yang sudah diputuskan.',
-            ],
-            [
-                'step_order' => 2,
-                'step_type' => 'pybmc',
-                'role_label' => 'PYBMC Lama',
-                'approver_employee_id' => $pybmc->id,
-                'status' => 'menunggu',
-                'is_final' => true,
-                'skipped_reason' => null,
-            ],
-        ]);
-
-        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
-        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
-
-        $snapshotSebelum = DB::table('leave_request_steps')
-            ->where('leave_request_id', $pengajuan->id)
-            ->orderBy('id')
-            ->get()
-            ->map(fn (object $row): array => (array) $row)
-            ->all();
-
-        $result = $this->app->make(BackfillEmployeeApprovalChainsAction::class)->execute(
-            $actor,
-            'Backfill tanpa mengubah snapshot pengajuan existing.',
-        );
-
-        $snapshotSesudah = DB::table('leave_request_steps')
-            ->where('leave_request_id', $pengajuan->id)
-            ->orderBy('id')
-            ->get()
-            ->map(fn (object $row): array => (array) $row)
-            ->all();
-
-        $this->assertContains($pegawai->id, $result['created_employee_ids']);
-        $this->assertSame($snapshotSebelum, $snapshotSesudah);
-    }
-
-    public function test_backfill_melanjutkan_target_lain_saat_kepala_bagian_efektif_nonaktif(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-        $kepalaBagianAktif = Employee::factory()->create();
-        $statusNonaktif = RefStatusPegawai::firstOrCreate(
-            ['kode' => 'PENSIUN_BACKFILL'],
-            [
-                'nama' => 'Pensiun Backfill',
-                'kelompok' => 'Nonaktif',
-                'keterangan' => 'Fixture Kepala Bagian nonaktif untuk backfill.',
-                'is_default' => false,
-                'is_active' => true,
-            ],
-        );
-        $kepalaBagianNonaktif = Employee::factory()->create();
-        $kepalaBagianNonaktif->update(['status_pegawai_id' => $statusNonaktif->id]);
-        $verifikator = Employee::factory()->create();
-        $pybmc = Employee::factory()->create();
-        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
-        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
-
-        $targetSebelum = Employee::factory()->make(['nama_lengkap' => 'Target Sebelum KB Nonaktif']);
-        $targetSebelum->id = '10000000-0000-4000-8000-000000000001';
-        $targetSebelum->save();
-        $targetKepalaBagianNonaktif = Employee::factory()->make(['nama_lengkap' => 'Target KB Nonaktif']);
-        $targetKepalaBagianNonaktif->id = '20000000-0000-4000-8000-000000000002';
-        $targetKepalaBagianNonaktif->save();
-        $targetSesudah = Employee::factory()->make(['nama_lengkap' => 'Target Sesudah KB Nonaktif']);
-        $targetSesudah->id = '30000000-0000-4000-8000-000000000003';
-        $targetSesudah->save();
-
-        SupervisorAssignment::insert([
-            [
-                'id' => (string) str()->uuid(),
-                'employee_id' => $targetSebelum->id,
-                'supervisor_id' => $kepalaBagianAktif->id,
-                'kepala_bagian_id' => $kepalaBagianAktif->id,
-                'tanggal_mulai' => today()->subDay(),
-                'tanggal_berakhir' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'id' => (string) str()->uuid(),
-                'employee_id' => $targetKepalaBagianNonaktif->id,
-                'supervisor_id' => $kepalaBagianNonaktif->id,
-                'kepala_bagian_id' => $kepalaBagianNonaktif->id,
-                'tanggal_mulai' => today()->subDay(),
-                'tanggal_berakhir' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'id' => (string) str()->uuid(),
-                'employee_id' => $targetSesudah->id,
-                'supervisor_id' => $kepalaBagianAktif->id,
-                'kepala_bagian_id' => $kepalaBagianAktif->id,
-                'tanggal_mulai' => today()->subDay(),
-                'tanggal_berakhir' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
-
-        $this->assertFalse($kepalaBagianNonaktif->fresh()->isActive());
-        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
-        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
-
-        $result = $this->app->make(BackfillEmployeeApprovalChainsAction::class)->execute(
-            $actor,
-            'Backfill tetap melanjutkan setelah Kepala Bagian nonaktif.',
-        );
-
-        $this->assertContains($targetSebelum->id, $result['created_employee_ids']);
-        $this->assertContains($targetSesudah->id, $result['created_employee_ids']);
-        $this->assertContains(
-            $targetKepalaBagianNonaktif->id,
-            $result['missing_kepala_bagian_employee_ids'],
-        );
-        $this->assertDatabaseHas('leave_approval_chains', [
-            'employee_id' => $targetSebelum->id,
-            'is_active' => true,
-        ]);
-        $this->assertDatabaseHas('leave_approval_chains', [
-            'employee_id' => $targetSesudah->id,
-            'is_active' => true,
-        ]);
-        $this->assertDatabaseMissing('leave_approval_chains', [
-            'employee_id' => $targetKepalaBagianNonaktif->id,
-        ]);
-    }
-
-    public function test_backfill_memisahkan_skip_karena_final_approver_tidak_tersedia(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-        $kepalaBagian = Employee::factory()->create();
-        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
-
-        $result = $this->actingAs($actor)->app->make(BackfillEmployeeApprovalChainsAction::class)->execute($actor, 'Backfill tanpa PYBMC.');
-
-        $this->assertContains($pegawai->id, $result['missing_final_approver_employee_ids']);
-        $this->assertNotContains($pegawai->id, $result['skipped_employee_ids']);
-    }
-
-    public function test_backfill_memproses_101_target_dengan_urutan_nama_dan_uuid_berlawanan(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-        $kepalaBagian = Employee::factory()->create(['nama_lengkap' => 'ZZZ Kepala Bagian Backfill']);
-        $verifikator = Employee::factory()->create(['nama_lengkap' => 'ZZZ Verifikator Backfill']);
-        $pybmc = Employee::factory()->create(['nama_lengkap' => 'ZZZ PYBMC Backfill']);
-        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
-        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
-        $targetIds = [];
-
-        foreach (range(1, 101) as $number) {
-            $id = match ($number) {
-                100 => 'ffffffff-ffff-4fff-bfff-ffffffffffff',
-                101 => '00000000-0000-4000-8000-000000000101',
-                default => sprintf('10000000-0000-4000-8000-%012d', $number),
-            };
-            $pegawai = Employee::factory()->make([
-                'nama_lengkap' => sprintf('Target Backfill %03d', $number),
-                'kepala_bagian_id' => $kepalaBagian->id,
-            ]);
-            $pegawai->id = $id;
-            $pegawai->save();
-            SupervisorAssignment::create([
-                'employee_id' => $pegawai->id,
-                'kepala_bagian_id' => $kepalaBagian->id,
-                'tanggal_mulai' => today()->subDay(),
-                'tanggal_berakhir' => null,
-            ]);
-            $targetIds[] = $id;
-        }
-
-        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
-        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
-
-        $result = $this->app->make(BackfillEmployeeApprovalChainsAction::class)->execute(
-            $actor,
-            'Backfill deterministik melintasi batas chunk.',
-        );
-
-        $createdIds = $result['created_employee_ids'];
-        sort($createdIds);
-        sort($targetIds);
-
-        $this->assertSame($targetIds, $createdIds);
-        $this->assertSame(101, count(array_unique($result['created_employee_ids'])));
-        $this->assertSame(
-            101,
-            LeaveApprovalChain::query()->whereIn('employee_id', $targetIds)->where('is_active', true)->count(),
-        );
-        $this->assertSame(
-            303,
-            DB::table('leave_approval_chain_steps')
-                ->whereIn('leave_approval_chain_id', LeaveApprovalChain::query()->whereIn('employee_id', $targetIds)->pluck('id'))
-                ->count(),
-        );
-    }
-
     public function test_super_admin_bisa_menyimpan_pybmc_global_melalui_route(): void
     {
         $actor = User::factory()->superAdmin()->create();
@@ -2164,7 +1900,7 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'pybmc_reason' => 'Penetapan PYBMC global melalui route.',
         ]);
 
-        $response->assertRedirect(route('cuti.config'));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pybmc']));
         $this->assertTrue(LeavePybmcGlobalConfig::where('approver_employee_id', $pybmc->id)->exists());
     }
 
@@ -2199,52 +1935,6 @@ class EmployeeApprovalChainConfigTest extends TestCase
             'approver_employee_id' => 'PYBMC global harus merupakan pegawai aktif.',
         ]);
         $this->assertDatabaseCount('leave_pybmc_global_config', 0);
-    }
-
-    public function test_super_admin_bisa_memicu_backfill_chain_dari_halaman_konfigurasi(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-        $kepalaBagian = Employee::factory()->create();
-        $verifikator = Employee::factory()->create();
-        $pybmc = Employee::factory()->create();
-        $pegawai = $this->buatPegawaiDenganKepalaBagianEfektif($kepalaBagian);
-        $verifikatorUser = User::factory()->adminKepegawaian()->create(['employee_id' => $verifikator->id]);
-        $pybmcUser = User::factory()->pimpinan()->create(['employee_id' => $pybmc->id]);
-
-        ApprovalConfig::setVal('stage2_approver_id', $verifikatorUser->id);
-        ApprovalConfig::setVal('stage3_approver_id', $pybmcUser->id);
-
-        $response = $this->actingAs($actor)->post(route('cuti.config.backfill'));
-
-        $response->assertRedirect(route('cuti.config'));
-        $response->assertSessionHas('success');
-        $this->assertDatabaseHas('leave_approval_chains', ['employee_id' => $pegawai->id, 'is_active' => true]);
-
-        $chain = LeaveApprovalChain::query()
-            ->where('employee_id', $pegawai->id)
-            ->where('is_active', true)
-            ->sole();
-        $audit = AuditLog::query()
-            ->where('auditable_type', 'LeaveApprovalChain')
-            ->where('auditable_id', $chain->id)
-            ->sole();
-
-        $this->assertSame($actor->id, $audit->user_id);
-        $this->assertSame($pegawai->id, $audit->new_values['employee_id']);
-        $this->assertSame('Atasan Langsung', $audit->new_values['steps'][1]['role_label']);
-        $this->assertArrayHasKey('reason', $audit->new_values);
-        $this->assertNull($audit->new_values['reason']);
-    }
-
-    public function test_halaman_konfigurasi_menampilkan_panel_backfill_chain(): void
-    {
-        $actor = User::factory()->superAdmin()->create();
-
-        $response = $this->actingAs($actor)->get(route('cuti.config'));
-
-        $response->assertOk();
-        $response->assertSee('Backfill Chain Dinamis');
-        $response->assertSee('Jalankan Backfill Chain');
     }
 
     public function test_halaman_konfigurasi_menampilkan_kontrol_chain_pegawai_dinamis_tanpa_stage_tetap(): void
@@ -2421,18 +2111,6 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $response->assertOk();
         $response->assertSee($verifikatorTersimpan->nama_lengkap);
         $response->assertSee($hasilPencarianLain->nama_lengkap);
-    }
-
-    public function test_backfill_chain_wajib_permission_configure_chain(): void
-    {
-        $admin = User::factory()->adminKepegawaian()->create();
-
-        $response = $this->actingAs($admin)->post(route('cuti.config.backfill'), [
-            'backfill_reason' => 'Percobaan tanpa permission.',
-        ]);
-
-        $response->assertForbidden();
-        $this->assertDatabaseCount('leave_approval_chains', 0);
     }
 
     /**

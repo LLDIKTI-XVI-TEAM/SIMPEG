@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Cuti;
 
 use App\Models\Employee;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -13,7 +14,17 @@ class GlobalPybmcConfigRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('cuti.configure_chain');
+        $actor = $this->user();
+
+        return $actor !== null
+            && $actor->hasPermission('cuti.configure')
+            && app(EmployeeDashboardScopeService::class)->hasGlobalIdentityScope($actor);
+    }
+
+    /** Kegagalan validasi tetap diarahkan ke panel PYBMC global internal. */
+    protected function getRedirectUrl(): string
+    {
+        return route('cuti.config', ['tab' => 'pybmc']);
     }
 
     /** @return array<string, list<string>> */
@@ -22,6 +33,8 @@ class GlobalPybmcConfigRequest extends FormRequest
         return [
             'approver_employee_id' => [
                 'required',
+                'bail',
+                'uuid',
                 Rule::exists('employees', 'id')
                     ->where(fn ($query) => $query->whereIn('id', Employee::query()->whereActiveStatus()->select('id'))),
             ],
@@ -34,6 +47,15 @@ class GlobalPybmcConfigRequest extends FormRequest
     {
         return [
             'approver_employee_id.exists' => 'PYBMC global harus merupakan pegawai aktif.',
+        ];
+    }
+
+    /** Label validasi mengikuti istilah yang terlihat pada form, bukan nama field internal. */
+    public function attributes(): array
+    {
+        return [
+            'approver_employee_id' => 'PYBMC Global',
+            'pybmc_reason' => 'Alasan PYBMC Global',
         ];
     }
 }

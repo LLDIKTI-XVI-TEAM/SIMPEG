@@ -18,6 +18,7 @@
     'submitLabel' => 'Terapkan',
     'embedded' => false,
     'autoSubmit' => true,
+    'lookupEndpoint' => null,
 ])
 
 @php
@@ -41,7 +42,7 @@
         debounceTimer: null,
         controller: null,
         requestId: 0,
-        endpoint: @js(route('cuti.employee-lookup')),
+        endpoint: @js($lookupEndpoint ?? route('cuti.employee-lookup')),
         onInput() {
             if (this.query !== this.selectedLabel) this.selectedId = '';
 

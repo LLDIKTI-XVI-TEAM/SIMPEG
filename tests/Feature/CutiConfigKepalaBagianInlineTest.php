@@ -65,7 +65,7 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
             'redirect_to' => 'cuti-config',
         ]);
 
-        $response->assertRedirect(route('cuti.config', ['employee_id' => $pegawai->id]));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
         $response->assertSessionHas(
             'success',
             'Atasan Langsung untuk '.$pegawai->nama_lengkap.' berhasil diperbarui.',
@@ -81,7 +81,7 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
 
         // Setelah kembali, tahap Atasan Langsung mengikuti seluruh verifikator dan terisi dari penugasan efektif baru.
         $this->actingAs($actor)
-            ->get(route('cuti.config', ['employee_id' => $pegawai->id]))
+            ->get(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]))
             ->assertOk()
             ->assertSee(':name="`steps[${verifiers.length}][approver_employee_id]`" value="'.$kabag->id.'"', false);
     }
@@ -132,7 +132,7 @@ class CutiConfigKepalaBagianInlineTest extends TestCase
             'redirect_to' => 'cuti-config',
         ]);
 
-        $response->assertRedirect(route('cuti.config', ['employee_id' => $pegawai->id]));
+        $response->assertRedirect(route('cuti.config', ['tab' => 'pegawai', 'employee_id' => $pegawai->id]));
         $response->assertSessionHasErrors([
             'kepala_bagian_id' => 'Pegawai tidak bisa menjadi atasan untuk diri sendiri.',
         ]);

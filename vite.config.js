@@ -11,6 +11,8 @@ export default defineConfig({
                 'resources/js/pages/employee-import.js',
                 'resources/js/pages/manual-external-approval.js',
                 'resources/js/pages/employee-statistics.js',
+                'resources/js/pages/chain-batch-editor.js',
+                'resources/js/pages/cuti-config-navigation.js',
             ],
             refresh: true,
         }),

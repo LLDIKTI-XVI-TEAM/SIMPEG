@@ -14,6 +14,9 @@ const focusVerifierBody = bladeSource.match(
 const searchApproverCandidatesBody = bladeSource.match(
     /async searchApproverCandidates\(\)\s*\{([\s\S]*?)\n\s*\},\n\s*addVerifier\(/,
 )?.[1];
+const invalidateApproverSearchBody = bladeSource.match(
+    /invalidateApproverSearch\(\)\s*\{([\s\S]*?)\n\s*\},\n\s*async searchApproverCandidates\(/,
+)?.[1];
 
 assert.ok(focusVerifierBody, 'Method focusVerifier harus dapat dieksekusi oleh test regresi.');
 
@@ -60,6 +63,8 @@ test('pencarian kandidat mempertahankan pilihan editor yang belum disimpan', asy
         approverLookupEndpoint: '/cuti/lookup-pegawai',
         approverSearch: 'Pegawai Baru',
         approverSearchLoading: false,
+        approverSearchSequence: 0,
+        invalidateApproverSearch: new Function(invalidateApproverSearchBody),
         approverSearchError: '',
         initialApproverCandidateIds: ['static-id'],
         approverLookupCandidates: [
@@ -97,4 +102,98 @@ test('pencarian kandidat mempertahankan pilihan editor yang belum disimpan', asy
     } finally {
         globalThis.fetch = originalFetch;
     }
+});
+
+const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((done, fail) => { resolve = done; reject = fail; });
+    return { promise, resolve, reject };
+};
+const candidateResponse = (id) => ({
+    ok: true,
+    json: async () => ({ data: [{ id, nama_lengkap: id, nip: '100' }] }),
+});
+const lookupContext = (fetch) => ({
+    approverLookupEndpoint: '/cuti/lookup-pegawai',
+    approverSearch: 'Andi', approverSearchSequence: 0,
+    approverSearchLoading: false, approverSearchError: '', approverSearchMessage: '',
+    initialApproverCandidateIds: [], approverLookupCandidates: [], verifiers: [], pybmcEmployeeId: '',
+    invalidateApproverSearch: new Function(invalidateApproverSearchBody),
+    searchApproverCandidates: new Function('fetch', `return async function () {${searchApproverCandidatesBody}}`)(fetch),
+});
+
+test('respons Andi yang datang setelah Budi tidak menimpa hasil pencarian Budi', async () => {
+    const first = deferred();
+    const page = lookupContext((url) => url.endsWith('Andi') ? first.promise : candidateResponse('Budi'));
+    const pending = page.searchApproverCandidates();
+    page.approverSearch = 'Budi';
+    await page.searchApproverCandidates();
+    first.resolve(candidateResponse('Andi'));
+    await pending;
+    assert.deepEqual(page.approverLookupCandidates.map(({ id }) => id), ['Budi']);
+    assert.equal(page.approverSearchMessage, '1 kandidat ditemukan.');
+    assert.equal(page.approverSearchError, '');
+    assert.equal(page.approverSearchLoading, false);
+});
+
+test('galat lama tidak mengakhiri loading atau menampilkan error pada pencarian terbaru', async () => {
+    const first = deferred();
+    const second = deferred();
+    const page = lookupContext((url) => url.endsWith('Andi') ? first.promise : second.promise);
+    const pending = page.searchApproverCandidates();
+    page.approverSearch = 'Budi';
+    const latest = page.searchApproverCandidates();
+    first.reject(new TypeError('Koneksi lama gagal'));
+    await pending;
+    assert.equal(page.approverSearchError, '');
+    assert.equal(page.approverSearchLoading, true);
+    second.resolve(candidateResponse('Budi'));
+    await latest;
+    assert.deepEqual(page.approverLookupCandidates.map(({ id }) => id), ['Budi']);
+});
+
+test('pencarian terlalu pendek membatalkan respons sebelumnya', async () => {
+    const first = deferred();
+    const page = lookupContext(() => first.promise);
+    const pending = page.searchApproverCandidates();
+    page.approverSearch = '';
+    await page.searchApproverCandidates();
+    first.resolve(candidateResponse('Andi'));
+    await pending;
+    assert.deepEqual(page.approverLookupCandidates, []);
+    assert.equal(page.approverSearchMessage, '');
+    assert.equal(page.approverSearchLoading, false);
+    assert.match(page.approverSearchError, /minimal 2 karakter/);
+});
+
+test('mengedit teks sebelum submit baru membuang hasil usang tetapi menjaga kandidat terpilih', async () => {
+    const first = deferred();
+    const page = lookupContext(() => first.promise);
+    page.verifiers = [{ approver_employee_id: 'terpilih' }];
+    page.approverLookupCandidates = [{ id: 'terpilih' }, { id: 'belum-dipilih' }];
+    const pending = page.searchApproverCandidates();
+    page.approverSearch = 'Budi';
+    page.invalidateApproverSearch();
+    first.resolve(candidateResponse('Andi'));
+    await pending;
+    assert.deepEqual(page.approverLookupCandidates, [{ id: 'terpilih' }]);
+    assert.equal(page.verifiers[0].approver_employee_id, 'terpilih');
+    assert.equal(page.approverSearchMessage, '');
+    assert.equal(page.approverSearchLoading, false);
+});
+
+test('galat pencarian terbaru tetap terlihat dan dapat dicoba ulang', async () => {
+    let fail = true;
+    const page = lookupContext(async () => {
+        if (fail) throw new TypeError('Koneksi gagal');
+        return candidateResponse('Andi');
+    });
+    await page.searchApproverCandidates();
+    assert.match(page.approverSearchError, /gagal/);
+    assert.equal(page.approverSearchLoading, false);
+    fail = false;
+    await page.searchApproverCandidates();
+    assert.equal(page.approverSearchError, '');
+    assert.deepEqual(page.approverLookupCandidates.map(({ id }) => id), ['Andi']);
 });

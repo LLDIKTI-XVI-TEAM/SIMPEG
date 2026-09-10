@@ -483,7 +483,7 @@ class PegawaiController extends Controller
         // Form penetapan juga tersedia inline di halaman Konfigurasi Approval Cuti; nilai redirect_to
         // sudah dibatasi whitelist pada FormRequest sehingga tidak dapat menjadi open redirect.
         [$redirectRoute, $redirectParams] = $isCutiConfig
-            ? ['cuti.config', ['employee_id' => $id]]
+            ? ['cuti.config', ['tab' => 'pegawai', 'employee_id' => $id]]
             : ['pegawai.show', $id];
         // Surface cuti memakai nama peran bisnis, sedangkan detail pegawai mempertahankan label struktural.
         $assignmentLabel = $isCutiConfig ? 'Atasan Langsung' : 'Kepala Bagian';

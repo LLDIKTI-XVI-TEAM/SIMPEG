@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\DataMasterProgramStudiController;
 use App\Http\Controllers\Admin\DataMasterStatusPegawaiController;
 use App\Http\Controllers\Admin\DataMasterUnitKerjaController;
 use App\Http\Controllers\Admin\DokumenController;
+use App\Http\Controllers\Admin\EmployeeApprovalChainBatchController;
 use App\Http\Controllers\Admin\EmployeeHistoryAttachmentController;
 use App\Http\Controllers\Admin\EmployeeImportController;
 use App\Http\Controllers\Admin\EmployeeStatisticsController;
@@ -539,25 +540,31 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('cuti.show')
         ->whereUuid('id');
 
-    // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
-    // role:super_admin sebagai pagar kasar dan permission:cuti.configure sebagai gerbang aksi.
+    // Capability konfigurasi dapat didelegasikan melalui matrix; scope identitas asli
+    // tetap ditegakkan pada request dan Action untuk setiap target.
     Route::get('/cuti/konfigurasi-approval', [CutiConfigController::class, 'index'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config');
+    Route::get('/cuti/konfigurasi-approval/target', [EmployeeApprovalChainBatchController::class, 'targets'])
+        ->middleware(['permission:cuti.configure', 'throttle:60,1'])
+        ->name('cuti.config.batch.targets');
+    Route::get('/cuti/konfigurasi-approval/approver', [EmployeeApprovalChainBatchController::class, 'approvers'])
+        ->middleware(['permission:cuti.configure', 'throttle:60,1'])
+        ->name('cuti.config.batch.approvers');
+    Route::post('/cuti/konfigurasi-approval/pratinjau', [EmployeeApprovalChainBatchController::class, 'preview'])
+        ->middleware(['permission:cuti.configure'])
+        ->name('cuti.config.batch.preview');
+    Route::post('/cuti/konfigurasi-approval/terapkan', [EmployeeApprovalChainBatchController::class, 'apply'])
+        ->middleware(['permission:cuti.configure'])
+        ->name('cuti.config.batch.apply');
     Route::post('/cuti/konfigurasi-approval', [CutiConfigController::class, 'update'])
         ->middleware(['role:super_admin', 'permission:cuti.configure'])
         ->name('cuti.config.update');
-    Route::post('/cuti/konfigurasi-approval/backfill', [CutiConfigController::class, 'backfill'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
-        ->name('cuti.config.backfill');
     Route::post('/cuti/konfigurasi-approval/pybmc-global', [CutiConfigController::class, 'updateGlobalPybmc'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.pybmc-global');
-    Route::post('/cuti/konfigurasi-approval/unit', [CutiConfigController::class, 'applyTemplateToUnit'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
-        ->name('cuti.config.unit-template.apply');
     Route::post('/cuti/konfigurasi-approval/pegawai/{employee}', [CutiConfigController::class, 'storeEmployeeChain'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware(['permission:cuti.configure'])
         ->name('cuti.config.employee-chain.store')
         ->whereUuid('employee');
 

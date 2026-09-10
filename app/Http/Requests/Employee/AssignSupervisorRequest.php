@@ -51,4 +51,20 @@ class AssignSupervisorRequest extends FormRequest
             'effective_date' => 'Tanggal Mulai Penugasan '.$supervisorLabel,
         ];
     }
+
+    /**
+     * Hanya caller cuti-config yang memperoleh tujuan khusus; nilai lain tetap
+     * memakai perilaku referer existing dan tidak memperluas whitelist.
+     */
+    protected function getRedirectUrl(): string
+    {
+        if ($this->input('redirect_to') === 'cuti-config') {
+            return route('cuti.config', [
+                'tab' => 'pegawai',
+                'employee_id' => (string) $this->route('id'),
+            ]);
+        }
+
+        return parent::getRedirectUrl();
+    }
 }

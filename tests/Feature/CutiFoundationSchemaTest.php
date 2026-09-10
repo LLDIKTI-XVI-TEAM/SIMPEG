@@ -701,6 +701,179 @@ class CutiFoundationSchemaTest extends TestCase
         $this->assertDutyPostponementMigrationSupportRemainsIntact();
     }
 
+    #[DataProvider('pybmcRevisionBaselines')]
+    public function test_migrasi_revisi_pybmc_mempertahankan_data_dan_menolak_urutan_ambigu(string $baseline): void
+    {
+        $this->assertTrue(Schema::hasColumn('leave_pybmc_global_config', 'revision'));
+        $migration = require database_path('migrations/2026_09_10_000000_add_revision_to_leave_pybmc_global_config.php');
+        $migration->down();
+        $columns = Schema::getColumnListing('leave_pybmc_global_config');
+        if ($baseline !== 'kosong') {
+            $approver = Employee::factory()->create();
+            foreach ([0, 1] as $offset) {
+                $createdAt = $baseline === 'ambigu null' ? null : '2026-09-09 08:00:0'.($baseline === 'berurutan' ? $offset : 0);
+                $id = (string) Str::uuid();
+                // Fixture migrasi memakai timestamp mentah, termasuk NULL, bukan timestamp otomatis model.
+                DB::table('leave_pybmc_global_config')->insert([
+                    'id' => $id,
+                    'approver_employee_id' => $approver->id,
+                    'effective_from' => '2026-09-09',
+                    'change_reason' => 'Histori konfigurasi tetap utuh.',
+                    'created_at' => $createdAt,
+                ]);
+                $this->assertSame($createdAt, DB::table('leave_pybmc_global_config')->where('id', $id)->value('created_at'));
+            }
+        }
+        $before = DB::table('leave_pybmc_global_config')->orderBy('id')->get($columns)->toJson();
+        $auditBefore = DB::table('audit_logs')->orderBy('id')->get()->toJson();
+        $ambiguous = str_starts_with($baseline, 'ambigu');
+
+        try {
+            DB::transaction(fn () => $migration->up());
+            $this->assertFalse($ambiguous, 'Migrasi tidak boleh menebak konfigurasi dengan waktu terbaru yang sama.');
+            $this->assertTrue(Schema::hasColumn('leave_pybmc_global_config', 'revision'));
+            $this->assertSame(0, DB::table('leave_pybmc_global_config')->where('revision', '!=', 0)->count());
+            $migration->down();
+        } catch (RuntimeException $exception) {
+            if (! $ambiguous) {
+                throw $exception;
+            }
+            $this->assertStringContainsString('Urutan konfigurasi PYBMC global terbaru ambigu', $exception->getMessage());
+        }
+
+        $this->assertFalse(Schema::hasColumn('leave_pybmc_global_config', 'revision'));
+        $this->assertSame($before, DB::table('leave_pybmc_global_config')->orderBy('id')->get($columns)->toJson());
+        $this->assertSame($auditBefore, DB::table('audit_logs')->orderBy('id')->get()->toJson());
+    }
+
+    public static function pybmcRevisionBaselines(): array
+    {
+        return [['kosong'], ['berurutan'], ['ambigu'], ['ambigu null']];
+    }
+
+    public function test_upgrade_revisi_pybmc_memulihkan_halaman_setelah_migrasi_dalam_maintenance(): void
+    {
+        $this->seedRbac();
+        $this->actingAs(User::factory()->superAdmin()->create());
+        $approver = Employee::factory()->create(['nama_lengkap' => 'PYBMC sebelum upgrade']);
+        $configId = (string) Str::uuid();
+        $migration = require database_path('migrations/2026_09_10_000000_add_revision_to_leave_pybmc_global_config.php');
+        $migration->down();
+        DB::table('leave_pybmc_global_config')->insert([
+            'id' => $configId,
+            'approver_employee_id' => $approver->id,
+            'effective_from' => '2026-09-09',
+            'created_at' => '2026-09-09 08:00:00',
+            'change_reason' => 'Konfigurasi sebelum upgrade tetap dipertahankan.',
+        ]);
+        AuditLog::create([
+            'event' => 'CREATE',
+            'auditable_type' => 'LeavePybmcGlobalConfig',
+            'auditable_id' => $configId,
+            'new_values' => ['approver_employee_id' => $approver->id],
+        ]);
+        $columns = Schema::getColumnListing('leave_pybmc_global_config');
+        $before = DB::table('leave_pybmc_global_config')->get($columns)->toJson();
+        $auditBefore = DB::table('audit_logs')->orderBy('id')->get()->toJson();
+
+        // Cache array menguji boundary HTTP aplikasi tanpa menutup server development melalui file bersama.
+        config(['app.maintenance.driver' => 'cache', 'app.maintenance.store' => 'array']);
+        $maintenance = app()->maintenanceMode();
+        $maintenance->activate(['status' => 503, 'retry' => 60]);
+
+        try {
+            $this->get(route('cuti.config'))->assertStatus(503)->assertDontSee('SQLSTATE');
+            $this->postJson(route('cuti.config.pybmc-global'), [
+                'approver_employee_id' => $approver->id,
+                'pybmc_reason' => 'Mutasi tidak boleh berjalan sebelum upgrade selesai.',
+            ])->assertStatus(503);
+
+            DB::transaction(fn () => $migration->up());
+            $this->assertSame(0, (int) DB::table('leave_pybmc_global_config')->value('revision'));
+            // Schema siap belum mengaktifkan akses: operator tetap harus membuka maintenance secara eksplisit.
+            $this->get(route('cuti.config'))->assertStatus(503);
+            $maintenance->deactivate();
+
+            $this->get(route('cuti.config'))
+                ->assertOk()
+                ->assertViewHas('globalPybmc', fn ($config): bool => $config?->id === $configId)
+                ->assertSee('PYBMC sebelum upgrade');
+            $this->assertSame($before, DB::table('leave_pybmc_global_config')->get($columns)->toJson());
+            $this->assertSame($auditBefore, DB::table('audit_logs')->orderBy('id')->get()->toJson());
+        } finally {
+            $maintenance->deactivate();
+        }
+    }
+
+    public function test_upgrade_revisi_pybmc_ambigu_menahan_akses_dan_mempertahankan_histori(): void
+    {
+        $this->seedRbac();
+        $this->actingAs(User::factory()->superAdmin()->create());
+        $migration = require database_path('migrations/2026_09_10_000000_add_revision_to_leave_pybmc_global_config.php');
+        $migration->down();
+        $requestedApprover = Employee::factory()->create();
+        foreach ([$requestedApprover, Employee::factory()->create()] as $approver) {
+            $configId = (string) Str::uuid();
+            DB::table('leave_pybmc_global_config')->insert([
+                'id' => $configId,
+                'approver_employee_id' => $approver->id,
+                'effective_from' => '2026-09-09',
+                'created_at' => '2026-09-09 08:00:00',
+                'change_reason' => 'Histori ambigu harus diverifikasi pengelola data.',
+            ]);
+            AuditLog::create([
+                'event' => 'CREATE',
+                'auditable_type' => 'LeavePybmcGlobalConfig',
+                'auditable_id' => $configId,
+                'new_values' => ['approver_employee_id' => $approver->id],
+            ]);
+        }
+        $before = DB::table('leave_pybmc_global_config')->orderBy('id')->get()->toJson();
+        $auditBefore = DB::table('audit_logs')->orderBy('id')->get()->toJson();
+        config(['app.maintenance.driver' => 'cache', 'app.maintenance.store' => 'array']);
+        $maintenance = app()->maintenanceMode();
+        $maintenance->activate(['status' => 503, 'retry' => 60]);
+
+        try {
+            $this->assertThrows(fn () => DB::transaction(fn () => $migration->up()), RuntimeException::class);
+
+            $this->assertFalse(Schema::hasColumn('leave_pybmc_global_config', 'revision'));
+            $this->get(route('cuti.config'))->assertStatus(503)->assertDontSee('SQLSTATE');
+            $this->postJson(route('cuti.config.pybmc-global'), [
+                'approver_employee_id' => $requestedApprover->id,
+                'pybmc_reason' => 'Mutasi tetap tertutup setelah migrasi gagal.',
+            ])->assertStatus(503);
+            $this->assertSame($before, DB::table('leave_pybmc_global_config')->orderBy('id')->get()->toJson());
+            $this->assertSame($auditBefore, DB::table('audit_logs')->orderBy('id')->get()->toJson());
+        } finally {
+            // Hanya membersihkan cache test; ini bukan instruksi mengaktifkan aplikasi setelah migrasi gagal.
+            $maintenance->deactivate();
+        }
+    }
+
+    public function test_rollback_revisi_pybmc_menolak_penghapusan_urutan_yang_sudah_dipakai(): void
+    {
+        DB::table('leave_pybmc_global_config')->insert([
+            'id' => (string) Str::uuid(),
+            'approver_employee_id' => Employee::factory()->create()->id,
+            'effective_from' => today(),
+            'revision' => 1,
+        ]);
+        $before = DB::table('leave_pybmc_global_config')->get()->toJson();
+        $migration = require database_path('migrations/2026_09_10_000000_add_revision_to_leave_pybmc_global_config.php');
+        $exception = null;
+        try {
+            DB::transaction(fn () => $migration->down());
+        } catch (RuntimeException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertNotNull($exception, 'Rollback tidak boleh menghilangkan urutan konfigurasi yang sudah dipakai.');
+        $this->assertStringContainsString('Rollback dibatalkan karena revisi PYBMC global sudah dipakai', $exception->getMessage());
+        $this->assertTrue(Schema::hasColumn('leave_pybmc_global_config', 'revision'));
+        $this->assertSame($before, DB::table('leave_pybmc_global_config')->get()->toJson());
+    }
+
     public function test_schema_fondasi_revisi_cuti_tersedia(): void
     {
         $expectedColumns = [

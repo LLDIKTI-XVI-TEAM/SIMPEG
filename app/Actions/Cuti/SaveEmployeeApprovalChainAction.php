@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use App\Services\Cuti\ApprovalChainInvariantService;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Support\Cuti\ApprovalStepLabel;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class SaveEmployeeApprovalChainAction
     public function __construct(
         private readonly ApprovalChainInvariantService $invariants,
         private readonly ApprovalChainConfigurationLockService $configurationLock,
+        private readonly EmployeeDashboardScopeService $employeeScope,
     ) {}
 
     /**
@@ -38,8 +40,15 @@ class SaveEmployeeApprovalChainAction
      */
     public function execute(Employee $employee, array $steps, User $actor, ?string $reason, ?Request $request = null): LeaveApprovalChain
     {
+        $employee = $this->authorizedTarget($actor, $employee->id);
+
         return DB::transaction(function () use ($employee, $steps, $actor, $reason, $request): LeaveApprovalChain {
             $this->configurationLock->acquire();
+            // Role dan identitas akun dapat berubah selama antre lock; jangan memakai snapshot request.
+            $actor->refresh();
+            // Recheck awal tidak mengambil row lock tersendiri: invariant di bawah
+            // mengunci union target dan approver dalam urutan UUID deterministik.
+            $employee = $this->authorizedTarget($actor, $employee->id);
             $steps = $this->appendGlobalPybmcWhenNeeded($steps);
             $steps = array_map(fn (array $step): array => [
                 ...$step,
@@ -67,6 +76,11 @@ class SaveEmployeeApprovalChainAction
                     'steps' => $exception->getMessage(),
                 ]);
             }
+
+            // Permission dan scope dibaca ulang setelah lock target/approver agar revoke
+            // atau perubahan penugasan yang menunggu lock tidak lolos memakai state lama.
+            $actor->refresh();
+            $employee = $this->authorizedTarget($actor, $employee->id, true);
 
             $oldChain = LeaveApprovalChain::query()
                 ->where('employee_id', $employee->id)
@@ -129,6 +143,35 @@ class SaveEmployeeApprovalChainAction
     }
 
     /**
+     * Memeriksa capability sebelum detail domain dan mengambil ulang target melalui
+     * scope identitas asli; respons 404 tidak membedakan ID asing dan target hilang.
+     */
+    private function authorizedTarget(User $actor, string $employeeId, bool $lock = false): Employee
+    {
+        abort_unless(
+            $actor->hasPermission('cuti.configure'),
+            403,
+            'Anda tidak lagi memiliki izin untuk tindakan ini. Perubahan tidak disimpan. Hubungi pengelola akses.',
+        );
+
+        $query = $this->employeeScope->forIdentity($actor)->whereKey($employeeId);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $target = $query->first();
+        abort_if($target === null, 404);
+
+        if (! $target->isActive()) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Pegawai target harus berstatus Aktif.',
+            ]);
+        }
+
+        return $target;
+    }
+
+    /**
      * @param  list<array{
      *     step_type:mixed,
      *     role_label:mixed,
@@ -151,8 +194,7 @@ class SaveEmployeeApprovalChainAction
         }
 
         $globalPybmc = LeavePybmcGlobalConfig::query()
-            ->orderByDesc('effective_from')
-            ->orderByDesc('created_at')
+            ->latestRevision()
             ->first();
 
         if ($globalPybmc === null) {

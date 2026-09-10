@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Cuti\ApplyEmployeeApprovalChainsAction;
 use App\Actions\Cuti\ApplyGlobalPybmcAction;
 use App\Actions\Cuti\SaveEmployeeApprovalChainAction;
 use App\Actions\Cuti\SubmitLeaveRequestAction;
@@ -9,6 +10,8 @@ use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
@@ -21,6 +24,16 @@ try {
     file_put_contents($input['stage'], 'before-actor-lookup');
     $actor = User::query()->findOrFail($input['actor_id']);
     file_put_contents($input['stage'], 'after-actor-lookup');
+
+    if ($input['action'] === 'batch') {
+        $backend = DB::selectOne('select pg_backend_pid() as pid');
+        file_put_contents($input['pid'], (string) $backend->pid);
+        file_put_contents($input['ready'], 'ready');
+        $result = app(ApplyEmployeeApprovalChainsAction::class)->execute($actor, $input['draft'], $input['preview_token']);
+        file_put_contents($input['result'], json_encode(['ok' => true, 'counts' => $result['data']['counts']], JSON_THROW_ON_ERROR));
+
+        return;
+    }
 
     if ($input['action'] === 'submit') {
         file_put_contents($input['stage'], 'before-submit-fixture-lookup');
@@ -58,6 +71,10 @@ try {
         $kepalaBagian = Employee::query()->findOrFail($input['kepala_bagian_id']);
         $pybmc = Employee::query()->findOrFail($input['pybmc_id']);
         file_put_contents($input['stage'], 'before-save-action');
+        if (isset($input['pid'])) {
+            $backend = DB::selectOne('select pg_backend_pid() as pid');
+            file_put_contents($input['pid'], (string) $backend->pid);
+        }
         file_put_contents($input['ready'], 'ready');
 
         $chain = app(SaveEmployeeApprovalChainAction::class)->execute(
@@ -106,6 +123,10 @@ try {
         file_put_contents($input['stage'], 'before-global-fixture-lookup');
         $approver = Employee::query()->findOrFail($input['approver_id']);
         file_put_contents($input['stage'], 'before-global-action');
+        if (isset($input['pid'])) {
+            $backend = DB::selectOne('select pg_backend_pid() as pid');
+            file_put_contents($input['pid'], (string) $backend->pid);
+        }
         file_put_contents($input['ready'], 'ready');
         $config = app(ApplyGlobalPybmcAction::class)->execute(
             $approver,
@@ -127,6 +148,10 @@ try {
     file_put_contents($input['result'], json_encode([
         'ok' => false,
         'class' => $exception::class,
+        'status' => method_exists($exception, 'getStatusCode')
+            ? $exception->getStatusCode()
+            : ($exception instanceof ValidationException ? $exception->status : null),
         'message' => $exception->getMessage(),
+        'errors' => $exception instanceof ValidationException ? $exception->errors() : null,
     ], JSON_THROW_ON_ERROR));
 }

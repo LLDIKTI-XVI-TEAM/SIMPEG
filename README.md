@@ -118,51 +118,89 @@ ditarik. Migration **tidak** dijalankan pada startup container dan **tidak** dij
 request HTTP, karena migration paralel dari beberapa container web/worker berisiko saling
 berebut (race condition) dan mengubah schema di luar kendali rilis.
 
-Jalankan langkah berikut **berurutan** setiap kali menarik perubahan yang memuat migration baru:
+Update dengan perubahan schema memakai maintenance terkontrol. Container pada `compose.yml`
+membaca checkout melalui bind mount: `git pull`, perpindahan checkout, dan penggantian dependency
+dapat langsung mengubah kode yang dilayani. Karena itu, selesaikan tahap penutupan akses di bawah
+**sebelum** mengganti kode. Tidak ada fallback runtime ke schema lama.
+
+### 1. Tutup akses dan selesaikan proses yang masih berjalan
+
+Jalankan pada versi aplikasi yang masih cocok dengan database:
 
 ```bash
-# 1. Ambil kode terbaru
-git pull
+podman compose exec app php artisan down --render=errors::503 --retry=60
+```
 
-# 2. Hentikan worker agar tidak ada job yang berjalan di atas schema lama
+Lanjutkan hanya jika perintah berhasil dan request ke `/cuti/konfigurasi-approval` mengembalikan
+HTTP **503**. Jangan memakai `/up` untuk pemeriksaan ini: health route tersebut dikecualikan dari
+maintenance. Jangan memakai secret/cookie bypass atau mengecualikan route bisnis selama update.
+Prerender memakai maintenance driver `file` bawaan konfigurasi proyek; bila konfigurasi target
+berbeda, pastikan barrier HTTP berlaku pada seluruh instance sebelum melanjutkan.
+
+Maintenance mencegah pekerjaan baru, tetapi tidak membatalkan request, job, atau task scheduler
+yang sudah berjalan. Tunggu proses tersebut selesai, hentikan worker dengan waktu penghentian
+yang cukup untuk proses target, lalu pastikan queue dan scheduler sudah berhenti:
+
+```bash
 podman compose stop queue scheduler
+podman compose ps -a
+```
 
-# 3. Perbarui dependency bila composer.lock / package-lock.json berubah
+Jangan menjalankan command mutasi manual atau worker dengan `--force` selama tahap update.
+Scheduler yang memakai `evenInMaintenanceMode()` juga harus dihentikan bila ada pada target.
+Jika akses belum tertutup atau proses lama belum selesai, jangan mengganti checkout.
+
+### 2. Perbarui kode dan schema dengan akses tetap tertutup
+
+Blok berikut dijalankan melalui Bash dan berhenti pada kegagalan pertama. Bila memakai
+PowerShell, jalankan perintah satu per satu dan lanjutkan hanya jika `$LASTEXITCODE` bernilai 0;
+`set -e` bukan perintah PowerShell. Jangan menjalankan tahap aktivasi jika salah satu perintah gagal.
+
+```bash
+set -e
+git pull --ff-only
 podman compose exec app composer install
 # Build asset dijalankan di host karena Node.js tidak tersedia di container app
-npm ci && npm run build
-
-# 4. Jalankan migration satu kali dari container app
+npm ci
+npm run build
+# Jalankan migration hanya dari satu container app
 podman compose exec app php artisan migrate
-
-# 5. Bersihkan cache konfigurasi/route hasil build lama
 podman compose exec app php artisan optimize:clear
-
-# 6. Jalankan ulang aplikasi dan worker dengan kode + schema yang sudah sinkron
-podman compose up -d
-podman compose restart queue scheduler
-
-# 7. Verifikasi tidak ada migration yang tertinggal
 podman compose exec app php artisan migrate:status
 podman compose exec app php artisan about --only=environment
 ```
 
-Catatan penting:
+Periksa bahwa semua migration yang diperlukan berstatus **Ran**, environment/database sesuai
+target, dan route konfigurasi masih memberi 503. Exit code 0 dari `migrate:status` saja tidak
+membuktikan tidak ada migration pending. Worker tetap berhenti sampai verifikasi ini selesai.
 
-- Langkah 4 harus selesai **sebelum** worker versi baru menerima job. Worker yang berjalan di
-  atas schema lama akan gagal menyimpan state batch dan job berpotensi berakhir di `failed_jobs`.
-- Pada instalasi dengan lebih dari satu container app/worker, jalankan `migrate` dari **satu**
-  container saja.
-- Untuk lingkungan yang melayani pengguna, aktifkan mode maintenance sebelum langkah 2 dan
-  matikan setelah langkah 6:
+Jika migration revisi PYBMC global menolak urutan histori ambigu, **tetap pertahankan maintenance
+dan worker yang berhenti**. Migrasi sengaja tidak memilih salah satu konfigurasi secara acak.
+Simpan bukti error serta backup data, lalu verifikasi konfigurasi yang benar bersama pengelola
+data. Pemulihan memerlukan keputusan dan langkah koreksi yang disetujui serta dapat diaudit;
+jangan mengubah timestamp, menghapus histori/audit, melemahkan guard, atau menjalankan seeder/reset
+agar migrasi lolos. Jalankan ulang migration dan verifikasi setelah penyebabnya diselesaikan.
 
-  ```bash
-  podman compose exec app php artisan down
-  podman compose exec app php artisan up
-  ```
+### 3. Aktifkan hanya setelah verifikasi berhasil
 
-- Jangan memakai `migrate:fresh`, `migrate:refresh`, atau `migrate:reset` pada database yang
-  sudah memuat data nyata; ketiganya menghapus data.
+Tahap ini terpisah dari blok update agar kegagalan tidak diikuti `up` secara otomatis.
+Jalankan tiap perintah hanya setelah perintah sebelumnya berhasil:
+
+```bash
+podman compose restart app
+podman compose start queue scheduler
+podman compose exec app php artisan up
+```
+
+Worker bawaan proyek menghormati maintenance sehingga pekerjaan baru dimulai setelah `up`.
+Jika restart/start gagal, jangan menjalankan `up`; hentikan kembali worker yang sempat aktif
+dan selesaikan penyebabnya. Setelah aktivasi, periksa akses konfigurasi dengan akun berizin
+serta kesehatan queue/scheduler. Jangan menaruh `up` dalam cleanup/finally atau melanjutkan
+aktivasi sesudah migration gagal.
+
+Pada instalasi dengan lebih dari satu container app/worker, tutup akses pada seluruh instance
+dan jalankan `migrate` dari **satu** container saja. Jangan memakai `migrate:fresh`,
+`migrate:refresh`, atau `migrate:reset` pada database existing; ketiganya menghapus data.
 
 > Prosedur rilis produksi kanonis (siapa yang menjalankan, jendela maintenance, dan strategi
 > rollback) belum ditetapkan dalam dokumen proyek. Sampai keputusan tersebut ada, prosedur di

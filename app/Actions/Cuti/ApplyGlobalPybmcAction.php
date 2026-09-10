@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\ApprovalChainConfigurationLockService;
 use App\Services\Cuti\ApprovalChainInvariantService;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -23,17 +24,28 @@ class ApplyGlobalPybmcAction
     public function __construct(
         private readonly ApprovalChainInvariantService $invariants,
         private readonly ApprovalChainConfigurationLockService $configurationLock,
+        private readonly EmployeeDashboardScopeService $employeeScope,
     ) {}
 
     public function execute(Employee $approver, User $actor, string $reason): LeavePybmcGlobalConfig
     {
+        $this->authorize($actor);
+
         return DB::transaction(function () use ($approver, $actor, $reason): LeavePybmcGlobalConfig {
             $this->configurationLock->acquire();
+            // Role dan identitas akun dapat berubah selama antre lock; jangan memakai snapshot request.
+            $actor->refresh();
+            $this->authorize($actor);
             $selectedApproverId = $approver->getAttribute('id');
             $lockedApproverIds = $this->invariants
                 ->lockActiveChainApproversForGlobalOverride($selectedApproverId);
+            // Izin dapat dicabut ketika writer menunggu row approver, setelah configuration lock diperoleh.
+            $actor->refresh();
+            $this->authorize($actor);
 
             $config = LeavePybmcGlobalConfig::create([
+                // Configuration lock menserialkan pemberian revisi bersama mutasi chain dan audit.
+                'revision' => (int) LeavePybmcGlobalConfig::query()->where('revision', '>', 0)->max('revision') + 1,
                 'approver_employee_id' => $selectedApproverId,
                 'effective_from' => today(),
                 'created_by' => $actor->id,
@@ -121,6 +133,20 @@ class ApplyGlobalPybmcAction
 
             return $config;
         });
+    }
+
+    /**
+     * PYBMC global mengubah seluruh chain sehingga memerlukan permission efektif
+     * sekaligus scope global dari identitas asli, termasuk saat Action dipanggil langsung.
+     */
+    private function authorize(User $actor): void
+    {
+        abort_unless(
+            $actor->hasPermission('cuti.configure')
+                && $this->employeeScope->hasGlobalIdentityScope($actor),
+            403,
+            'Anda tidak lagi memiliki izin untuk tindakan ini. Perubahan tidak disimpan. Hubungi pengelola akses.',
+        );
     }
 
     /**

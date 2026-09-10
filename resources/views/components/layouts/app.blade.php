@@ -157,7 +157,9 @@
                             ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
                             : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
-                        $activeRole === 'super_admin' ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
+                        ($layoutCapabilities['cuti.configure'] ?? false)
+                            ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth']
+                            : null,
                     ])
                 ],
                 [
@@ -265,6 +267,28 @@
                         ]),
                     ],
                 ];
+            }
+
+            // Override menu per role tidak boleh menghilangkan capability yang didelegasikan.
+            // Entry ini hanya membuka konfigurasi cuti, bukan menu administrasi lain.
+            if ($layoutCapabilities['cuti.configure'] ?? false) {
+                $hasCutiConfigMenu = collect($menuGroups)
+                    ->flatMap(fn (array $group) => $group['items'])
+                    ->contains(fn (array $item) => $item['route'] === 'cuti.config');
+
+                if (! $hasCutiConfigMenu) {
+                    foreach ($menuGroups as &$menuGroup) {
+                        if ($menuGroup['group'] === 'Cuti') {
+                            $menuGroup['items'][] = [
+                                'label' => 'Konfigurasi Approval Cuti',
+                                'route' => 'cuti.config',
+                                'icon' => 'cog-6-tooth',
+                            ];
+                            break;
+                        }
+                    }
+                    unset($menuGroup);
+                }
             }
 
             $allMenuRoutes = [];

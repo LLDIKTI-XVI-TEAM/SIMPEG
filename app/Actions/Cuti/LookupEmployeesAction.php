@@ -16,7 +16,8 @@ class LookupEmployeesAction
      */
     public function execute(string $query): Collection
     {
-        $keyword = '%'.mb_strtolower(trim($query)).'%';
+        // Karakter LIKE merupakan bagian nama/NIP literal, bukan izin memperluas roster.
+        $keyword = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_strtolower(trim($query))).'%';
 
         return Employee::query()
             ->select(['id', 'nama_lengkap', 'nip'])
@@ -26,6 +27,7 @@ class LookupEmployeesAction
                     ->orWhereRaw('lower(nip) like ?', [$keyword]);
             })
             ->orderBy('nama_lengkap')
+            ->orderBy('id')
             ->limit(self::RESULT_LIMIT)
             ->get()
             ->map(fn (Employee $employee): array => [
