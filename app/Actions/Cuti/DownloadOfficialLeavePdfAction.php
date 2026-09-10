@@ -43,7 +43,8 @@ class DownloadOfficialLeavePdfAction
             return false;
         }
 
-        if ($user->employee_id === $leaveRequest->employee_id) {
+        if ($user->employee_id !== null
+            && $user->employee_id === $leaveRequest->employee_id) {
             return true;
         }
 

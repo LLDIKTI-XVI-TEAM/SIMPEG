@@ -31,7 +31,6 @@ class CalculateWorkdaysTest extends TestCase
     {
         return [
             'admin kepegawaian' => ['admin_kepegawaian'],
-            'pimpinan' => ['pimpinan'],
             'kepala bagian' => ['kepala_bagian'],
             'pegawai' => ['pegawai'],
         ];
@@ -79,14 +78,23 @@ class CalculateWorkdaysTest extends TestCase
         $response->assertJsonCount(1, 'data.warnings');
     }
 
-    public function test_super_admin_tidak_dapat_mengakses(): void
+    public function test_super_admin_dapat_mengakses(): void
     {
         $user = User::factory()->superAdmin()->create();
 
         $this->actingAs($user);
         $response = $this->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09');
 
-        $response->assertForbidden();
+        $response->assertOk();
+    }
+
+    public function test_pimpinan_tidak_dapat_menghitung_untuk_pengajuan_cuti(): void
+    {
+        $user = User::factory()->pimpinan()->create();
+
+        $this->actingAs($user)
+            ->getJson(self::ENDPOINT.'?start=2026-01-05&end=2026-01-09')
+            ->assertForbidden();
     }
 
     public function test_tamu_diarahkan_ke_login(): void

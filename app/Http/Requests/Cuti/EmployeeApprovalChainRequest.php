@@ -20,7 +20,9 @@ class EmployeeApprovalChainRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return (bool) $this->user()?->hasPermission('cuti.configure_chain');
+        $actor = $this->user();
+
+        return $actor !== null && $actor->hasPermission('cuti.configure');
     }
 
     /**

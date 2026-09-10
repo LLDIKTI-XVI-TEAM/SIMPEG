@@ -41,7 +41,7 @@ class ApprovalConfigSeeder extends Seeder
             ],
             [
                 'name' => 'Nurarningsih Dumbea, S.P.',
-                'email' => 'rainingdumbea47@gmail.com',
+                'email' => 'nurarningsih.dumbea@example.test',
                 'role' => 'admin_kepegawaian',
                 'password' => bcrypt('password'),
             ],

@@ -72,14 +72,17 @@ class BuildPegawaiDashboardAction
                 ->take(5)
                 ->get();
 
-            // Kolom user_id pada tabel notifications adalah FK ke employees
-            // (bukan users), sehingga filternya wajib memakai employee_id.
-            $notifikasi = SimpegNotification::query()
-                ->where('user_id', $employeeId)
-                ->latest()
-                ->take(5)
-                ->get();
         }
+
+        // Inbox discope ke User penerima dan tidak bergantung pada employee_id.
+        // Data pegawai/cuti di atas tetap domain-employee, tetapi akun SSO yang
+        // belum terhubung masih boleh menerima notifikasi yang memang dialamatkan
+        // kepada User tersebut.
+        $notifikasi = SimpegNotification::query()
+            ->where('recipient_user_id', $user->id)
+            ->latest()
+            ->take(5)
+            ->get();
 
         return [
             'dashboardEwsAlerts' => $dashboardEwsData['alerts'],

@@ -58,7 +58,7 @@
                                 $remaining = $alert['sisa_hari'] < 0 ? 'Lewat '.abs($alert['sisa_hari']).' hari' : $alert['sisa_hari'].' hari';
                             @endphp
                             <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
-                                <x-ui.table-td class="px-5 py-3"><a href="{{ route('pimpinan.pegawai.show', $alert['pegawai_id']) }}" class="font-semibold text-ink transition hover:text-primary focus:outline-none rounded">{{ $alert['nama'] }}</a><span class="mt-1 block font-sans text-[10px] text-muted">NIP. {{ $alert['nip'] }}</span></x-ui.table-td>
+                                <x-ui.table-td class="px-5 py-3">@php $pimpinanEwsDetailUrl = route('rbac.pegawai.show', $alert['pegawai_id']); @endphp<a href="{{ $pimpinanEwsDetailUrl }}" class="font-semibold text-ink transition hover:text-primary focus:outline-none rounded">{{ $alert['nama'] }}</a><span class="mt-1 block font-sans text-[10px] text-muted">NIP. {{ $alert['nip'] }}</span></x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ $alert['jenis_event'] }}<p class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</p></x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5"><x-ui.badge :variant="$alert['urgency']" size="sm" dot>{{ $remaining }}</x-ui.badge></x-ui.table-td>

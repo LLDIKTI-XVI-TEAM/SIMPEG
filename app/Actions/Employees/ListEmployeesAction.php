@@ -3,6 +3,7 @@
 namespace App\Actions\Employees;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\EmployeeDocumentStatusService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -15,10 +16,15 @@ class ListEmployeesAction
     /**
      * Mengambil daftar pegawai dengan filter default hanya pegawai aktif.
      *
+     * Data milik sendiri (user.employee_id) selalu dikecualikan kecuali untuk
+     * Super Admin efektif — pengelolaan data sendiri wajib lewat Profil Saya
+     * (employees.read_self), bukan dari daftar. Diterapkan sebelum paginasi
+     * agar total/meta konsisten.
+     *
      * @param  array<string, mixed>  $validated
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    public function execute(array $validated): LengthAwarePaginator
+    public function execute(array $validated, ?User $viewer = null): LengthAwarePaginator
     {
         $sort = $validated['sort'] ?? 'nama_lengkap';
         $direction = $validated['direction'] ?? 'asc';
@@ -27,6 +33,13 @@ class ListEmployeesAction
         // Soft delete sudah dihapus (keputusan produk): parameter show_nonaktif/onlyTrashed
         // tidak lagi relevan — nonaktif kini status kepegawaian biasa.
         $employees = Employee::query();
+
+        if ($viewer !== null
+            && $viewer->getEffectiveRole() !== 'super_admin'
+            && is_string($viewer->employee_id)
+            && $viewer->employee_id !== '') {
+            $employees->whereKeyNot($viewer->employee_id);
+        }
         $paginator = $employees
             ->select([
                 'id',
@@ -53,7 +66,7 @@ class ListEmployeesAction
                     ->orderByDesc('tmt_jabatan'),
                 'salaryHistories:id,employee_id,no_sk,tanggal_sk,tmt_kgb,file_sk,is_latest,created_at',
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                    ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
                     ->orderByDesc('tmt_pengangkatan')
                     ->orderByDesc('created_at'),
                 'documents:id,employee_id,jenis_dokumen,nama_dokumen,nomor_dokumen,tanggal_dokumen,file_path,keterangan,created_at',

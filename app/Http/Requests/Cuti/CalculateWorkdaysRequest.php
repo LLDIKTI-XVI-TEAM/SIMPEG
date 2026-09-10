@@ -6,15 +6,19 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Memvalidasi parameter kalkulasi hari kerja untuk form pengajuan cuti.
- * Otorisasi ditegakkan ganda: middleware route (permission:cuti.create) dan authorize() ini
- * agar backend tidak hanya bergantung pada penyembunyian menu/tombol di UI.
+ * Otorisasi mengunci konteks self-service agar backend tidak bergantung pada
+ * penyembunyian menu/tombol di UI.
  */
 class CalculateWorkdaysRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Hanya pengguna dengan hak mengajukan cuti yang boleh memakai kalkulasi hari kerja.
-        return (bool) $this->user()?->hasPermission('cuti.create');
+        // Kalkulasi adalah bagian dari self-service pengajuan cuti PATEN.
+        $actor = $this->user();
+
+        return $actor !== null && in_array($actor->getEffectiveRole(), [
+            'super_admin', 'admin_kepegawaian', 'kepala_bagian', 'pegawai',
+        ], true);
     }
 
     /**

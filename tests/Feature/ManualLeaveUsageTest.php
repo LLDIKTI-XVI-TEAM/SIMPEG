@@ -73,7 +73,9 @@ class ManualLeaveUsageTest extends TestCase
         $this->post($this->storeUrl($employee), $this->validPayload())
             ->assertRedirect(route('login'));
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        // Kontrak CutiRbacTest: manual.manage default milik super_admin dan admin.
+        // Super_admin lolos gate sehingga tidak termasuk dalam daftar penolakan.
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $user = User::factory()->create(['role' => $role]);
 
             $this->actingAs($user)
@@ -109,7 +111,8 @@ class ManualLeaveUsageTest extends TestCase
         $employee = Employee::factory()->create();
         $current = $this->rawManualFact($employee, User::factory()->adminKepegawaian()->create());
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        // Kontrak CutiRbacTest: manual.manage default milik super_admin dan admin.
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $actor = User::factory()->create(['role' => $role]);
             $this->assertAllManualActionsReject($employee, $current, $actor, $role);
         }
@@ -160,13 +163,16 @@ class ManualLeaveUsageTest extends TestCase
             $existingResponse->assertRedirect(route('login'));
         }
 
+        // Super_admin memegang manual.manage (kontrak CutiRbacTest) sehingga lolos
+        // gate: payload valid mencapai lookup lalu 404 tanpa menyentuh data existing.
+        // URL existing tidak dipost di sini agar hitungan record di bawah tetap satu.
+        // Field dokumen prohibited pada route batalkan, jadi dilepas agar request
+        // mencapai lookup (bukan berhenti di validasi).
         $superAdmin = User::factory()->superAdmin()->create();
-        foreach ($requests as [$unknownUrl, $existingUrl, $payload]) {
-            $unknownResponse = $this->actingAs($superAdmin)->post($unknownUrl, $payload());
-            $existingResponse = $this->actingAs($superAdmin)->post($existingUrl, $payload());
-            $this->assertSame($existingResponse->getStatusCode(), $unknownResponse->getStatusCode());
-            $unknownResponse->assertForbidden();
-            $existingResponse->assertForbidden();
+        foreach ($requests as [$unknownUrl, , $payload]) {
+            $data = $payload();
+            unset($data['dokumen']);
+            $this->actingAs($superAdmin)->post($unknownUrl, $data)->assertNotFound();
         }
 
         $role = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
@@ -532,9 +538,16 @@ SQL))->pluck('confdeltype', 'conname');
         $this->post($correctUrl, [])->assertRedirect(route('login'));
         $this->post($cancelUrl, [])->assertRedirect(route('login'));
 
+        // Super_admin memegang manual.manage (kontrak CutiRbacTest): payload kosong
+        // lolos gate lalu berhenti di validasi seperti admin.
         $superAdmin = User::factory()->superAdmin()->create();
-        $this->actingAs($superAdmin)->post($correctUrl, [])->assertForbidden();
-        $this->actingAs($superAdmin)->post($cancelUrl, [])->assertForbidden();
+        $this->actingAs($superAdmin)->post($correctUrl, [])->assertSessionHasErrors([
+            'correction_reason',
+            'approval_steps',
+        ]);
+        $this->actingAs($superAdmin)->post($cancelUrl, [])->assertSessionHasErrors([
+            'correction_reason',
+        ]);
 
         $role = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
         $permission = Permission::query()->where('name', 'cuti.manual.manage')->firstOrFail();

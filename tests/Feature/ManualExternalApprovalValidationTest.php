@@ -284,7 +284,7 @@ class ManualExternalApprovalValidationTest extends TestCase
     {
         $employee = Employee::factory()->create();
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $actor = User::factory()->create(['role' => $role]);
             $queries = [];
             DB::listen(function ($query) use (&$queries): void {

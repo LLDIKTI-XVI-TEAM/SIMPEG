@@ -4,6 +4,8 @@ namespace Tests\Feature\Documents;
 
 use App\Models\Document;
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -91,6 +93,47 @@ class CentralArchiveReadOnlyTest extends TestCase
         $this->get(route('dokumen'))->assertOk();
         $this->get(route('dokumen.show', $document->id))->assertOk();
         $this->get(route('dokumen.download', $document->id))->assertOk();
+    }
+
+    /**
+     * K-privasi (lapisan terpisah dari RBAC aksi): arsip memuat dokumen sensitif
+     * lintas pegawai (mis. ktp_kk) — permission employees.read saja tidak cukup;
+     * baca/unduh wajib lolos DocumentAuthorization::canViewArchive.
+     * Pimpinan tidak dapat memakai arsip lintas pegawai, meski memiliki dokumen_sk.read.
+     */
+    public function test_pimpinan_dengan_employees_read_tetap_dilarang_mengakses_arsip(): void
+    {
+        $this->actingAsRole('pimpinan');
+        // Cabut dokumen_sk.read agar tersisa employees.read saja.
+        Role::where('name', 'pimpinan')->firstOrFail()
+            ->permissions()->detach(Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id);
+        $document = $this->createBerkas();
+
+        $this->get(route('dokumen'))->assertForbidden();
+        $this->get(route('dokumen.show', $document->id))->assertForbidden();
+        $this->get(route('dokumen.download', $document->id))->assertForbidden();
+    }
+
+    public function test_pimpinan_dengan_dokumen_read_dapat_mengakses_arsip_lintas_pegawai(): void
+    {
+        $this->actingAsRole('pimpinan');
+        $ktpDoc = $this->createBerkas();
+        // Dokumen non-ktp untuk verifikasi pimpinan tetap dapat akses kategori allowed.
+        $employee = Employee::factory()->create();
+        $allowedDoc = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Ijazah Pimpinan',
+            'file_path' => $employee->id.'/ijazah/pimpinan.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($allowedDoc->file_path, 'ijazah');
+
+        // P1 privacy: pimpinan tetap 200 tapi ktp_kk excluded.
+        $this->get(route('dokumen'))->assertOk();
+        $this->get(route('dokumen.show', $ktpDoc->id))->assertNotFound();
+        $this->get(route('dokumen.download', $ktpDoc->id))->assertNotFound();
+        $this->get(route('dokumen.show', $allowedDoc->id))->assertOk();
+        $this->get(route('dokumen.download', $allowedDoc->id))->assertOk();
     }
 
     public function test_archive_search_matches_category_label_and_key(): void

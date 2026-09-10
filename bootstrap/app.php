@@ -2,9 +2,11 @@
 
 use App\Http\Middleware\AuditRoleSimulationUsage;
 use App\Http\Middleware\EnsureActiveEmployeeAccount;
+use App\Http\Middleware\EnsureEmployeeApiScope;
 use App\Http\Middleware\EnsureKeycloakAuthenticated;
 use App\Http\Middleware\EnsurePermission;
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\EnsureUserContextAccountAccessible;
 use App\Http\Middleware\SessionTimeoutMessage;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -20,9 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'keycloak.auth' => EnsureKeycloakAuthenticated::class,
+            'employee.scope' => EnsureEmployeeApiScope::class,
             'permission' => EnsurePermission::class,
             'role' => EnsureRole::class,
             'session.timeout' => SessionTimeoutMessage::class,
+            'user.context.account' => EnsureUserContextAccountAccessible::class,
         ]);
 
         // Middleware global hanya mengamati route web; kelasnya sendiri membatasi audit

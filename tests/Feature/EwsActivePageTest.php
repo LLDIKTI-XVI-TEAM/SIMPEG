@@ -318,7 +318,11 @@ class EwsActivePageTest extends TestCase
             ->get(route('ews'))
             ->assertOk()
             ->assertSee($alert->id, false)
-            ->assertSee('Catatan Tindak Lanjut EWS');
+            ->assertSee('Catatan Tindak Lanjut EWS')
+            ->assertSee('openFollowupFromButton($event)', false)
+            ->assertSee('data-followup-action="'.route('ews.followup.update', $alert).'"', false)
+            ->assertSee('data-followup-status="ditangani"', false)
+            ->assertSee('data-followup-status="tidak_perlu"', false);
     }
 
     public function test_non_eligible_promotion_alert_still_appears_for_admin(): void
@@ -383,10 +387,11 @@ class EwsActivePageTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $alert = $this->alert(now()->addDays(60)->toDateString(), 'KGB', 'Pegawai Link Detail');
 
+        // Kode: admin/ews/aktif.blade.php:206 memakai rbac.pegawai.show untuk non-super_admin.
         $this->actingAs($user)
             ->get(route('ews'))
             ->assertOk()
-            ->assertSee(route('pegawai.show', $alert->employee_id), false);
+            ->assertSee(route('rbac.pegawai.show', $alert->employee_id), false);
     }
 
     public function test_alert_pegawai_nonaktif_tidak_muncul_di_halaman_ews(): void

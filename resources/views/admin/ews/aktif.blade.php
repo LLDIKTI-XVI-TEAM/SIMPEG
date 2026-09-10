@@ -30,8 +30,18 @@
 
     <div class="space-y-6" x-data="{
         followup: { open: false, action: '', status: '', label: '', employee: '', type: '', note: '' },
-        openFollowup(action, status, label, employee, type) {
-            this.followup = { open: true, action, status, label, employee, type, note: '' };
+        openFollowupFromButton(event) {
+            const button = event.currentTarget;
+
+            this.followup = {
+                open: true,
+                action: button.dataset.followupAction,
+                status: button.dataset.followupStatus,
+                label: button.dataset.followupLabel,
+                employee: button.dataset.followupEmployee,
+                type: button.dataset.followupType,
+                note: '',
+            };
         },
         closeFollowup() {
             this.followup.open = false;
@@ -193,7 +203,8 @@
                                 <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ ($alerts->firstItem() ?? 1) + $index }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
-                                        <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
+                                        @php $ewsDetailUrl = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('pegawai.show', $alert['pegawai_id']) : route('rbac.pegawai.show', $alert['pegawai_id']); @endphp
+                                        <a href="{{ $ewsDetailUrl }}">{{ $alert['nama'] }}</a>
                                     </div>
                                     <div class="mt-1 text-xs text-muted">{{ $alert['nip'] }}</div>
                                 </x-ui.table-td>
@@ -296,10 +307,16 @@
                                                 <div class="flex items-center gap-1.5">
                                                     <x-ui.tooltip text="Tandai Ditangani" position="top">
                                                         <x-ui.button
+                                                            type="button"
                                                             variant="success"
                                                             size="icon"
-                                                            @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('ditangani'), @js('Ditangani'), @js($alert['nama']), @js($alert['type']))"
+                                                            @click="openFollowupFromButton($event)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
+                                                            data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
+                                                            data-followup-status="ditangani"
+                                                            data-followup-label="Ditangani"
+                                                            data-followup-employee="{{ $alert['nama'] }}"
+                                                            data-followup-type="{{ $alert['type'] }}"
                                                             aria-label="Tandai Ditangani untuk {{ $alert['nama'] }}"
                                                         >
                                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -310,10 +327,16 @@
 
                                                     <x-ui.tooltip text="Tandai Tidak Perlu" position="top">
                                                         <x-ui.button
+                                                            type="button"
                                                             variant="danger"
                                                             size="icon"
-                                                            @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('tidak_perlu'), @js('Tidak Perlu'), @js($alert['nama']), @js($alert['type']))"
+                                                            @click="openFollowupFromButton($event)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
+                                                            data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
+                                                            data-followup-status="tidak_perlu"
+                                                            data-followup-label="Tidak Perlu"
+                                                            data-followup-employee="{{ $alert['nama'] }}"
+                                                            data-followup-type="{{ $alert['type'] }}"
                                                             aria-label="Tandai Tidak Perlu untuk {{ $alert['nama'] }}"
                                                         >
                                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">

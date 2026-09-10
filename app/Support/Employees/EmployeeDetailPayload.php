@@ -24,7 +24,7 @@ class EmployeeDetailPayload
      * - Disiplin, Pendidikan, Dokumen (tanggal desc / latest)
      * - Atasan, Saldo Cuti, Pengajuan Cuti, Alert EWS (tanggal desc / order)
      */
-    public function loadRelations(Employee $employee): Employee
+    public function loadRelations(Employee $employee, bool $canReadFamilies = true, bool $canReadHistories = true, bool $canReadDiscipline = true, bool $canReadDocuments = true): Employee
     {
         return $employee->load([
             'agama:id,nama',
@@ -32,10 +32,10 @@ class EmployeeDetailPayload
             'jenisPegawai:id,nama',
             'statusPegawai:id,nama',
             'programStudi:id,nama',
-            'families' => fn ($query) => $query->latest(),
-            'appointments' => fn ($query) => $query->orderByDesc('tmt_pengangkatan'),
-            'rankHistories' => fn ($query) => $query->with('golongan:id,kode,nama')->orderByDesc('tmt_pangkat'),
-            'positionHistories' => fn ($query) => $query
+            'families' => fn ($query) => $query->when(! $canReadFamilies, fn ($q) => $q->whereRaw('1 = 0'))->latest(),
+            'appointments' => fn ($query) => $query->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->orderByDesc('tmt_pengangkatan'),
+            'rankHistories' => fn ($query) => $query->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with('golongan:id,kode,nama')->orderByDesc('tmt_pangkat'),
+            'positionHistories' => fn ($query) => $query->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))
                 ->with([
                     'jabatan:id,nama,jenis_jabatan_id',
                     'jenisJabatan:id,nama,maks_usia_pensiun',
@@ -43,10 +43,10 @@ class EmployeeDetailPayload
                     'unitKerja:id,nama',
                 ])
                 ->orderByDesc('tmt_jabatan'),
-            'salaryHistories' => fn ($query) => $query->orderByDesc('tmt_kgb'),
-            'disciplineRecords' => fn ($query) => $query->orderByDesc('tanggal_mulai'),
-            'educationHistories' => fn ($query) => $query->with(['jenjang:id,nama', 'programStudi:id,nama'])->orderByDesc('tahun_lulus'),
-            'documents' => fn ($query) => $query->latest(),
+            'salaryHistories' => fn ($query) => $query->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->orderByDesc('tmt_kgb'),
+            'disciplineRecords' => fn ($query) => $query->when(! $canReadDiscipline, fn ($q) => $q->whereRaw('1 = 0'))->orderByDesc('tanggal_mulai'),
+            'educationHistories' => fn ($query) => $query->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with(['jenjang:id,nama', 'programStudi:id,nama'])->orderByDesc('tahun_lulus'),
+            'documents' => fn ($query) => $query->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))->latest(),
             'kepalaBagian:id,nama_lengkap,nip,jabatan_terakhir',
             'supervisorAssignments' => fn ($query) => $query
                 ->with('supervisor:id,nama_lengkap,nip,jabatan_terakhir')

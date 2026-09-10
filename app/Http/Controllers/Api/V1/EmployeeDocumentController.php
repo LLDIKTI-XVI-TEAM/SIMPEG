@@ -23,10 +23,16 @@ class EmployeeDocumentController extends Controller
      */
     public function index(Employee $employee, Request $request): JsonResponse
     {
+        $viewer = $request->user();
         $kategori = $request->query('kategori');
+        // P1 privacy: pimpinan tetap 200 tapi ktp_kk excluded.
+        if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan' && $kategori === 'ktp_kk') {
+            abort(404);
+        }
 
         $query = $employee->documents()
             ->when($kategori, fn ($q) => $q->where('jenis_dokumen', $kategori))
+            ->when($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan', fn ($q) => $q->whereIn('jenis_dokumen', DocumentCategory::visibleToPimpinanKeys()))
             ->orderByDesc('tanggal_dokumen')
             ->orderByDesc('created_at');
 

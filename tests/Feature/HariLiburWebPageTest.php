@@ -2,14 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\RefHariLibur;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\WorkdayCalculator;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -37,18 +40,38 @@ class HariLiburWebPageTest extends TestCase
         $this->get(route('hari-libur'))->assertRedirect('/login');
     }
 
-    public function test_admin_kepegawaian_tidak_dapat_membuka_halaman_hari_libur(): void
+    public function test_admin_kepegawaian_dapat_membuka_halaman_hari_libur_sebagai_capability_paten(): void
     {
         $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('hari-libur'))
-            ->assertForbidden();
+            ->assertOk();
     }
 
-    public function test_pegawai_tidak_dapat_membuka_halaman_hari_libur(): void
+    public function test_pegawai_tanpa_employee_tetap_dapat_membuka_halaman_hari_libur_sebagai_capability_paten(): void
     {
-        $this->actingAs(User::factory()->pegawai()->create())
+        $this->actingAsUnmapped(User::factory()->pegawai()->create(['employee_id' => null]))
             ->get(route('hari-libur'))
-            ->assertForbidden();
+            ->assertOk();
+    }
+
+    public function test_pegawai_dengan_employee_nonaktif_tetap_diblokir_dari_hari_libur(): void
+    {
+        $employee = $this->employeeNonaktif();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $this->actingAsUnmapped($user)
+            ->get(route('hari-libur'))
+            ->assertRedirect(route('status-akun'));
+    }
+
+    public function test_pegawai_dengan_referensi_employee_hilang_tetap_diblokir_dari_hari_libur(): void
+    {
+        $user = User::factory()->pegawai()->create();
+        $user->forceFill(['employee_id' => (string) Str::uuid()]);
+
+        $this->actingAsUnmapped($user)
+            ->get(route('hari-libur'))
+            ->assertRedirect(route('status-akun'));
     }
 
     public function test_halaman_menampilkan_hari_libur_dari_database_bukan_data_statis(): void
@@ -384,6 +407,28 @@ class HariLiburWebPageTest extends TestCase
         $this->assertSame(0, RefHariLibur::query()->count());
     }
 
+    public function test_role_non_super_admin_dengan_grant_create_dapat_menambah_hari_libur_dari_web(): void
+    {
+        $permission = Permission::query()->where('name', 'hari_libur.create')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()
+            ->permissions()
+            ->syncWithoutDetaching([$permission->id]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
+
+        $this->actingAs($user)
+            ->postWithCsrf(route('hari-libur.store'), [
+                'tanggal' => '2026-04-03',
+                'nama' => 'Hari Libur Berdasarkan Grant',
+                'tipe' => 'libur_nasional',
+            ])
+            ->assertRedirect(route('hari-libur', ['tahun' => 2026]));
+
+        $this->assertDatabaseHas('ref_hari_libur', [
+            'nama' => 'Hari Libur Berdasarkan Grant',
+        ]);
+    }
+
     public function test_halaman_edit_menampilkan_data_dari_database(): void
     {
         $hariLibur = $this->buatHariLibur('2026-12-25', 'Hari Raya Natal');
@@ -529,6 +574,24 @@ class HariLiburWebPageTest extends TestCase
             'nama' => $nama,
             'tahun' => (int) Carbon::parse($tanggal)->format('Y'),
             'is_cuti_bersama' => $cutiBersama,
+        ]);
+    }
+
+    private function employeeNonaktif(): Employee
+    {
+        $status = RefStatusPegawai::query()->firstOrCreate(
+            ['kode' => 'NONAKTIF'],
+            [
+                'nama' => 'Nonaktif',
+                'kelompok' => 'Nonaktif',
+                'keterangan' => 'Status nonaktif untuk regression lifecycle.',
+                'is_default' => false,
+            ],
+        );
+
+        return Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => $status->nama,
         ]);
     }
 

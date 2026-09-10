@@ -9,10 +9,10 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Kontrak perubahan status resmi saat pegawai nonaktif diaktifkan kembali (US-2.10 AC-4).
  *
- * Pemulihan adalah perubahan status administrasi resmi: Super Admin atau Admin
- * Kepegawaian yang memiliki permission employees.restore boleh menjalankannya,
- * dengan tanggal efektif dan alasan wajib; riwayat status serta audit ditulis
- * oleh RestoreEmployeeAction dalam satu transaksi.
+ * Pemulihan adalah perubahan status administrasi resmi: role efektif apa pun yang
+ * memiliki permission employees.restore boleh menjalankannya (dikelola lewat RBAC
+ * matrix), dengan tanggal efektif dan alasan wajib; riwayat status serta audit
+ * ditulis oleh RestoreEmployeeAction dalam satu transaksi.
  */
 class RestoreEmployeeRequest extends FormRequest
 {

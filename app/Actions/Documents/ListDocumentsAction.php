@@ -3,6 +3,8 @@
 namespace App\Actions\Documents;
 
 use App\Models\Document;
+use App\Models\User;
+use App\Services\Employees\KepalaBagianScopeService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -14,25 +16,55 @@ class ListDocumentsAction
     /**
      * Mengambil daftar dokumen dengan filter dan paginasi server-side.
      *
+     * Kepala Bagian selalu di-scope ke bawahan langsung, Pegawai ke dokumen
+     * sendiri (fail-closed).
+     *
      * @param  array<string, mixed>  $validated
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
-    public function execute(array $validated): LengthAwarePaginator
+    public function execute(array $validated, ?User $viewer = null): LengthAwarePaginator
     {
         $perPage = (int) ($validated['per_page'] ?? 10);
 
-        $query = Document::query()
-            ->select([
-                'documents.id',
-                'documents.employee_id',
-                'documents.jenis_dokumen',
-                'documents.nama_dokumen',
-                'documents.nomor_dokumen',
-                'documents.tanggal_dokumen',
-                'documents.file_path',
-                'documents.keterangan',
-                'documents.created_at',
-            ])
+        $query = Document::query();
+
+        if ($viewer !== null && $viewer->getEffectiveRole() === 'kepala_bagian') {
+            $scope = app(KepalaBagianScopeService::class);
+            $reportIds = $scope->directReportIds($viewer);
+
+            $requestedEmployeeId = $validated['employee_id'] ?? null;
+            if (is_string($requestedEmployeeId) && $requestedEmployeeId !== '') {
+                abort_unless(in_array($requestedEmployeeId, $reportIds, true), 403, 'Dokumen hanya tersedia untuk bawahan langsung Anda.');
+                $query->where('documents.employee_id', $requestedEmployeeId);
+            } else {
+                $query->whereIn('documents.employee_id', $reportIds);
+            }
+        } elseif ($viewer !== null && $viewer->getEffectiveRole() === 'pegawai') {
+            $ownId = (string) ($viewer->employee_id ?? '');
+            $requestedEmployeeId = $validated['employee_id'] ?? null;
+            if (is_string($requestedEmployeeId) && $requestedEmployeeId !== '') {
+                abort_unless($ownId !== '' && hash_equals($ownId, $requestedEmployeeId), 403, 'Dokumen hanya tersedia untuk data Anda sendiri.');
+            }
+            if ($ownId === '') {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('documents.employee_id', $ownId);
+            }
+        } elseif (! empty($validated['employee_id'])) {
+            $query->where('documents.employee_id', $validated['employee_id']);
+        }
+
+        $query->select([
+            'documents.id',
+            'documents.employee_id',
+            'documents.jenis_dokumen',
+            'documents.nama_dokumen',
+            'documents.nomor_dokumen',
+            'documents.tanggal_dokumen',
+            'documents.file_path',
+            'documents.keterangan',
+            'documents.created_at',
+        ])
             ->with([
                 // Hanya employee data ringkas — tidak perlu load semua relasi
                 'employee:id,nama_lengkap,nip,foto',
@@ -54,6 +86,9 @@ class ListDocumentsAction
                     $matchedCategoryKeys[] = $categoryKey;
                 }
             }
+            if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan') {
+                $matchedCategoryKeys = array_values(array_intersect($matchedCategoryKeys, DocumentCategory::visibleToPimpinanKeys()));
+            }
 
             $query->where(function ($q) use ($keyword, $matchedCategoryKeys): void {
                 $q->whereRaw('lower(documents.nama_dokumen) like ?', [$keyword])
@@ -71,7 +106,17 @@ class ListDocumentsAction
         }
 
         if (! empty($validated['kategori'])) {
-            $query->where('jenis_dokumen', $validated['kategori']);
+            // Pimpinan tetap 200 tapi ktp_kk excluded (P1 privacy).
+            if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan' && $validated['kategori'] === 'ktp_kk') {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('jenis_dokumen', $validated['kategori']);
+            }
+        }
+
+        // Pimpinan: global scope boleh, tapi ktp_kk tetap excluded.
+        if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan') {
+            $query->whereIn('jenis_dokumen', DocumentCategory::visibleToPimpinanKeys());
         }
 
         $paginator = $query->latest('documents.created_at')->paginate($perPage)->withQueryString();

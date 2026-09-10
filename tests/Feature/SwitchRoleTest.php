@@ -48,6 +48,14 @@ class SwitchRoleTest extends TestCase
         ]);
     }
 
+    /** Memberikan permission users.switch_role untuk menguji guard origin-role. */
+    private function grantSwitchPermission(string $role): void
+    {
+        $roleModel = Role::where('name', $role)->firstOrFail();
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        $roleModel->permissions()->syncWithoutDetaching([$switchPermission->id]);
+    }
+
     public function test_super_admin_can_switch_to_lower_role(): void
     {
         $user = $this->createUserWithRole('super_admin');
@@ -66,6 +74,48 @@ class SwitchRoleTest extends TestCase
         $this->assertEquals($user->id, $user->temporary_role_switched_by);
     }
 
+    public function test_super_admin_without_switch_permission_cannot_switch_role(): void
+    {
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        $superAdminRole = Role::where('name', 'super_admin')->firstOrFail();
+        $superAdminRole->permissions()->detach($switchPermission);
+        $user = $this->createUserWithRole('super_admin');
+
+        $this->actingAs($user)
+            ->post(route('switch-role'), ['target_role' => 'pegawai'])
+            ->assertForbidden();
+
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+        $this->assertSame([], $user->switchableRoleOptions());
+
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('Simulasi Role');
+    }
+
+    public function test_revoking_switch_permission_does_not_end_active_simulation(): void
+    {
+        $user = $this->createUserWithRole('super_admin');
+        $user->forceFill([
+            'temporary_role' => 'pegawai',
+            'temporary_role_started_at' => now(),
+        ])->save();
+
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        Role::where('name', 'super_admin')->firstOrFail()->permissions()->detach($switchPermission);
+
+        $user->refresh();
+        $this->assertSame('pegawai', $user->getEffectiveRole());
+        $this->assertFalse($user->hasPermission('users.switch_role'));
+        $this->assertSame([], $user->switchableRoleOptions());
+
+        $this->actingAs($user)->post(route('revert-role'))->assertRedirect(route('dashboard'));
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+    }
+
     public function test_super_admin_cannot_switch_to_same_role(): void
     {
         $user = $this->createUserWithRole('super_admin');
@@ -79,7 +129,7 @@ class SwitchRoleTest extends TestCase
         $this->assertNull($user->temporary_role);
     }
 
-    public function test_admin_kepegawaian_cannot_switch_role(): void
+    public function test_admin_kepegawaian_without_permission_cannot_switch_role(): void
     {
         $user = $this->createUserWithRole('admin_kepegawaian');
 
@@ -88,6 +138,88 @@ class SwitchRoleTest extends TestCase
         ]);
 
         $response->assertStatus(403);
+        $user->refresh();
+        $this->assertNull($user->temporary_role);
+    }
+
+    /**
+     * RBAC membuka capability; hierarki menentukan target yang sah.
+     */
+    public function test_only_allowed_origin_roles_with_permission_can_switch_role(): void
+    {
+        foreach ([
+            'super_admin' => 'admin_kepegawaian',
+            'admin_kepegawaian' => 'pimpinan',
+        ] as $role => $targetRole) {
+            $this->grantSwitchPermission($role);
+            $user = $this->createUserWithRole($role);
+
+            $this->actingAs($user)
+                ->post(route('switch-role'), ['target_role' => $targetRole])
+                ->assertRedirect(route('dashboard'));
+
+            $user->refresh();
+            $this->assertSame($targetRole, $user->temporary_role);
+        }
+
+        foreach ([
+            'pimpinan' => 'kepala_bagian',
+            'kepala_bagian' => 'pegawai',
+        ] as $role => $targetRole) {
+            $this->grantSwitchPermission($role);
+            $user = $this->createUserWithRole($role);
+
+            $this->actingAs($user)
+                ->post(route('switch-role'), ['target_role' => $targetRole])
+                ->assertRedirect(route('dashboard'));
+
+            $user->refresh();
+            $this->assertSame($targetRole, $user->temporary_role);
+        }
+    }
+
+    public function test_pimpinan_with_permission_can_switch_to_kepala_bagian(): void
+    {
+        $this->grantSwitchPermission('pimpinan');
+        $user = $this->createUserWithRole('pimpinan');
+
+        $this->assertTrue($user->canInitiateSwitchRole());
+
+        $this->actingAs($user)
+            ->post(route('switch-role'), ['target_role' => 'kepala_bagian'])
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+        $this->assertSame('kepala_bagian', $user->temporary_role);
+    }
+
+    public function test_kepala_bagian_with_permission_can_switch_to_pegawai(): void
+    {
+        $this->grantSwitchPermission('kepala_bagian');
+        $user = $this->createUserWithRole('kepala_bagian');
+
+        $this->actingAs($user)
+            ->post(route('switch-role'), ['target_role' => 'pegawai'])
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+        $this->assertSame('pegawai', $user->temporary_role);
+    }
+
+    /** Pegawai tidak memiliki target dan tetap ditolak walaupun permission salah terpasang. */
+    public function test_pegawai_with_permission_has_no_switchable_target(): void
+    {
+        $this->grantSwitchPermission('pegawai');
+        $user = $this->createUserWithRole('pegawai');
+        $this->assertSame([], $user->switchableRoleOptions());
+        $this->assertFalse($user->canSwitchToAnyRole());
+
+        // Kode: target invalid = validasi 302 + session errors (SwitchRoleRequest::withValidator), bukan 403.
+        $this->actingAs($user)
+            ->post(route('switch-role'), ['target_role' => 'pegawai'])
+            ->assertRedirect()
+            ->assertSessionHasErrors('target_role');
+
         $user->refresh();
         $this->assertNull($user->temporary_role);
     }
@@ -557,35 +689,31 @@ class SwitchRoleTest extends TestCase
         $this->assertTrue($user->hasPermission('employees.read'));
     }
 
-    public function test_switch_role_only_allowed_for_super_admin_origin(): void
+    public function test_switch_role_pegawai_tetap_ditolak_karena_tidak_ada_target_lebih_rendah(): void
     {
-        // users.switch_role sengaja dipasang ke role non-Super-Admin (salah konfigurasi).
-        $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
-        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
-        $adminRole->permissions()->syncWithoutDetaching([$switchPermission->id]);
+        $this->grantSwitchPermission('pegawai');
 
-        $admin = $this->createUserWithRole('admin_kepegawaian');
-        $this->assertTrue($admin->hasPermission('users.switch_role'));
+        $kepalaBagian = $this->createUserWithRole('pegawai');
+        $this->assertTrue($kepalaBagian->hasPermission('users.switch_role'));
 
-        // Invariant source role: admin_kepegawaian tetap ditolak walaupun punya permission.
-        $response = $this->actingAs($admin)->post(route('switch-role'), [
-            'target_role' => 'pegawai',
-        ]);
+        $this->actingAs($kepalaBagian)
+            ->post(route('switch-role'), ['target_role' => 'pegawai'])
+            ->assertRedirect()
+            ->assertSessionHasErrors('target_role');
 
-        $response->assertForbidden();
-        $admin->refresh();
-        $this->assertNull($admin->temporary_role);
+        $kepalaBagian->refresh();
+        $this->assertNull($kepalaBagian->temporary_role);
     }
 
     public function test_cuti_create_button_uses_effective_role_during_pegawai_simulation(): void
     {
         $user = $this->createUserWithRole('super_admin');
 
-        // Super Admin biasa: tombol Ajukan Cuti Baru tidak tampil.
+        // Super Admin biasa memiliki hak pengajuan cuti.
         $this->actingAs($user)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertDontSee('Ajukan Cuti Baru');
+            ->assertSee('Ajukan Cuti Baru');
 
         // Simulasi pegawai: role efektif pegawai memenuhi syarat cuti.create,
         // tombol harus tampil meskipun role asli tetap super_admin.
@@ -810,6 +938,7 @@ class SwitchRoleTest extends TestCase
         $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
         $adminRole->permissions()->detach(
             Permission::whereIn('name', [
+                'cuti.balance.read',
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
             ])->pluck('id'),
@@ -906,28 +1035,45 @@ class SwitchRoleTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'REVERT_ROLE', 'auditable_id' => $user->id]);
     }
 
-    /** UI switch tetap tersembunyi bagi non-Super-Admin meski permission salah dikonfigurasi. */
-    public function test_switch_menu_hidden_for_non_super_admin_even_with_permission(): void
+    /** UI Switch Role tampil untuk setiap role asal yang diizinkan dan ber-permission. */
+    public function test_switch_menu_visible_for_allowed_origin_roles_with_permission(): void
     {
-        $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
-        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
-        $adminRole->permissions()->syncWithoutDetaching([$switchPermission->id]);
+        $superAdmin = $this->createUserWithRole('super_admin');
 
+        $this->actingAs($superAdmin)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertSee('Simulasi Role')
+            ->assertSee('Switch ke Pimpinan')
+            ->assertSee('Switch ke Pegawai');
+
+        $this->grantSwitchPermission('admin_kepegawaian');
         $admin = $this->createUserWithRole('admin_kepegawaian');
-        $this->assertTrue($admin->hasPermission('users.switch_role'));
 
-        // UI tidak menampilkan Simulasi Role bagi non Super Admin meski ber-permission.
+        // Kode: submenu hanya untuk role asli super_admin (app.blade.php:600,605). Test mengikuti kode.
         $this->actingAs($admin)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('Simulasi Role');
+
+        // Pimpinan melihat entri disabled, bukan submenu aksi.
+        $this->grantSwitchPermission('pimpinan');
+        $pimpinan = $this->createUserWithRole('pimpinan');
+
+        $this->actingAs($pimpinan)
             ->get(route('cuti'))
             ->assertOk()
             ->assertDontSee('Simulasi Role')
             ->assertDontSee('Switch ke');
 
-        // Backend tetap menolak (invariant source role super_admin).
-        $response = $this->actingAs($admin)->post(route('switch-role'), ['target_role' => 'pegawai']);
-        $response->assertForbidden();
-        $admin->refresh();
-        $this->assertNull($admin->temporary_role);
+        $this->grantSwitchPermission('kepala_bagian');
+        $kepalaBagian = $this->createUserWithRole('kepala_bagian');
+
+        $this->actingAs($kepalaBagian)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('Simulasi Role')
+            ->assertDontSee('Switch ke');
     }
 
     /** Request yang ditolak role efektif tidak boleh diklaim sebagai penggunaan yang berhasil. */

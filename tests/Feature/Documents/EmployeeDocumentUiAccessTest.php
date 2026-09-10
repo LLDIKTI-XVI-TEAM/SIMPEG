@@ -36,7 +36,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('admin_kepegawaian');
         $employee = Employee::factory()->create();
 
-        $this->get(route('pegawai.show', $employee->id))
+        $this->get(route('rbac.pegawai.show', $employee->id))
             ->assertOk()
             ->assertSee('Dokumen SK')
             ->assertSee('Berkas Lainnya')
@@ -47,7 +47,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
             ->assertSee('Hapus Berkas')
             ->assertSee('Form ini hanya untuk dokumen tambahan')
             ->assertDontSee('Tambah Berkas SK')
-            ->assertDontSee('Ganti Berkas SK');
+            ->assertSee('Ganti Berkas SK');
     }
 
     public function test_pimpinan_cannot_open_archive_or_admin_employee_detail(): void
@@ -55,8 +55,22 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('pimpinan');
         $employee = Employee::factory()->create();
 
-        $this->get(route('dokumen'))->assertForbidden();
-        $this->get(route('pegawai.show', $employee->id))->assertForbidden();
+        // RBAC configurable: pimpinan dengan dokumen_sk.read dapat membuka arsip (canBrowseArchive pure RBAC).
+        $this->get(route('dokumen'))->assertOk();
+        // Pimpinan diarahkan ke surface masked khusus, bukan halaman admin.
+        $this->get(route('pegawai.show', $employee->id))
+            ->assertRedirect(route('pimpinan.pegawai.show', $employee->id));
+    }
+
+    public function test_pimpinan_does_not_receive_archive_link_even_with_document_permission(): void
+    {
+        $this->actingAsRole('pimpinan');
+
+        // Setelah canBrowseArchive pure RBAC, sidebar pimpinan tetap tidak memuat arsip
+        // lintas pegawai karena hak sidebar terpisah — arsip dibuka via URL langsung.
+        $this->get(route('pimpinan.dashboard'))
+            ->assertOk()
+            ->assertDontSee('href="'.route('dokumen').'"', false);
     }
 
     public function test_admin_kepegawaian_can_upload_berkas_lainnya(): void
@@ -81,7 +95,7 @@ class EmployeeDocumentUiAccessTest extends TestCase
         $this->actingAsRole('admin_kepegawaian');
         $employee = Employee::factory()->create();
 
-        $content = $this->get(route('pegawai.show', $employee->id))
+        $content = $this->get(route('rbac.pegawai.show', $employee->id))
             ->assertOk()
             ->getContent();
 

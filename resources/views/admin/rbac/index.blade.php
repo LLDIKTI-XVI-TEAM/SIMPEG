@@ -3,6 +3,7 @@
 @php
 $permissionPaths = [
     'manage_reference_tables' => 'Data Master',
+    'reference_tables.manage' => 'Data Master',
     'configure_ews'           => 'Konfigurasi EWS',
     'manage_holidays'         => 'Hari Libur',
     'manage_user_mapping'     => 'User Management',
@@ -11,6 +12,7 @@ $permissionPaths = [
     'view_all_pegawai'        => 'Data Pegawai (Lihat)',
     'manage_pegawai'          => 'Data Pegawai (Kelola)',
     'manage_riwayat'          => 'Data Pegawai (Riwayat)',
+    'employee_histories.read' => 'Riwayat Pegawai (Pangkat, Jabatan, KGB, Pendidikan, Pengangkatan, Status)',
     'import_pegawai'          => 'Import Pegawai',
     'manage_supervisor'       => 'Data Pegawai (Supervisor)',
     'manage_documents'        => 'Dokumen & SK',
@@ -20,6 +22,11 @@ $permissionPaths = [
     'approve_cuti_stage3'     => 'Approval Cuti (Stage 3)',
     'view_all_ews'            => 'EWS Aktif',
     'generate_reports'        => 'Laporan (Export)',
+    // Permission baru — dikontrol dari halaman ini
+    'dokumen_sk.read'         => 'Dokumen & SK (Lihat)',
+    'ews.read'                => 'EWS Aktif (Lihat)',
+    'ews.configure'           => 'Konfigurasi EWS',
+    'employee_histories.export' => 'Laporan Riwayat Kepangkatan',
 ];
 
 $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $moduleName) use ($permissionPaths) {
@@ -45,6 +52,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
         originalData: {},
         currentData: {},
         isDirty: false,
+        lockedPermissionIdsByRole: {{ json_encode($lockedPermissionIdsByRole) }},
         permissionGroups: {{ json_encode($permissionGroupsForFilter) }},
 
         init() {
@@ -87,8 +95,12 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                 (this.moduleFilter === '' || this.moduleFilter === module)
                 && this.matchesPermission(search)
             );
+        },
+
+        saveBarVisible() {
+            return this.isDirty;
         }
-    }" @confirm-rbac.window="$refs.rbacForm.submit()" class="space-y-6">
+    }" @confirm-rbac.window="$refs.rbacForm.submit()" :class="{ 'pb-32 sm:pb-24': saveBarVisible() }" class="space-y-6 transition-[padding] duration-200">
 
         {{-- PAGE HEADER & BREADCRUMBS --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -253,17 +265,20 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                                             </div>
                                         </x-ui.table-td>
                                         @foreach($roles as $role)
-                                            <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition">
-                                                @if($role->name === 'super_admin')
-                                                    {{-- Super Admin is always checked and disabled to prevent lockout --}}
-                                                    <div class="flex items-center justify-center">
+                                            @php
+                                                $isLockedForRole = in_array($permission->id, $lockedPermissionIdsByRole[$role->id] ?? [], true);
+                                                $isAssigned = $role->permissions->contains('id', $permission->id);
+                                                $lockReason = 'Permission ini tidak berlaku untuk role tersebut.';
+                                            @endphp
+                                            <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition" title="{{ $isLockedForRole ? $lockReason : '' }}">
+                                                @if($isLockedForRole)
+                                                    {{-- Kebijakan juga dipaksa ulang di backend saat matriks disimpan. --}}
+                                                    <div class="flex items-center justify-center" title="Tidak dapat diberikan ke role ini">
                                                         <x-form.checkbox
-                                                            checked
+                                                            :checked="$isAssigned"
                                                             disabled
-                                                            class="text-primary/45 bg-soft focus:ring-0"
+                                                            class="text-muted/40 bg-soft focus:ring-0"
                                                         />
-                                                        {{-- Standard hidden inputs for checked values to send back --}}
-                                                        <input type="hidden" name="matrix[{{ $role->id }}][]" value="{{ $permission->id }}">
                                                     </div>
                                                 @else
                                                     <div class="flex items-center justify-center">
@@ -292,6 +307,8 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
             </x-ui.card>
 
             {{-- STICKY SAVE BAR --}}
+            {{-- Ruang bawah dinamis pada wrapper x-data memastikan permission terakhir
+                 tetap dapat digulir di atas sticky save bar saat ada perubahan. --}}
             <div
                 x-show="isDirty"
                 x-transition:enter="transition ease-out duration-300"
@@ -300,7 +317,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                 x-transition:leave="transition ease-in duration-200"
                 x-transition:leave-start="opacity-100 translate-y-0"
                 x-transition:leave-end="opacity-0 translate-y-10"
-                class="fixed bottom-6 left-6 right-6 lg:left-[280px] z-40 bg-ink text-white rounded-xl shadow-2xl px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border border-white/10"
+                class="fixed inset-x-4 bottom-4 z-40 flex flex-col gap-3 rounded-xl border border-white/10 bg-ink px-4 py-4 text-white shadow-2xl sm:bottom-6 sm:left-6 sm:right-6 sm:px-6 lg:left-[280px] sm:flex-row sm:items-center sm:justify-between"
                 style="display: none;"
             >
                 <div class="flex items-center gap-3">

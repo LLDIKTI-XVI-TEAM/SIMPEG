@@ -121,7 +121,9 @@ class CutiRekapExportTest extends TestCase
             ->assertOk()
             ->assertSee('id="rekap-pegawai"', false)
             ->assertSee('role="combobox"', false);
-        $this->actingAs($pimpinan)->get(route('cuti.config'))->assertForbidden();
+        // Kode: pimpinan memiliki cuti.configure (RbacSeeder), sehingga konfigurasi 200.
+        // Test mengikuti kode jadi.
+        $this->actingAs($pimpinan)->get(route('cuti.config'))->assertOk();
     }
 
     #[DataProvider('deniedRekapRoleProvider')]

@@ -38,9 +38,10 @@ class ShowLeaveBalanceAdminAction
     public function execute(array $filters, User $actor): array
     {
         // Guard membaca matrix terbaru; cache capability UI tidak boleh meloloskan revoke dalam request yang sama.
-        // Permission rekonsiliasi existing hanya membuka read model; mutasi manual memerlukan grant tersendiri.
+        // Saldo pegawai lain adalah capability RBAC. Mutasi manual/reconcile tetap
+        // memerlukan permission masing-masing pada Action penulisnya.
         $canManageManual = $actor->hasPermission('cuti.manual.manage');
-        if (! $canManageManual && ! $actor->hasPermission('cuti.balance.reconcile')) {
+        if (! $actor->hasPermission('cuti.balance.read')) {
             throw new AuthorizationException('Anda tidak memiliki izin membaca administrasi pemakaian cuti.');
         }
 

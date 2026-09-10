@@ -6,16 +6,17 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Memvalidasi perubahan konfigurasi rantai approval cuti (penentuan approver stage 2 dan stage 3).
- * Otorisasi ditegakkan ganda di backend: middleware route (role:super_admin + permission:cuti.configure)
- * dan authorize() di sini, supaya keamanan tidak hanya bergantung pada penyembunyian menu/tombol di UI.
+ * Otorisasi ditegakkan ganda di backend: middleware route dan authorize() dengan cuti.configure,
+ * supaya keamanan tidak hanya bergantung pada penyembunyian menu/tombol di UI.
  */
 class ApprovalChainConfigRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Konfigurasi rantai approval adalah pengaturan tingkat sistem, jadi sengaja dibatasi
-        // hanya untuk pemegang permission cuti.configure (di Fase 1 hanya super_admin).
-        return (bool) $this->user()?->hasPermission('cuti.configure');
+        // Konfigurasi rantai approval hanya dapat diubah pemegang cuti.configure.
+        $actor = $this->user();
+
+        return $actor !== null && $actor->hasPermission('cuti.configure');
     }
 
     /**

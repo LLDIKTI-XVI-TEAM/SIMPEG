@@ -6,12 +6,14 @@ use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeHistoryAttachmentDownloadAction;
 use App\Actions\Employees\PreparePimpinanEmployeeDetailAction;
+use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\User;
 use App\Services\Documents\SkRequirementMatrixVersionService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
@@ -45,7 +47,7 @@ class PimpinanEmployeeController extends Controller
             'per_page' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
-        ]));
+        ]), $request->user());
         $initialRows = $employees->items();
         $initialMeta = [
             'total' => $employees->total(),
@@ -62,7 +64,23 @@ class PimpinanEmployeeController extends Controller
                 'url' => route('pimpinan.pegawai.show', $employee['id']),
             ])
             ->all();
-        $isReadOnly = true;
+        // Permission-driven (kontrak RBAC): capability halaman mengikuti permission
+        // pada role efektif — bukan role asli. Halaman read-only default; blok aksi
+        // (SK wajib, tambah/import pegawai) tampil sesuai permission yang diberikan.
+        $user = $request->user();
+        $canManageSkRequirements = $user?->hasPermission('sk_requirements.manage') ?? false;
+        $skRequirementMatrix = $canManageSkRequirements
+            ? app(ShowSkRequirementMatrixAction::class)->execute()
+            : ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
+        $canCreateEmployee = $user?->hasPermission('employees.create') ?? false;
+        $canImportEmployees = $user?->hasPermission('employees.import') ?? false;
+        $hasEmployeeMutationCapability = $canManageSkRequirements
+            || $canCreateEmployee
+            || $canImportEmployees
+            || ($user?->hasPermission('employees.update') ?? false)
+            || ($user?->hasPermission('employees.deactivate') ?? false)
+            || ($user?->hasPermission('employees.restore') ?? false);
+        $isReadOnly = ! $hasEmployeeMutationCapability;
         $skRequirementVersion = $matrixVersion->current();
 
         $golonganOptions = Employee::query()
@@ -95,12 +113,21 @@ class PimpinanEmployeeController extends Controller
             'serverRenderedDetailLinks',
             'isReadOnly',
             'skRequirementVersion',
+            'canManageSkRequirements',
+            'skRequirementMatrix',
+            'canCreateEmployee',
+            'canImportEmployees',
         ));
     }
 
     public function show(Employee $employee, PreparePimpinanEmployeeDetailAction $action)
     {
-        return view('pimpinan.pegawai.show', $action->execute($employee->id));
+        // Surface khusus Pimpinan: payload dimasking di level query (tanpa NIK)
+        // sehingga tidak bergantung pada endpoint API mentah lintas pegawai.
+        /** @var User $viewer */
+        $viewer = request()->user();
+
+        return view('pimpinan.pegawai.show', $action->execute($employee->id, $viewer));
     }
 
     public function downloadDocument(

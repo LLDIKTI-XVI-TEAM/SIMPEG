@@ -20,7 +20,7 @@ class DatabaseSeeder extends Seeder
             RbacSeeder::class,
             ApprovalConfigSeeder::class,
             EwsConfigSeeder::class,
-            DemoSsoUserSeeder::class,
+            SsoRoleMappedAccountSeeder::class,
         ]);
 
     }

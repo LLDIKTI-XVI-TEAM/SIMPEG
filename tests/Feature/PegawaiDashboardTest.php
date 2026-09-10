@@ -34,9 +34,9 @@ class PegawaiDashboardTest extends TestCase
         [$user, $employee] = $this->pegawaiWithEmployee();
         $otherEmployee = Employee::factory()->create();
 
-        // Kolom user_id pada tabel notifications adalah FK ke employees, bukan users.
-        // Test ini mengunci kontrak tersebut karena query dashboard pernah salah
-        // memfilter dengan id user sehingga widget notifikasi selalu kosong.
+        // user_id lama menyimpan konteks Employee, sedangkan recipient_user_id
+        // menetapkan pemilik inbox. Model melengkapi recipient untuk mapping
+        // Employee–User tunggal agar riwayat lama tetap tampil ke pemiliknya.
         $this->notificationFor($employee, 'Notifikasi Milik Sendiri');
         $this->notificationFor($otherEmployee, 'Notifikasi Pegawai Lain');
 

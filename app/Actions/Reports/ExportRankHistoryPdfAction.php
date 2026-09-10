@@ -19,7 +19,7 @@ class ExportRankHistoryPdfAction
 
     private function document(Collection $rows): string
     {
-        $pages = $rows->chunk(34);
+        $pages = $rows->chunk(33);
         if ($pages->isEmpty()) {
             $pages = collect([collect()]);
         }
@@ -48,63 +48,87 @@ class ExportRankHistoryPdfAction
     private function pageStream(Collection $rows, int $page, int $totalPages): string
     {
         $columns = [
-            ['No', 36, 3],
-            ['NIP', 85, 18],
-            ['Nama Pegawai', 190, 34],
-            ['Golongan', 78, 12],
-            ['TMT Pangkat', 88, 14],
-            ['Nomor SK', 145, 25],
-            ['Tanggal SK', 84, 14],
+            ['No', 30, 4],
+            ['NIP', 105, 19],
+            ['Nama Pegawai', 185, 34],
+            ['Golongan', 62, 10],
+            ['TMT Pangkat', 85, 14],
+            ['Nomor SK', 225, 42],
+            ['Tanggal SK', 90, 14],
         ];
         $left = 30;
-        $top = 532;
+        $tableTop = 520;
+        $headerHeight = 16;
         $rowHeight = 14;
-        $stream = [
-            '0.07 0.18 0.57 rg',
-            '30 552 782 20 re f',
-            '1 1 1 rg',
-            $this->text(42, 559, 13, 'LAPORAN RIWAYAT KEPANGKATAN'),
-            '0 0 0 rg',
-            $this->text(42, 542, 8, 'LLDIKTI Wilayah XVI | Dicetak '.now()->translatedFormat('d M Y')),
-            $this->text(700, 542, 8, "Halaman {$page}/{$totalPages}"),
-            '0.95 g',
-            "{$left} {$top} 782 {$rowHeight} re f",
-            '0 0 0 RG',
-            '0.6 w',
-        ];
-        $x = $left;
+        $tableBottom = $tableTop - $headerHeight - ($rowHeight * count($rows));
 
+        $stream = [
+            // 1. Header Banner
+            '0.07 0.18 0.57 rg',
+            '30 550 782 24 re f',
+            '1 1 1 rg',
+            $this->text(44, 558, 12, 'LAPORAN RIWAYAT KEPANGKATAN'),
+
+            // 2. Sub-header & Meta Info
+            '0.2 0.2 0.2 rg',
+            $this->text(30, 532, 8, 'LLDIKTI Wilayah XVI | Tanggal Cetak: '.now()->translatedFormat('d F Y')),
+            $this->text(725, 532, 8, "Halaman {$page} dari {$totalPages}"),
+
+            // 3. Table Header Background
+            '0.94 0.95 0.97 rg',
+            "{$left} ".($tableTop - $headerHeight)." 782 {$headerHeight} re f",
+
+            // 4. Lines setup
+            '0 0 0 RG',
+            '0 0 0 rg',
+            '0.5 w',
+            // Horizontal line on top of header
+            "{$left} {$tableTop} m ".($left + 782)." {$tableTop} l S",
+            // Horizontal line below header
+            "{$left} ".($tableTop - $headerHeight).' m '.($left + 782).' '.($tableTop - $headerHeight).' l S',
+        ];
+
+        // Header column texts
+        $x = $left;
         foreach ($columns as [$label, $width]) {
-            $stream[] = "{$x} ".($top - ($rowHeight * (count($rows) + 1)))." m {$x} ".($top + $rowHeight).' l S';
-            $stream[] = $this->text($x + 3, $top + 4, 7, $label);
+            $stream[] = $this->text($x + 4, $tableTop - $headerHeight + 5, 8, $label);
             $x += $width;
         }
 
-        $stream[] = "{$x} ".($top - ($rowHeight * (count($rows) + 1)))." m {$x} ".($top + $rowHeight).' l S';
-        $stream[] = "{$left} {$top} m ".($left + 782)." {$top} l S";
-        $stream[] = "{$left} ".($top + $rowHeight).' m '.($left + 782).' '.($top + $rowHeight).' l S';
-
+        // Data rows
+        $currentRowTop = $tableTop - $headerHeight;
         foreach ($rows->values() as $index => $row) {
-            $y = $top - (($index + 1) * $rowHeight);
-            $stream[] = "{$left} {$y} m ".($left + 782)." {$y} l S";
+            $rowBottom = $currentRowTop - $rowHeight;
+            $stream[] = "{$left} {$rowBottom} m ".($left + 782)." {$rowBottom} l S";
+
             $x = $left;
             $values = [
-                (string) ($index + 1 + (($page - 1) * 34)),
-                $row['nip'],
-                $row['nama'],
-                $row['golongan'],
-                $row['tmt'],
-                $row['no_sk'],
-                $row['tanggal_sk'],
+                (string) ($index + 1 + (($page - 1) * 33)),
+                (string) ($row['nip'] ?? '-'),
+                (string) ($row['nama'] ?? '-'),
+                (string) ($row['golongan'] ?? '-'),
+                (string) ($row['tmt'] ?? '-'),
+                (string) ($row['no_sk'] ?? '-'),
+                (string) ($row['tanggal_sk'] ?? '-'),
             ];
 
             foreach ($columns as $columnIndex => [, $width, $limit]) {
-                $stream[] = $this->text($x + 3, $y + 4, 7, $this->truncate($values[$columnIndex], $limit));
+                $stream[] = $this->text($x + 4, $rowBottom + 4, 7, $this->truncate($values[$columnIndex], $limit));
                 $x += $width;
             }
+
+            $currentRowTop = $rowBottom;
         }
 
-        // ponytail: fixed Latin-1 tabular reports only; replace with a maintained Unicode-capable renderer after the PHP/Symfony dependency baseline is healthy.
+        // Vertical column separator lines
+        $x = $left;
+        foreach ($columns as [, $width]) {
+            $stream[] = "{$x} {$tableBottom} m {$x} {$tableTop} l S";
+            $x += $width;
+        }
+        // Rightmost vertical line
+        $stream[] = "{$x} {$tableBottom} m {$x} {$tableTop} l S";
+
         return implode("\n", $stream);
     }
 

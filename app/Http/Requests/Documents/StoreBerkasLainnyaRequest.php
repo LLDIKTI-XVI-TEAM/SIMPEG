@@ -15,7 +15,7 @@ class StoreBerkasLainnyaRequest extends FormRequest
             return true;
         }
 
-        return DocumentAuthorization::canManage($this->user());
+        return DocumentAuthorization::canCreate($this->user());
     }
 
     public function rules(): array

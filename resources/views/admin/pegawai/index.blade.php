@@ -1,6 +1,7 @@
 <div>
     @php
-        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
+        $defaultPrefix = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('data-pegawai') : url('/rbac/pegawai');
+        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? $defaultPrefix;
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
         $isReadOnly = $isReadOnly ?? false;
         $openStatusModal = $openStatusModal ?? false;
@@ -12,6 +13,11 @@
         $canRestoreEmployee = ! $isReadOnly
             && auth()->user()?->hasPermission('employees.restore');
         $canManageSkRequirements = $canManageSkRequirements ?? false;
+        // Capability aksi pegawai permission-driven: dihitung dari permission role efektif
+        // (controller bisa mengoverride), bukan blanket role super_admin/admin_kepegawaian.
+        $canCreateEmployee = $canCreateEmployee ?? (bool) auth()->user()?->hasPermission('employees.create');
+        $canImportEmployees = $canImportEmployees ?? (bool) auth()->user()?->hasPermission('employees.import');
+        $canExportEmployees = $canExportEmployees ?? (bool) auth()->user()?->hasPermission('employees.export');
         $skRequirementMatrix = $skRequirementMatrix ?? ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $skRequirementVersion = $skRequirementVersion ?? 'unversioned';
     @endphp
@@ -165,6 +171,9 @@
         status_aktif: '{{ $filters['status_aktif'] ?? '' }}',
     },
     searchTimer: null,
+    // Namespace cache per akun agar baris milik sendiri yang di-exclude
+    // tidak bocor antar akun atau antar simulasi role pada browser yang sama.
+    viewerKey: @js(auth()->user()?->employee_id ?? auth()->id() ?? 'guest'),
     skRequirementVersion: @js($skRequirementVersion),
     skRequirementStorageKey: 'simpeg:sk-requirements:version',
     skRequirementStorageListener: null,
@@ -267,7 +276,7 @@
 
     get cacheKey() {
         const f = this.filters;
-return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sa${f.status_aktif}_sort${this.sort}_dir${this.direction}`;
+return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sa${f.status_aktif}_sort${this.sort}_dir${this.direction}`;
     },
 
     clearCacheByPrefixes(prefixes) {
@@ -507,7 +516,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         }
         this.isRestoring = true;
         try {
-            // Endpoint restore memakai gate role super_admin + permission di backend,
+            // Endpoint restore permission-driven (employees.restore pada role efektif),
             // sehingga tombol ini hanya mempercepat akses dan bukan penentu otorisasi.
             const res = await fetch(`/api/v1/pegawai/${this.restorePegawaiId}/restore`, {
                 method: 'POST',
@@ -744,7 +753,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </svg>
                     <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
                 </x-ui.button>
-                @if(!$isReadOnly)
+                @if(!$isReadOnly && ($canExportEmployees ?? false))
                 <x-ui.button type="button" variant="primary" onclick="exportFilteredData()" id="export-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
@@ -753,12 +762,14 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </svg>
                     Export Excel
                 </x-ui.button>
+                @if($canExportEmployees ?? false)
                 <x-ui.button type="button" variant="primary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Export PDF
                 </x-ui.button>
+                @endif
                 @if ($canManageSkRequirements)
                 <x-ui.button type="button" variant="primary" id="sk-requirement-btn" @click="openSkRequirementModal()"
                     aria-label="Atur SK Wajib per Jenis Pegawai">
@@ -769,6 +780,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     <span>SK Wajib</span>
                 </x-ui.button>
                 @endif
+                @if (($canCreateEmployee ?? false) || ($canImportEmployees ?? false))
                 <div class="relative" x-data="{ open: false }">
                     <x-ui.button type="button" @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         ::aria-expanded="open.toString()" aria-controls="add-pegawai-menu">
@@ -780,6 +792,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </x-ui.button>
                     <div id="add-pegawai-menu" x-show="open" style="display: none;" x-transition
                         class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
+                        @if ($canCreateEmployee ?? false)
                         <a href="{{ route('pegawai.create') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
@@ -789,6 +802,8 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             </svg>
                             Tambah Manual
                         </a>
+                        @endif
+                        @if ($canImportEmployees ?? false)
                         <a href="{{ route('pegawai.import') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans mt-1">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
@@ -798,16 +813,20 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             </svg>
                             Import Pegawai
                         </a>
+                        @endif
                     </div>
                 </div>
+                @endif
                 @else
-                <a href="{{ route('pimpinan.laporan.nominatif') }}"
+                @if($canExportEmployees ?? false)
+                <a href="{{ route('laporan.pegawai') }}"
                     class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
                     <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                     </svg>
                     Laporan Pegawai
                 </a>
+                @endif
                 @endif
             </div>
         </div>

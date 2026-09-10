@@ -34,7 +34,6 @@ final class DecideLeaveCancellationAction
 
         if (! $requestUser instanceof User
             || $requestUser->id !== $actor->id
-            || $actor->getEffectiveRole() !== 'admin_kepegawaian'
             || ! $actor->hasPermission('cuti.cancellation.manage')) {
             throw new AuthorizationException('Anda tidak berwenang memutuskan permohonan pembatalan cuti.');
         }

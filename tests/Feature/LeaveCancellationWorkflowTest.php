@@ -10,7 +10,9 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\LeaveApprovalService;
@@ -341,7 +343,7 @@ class LeaveCancellationWorkflowTest extends TestCase
             ->assertSee($cancellation->reason, false);
     }
 
-    public function test_decision_action_rechecks_admin_role_and_permission_before_mutation(): void
+    public function test_decision_action_rechecks_permission_before_mutation(): void
     {
         $fixture = $this->makeLeaveFixture();
         $cancellation = $this->createPendingCancellation($fixture['leave'], $fixture['ownerUser']);
@@ -355,12 +357,37 @@ class LeaveCancellationWorkflowTest extends TestCase
                 'DISETUJUI',
                 $request,
             );
-            $this->fail('Action keputusan pembatalan harus memeriksa ulang role dan permission Admin Kepegawaian.');
+            $this->fail('Action keputusan pembatalan harus memeriksa ulang permission pembatalan.');
         } catch (AuthorizationException) {
             $this->assertSame(LeaveCancellationRequest::STATUS_PENDING, $cancellation->fresh()->status);
             $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $fixture['leave']->fresh()->status);
             $this->assertSame(5, $this->reservationAmount($fixture['leave']));
         }
+    }
+
+    public function test_role_lain_dapat_mengelola_pembatalan_saat_permission_diberikan(): void
+    {
+        $fixture = $this->makeLeaveFixture();
+        $cancellation = $this->createPendingCancellation($fixture['leave'], $fixture['ownerUser']);
+        $pimpinan = User::factory()->pimpinan()->create();
+        $permission = Permission::query()
+            ->where('name', 'cuti.cancellation.manage')
+            ->firstOrFail();
+        Role::query()
+            ->where('name', 'pimpinan')
+            ->firstOrFail()
+            ->permissions()
+            ->syncWithoutDetaching([$permission->id]);
+
+        $this->actingAs($pimpinan)
+            ->get(route('cuti.cancellations.index'))
+            ->assertOk();
+
+        $this->actingAs($pimpinan)
+            ->patch(route('cuti.cancellations.decide', $cancellation), ['decision' => 'DITOLAK'])
+            ->assertRedirect(route('cuti.cancellations.index'));
+
+        $this->assertSame(LeaveCancellationRequest::STATUS_REJECTED, $cancellation->fresh()->status);
     }
 
     public function test_admin_approval_cancels_main_request_skips_open_steps_and_releases_reservation_once(): void

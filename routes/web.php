@@ -47,6 +47,7 @@ use App\Http\Controllers\Admin\PimpinanLeaveDocumentController;
 use App\Http\Controllers\Admin\PimpinanReportController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\RbacController;
+use App\Http\Controllers\Admin\RbacEmployeeController;
 use App\Http\Controllers\Admin\SkRequirementController;
 use App\Http\Controllers\Admin\SwitchRoleController;
 use App\Http\Controllers\Admin\UserMappingController;
@@ -54,6 +55,7 @@ use App\Http\Controllers\Auth\InactiveEmployeeAccountController;
 use App\Http\Controllers\Auth\KeycloakAuthController;
 use App\Http\Controllers\Cuti\VerifyLeaveProofController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Middleware\EnsureActiveEmployeeAccount;
 use App\Livewire\Admin\Pegawai\Create;
 use App\Livewire\Admin\Pegawai\Edit;
 use App\Livewire\Admin\Pegawai\Index;
@@ -81,9 +83,9 @@ Route::get('/cuti/verifikasi/{token}', VerifyLeaveProofController::class)
     ->name('cuti.verify');
 
 if (app()->environment(['local', 'testing'])) {
-    Route::get('/dev-login', [KeycloakAuthController::class, 'defaultDemoLogin']);
-    Route::post('/dev-login', [KeycloakAuthController::class, 'demoLogin'])->name('dev-login');
-
+    // Jalur demo/dev-login dihapus: seluruh login wajib melalui identitas
+    // Keycloak asli. Handler demo (defaultDemoLogin/demoLogin) sudah tidak ada
+    // sehingga registrasi route-nya dihapus agar tidak berakhir 500.
     Route::get('/map-dummy-employee', function () {
         $user = auth()->user();
         if ($user) {
@@ -136,49 +138,49 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/pegawai/import-data', function () {
         return view('admin.pegawai.import');
-    })->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+    })->middleware('permission:employees.import')
         ->name('pegawai.import');
 
     Route::get('/pegawai/import/template/{type}', [EmployeeImportController::class, 'template'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import-template');
 
     // Import API endpoints (dipanggil via fetch dari blade, butuh session auth)
     Route::post('/api/pegawai/import/upload', [EmployeeImportController::class, 'upload'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.upload');
 
     Route::get('/api/pegawai/import/{batchId}/preview', [EmployeeImportController::class, 'preview'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.preview');
 
     Route::post('/api/pegawai/import/{batchId}/validate', [EmployeeImportController::class, 'validate'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.validate');
 
     // Pemetaan kolom disimpan sebagai state batch agar dipakai ulang oleh preview/validasi/eksekusi.
     Route::post('/api/pegawai/import/{batchId}/mapping', [EmployeeImportController::class, 'saveMapping'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.mapping');
 
     Route::post('/api/pegawai/import/{batchId}/execute', [EmployeeImportController::class, 'execute'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.execute');
 
     Route::get('/api/pegawai/import/{batchId}/status', [EmployeeImportController::class, 'status'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.status');
 
     Route::get('/pegawai/import/{batchId}/laporan', [EmployeeImportController::class, 'report'])
         ->whereUuid('batchId')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.import'])
+        ->middleware('permission:employees.import')
         ->name('pegawai.import.report');
 
     Route::get('/ews', [EwsController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware('permission:ews.read')
         ->name('ews');
     Route::get('/dashboard/ews-saya', [EwsController::class, 'myAlerts'])
         ->middleware(['role:pegawai'])
@@ -215,26 +217,30 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('rbac.update');
 
     Route::get('/data-master', [DataMasterController::class, 'index'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:reference_tables.manage')
         ->name('data-master');
 
     // CRUD reference table memakai kebijakan hapus hybrid: item terpakai hanya
     // boleh dinonaktifkan, item belum terpakai boleh dihapus permanen.
-    Route::prefix('data-master')->name('data-master.')->middleware('role:super_admin')->group(function (): void {
-        Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
-            ->name('channel-notifikasi.index');
-        Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
-            ->name('channel-notifikasi.store');
-        Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
-        Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
-        Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
-        Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
-        Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
-            ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
+    Route::prefix('data-master')->name('data-master.')->middleware('permission:reference_tables.manage')->group(function (): void {
+        // Kanal notifikasi membawa konfigurasi sistem, bukan tabel referensi
+        // delegable. Tetap eksklusif untuk Super Admin.
+        Route::middleware('role:super_admin')->group(function (): void {
+            Route::get('/channel-notifikasi', [NotificationChannelController::class, 'index'])
+                ->name('channel-notifikasi.index');
+            Route::post('/channel-notifikasi', [NotificationChannelController::class, 'store'])
+                ->name('channel-notifikasi.store');
+            Route::post('/channel-notifikasi/{notificationChannel}/update', [NotificationChannelController::class, 'update'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.update');
+            Route::post('/channel-notifikasi/{notificationChannel}/status', [NotificationChannelController::class, 'setEnabled'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.status');
+            Route::post('/channel-notifikasi/{notificationChannel}/destroy', [NotificationChannelController::class, 'destroy'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.destroy');
+            Route::post('/channel-notifikasi/{notificationChannel}/kebijakan-event', [NotificationChannelController::class, 'setEventPolicy'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.policy');
+            Route::post('/channel-notifikasi/{notificationChannel}/konfigurasi-whatsapp', [NotificationChannelController::class, 'updateWhatsAppConfig'])
+                ->whereUuid('notificationChannel')->name('channel-notifikasi.whatsapp-config');
+        });
 
         Route::post('/eselon', [DataMasterEselonController::class, 'store'])->name('eselon.store');
         Route::post('/eselon/{eselon}/update', [DataMasterEselonController::class, 'update'])
@@ -306,9 +312,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.rekap');
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
-        ->middleware(['permission:cuti.balance.reconcile,cuti.manual.manage'])
+        ->middleware('permission:cuti.balance.read')
         ->name('cuti.saldo.administrasi');
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.cancellation.manage'])
+    Route::middleware('permission:cuti.cancellation.manage')
         ->prefix('cuti/pembatalan')
         ->name('cuti.cancellations.')
         ->group(function (): void {
@@ -350,7 +356,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
         ->name('cuti.laporan.excel');
 
-    Route::middleware(['role:super_admin,admin_kepegawaian', 'permission:cuti.kepala_lembaga_documents.manage'])
+    Route::middleware('permission:cuti.kepala_lembaga_documents.manage')
         ->prefix('cuti/dokumen-kepala-lembaga')
         ->name('cuti.dokumen-kepala-lembaga.')
         ->group(function (): void {
@@ -370,30 +376,34 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         });
 
     Route::get('/konfigurasi', [EwsConfigController::class, 'index'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:ews.configure')
         ->name('ews.config');
     Route::post('/konfigurasi/update', [EwsConfigController::class, 'update'])
-        ->middleware(['role:super_admin'])
+        ->middleware('permission:ews.configure')
         ->name('ews.config.update');
 
     Route::get('/laporan/export-pegawai', [LaporanController::class, 'exportPegawai'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai');
 
     Route::get('/laporan/export-pegawai/preview', [LaporanController::class, 'exportPegawaiPreview'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.preview');
 
     Route::get('/laporan/export-pegawai/excel', [LaporanController::class, 'exportPegawaiExcel'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.excel');
 
     Route::get('/laporan/export-pegawai/pdf', [LaporanController::class, 'exportPegawaiPdf'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.pdf');
 
+    Route::get('/laporan/export-pegawai/pdf-nominatif', [LaporanController::class, 'exportPegawaiNominatifPdf'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
+        ->name('laporan.pegawai.pdf-nominatif');
+
     Route::post('/laporan/export-pegawai/custom', [LaporanController::class, 'exportPegawaiCustom'])
-        ->middleware(['role:super_admin,admin_kepegawaian,pimpinan'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('laporan.pegawai.custom');
     Route::get('/pegawai', Index::class)
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
@@ -412,7 +422,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('pegawai.status.update');
     Route::get('/pegawai/{id}', Show::class)
         ->whereUuid('id')
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware('permission:employees.read')
         ->name('pegawai.show');
     Route::get('/pegawai/{id}/edit', Edit::class)
         ->whereUuid('id')
@@ -457,6 +467,71 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.update'])
         ->name('pegawai.assign-atasan');
 
+    // Surface detail canonical untuk role yang diberi capability melalui RBAC.
+    // Permission mengatur aksi, employee.scope mengatur record target: Pegawai
+    // hanya diri sendiri, Kabag bawahan aktif, sementara role global tetap luas.
+    Route::prefix('rbac/pegawai')->name('rbac.pegawai.')->group(function (): void {
+        Route::get('/create', Create::class)
+            ->middleware('permission:employees.create')
+            ->name('create');
+        Route::post('/', [PegawaiController::class, 'store'])
+            ->middleware('permission:employees.create')
+            ->name('store');
+        Route::get('/{employee}', [RbacEmployeeController::class, 'show'])
+            ->whereUuid('employee')
+            ->middleware(['permission:employees.read', 'employee.scope'])
+            ->name('show');
+        Route::get('/{id}/edit', Edit::class)
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('edit');
+        Route::post('/{id}', [PegawaiController::class, 'update'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('update');
+        Route::post('/{id}/delete', [PegawaiController::class, 'destroy'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.deactivate', 'employee.scope'])
+            ->name('destroy');
+        Route::post('/{id}/restore', [PegawaiController::class, 'restore'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.restore', 'employee.scope'])
+            ->name('restore');
+        Route::post('/{id}/kinerja-baik', [PegawaiController::class, 'updatePerformanceFlag'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('kinerja.update');
+        Route::post('/{id}/satyalancana-eligibility', [PegawaiController::class, 'updateSatyalancanaEligibility'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('satyalancana.update');
+        Route::post('/{id}/assign-atasan', [PegawaiController::class, 'assignAtasan'])
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope'])
+            ->name('assign-atasan');
+        Route::get('/{id}/cari-kepala-bagian', EmployeeSupervisorLookupController::class)
+            ->whereUuid('id')
+            ->middleware(['permission:employees.update', 'employee.scope', 'throttle:60,1'])
+            ->name('supervisor-lookup');
+        Route::get('/{employee}/dokumen/{document}/unduh', [RbacEmployeeController::class, 'downloadDocument'])
+            ->whereUuid(['employee', 'document'])
+            ->middleware(['permission:employees.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('documents.download');
+        Route::get('/{employee}/hukuman-disiplin/{history}/unduh', [RbacEmployeeController::class, 'downloadDisciplineAttachment'])
+            ->whereUuid(['employee', 'history'])
+            ->middleware(['permission:employees.read', 'permission:discipline_records.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('discipline-attachments.download');
+        Route::get('/{employee}/status/{history}/unduh', [RbacEmployeeController::class, 'downloadStatusAttachment'])
+            ->whereUuid(['employee', 'history'])
+            ->middleware(['permission:employees.read', 'permission:employee_histories.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('status-attachments.download');
+        Route::get('/{employee}/attachment-riwayat/{type}/{history}/unduh', [RbacEmployeeController::class, 'downloadHistoryAttachment'])
+            ->whereUuid(['employee', 'history'])
+            ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'education'])
+            ->middleware(['permission:employees.read', 'permission:employee_histories.read', 'permission:dokumen_sk.read', 'employee.scope'])
+            ->name('history-attachments.download');
+    });
+
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
         ->name('cuti.saldo');
 
@@ -467,21 +542,22 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // Parameter memakai model binding ber-UUID agar id rusak berhenti sebagai 404
     // di layer route, bukan menjadi error database.
     Route::get('/hari-libur', [HariLiburController::class, 'index'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.read'])
+        ->middleware(['user.context.account', 'permission:hari_libur.read'])
+        ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
         ->name('hari-libur');
     Route::post('/hari-libur', [HariLiburController::class, 'store'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.create'])
+        ->middleware('permission:hari_libur.create')
         ->name('hari-libur.store');
     Route::get('/hari-libur/{hariLibur}/edit', [HariLiburController::class, 'edit'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->middleware('permission:hari_libur.update')
         ->whereUuid('hariLibur')
         ->name('hari-libur.edit');
     Route::put('/hari-libur/{hariLibur}', [HariLiburController::class, 'update'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.update'])
+        ->middleware('permission:hari_libur.update')
         ->whereUuid('hariLibur')
         ->name('hari-libur.update');
     Route::delete('/hari-libur/{hariLibur}', [HariLiburController::class, 'destroy'])
-        ->middleware(['role:super_admin', 'permission:hari_libur.delete'])
+        ->middleware('permission:hari_libur.delete')
         ->whereUuid('hariLibur')
         ->name('hari-libur.destroy');
 
@@ -491,13 +567,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
 
     Route::get('/dashboard/cuti', [CutiController::class, 'index'])->name('cuti');
     Route::get('/dashboard/cuti/create', [CutiController::class, 'create'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.create');
     Route::post('/dashboard/cuti', [CutiController::class, 'store'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.store');
     Route::post('/dashboard/cuti/{leaveRequest}/pembatalan', [LeaveCancellationController::class, 'store'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.cancellations.store')
         ->whereUuid('leaveRequest');
     Route::post('/cuti/{leaveRequest}/penangguhan-administratif', [AdministrativeLeavePostponementController::class, 'store'])
@@ -505,7 +578,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->whereUuid('leaveRequest')
         ->name('cuti.penangguhan-administratif');
     Route::patch('/dashboard/cuti/{leaveRequest}/resubmit', [CutiController::class, 'resubmit'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.resubmit')
         ->whereUuid('leaveRequest');
     Route::get('/dashboard/cuti/{leaveRequest}/formulir-pdf', [CutiController::class, 'formulirPdf'])
@@ -539,25 +611,25 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('cuti.show')
         ->whereUuid('id');
 
-    // Konfigurasi rantai approval cuti bersifat pengaturan sistem, jadi digerbang ganda:
-    // role:super_admin sebagai pagar kasar dan permission:cuti.configure sebagai gerbang aksi.
+    // Konfigurasi rantai approval adalah capability RBAC; domain validasi tetap berada
+    // di FormRequest dan Action, bukan allowlist role historis pada route.
     Route::get('/cuti/konfigurasi-approval', [CutiConfigController::class, 'index'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config');
     Route::post('/cuti/konfigurasi-approval', [CutiConfigController::class, 'update'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.update');
     Route::post('/cuti/konfigurasi-approval/backfill', [CutiConfigController::class, 'backfill'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.backfill');
     Route::post('/cuti/konfigurasi-approval/pybmc-global', [CutiConfigController::class, 'updateGlobalPybmc'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.pybmc-global');
     Route::post('/cuti/konfigurasi-approval/unit', [CutiConfigController::class, 'applyTemplateToUnit'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.unit-template.apply');
     Route::post('/cuti/konfigurasi-approval/pegawai/{employee}', [CutiConfigController::class, 'storeEmployeeChain'])
-        ->middleware(['role:super_admin', 'permission:cuti.configure_chain'])
+        ->middleware('permission:cuti.configure')
         ->name('cuti.config.employee-chain.store')
         ->whereUuid('employee');
 
@@ -572,7 +644,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     });
 
     Route::get('/dashboard/dokumen', [DokumenController::class, 'index'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        // RBAC configurable: canBrowseArchive pure dokumen_sk.read; scoping per role
+        // ditegakkan controller/action (kabag hanya bawahan, pegawai hanya milik sendiri).
+        ->middleware(['role:super_admin,admin_kepegawaian,kepala_bagian,pegawai,pimpinan', 'permission:dokumen_sk.read'])
         ->name('dokumen');
     Route::post('/dashboard/dokumen/upload', [DokumenController::class, 'store'])
         ->middleware(['role:super_admin,admin_kepegawaian'])
@@ -582,11 +656,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('dokumen.update')
         ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}', [DokumenController::class, 'show'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['role:super_admin,admin_kepegawaian,kepala_bagian,pegawai,pimpinan', 'permission:dokumen_sk.read'])
         ->name('dokumen.show')
         ->whereUuid('id');
     Route::get('/dashboard/dokumen/{id}/download', [DokumenController::class, 'download'])
-        ->middleware(['role:super_admin,admin_kepegawaian', 'permission:employees.read'])
+        ->middleware(['role:super_admin,admin_kepegawaian,kepala_bagian,pegawai,pimpinan', 'permission:dokumen_sk.read'])
         ->name('dokumen.download')
         ->whereUuid('id');
     Route::delete('/dashboard/dokumen/{id}', [DokumenController::class, 'destroy'])
@@ -629,11 +703,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     // SWITCH & REVERT ROLE
     // =========================================================================
 
-    // Coarse gate route dibuat eksplisit: aksi switch hanya untuk Super Admin yang
-    // memiliki users.switch_role. FormRequest tetap menjadi mutation boundary dengan
-    // invariant yang sama (role asli super_admin + permission khusus).
+    // Permission asal dibaca oleh FormRequest agar setiap role berperingkat yang
+    // diberi grant dapat switch hanya ke role yang lebih rendah.
     Route::post('/switch-role', [SwitchRoleController::class, 'switchRole'])
-        ->middleware(['role:super_admin', 'permission:users.switch_role'])
+        ->middleware('permission:users.switch_role')
         ->name('switch-role');
 
     // Jalur pemulihan hanya memerlukan autentikasi. Ia sengaja dikecualikan dari role efektif agar
@@ -647,14 +720,16 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->name('revert-role');
 
     Route::get('/notifikasi', [NotificationController::class, 'index'])
-        ->middleware('permission:notifications.read')
+        ->middleware(['user.context.account', 'permission:notifications.read'])
+        ->withoutMiddleware(EnsureActiveEmployeeAccount::class)
         ->name('notifications.index');
 
     Route::redirect('/notifications', '/notifikasi')
-        ->middleware('permission:notifications.read');
+        ->middleware(['user.context.account', 'permission:notifications.read'])
+        ->withoutMiddleware(EnsureActiveEmployeeAccount::class);
 
     Route::get('/pegawai/export', [PegawaiController::class, 'export'])
-        ->middleware(['role:super_admin,admin_kepegawaian'])
+        ->middleware(['permission:employees.read', 'permission:employees.export'])
         ->name('pegawai.export');
 
     // =========================================================================
@@ -681,7 +756,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('document')
                 ->name('pegawai.documents.download');
             Route::get('/pegawai/{employee}/hukuman-disiplin/{history}/unduh', [PimpinanEmployeeController::class, 'downloadDisciplineAttachment'])
-                ->middleware('permission:employees.read')
+                ->middleware(['permission:employees.read', 'permission:discipline_records.read'])
                 ->whereUuid('employee')
                 ->whereUuid('history')
                 ->name('pegawai.discipline-attachments.download');
@@ -717,7 +792,9 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');
 
-            Route::get('/ews', [PimpinanEwsController::class, 'index'])->name('ews.index');
+            Route::get('/ews', [PimpinanEwsController::class, 'index'])
+                ->middleware('permission:ews.read')
+                ->name('ews.index');
 
             Route::get('/laporan/kepangkatan', [PimpinanReportController::class, 'rankHistories'])->name('laporan.kepangkatan');
             Route::get('/laporan/kepangkatan/excel', [PimpinanReportController::class, 'exportRankHistoriesExcel'])->name('laporan.kepangkatan.excel');
@@ -758,6 +835,8 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');
 
-            Route::get('/ews', [KepalaBagianEwsController::class, 'index'])->name('ews.index');
+            Route::get('/ews', [KepalaBagianEwsController::class, 'index'])
+                ->middleware('permission:ews.read')
+                ->name('ews.index');
         });
 });

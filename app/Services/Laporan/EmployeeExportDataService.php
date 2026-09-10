@@ -9,17 +9,21 @@ use App\Models\RefJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\User;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class EmployeeExportDataService
 {
+    public function __construct(private readonly EmployeeDashboardScopeService $employeeScope) {}
+
     /**
      * @param  array<string, mixed>  $filters
      * @return Collection<int, array<string, string>>
      */
-    public function rows(array $filters, bool $defaultToActive = true): Collection
+    public function rows(array $filters, bool $defaultToActive = true, ?User $actor = null): Collection
     {
         $status = $this->stringFilter($filters, 'status');
         $statusId = $this->stringFilter($filters, 'status_pegawai_id');
@@ -35,7 +39,13 @@ class EmployeeExportDataService
 
         $bup = max(0, (int) EwsConfig::getVal('pensiun_required_age_years', 0));
 
-        $employees = Employee::query()
+        // Semua laporan pegawai memakai sumber scope yang sama dengan dashboard.
+        // Actor wajib diberikan oleh controller/action pemanggil; fallback request
+        // menjaga jalur HTTP lama tetap fail-closed bila identitas tidak tersedia.
+        $actor ??= request()->user();
+        $masked = ! $actor instanceof User
+            || ! in_array($actor->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true);
+        $employees = $this->employeeScope->for($actor instanceof User ? $actor : null)
             ->select([
                 'id',
                 'nama_lengkap',
@@ -49,6 +59,7 @@ class EmployeeExportDataService
                 'tanggal_lahir',
                 'tanggal_pensiun',
             ])
+            ->when(! $masked, fn (Builder $query) => $query->addSelect(['email_pribadi', 'no_hp']))
             ->with([
                 'jenisPegawai:id,nama',
                 'statusPegawai:id,nama',
@@ -138,7 +149,7 @@ class EmployeeExportDataService
         $rowStart = max(1, (int) ($filters['row_start'] ?? 1));
         $rowEnd = (int) ($filters['row_end'] ?? 0);
 
-        $mapped = $employees->map(function (Employee $employee) use ($bup): array {
+        $mapped = $employees->map(function (Employee $employee) use ($bup, $masked): array {
             $currentPosition = $employee->positionHistories->first();
 
             $pensiunDate = null;
@@ -159,8 +170,8 @@ class EmployeeExportDataService
                 'status' => $employee->statusPegawai?->nama ?: ($employee->status_aktif ?: '-'),
                 'pendidikan' => $employee->pendidikan_terakhir ?: '',
                 'tanggal_pensiun' => $pensiunDate?->format('Y-m-d') ?: '-',
-                'email' => $employee->getRawOriginal('email_pribadi') ?: '-',
-                'no_hp' => $employee->no_hp ?: '-',
+                'email' => $masked ? '-' : ($employee->getRawOriginal('email_pribadi') ?: '-'),
+                'no_hp' => $masked ? '-' : ($employee->no_hp ?: '-'),
             ];
         });
 
@@ -188,8 +199,10 @@ class EmployeeExportDataService
      */
     public function filterOptions(): array
     {
+        $unitsQuery = RefUnitKerja::query()->orderBy('nama');
+
         return [
-            'units' => RefUnitKerja::query()->orderBy('nama')->pluck('nama')->all(),
+            'units' => $unitsQuery->pluck('nama')->all(),
             'golongan' => RefGolongan::query()->orderBy('urutan')->pluck('kode')->all(),
             'jenis' => RefJenisPegawai::query()->orderBy('nama')->pluck('nama')->all(),
             'status' => RefStatusPegawai::query()->orderBy('nama')->pluck('nama')->all(),

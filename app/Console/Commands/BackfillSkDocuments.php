@@ -23,7 +23,7 @@ class BackfillSkDocuments extends Command
                 if ($rank->file_sk && Storage::disk(Document::STORAGE_DISK)->exists($rank->file_sk)) {
                     $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_pangkat')->where('file_path', $rank->file_sk)->exists();
                     if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'jenis_dokumen' => 'sk_pangkat', 'nama_dokumen' => 'SK Kenaikan Pangkat', 'nomor_dokumen' => $rank->no_sk, 'tanggal_dokumen' => $rank->tanggal_sk, 'file_path' => $rank->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat pangkat']);
+                        Document::create(['employee_id' => $employee->id, 'history_id' => $rank->id, 'jenis_dokumen' => 'sk_pangkat', 'nama_dokumen' => 'SK Kenaikan Pangkat', 'nomor_dokumen' => $rank->no_sk, 'tanggal_dokumen' => $rank->tanggal_sk, 'file_path' => $rank->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat pangkat']);
                         $created++;
                         $this->line("[Pangkat] {$employee->nama_lengkap}");
                     }
@@ -33,7 +33,7 @@ class BackfillSkDocuments extends Command
                 if ($pos->file_sk && Storage::disk(Document::STORAGE_DISK)->exists($pos->file_sk)) {
                     $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_jabatan')->where('file_path', $pos->file_sk)->exists();
                     if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'jenis_dokumen' => 'sk_jabatan', 'nama_dokumen' => 'SK Jabatan '.($pos->nama_jabatan ?? ''), 'nomor_dokumen' => $pos->no_sk, 'tanggal_dokumen' => $pos->tanggal_sk, 'file_path' => $pos->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat jabatan']);
+                        Document::create(['employee_id' => $employee->id, 'history_id' => $pos->id, 'jenis_dokumen' => 'sk_jabatan', 'nama_dokumen' => 'SK Jabatan '.($pos->nama_jabatan ?? ''), 'nomor_dokumen' => $pos->no_sk, 'tanggal_dokumen' => $pos->tanggal_sk, 'file_path' => $pos->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat jabatan']);
                         $created++;
                         $this->line("[Jabatan] {$employee->nama_lengkap}");
                     }
@@ -43,7 +43,7 @@ class BackfillSkDocuments extends Command
                 if ($sal->file_sk && Storage::disk(Document::STORAGE_DISK)->exists($sal->file_sk)) {
                     $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_kgb')->where('file_path', $sal->file_sk)->exists();
                     if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'jenis_dokumen' => 'sk_kgb', 'nama_dokumen' => 'SK KGB', 'nomor_dokumen' => $sal->no_sk, 'tanggal_dokumen' => $sal->tanggal_sk, 'file_path' => $sal->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat KGB']);
+                        Document::create(['employee_id' => $employee->id, 'history_id' => $sal->id, 'jenis_dokumen' => 'sk_kgb', 'nama_dokumen' => 'SK KGB', 'nomor_dokumen' => $sal->no_sk, 'tanggal_dokumen' => $sal->tanggal_sk, 'file_path' => $sal->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat KGB']);
                         $created++;
                         $this->line("[KGB] {$employee->nama_lengkap}");
                     }
@@ -54,7 +54,7 @@ class BackfillSkDocuments extends Command
                 if (Storage::disk(Document::STORAGE_DISK)->exists($appoint->file_sk)) {
                     $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_pengangkatan')->where('file_path', $appoint->file_sk)->exists();
                     if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'jenis_dokumen' => 'sk_pengangkatan', 'nama_dokumen' => 'SK Pengangkatan '.($appoint->jenis_pengangkatan ?? ''), 'nomor_dokumen' => $appoint->no_sk, 'tanggal_dokumen' => $appoint->tanggal_sk, 'file_path' => $appoint->file_sk, 'keterangan' => 'Backfill otomatis dari data pengangkatan']);
+                        Document::create(['employee_id' => $employee->id, 'history_id' => $appoint->id, 'jenis_dokumen' => 'sk_pengangkatan', 'nama_dokumen' => 'SK Pengangkatan '.($appoint->jenis_pengangkatan ?? ''), 'nomor_dokumen' => $appoint->no_sk, 'tanggal_dokumen' => $appoint->tanggal_sk, 'file_path' => $appoint->file_sk, 'keterangan' => 'Backfill otomatis dari data pengangkatan']);
                         $created++;
                         $this->line("[Pengangkatan] {$employee->nama_lengkap}");
                     }

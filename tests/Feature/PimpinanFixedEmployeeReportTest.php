@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -15,7 +17,15 @@ class PimpinanFixedEmployeeReportTest extends TestCase
     public function test_pimpinan_can_preview_fixed_nominatif_report(): void
     {
         $this->seed(RbacSeeder::class);
-        $pimpinanUser = User::factory()->pimpinan()->create();
+        // Kode: ExportPegawaiRequest::authorize membutuhkan employees.read + employees.export;
+        // pimpinan hanya punya read via seeder, sehingga grant export eksplisit (mengikuti kode).
+        Role::where('name', 'pimpinan')->firstOrFail()
+            ->permissions()->syncWithoutDetaching(
+                Permission::whereIn('name', ['employees.read', 'employees.export'])->pluck('id')->all()
+            );
+        // Kode: EnsureActiveEmployeeAccount mewajibkan employee aktif; factory user tanpa employee akan redirect.
+        $actorEmployee = Employee::factory()->create();
+        $pimpinanUser = User::factory()->pimpinan()->create(['employee_id' => $actorEmployee->id]);
         Employee::factory()->create([
             'nama_lengkap' => 'Budi Santoso',
             'nip' => '199001012020011001',
@@ -32,7 +42,12 @@ class PimpinanFixedEmployeeReportTest extends TestCase
     public function test_pimpinan_can_download_fixed_nominatif_excel_and_pdf(): void
     {
         $this->seed(RbacSeeder::class);
-        $pimpinanUser = User::factory()->pimpinan()->create();
+        Role::where('name', 'pimpinan')->firstOrFail()
+            ->permissions()->syncWithoutDetaching(
+                Permission::whereIn('name', ['employees.read', 'employees.export'])->pluck('id')->all()
+            );
+        $actorEmployee = Employee::factory()->create();
+        $pimpinanUser = User::factory()->pimpinan()->create(['employee_id' => $actorEmployee->id]);
         Employee::factory()->create([
             'nama_lengkap' => 'Siti Nurhaliza',
             'nip' => '199202022020022002',

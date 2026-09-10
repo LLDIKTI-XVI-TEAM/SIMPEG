@@ -65,6 +65,7 @@ class EmployeeHistoryService
 
             if ($history->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $history->id,
                     'jenis_dokumen' => 'sk_pangkat',
                     'nama_dokumen' => 'SK Kenaikan Pangkat '.$golongan->kode,
                     'nomor_dokumen' => $history->no_sk,
@@ -170,6 +171,7 @@ class EmployeeHistoryService
 
             if ($history->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $history->id,
                     'jenis_dokumen' => 'sk_jabatan',
                     'nama_dokumen' => 'SK Kenaikan Jabatan '.$jabatan->nama,
                     'nomor_dokumen' => $history->no_sk,
@@ -216,6 +218,7 @@ class EmployeeHistoryService
 
             if ($history->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $history->id,
                     'jenis_dokumen' => 'sk_kgb',
                     'nama_dokumen' => 'SK KGB TMT '.($history->tmt_kgb ? $history->tmt_kgb->format('d-m-Y') : ''),
                     'nomor_dokumen' => $history->no_sk,
@@ -236,6 +239,16 @@ class EmployeeHistoryService
      */
     public function createDisciplineRecord(Employee $employee, array $data, ?Request $request = null): DisciplineRecord
     {
+        $user = $request?->user() ?? auth()->user();
+        $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            $canCreateDoc = true;
+        }
+        if (! $canCreateDoc) {
+            // Tanpa hak dokumen, abaikan berkas dan dokumen_id agar riwayat tetap tersimpan tanpa lampiran
+            unset($data['dokumen_id'], $data['file_sk']);
+        }
+
         $document = null;
         if (! empty($data['dokumen_id'])) {
             // Arsip yang dipakai ulang wajib tetap menjadi SK disiplin milik pegawai ini.
@@ -303,6 +316,7 @@ class EmployeeHistoryService
 
             if ($record->file_sk) {
                 $employee->documents()->create([
+                    'history_id' => $record->id,
                     'jenis_dokumen' => 'sk_hukuman_disiplin',
                     'nama_dokumen' => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
                     'nomor_dokumen' => $record->no_sk,
@@ -344,8 +358,32 @@ class EmployeeHistoryService
         $uploadedSkPath = null;
 
         if (($data['file_sk'] ?? null) instanceof UploadedFile) {
+            $user = auth()->user();
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
+            // Di environment lokal dengan disable auth, bypass dianggap memiliki hak dokumen
+            if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+                $canCreateDoc = true;
+            }
+            if (! $canCreateDoc) {
+                // Permission dokumen tidak aktif: jangan simpan file, riwayat tetap dibuat tanpa berkas
+                $data['file_sk'] = null;
+
+                return [$data, null];
+            }
             $data['file_sk'] = $this->files->storeSk($data['file_sk']);
             $uploadedSkPath = $data['file_sk'];
+        }
+
+        // String controlled path (reuse arsip) juga memerlukan dokumen_sk.create
+        if (is_string($data['file_sk'] ?? null) && $data['file_sk'] !== '') {
+            $user = auth()->user();
+            $canCreateDoc = $user === null || $user->hasPermission('dokumen_sk.create');
+            if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+                $canCreateDoc = true;
+            }
+            if (! $canCreateDoc) {
+                $data['file_sk'] = null;
+            }
         }
 
         return [$data, $uploadedSkPath];

@@ -12,9 +12,9 @@ class RbacSeeder extends Seeder
     {
         // Daftar role aplikasi sesuai permission matrix SIMPEG.
         $roles = [
-            'super_admin' => 'Super Admin — akses administrasi penuh selain pengajuan cuti pribadi',
+            'super_admin' => 'Super Admin — akses administrasi penuh dan fitur cuti pegawai',
             'admin_kepegawaian' => 'Admin Kepegawaian — kelola data pegawai, pantau cuti, dan ajukan cuti sendiri',
-            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, dan pengajuan cuti sendiri',
+            'pimpinan' => 'Pimpinan — dashboard, pemantauan, final approval, dan pengajuan cuti pribadi sesuai eligibility PATEN',
             'kepala_bagian' => 'Kepala Bagian — approval cuti bawahan dan pengajuan cuti sendiri',
             'pegawai' => 'Pegawai — read-only data sendiri, ajukan cuti, lihat notifikasi',
         ];
@@ -27,13 +27,16 @@ class RbacSeeder extends Seeder
             'employees.import' => ['module' => 'employees', 'description' => 'Import data pegawai'],
             'employees.deactivate' => ['module' => 'employees', 'description' => 'Menonaktifkan data pegawai'],
             'employees.restore' => ['module' => 'employees', 'description' => 'Mengaktifkan kembali data pegawai nonaktif'],
+            'employees.export' => ['module' => 'employees', 'description' => 'Mengekspor data pegawai (Excel/PDF)'],
             'employees.read_self' => ['module' => 'employees', 'description' => 'Melihat detail data pegawai milik sendiri'],
-            'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai'],
+            'employee_histories.read' => ['module' => 'employee_histories', 'description' => 'Melihat riwayat pegawai (pangkat, jabatan, KGB, pendidikan, pengangkatan, status kepegawaian)'],
             'employee_histories.create' => ['module' => 'employee_histories', 'description' => 'Membuat entri riwayat pegawai'],
             'employee_histories.update' => ['module' => 'employee_histories', 'description' => 'Memperbarui riwayat pegawai'],
             'employee_histories.delete' => ['module' => 'employee_histories', 'description' => 'Menghapus riwayat pegawai'],
+            'employee_histories.export' => ['module' => 'employee_histories', 'description' => 'Melihat dan mengunduh Laporan Riwayat Kepangkatan pegawai'],
             'discipline_records.read' => ['module' => 'discipline_records', 'description' => 'Melihat riwayat hukuman disiplin'],
             'discipline_records.create' => ['module' => 'discipline_records', 'description' => 'Membuat riwayat hukuman disiplin'],
+            'discipline_records.delete' => ['module' => 'discipline_records', 'description' => 'Menghapus riwayat hukuman disiplin'],
             'employee_families.read' => ['module' => 'employee_families', 'description' => 'Melihat data keluarga pegawai'],
             'employee_families.create' => ['module' => 'employee_families', 'description' => 'Membuat data keluarga pegawai'],
             'employee_families.update' => ['module' => 'employee_families', 'description' => 'Mengubah data keluarga pegawai'],
@@ -48,16 +51,13 @@ class RbacSeeder extends Seeder
             'notifications.read' => ['module' => 'notifications', 'description' => 'Melihat notifikasi milik sendiri'],
             'notifications.update' => ['module' => 'notifications', 'description' => 'Menandai notifikasi milik sendiri sudah dibaca'],
             'users.switch_role' => ['module' => 'users', 'description' => 'Melakukan simulasi beralih ke role yang lebih rendah untuk demo/testing/support'],
-            // Permission cuti menjadi gerbang kasar route/menu; otorisasi inti per pengajuan tetap berbasis approver terkonfigurasi.
+            // Permission cuti menjadi gerbang halaman/fitur; otorisasi keputusan tetap berbasis
+            // approver yang tercatat pada approval chain aktif, bukan permission per stage.
             'cuti.create' => ['module' => 'cuti', 'description' => 'Mengajukan permohonan cuti'],
             'cuti.read_own' => ['module' => 'cuti', 'description' => 'Melihat pengajuan cuti milik sendiri'],
             'cuti.read_all' => ['module' => 'cuti', 'description' => 'Melihat seluruh pengajuan cuti (monitor)'],
             'cuti.approve' => ['module' => 'cuti', 'description' => 'Mengambil keputusan approval cuti sesuai assignment aktif'],
-            'cuti.approve_stage1' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 1 (Atasan Langsung)'],
-            'cuti.approve_stage2' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 2 (Kabag Umum)'],
-            'cuti.approve_stage3' => ['module' => 'cuti', 'description' => 'Menyetujui/menunda cuti pada stage 3 (Pimpinan/PYBMC)'],
             'cuti.configure' => ['module' => 'cuti', 'description' => 'Mengonfigurasi approval chain cuti'],
-            'cuti.configure_chain' => ['module' => 'cuti', 'description' => 'Mengonfigurasi rantai approval cuti per pegawai'],
             'cuti.balance.read' => ['module' => 'cuti', 'description' => 'Melihat saldo cuti'],
             'cuti.balance.reconcile' => ['module' => 'cuti', 'description' => 'Mencatat dan memperbaiki fakta pemakaian serta saldo cuti'],
             'cuti.manual.manage' => ['module' => 'cuti', 'description' => 'Mencatat, mengoreksi, dan membatalkan pemakaian cuti manual'],
@@ -65,41 +65,61 @@ class RbacSeeder extends Seeder
             'cuti.administrative_postponement.manage' => ['module' => 'cuti', 'description' => 'Menangguhkan cuti yang disetujui secara administratif'],
             'cuti.proof.generate' => ['module' => 'cuti', 'description' => 'Membuat bukti/formulir cuti resmi setelah approval final'],
             'cuti.kepala_lembaga_documents.manage' => ['module' => 'cuti', 'description' => 'Mengelola dokumen pendukung cuti Kepala Lembaga'],
+            'dokumen_sk.read' => ['module' => 'dokumen_sk', 'description' => 'Melihat dokumen dan SK pegawai'],
+            'dokumen_sk.create' => ['module' => 'dokumen_sk', 'description' => 'Mengunggah dokumen dan SK pegawai (riwayat, status, pengangkatan, berkas tambahan)'],
+            'dokumen_sk.update' => ['module' => 'dokumen_sk', 'description' => 'Mengganti berkas SK riwayat dan memperbarui berkas tambahan pegawai'],
+            'dokumen_sk.delete' => ['module' => 'dokumen_sk', 'description' => 'Menghapus berkas tambahan mandiri pegawai (KTP, KK, ijazah, lainnya)'],
+            'ews.read' => ['module' => 'ews', 'description' => 'Melihat daftar EWS aktif seluruh pegawai'],
+            'ews.configure' => ['module' => 'ews', 'description' => 'Mengonfigurasi parameter dan threshold EWS'],
         ];
 
-        // Assignment administratif yang sudah dikonfigurasi operator, termasuk pencabutan total, dipertahankan.
-        $administrativeRoles = Permission::query()->where('name', 'cuti.administrative_postponement.manage')
-            ->first()?->roles()->pluck('name')->all();
-
+        $newRoleNames = [];
         foreach ($roles as $name => $description) {
-            Role::updateOrCreate(['name' => $name], [
+            $role = Role::firstOrNew(['name' => $name]);
+            $isNewRole = ! $role->exists;
+            $role->fill([
                 'guard_name' => 'web',
                 'description' => $description,
             ]);
+            $role->save();
+            if ($isNewRole) {
+                $newRoleNames[] = $name;
+            }
         }
 
+        $newPermissionNames = [];
         foreach ($permissions as $name => $attributes) {
-            Permission::updateOrCreate(['name' => $name], $attributes);
+            $permission = Permission::firstOrNew(['name' => $name]);
+            $isNewPermission = ! $permission->exists;
+            $permission->fill($attributes);
+            $permission->save();
+            if ($isNewPermission) {
+                $newPermissionNames[] = $name;
+            }
         }
 
         // Mapping permission per role dibuat eksplisit agar perubahan hak akses mudah ditelusuri saat review.
-        // hari_libur tetap khusus super_admin; pimpinan/atasan/pegawai belum punya akses route admin.
-        // Catatan cuti: cuti.approve_stage2 (Kabag Umum) belum dipetakan ke role dasar karena approver stage 2
-        // bersifat person-based via approval_configs; pemetaan role penampungnya menunggu konfirmasi dan ditegakkan
-        // di approval engine. cuti.configure dibatasi khusus super_admin.
-        $this->syncRolePermissions([
-            'super_admin' => array_values(array_diff(array_keys($permissions), [
-                'cuti.create',
-                'cuti.balance.reconcile',
-                'cuti.manual.manage',
-                'cuti.cancellation.manage',
-                'cuti.administrative_postponement.manage',
-            ])),
+        // Tahap approval tidak disimpan sebagai permission: semua role dapat menjadi approver bila tercatat
+        // pada chain aktif. Capability mandiri PATEN tetap dicantumkan untuk kompatibilitas data lama,
+        // tetapi runtime tidak memakai pivot sebagai sumber keputusan.
+        // Permission penangguhan administratif mengikuti bootstrap non-destruktif yang sama;
+        // perubahan grant operator tidak boleh ditimpa saat seeder dijalankan ulang.
+        $this->bootstrapRolePermissions([
+            // Super Admin menerima default semua capability RBAC, tetapi tetap
+            // dapat direvoke dari matrix setelah bootstrap. Penangguhan cuti
+            // administratif dikecualikan: default produk hanya Admin Kepegawaian
+            // (lihat migrasi 2026_09_06_000002); operator dapat memberikannya
+            // eksplisit bila dibutuhkan.
+            'super_admin' => array_values(array_diff(
+                array_keys($permissions),
+                ['cuti.administrative_postponement.manage']
+            )),
             'admin_kepegawaian' => [
                 'employees.read',
                 'employees.create',
                 'employees.update',
                 'employees.import',
+                'employees.export',
                 'employees.deactivate',
                 // K-STATUS-04: reaktivasi boleh Super Admin ATAU Admin Kepegawaian
                 // selama role EFEKTIF memiliki employees.restore. Gate tetap memakai
@@ -109,8 +129,10 @@ class RbacSeeder extends Seeder
                 'employee_histories.create',
                 'employee_histories.update',
                 'employee_histories.delete',
+                'employee_histories.export',
                 'discipline_records.read',
                 'discipline_records.create',
+                'discipline_records.delete',
                 'employee_families.read',
                 'employee_families.create',
                 'employee_families.update',
@@ -119,72 +141,102 @@ class RbacSeeder extends Seeder
                 'audit_logs.read',
                 'notifications.read',
                 'notifications.update',
-                // Admin kepegawaian dapat mengajukan cuti sendiri dan memonitor seluruh pengajuan tanpa menyetujui.
+                // Admin kepegawaian dapat melihat dokumen & SK pegawai dan memantau EWS aktif
+                'dokumen_sk.read',
+                'dokumen_sk.create',
+                'dokumen_sk.update',
+                'dokumen_sk.delete',
+                'ews.read',
+                // Admin kepegawaian dapat mengajukan, memantau, mengelola konfigurasi, dan administrasi cuti.
                 'cuti.create',
+                'cuti.read_own',
                 'cuti.read_all',
+                'cuti.approve',
+                'cuti.configure',
                 'cuti.balance.read',
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
+                'cuti.proof.generate',
                 'cuti.cancellation.manage',
                 'cuti.administrative_postponement.manage',
                 'cuti.kepala_lembaga_documents.manage',
             ],
             'pimpinan' => [
                 'employees.read',
+                'employee_histories.read',
+                'employee_histories.export',
+                'employee_families.read',
+                'discipline_records.read',
+                'dokumen_sk.read',
+                'ews.read',
                 'notifications.read',
                 'notifications.update',
-                // Role pimpinan dapat mengajukan cuti sendiri bila bukan pegawai bertanda Kepala Lembaga.
+                // Grant legacy dipertahankan, tetapi pengajuan mandiri diputus PATEN berdasarkan
+                // identitas pegawai aktif dan eligibility domain, bukan checkbox role.
                 'cuti.create',
+                'cuti.read_own',
                 'cuti.approve',
-                'cuti.approve_stage3',
                 'cuti.read_all',
+                'cuti.configure',
+                'cuti.balance.read',
             ],
             'kepala_bagian' => [
                 'notifications.read',
                 'notifications.update',
-                // Kepala bagian dapat mengajukan cuti sendiri sekaligus memegang approval stage 1 bawahan.
+                // Kepala Bagian dapat mengajukan cuti, memantau, dan mengatur chain.
                 'cuti.create',
+                'cuti.read_own',
                 'cuti.approve',
-                'cuti.approve_stage1',
+                'cuti.read_all',
+                'cuti.configure',
+                'cuti.balance.read',
             ],
             'pegawai' => [
                 'employees.read_self',
                 'notifications.read',
                 'notifications.update',
-                // Pegawai dapat membuat pengajuan cuti miliknya sendiri.
+                // Pegawai dapat membuat serta membaca pengajuan/saldo miliknya sendiri.
                 'cuti.create',
+                'cuti.read_own',
+                'cuti.approve',
+                'cuti.balance.read',
                 // Profil mandiri hanya memberi akses baca; mutasi tetap melalui admin kepegawaian.
                 'employee_families.read',
                 'employee_histories.read',
             ],
-        ], $administrativeRoles);
+        ], $newRoleNames, $newPermissionNames);
     }
 
     /**
-     * Menyinkronkan mapping role-permission secara idempoten.
-     * Memakai sync agar seeder aman dijalankan ulang tanpa menduplikasi pivot.
+     * Menanam default hanya untuk role atau permission yang baru dibuat.
+     *
+     * Matrix operator adalah sumber otorisasi efektif. Seeder ulang tidak boleh
+     * mencabut grant non-default maupun menanam kembali grant default yang telah
+     * direvoke operator.
      *
      * @param  array<string, list<string>>  $mapping
-     * @param  list<string>|null  $administrativeRoles
+     * @param  list<string>  $newRoleNames
+     * @param  list<string>  $newPermissionNames
      */
-    private function syncRolePermissions(array $mapping, ?array $administrativeRoles): void
+    private function bootstrapRolePermissions(array $mapping, array $newRoleNames, array $newPermissionNames): void
     {
         foreach ($mapping as $roleName => $permissionNames) {
             $role = Role::where('name', $roleName)->firstOrFail();
 
-            if ($administrativeRoles !== null) {
-                $permissionNames = array_values(array_diff($permissionNames, ['cuti.administrative_postponement.manage']));
-                if (in_array($roleName, $administrativeRoles, true)) {
-                    $permissionNames[] = 'cuti.administrative_postponement.manage';
-                }
+            $namesToAttach = in_array($roleName, $newRoleNames, true)
+                ? $permissionNames
+                : array_values(array_intersect($permissionNames, $newPermissionNames));
+
+            if ($namesToAttach === []) {
+                continue;
             }
 
             $permissionIds = Permission::query()
-                ->whereIn('name', $permissionNames)
+                ->whereIn('name', $namesToAttach)
                 ->pluck('id')
                 ->all();
 
-            $role->permissions()->sync($permissionIds);
+            $role->permissions()->syncWithoutDetaching($permissionIds);
         }
     }
 }

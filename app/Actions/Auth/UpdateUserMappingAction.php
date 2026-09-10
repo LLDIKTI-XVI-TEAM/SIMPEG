@@ -6,6 +6,7 @@ use App\Exceptions\UserMappingAuditException;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Support\IdentifierMasker;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -70,7 +71,7 @@ class UpdateUserMappingAction
                 // Jika role asli akun diubah dan temporary_role tidak lagi valid (misalnya role diturunkan
                 // sehingga temporary_role tidak lagi lebih rendah dari role baru), batalkan simulasi.
                 $simulationCancelled = false;
-                if ($user->temporary_role !== null && ! $user->canSwitchToRole($user->temporary_role)) {
+                if ($user->temporary_role !== null && ! $this->isTemporaryRoleValidForOriginalRole($user->role, $user->temporary_role)) {
                     $simulationCancelled = true;
                     $user->temporary_role = null;
                     $user->temporary_permission = null;
@@ -156,6 +157,14 @@ class UpdateUserMappingAction
         return $this->findLegacyUser($employee) ?? new User;
     }
 
+    private function isTemporaryRoleValidForOriginalRole(?string $originalRole, string $temporaryRole): bool
+    {
+        $originalRank = User::ROLE_RANKS[$originalRole] ?? null;
+        $temporaryRank = User::ROLE_RANKS[$temporaryRole] ?? null;
+
+        return $originalRank !== null && $temporaryRank !== null && $temporaryRank < $originalRank;
+    }
+
     private function findLegacyUser(Employee $employee): ?User
     {
         $emails = $this->employeeEmails($employee);
@@ -238,24 +247,12 @@ class UpdateUserMappingAction
             'employee_id' => $user->employee_id,
             'role' => $user->role,
             'mapping_status' => $user->keycloak_id ? 'connected' : 'disconnected',
-            'keycloak_id_masked' => $this->maskIdentifier($user->keycloak_id),
+            'keycloak_id_masked' => IdentifierMasker::mask($user->keycloak_id),
             'temporary_role' => $user->temporary_role,
             'temporary_permission' => $user->temporary_permission,
             'temporary_role_started_at' => $user->temporary_role_started_at?->toIso8601String(),
             'temporary_role_switched_by' => $user->temporary_role_switched_by,
         ];
-    }
-
-    private function maskIdentifier(?string $identifier): ?string
-    {
-        if ($identifier === null || $identifier === '') {
-            return null;
-        }
-
-        $visibleCharacters = min(4, strlen($identifier));
-
-        return str_repeat('*', max(strlen($identifier) - $visibleCharacters, 0))
-            .substr($identifier, -$visibleCharacters);
     }
 
     private function isUniqueConstraintViolation(QueryException $exception): bool

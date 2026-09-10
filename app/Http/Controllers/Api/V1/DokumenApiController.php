@@ -14,7 +14,7 @@ class DokumenApiController extends Controller
         return response()
             ->json([
                 'message' => 'Daftar dokumen berhasil diambil.',
-                'documents' => $action->execute($request->validated()),
+                'documents' => $action->execute($request->validated(), $request->user()),
                 'file_status_checked_at' => now()->toIso8601String(),
             ])
             // Status file berasal dari filesystem, sehingga respons daftar tidak boleh

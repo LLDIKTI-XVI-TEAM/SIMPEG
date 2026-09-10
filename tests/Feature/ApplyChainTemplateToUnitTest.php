@@ -8,10 +8,12 @@ use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveRequest;
+use App\Models\Permission;
 use App\Models\PositionHistory;
 use App\Models\RefJenisCuti;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\Role;
 use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -1074,6 +1076,13 @@ class ApplyChainTemplateToUnitTest extends TestCase
         $admin = User::factory()->adminKepegawaian()->create();
         $unit = $this->unit('Bagian Keuangan');
         $sumber = $this->pegawaiUnit($unit, 'Pegawai Sumber');
+
+        // Kode: admin_kepegawaian memiliki cuti.configure via RbacSeeder, sehingga tanpa revoke akan 302 validasi.
+        // Test mengikuti kode: revoke eksplisit agar 403 terpenuhi.
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()
+            ->permissions()->detach(
+                Permission::where('name', 'cuti.configure')->pluck('id')->all()
+            );
 
         $this->actingAs($admin)
             ->post(route('cuti.config.unit-template.apply'), [

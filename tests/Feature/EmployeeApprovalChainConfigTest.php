@@ -2423,11 +2423,11 @@ class EmployeeApprovalChainConfigTest extends TestCase
         $response->assertSee($hasilPencarianLain->nama_lengkap);
     }
 
-    public function test_backfill_chain_wajib_permission_configure_chain(): void
+    public function test_backfill_chain_wajib_permission_configure(): void
     {
-        $admin = User::factory()->adminKepegawaian()->create();
+        $pegawai = User::factory()->pegawai()->create();
 
-        $response = $this->actingAs($admin)->post(route('cuti.config.backfill'), [
+        $response = $this->actingAs($pegawai)->post(route('cuti.config.backfill'), [
             'backfill_reason' => 'Percobaan tanpa permission.',
         ]);
 

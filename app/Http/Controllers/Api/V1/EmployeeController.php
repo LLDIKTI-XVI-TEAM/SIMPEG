@@ -29,19 +29,29 @@ class EmployeeController extends Controller
     {
         return response()->json([
             'message' => 'Daftar pegawai berhasil diambil.',
-            'employees' => $action->execute($request->validated()),
+            'employees' => $action->execute($request->validated(), $request->user()),
         ]);
     }
 
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($request->validated(), $request);
+        $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Data pegawai berhasil ditambahkan.',
+            $message = 'Data pegawai berhasil ditambahkan.';
+            if (! empty($warnings)) {
+                $message .= ' Peringatan: '.implode(' ', $warnings);
+            }
+            $payload = [
+                'message' => $message,
                 'employee' => $employee,
-            ], 201);
+            ];
+            if (! empty($warnings)) {
+                $payload['warnings'] = $warnings;
+            }
+
+            return response()->json($payload, 201);
         }
 
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
@@ -83,12 +93,22 @@ class EmployeeController extends Controller
     public function update(UpdateEmployeeRequest $request, Employee $employee, UpdateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($employee, $request->validated(), $request);
+        $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Data pegawai berhasil diperbarui.',
+            $message = 'Data pegawai berhasil diperbarui.';
+            if (! empty($warnings)) {
+                $message .= ' Peringatan: '.implode(' ', $warnings);
+            }
+            $payload = [
+                'message' => $message,
                 'employee' => $employee,
-            ]);
+            ];
+            if (! empty($warnings)) {
+                $payload['warnings'] = $warnings;
+            }
+
+            return response()->json($payload);
         }
 
         return back()->with('success', 'Data pegawai berhasil diperbarui.');
@@ -115,7 +135,7 @@ class EmployeeController extends Controller
                 ->orderByDesc('tmt_jabatan'),
             'salaryHistories:id,employee_id,no_sk,tanggal_sk,tmt_kgb,file_sk,is_latest,created_at',
             'appointments' => fn ($query) => $query
-                ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
                 ->orderByDesc('tmt_pengangkatan')
                 ->orderByDesc('created_at'),
             'documents:id,employee_id,jenis_dokumen,nama_dokumen,nomor_dokumen,tanggal_dokumen,file_path,keterangan,created_at',

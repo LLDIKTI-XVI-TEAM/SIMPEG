@@ -32,7 +32,7 @@ class LeaveUsageDocumentDownloadTest extends TestCase
         Storage::fake(LeaveUsageDocument::STORAGE_DISK);
     }
 
-    public function test_download_guard_admin_dijalankan_sebelum_lookup_dokumen_sensitif(): void
+    public function test_download_guard_permission_manual_dijalankan_sebelum_lookup_dokumen_sensitif(): void
     {
         [$record, $document] = $this->manualDocument();
         $unknownUsage = (string) Str::uuid();
@@ -40,7 +40,7 @@ class LeaveUsageDocumentDownloadTest extends TestCase
 
         $this->get($this->downloadUrl($record, $document))->assertRedirect(route('login'));
 
-        foreach (['super_admin', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
             $actor = User::factory()->create(['role' => $role]);
             $this->actingAs($actor)
                 ->get("/cuti/pemakaian-manual/{$unknownUsage}/dokumen/{$unknownDocument}")

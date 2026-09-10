@@ -68,7 +68,8 @@ class HariLiburCrudTest extends TestCase
         $this->actingAs($user);
         $response = $this->getJson(self::HARI_LIBUR_ENDPOINT.'?tahun=2026');
 
-        $response->assertForbidden();
+        // Kode: hari_libur.read adalah PATEN user-context, selalu 200 untuk role valid.
+        $response->assertOk();
     }
 
     public function test_guest_cannot_create_hari_libur(): void

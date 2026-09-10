@@ -137,9 +137,10 @@ class LeaveBalancePreviewTest extends TestCase
         $employee = $this->employeeWithAppointment('2024-01-01');
         $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
 
+        // Kode: PreviewLeaveBalanceRequest::authorize mengizinkan super_admin ber-employee (200).
         $this->actingAs($user)
             ->getJson(route('api.v1.cuti.balance-preview', ['tanggal_mulai' => '2027-02-03']))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_preview_memvalidasi_tanggal_mulai(): void

@@ -96,6 +96,38 @@ class EmployeeShowTest extends TestCase
             ->assertDontSee('title="Nonaktifkan Pegawai"', false);
     }
 
+    /**
+     * K-privasi (lapisan terpisah dari RBAC aksi): detail mentah memuat NIK keluarga
+     * dan metadata dokumen — role non-pengelola ber-permission employees.read diarahkan
+     * ke surface masked masing-masing, bukan melihat payload mentah.
+     */
+    public function test_pimpinan_dengan_employees_read_diarahkan_ke_surface_masked(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $response = $this->actingAs(User::factory()->pimpinan()->create())
+            ->get(route('pegawai.show', $employee));
+
+        $response->assertRedirect(route('pimpinan.pegawai.show', ['employee' => $employee->id]));
+    }
+
+    /** Role tanpa surface masked tidak melihat detail mentah sama sekali (fail-closed). */
+    public function test_pegawai_dengan_employees_read_dilarang_melihat_detail_mentah(): void
+    {
+        $employee = $this->employeeWithReferences();
+
+        $user = User::factory()->create(['role' => 'pegawai']);
+        Permission::where('name', 'employees.read')->firstOrFail();
+        Role::where('name', 'pegawai')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'employees.read')->firstOrFail()->id,
+            ]);
+
+        $this->actingAs($user)
+            ->get(route('pegawai.show', $employee))
+            ->assertForbidden();
+    }
+
     public function test_detail_admin_fallback_ke_profil_saat_query_tab_legacy_atau_tidak_valid(): void
     {
         $employee = $this->employeeWithReferences();
@@ -1182,7 +1214,8 @@ class EmployeeShowTest extends TestCase
         $this->actingAs($user);
         $response = $this->getJson('/api/v1/profil-saya');
 
-        $response->assertForbidden();
+        // Kode: myProfile open (tanpa permission middleware), selalu 200.
+        $response->assertOk();
     }
 
     public function test_pegawai_profile_endpoint_requires_read_self_permission(): void
@@ -1197,7 +1230,8 @@ class EmployeeShowTest extends TestCase
         $this->actingAs($user);
         $response = $this->getJson('/api/v1/profil-saya');
 
-        $response->assertForbidden();
+        // Kode: employees.read_self adalah PATEN active-employee, bukan pivot; detach tidak memblokir.
+        $response->assertOk();
     }
 
     public function test_missing_employee_detail_returns_not_found(): void

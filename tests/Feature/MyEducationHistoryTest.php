@@ -73,9 +73,10 @@ class MyEducationHistoryTest extends TestCase
         $role->permissions()->detach($permission->id);
         $user = User::factory()->pegawai()->create(['employee_id' => Employee::factory()->create()->id]);
 
+        // Kode: profil-saya/pendidikan open-by-design (resolve dari sesi).
         $this->actingAs($user)
             ->getJson(route('api.v1.profil-saya.pendidikan.index'))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     /**

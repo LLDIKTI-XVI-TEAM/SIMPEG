@@ -200,7 +200,7 @@ class PegawaiController extends Controller
                 'sort' => $sort,
                 'direction' => $direction,
                 'per_page' => $perPage,
-            ]));
+            ]), $request->user());
             $initialRows = $initialPageData->items();
             $initialMeta = [
                 'total' => $initialPageData->total(),
@@ -248,10 +248,21 @@ class PegawaiController extends Controller
     {
         try {
             $employee = $action->execute($request->validated(), $request);
+            $warnings = $action->warnings;
 
-            return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
+            $successMsg = 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.';
+            if (! empty($warnings)) {
+                $successMsg .= ' Peringatan: '.implode(' ', $warnings);
+            }
+
+            $redirect = redirect()->route('data-pegawai')
+                ->with('success', $successMsg)
                 ->with('employee_data_changed', true);
+            if (! empty($warnings)) {
+                $redirect = $redirect->with('warnings', $warnings);
+            }
+
+            return $redirect;
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->except(array_keys($request->allFiles())))
@@ -329,6 +340,7 @@ class PegawaiController extends Controller
 
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
+            $warnings = $action->warnings;
 
             $employee->load([
                 'jenisPegawai:id,nama',
@@ -341,7 +353,7 @@ class PegawaiController extends Controller
                     ->orderByDesc('tmt_jabatan'),
                 'salaryHistories:id,employee_id,no_sk,tanggal_sk,tmt_kgb,file_sk,is_latest,created_at',
                 'appointments' => fn ($query) => $query
-                    ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
+                    ->select(['id', 'employee_id', 'jenis_pengangkatan', 'no_sk', 'tanggal_sk', 'file_sk', 'tmt_pengangkatan', 'created_at'])
                     ->orderByDesc('tmt_pengangkatan')
                     ->orderByDesc('created_at'),
                 'documents:id,employee_id,jenis_dokumen,nama_dokumen,nomor_dokumen,tanggal_dokumen,file_path,keterangan,created_at',
@@ -353,14 +365,24 @@ class PegawaiController extends Controller
             // (termasuk relasi dan file SK) tercatat di cache sessionStorage
             $editedEmployeeData = array_merge($employee->toArray(), $tableRow);
 
+            $successMsg = 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.';
+            if (! empty($warnings)) {
+                $successMsg .= ' Peringatan: '.implode(' ', $warnings);
+            }
+
             $redirect = redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('success', $successMsg)
                 ->with('employee_data_changed', true)
                 ->with('edited_employee_id', $employee->id)
                 ->with('edited_employee_data', $editedEmployeeData);
+            if (! empty($warnings)) {
+                $redirect = $redirect->with('warnings', $warnings);
+            }
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
-            if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {
+            // Hanya jika file benar-benar tersimpan (ada permission), bukan warning
+            $hasBerkasUploaded = $request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid() && empty(array_filter($warnings, fn ($w) => str_contains($w, 'Berkas lainnya')));
+            if ($hasBerkasUploaded) {
                 $redirect = $redirect->with('document_data_changed', true);
             }
 

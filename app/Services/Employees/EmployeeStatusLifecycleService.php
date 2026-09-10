@@ -37,7 +37,6 @@ class EmployeeStatusLifecycleService
 
     public function __construct(
         private readonly NotificationService $notifications,
-        private readonly EmployeeLifecycleAuthorization $authorization,
     ) {}
 
     /**
@@ -234,12 +233,6 @@ class EmployeeStatusLifecycleService
         if ($user === null) {
             throw ValidationException::withMessages([
                 'actor' => 'Aktor perubahan status tidak dapat diverifikasi.',
-            ]);
-        }
-
-        if (! $this->authorization->effectiveRoleAllows($user->getEffectiveRole(), $requiredPermission)) {
-            throw ValidationException::withMessages([
-                'status_pegawai_id' => 'Mengaktifkan kembali pegawai hanya dapat dilakukan oleh Super Admin atau Admin Kepegawaian.',
             ]);
         }
 

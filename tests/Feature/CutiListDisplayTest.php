@@ -406,14 +406,15 @@ class CutiListDisplayTest extends TestCase
         $this->assertMatchesRegularExpression('/<th\b[^>]*>\s*Unit Kerja\s*<\/th>/s', $content);
     }
 
-    public function test_super_admin_tidak_melihat_cta_pengajuan_cuti(): void
+    public function test_super_admin_melihat_cta_pengajuan_cuti(): void
     {
-        $user = User::factory()->superAdmin()->create();
+        $employee = Employee::factory()->create();
+        $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
 
         $this->actingAs($user)->get(route('cuti'))
             ->assertOk()
-            ->assertDontSee('Ajukan Cuti Baru')
-            ->assertDontSee('href="'.route('cuti.create').'"', false);
+            ->assertSee('Ajukan Cuti Baru')
+            ->assertSee('href="'.route('cuti.create').'"', false);
     }
 
     public function test_kepala_lembaga_tidak_melihat_cta_pengajuan_cuti(): void

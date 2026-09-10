@@ -1,9 +1,15 @@
 <x-layouts.app title="Arsip Dokumen Kepegawaian">
 
+    @php
+        $isKepalaBagianArchive = ($isKepalaBagian ?? false) === true;
+        $isPegawaiArchive = ($isPegawai ?? false) === true || auth()->user()?->getEffectiveRole() === 'pegawai';
+        $archiveBawahans = $bawahans ?? collect();
+    @endphp
     <div x-data="{
         filters: {
             search: '',
             kategori: '',
+            employee_id: '',
         },
         documentsRows: [],
         meta: { current_page: 1, last_page: 1, total: 0, from: 0, to: 0 },
@@ -18,7 +24,7 @@
 
         get cacheKey() {
             const f = this.filters;
-            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}`;
+            return `dokumen_pp${this.perPage}_s${f.search}_k${f.kategori}_e${f.employee_id}`;
         },
 
         clearCache() {
@@ -168,6 +174,7 @@
                 this.searchTimer = setTimeout(() => this.applyFilter(), 300);
             });
             this.$watch('filters.kategori', () => this.applyFilter());
+            this.$watch('filters.employee_id', () => this.applyFilter());
             this.$watch('perPage', () => this.applyFilter());
         },
     }" class="space-y-6">
@@ -176,10 +183,20 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h2 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h2>
+                @php
+                    $archiveEffectiveRole = auth()->user()?->getEffectiveRole();
+                    $archiveDashboardUrl = $archiveEffectiveRole === 'kepala_bagian' ? route('kepala-bagian.dashboard') : route('dashboard');
+                    $archivePegawaiUrl = $archiveEffectiveRole === 'kepala_bagian' ? route('kepala-bagian.bawahan.index') : ($archiveEffectiveRole === 'pegawai' ? route('profil') : route('data-pegawai'));
+                @endphp
                 <x-ui.breadcrumb :items="[
-                    ['label' => 'Dashboard', 'url' => route('dashboard')],
+                    ['label' => 'Dashboard', 'url' => $archiveDashboardUrl],
                     ['label' => 'Arsip Dokumen'],
                 ]" />
+                @if($isKepalaBagianArchive)
+                    <p class="mt-1 text-xs text-muted font-sans">Hanya menampilkan dokumen bawahan langsung Anda.</p>
+                @elseif($isPegawaiArchive)
+                    <p class="mt-1 text-xs text-muted font-sans">Hanya menampilkan dokumen Anda sendiri.</p>
+                @endif
             </div>
             <div class="flex shrink-0 items-center gap-3">
                 <x-ui.button
@@ -241,6 +258,17 @@
                         @endforeach
                     </x-form.select>
                 </div>
+                @if($isKepalaBagianArchive)
+                    {{-- Filter Bawahan khusus Kepala Bagian --}}
+                    <div class="relative col-span-1">
+                        <x-form.select x-model="filters.employee_id" aria-label="Filter bawahan">
+                            <option value="">Semua Bawahan</option>
+                            @foreach ($archiveBawahans as $bawahan)
+                                <option value="{{ $bawahan->id }}">{{ $bawahan->nama_lengkap }} — {{ $bawahan->nip }}</option>
+                            @endforeach
+                        </x-form.select>
+                    </div>
+                @endif
             </x-slot:filters>
 
             {{-- ---- Custom Body Rows ---- --}}
