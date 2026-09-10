@@ -174,16 +174,34 @@ class PhaseSevenBrowserQaSeeder extends Seeder
     private function upsertAdminSession(?string $jenisPegawaiId, ?string $statusAktifId): User
     {
         $email = 'demo-klabat-kepeg@example.test';
-        $user = User::query()
-            ->where('keycloak_username', 'demo-klabat-kepeg')
-            ->orWhere('email', $email)
-            ->first() ?? new User;
+        // Validate-only for SSO persona existing: do not repair silently.
+        $userCandidates = User::query()
+            ->whereRaw('lower(keycloak_username) = ?', [strtolower('demo-klabat-kepeg')])
+            ->orWhereRaw('lower(email) = ?', [strtolower($email)])
+            ->limit(2)
+            ->get();
+        if ($userCandidates->count() > 1) {
+            throw new \RuntimeException('QA fixture contract violated: ambiguous admin user for demo-klabat-kepeg');
+        }
+        $user = $userCandidates->first();
 
-        $employee = $user->employee_id !== null
-            ? Employee::query()->find($user->employee_id)
-            : Employee::query()->where('email', $email)->first();
-
+        $employeeCandidates = Employee::query()
+            ->whereRaw('lower(email) = ? OR lower(email_pribadi) = ?', [strtolower($email), strtolower($email)])
+            ->limit(2)
+            ->get();
+        if ($employeeCandidates->count() > 1) {
+            throw new \RuntimeException('QA fixture contract violated: ambiguous admin employee for demo-klabat-kepeg');
+        }
+        $employee = null;
+        if ($user !== null && $user->employee_id !== null) {
+            $employee = Employee::query()->find($user->employee_id);
+        }
         if ($employee === null) {
+            $employee = $employeeCandidates->first();
+        }
+
+        if ($user === null && $employee === null) {
+            // Both missing: create via upsertEmployee (qa-phase7 style) - first time only
             $employee = $this->upsertEmployee(
                 $email,
                 '198001012026000004',
@@ -192,18 +210,32 @@ class PhaseSevenBrowserQaSeeder extends Seeder
                 $jenisPegawaiId,
                 $statusAktifId,
             );
+            $user = new User;
+            $user->fill([
+                'name' => 'Demo Klabat (Admin Kepegawaian)',
+                'email' => $email,
+                'keycloak_username' => 'demo-klabat-kepeg',
+                'role' => 'admin_kepegawaian',
+                'employee_id' => $employee->id,
+                'email_verified_at' => now(),
+                'password' => 'demo-klabat-kepeg',
+            ]);
+            $user->save();
+
+            return $user;
         }
 
-        $user->fill([
-            'name' => 'Demo Klabat (Admin Kepegawaian)',
-            'email' => $email,
-            'keycloak_username' => 'demo-klabat-kepeg',
-            'role' => 'admin_kepegawaian',
-            'employee_id' => $employee->id,
-            'email_verified_at' => $user->email_verified_at ?? now(),
-            'password' => $user->password ?? 'demo-klabat-kepeg',
-        ]);
-        $user->save();
+        if ($user === null || $employee === null) {
+            throw new \RuntimeException('QA fixture contract violated: admin user/employee incomplete - run SsoRoleMappedAccountSeeder');
+        }
+
+        if (! $employee->isActive() || $employee->status_pegawai_id !== $statusAktifId || $employee->jenis_pegawai_id !== $jenisPegawaiId) {
+            throw new \RuntimeException('QA fixture contract violated: admin employee not Aktif or mismatched jenis/status - refusing to force Aktif');
+        }
+
+        if ($user->role !== 'admin_kepegawaian' || $user->keycloak_username !== 'demo-klabat-kepeg' || $user->employee_id !== $employee->id) {
+            throw new \RuntimeException('QA fixture contract violated: admin user role/employee_id mismatch - refusing to overwrite');
+        }
 
         return $user;
     }
@@ -257,22 +289,13 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             throw new \RuntimeException('Employee untuk demo-klabat-kabag belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
         }
 
-        $employee->fill([
-            'nama_lengkap' => 'Demo Klabat (Kepala Bagian)',
-            'status_pegawai_id' => $statusAktifId,
-            'status_aktif' => 'Aktif',
-            'jenis_pegawai_id' => $jenisPegawaiId,
-            'jabatan_terakhir' => 'Kepala Bagian',
-            'role' => 'kepala_bagian',
-        ]);
-        $employee->save();
+        if (! $employee->isActive() || $employee->status_pegawai_id !== $statusAktifId || $employee->jenis_pegawai_id !== $jenisPegawaiId || $employee->jabatan_terakhir !== 'Kepala Bagian' || ($employee->role ?? null) !== 'kepala_bagian') {
+            throw new \RuntimeException('QA fixture contract violated: demo approver employee not Aktif/kepala_bagian - refusing to force');
+        }
 
-        $user->fill([
-            'name' => 'Demo Klabat (Kepala Bagian)',
-            'role' => 'kepala_bagian',
-            'employee_id' => $employee->id,
-        ]);
-        $user->save();
+        if ($user->role !== 'kepala_bagian' || $user->employee_id !== $employee->id) {
+            throw new \RuntimeException('QA fixture contract violated: demo approver user role/employee_id mismatch - refusing to overwrite');
+        }
 
         return $employee;
     }
@@ -297,37 +320,30 @@ class PhaseSevenBrowserQaSeeder extends Seeder
             throw new \RuntimeException('Employee untuk demo-klabat-pegawai belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
         }
 
-        $employee->fill([
-            'nama_lengkap' => 'QA Fase 7 Pegawai',
-            'status_pegawai_id' => $statusAktifId,
-            'status_aktif' => 'Aktif',
-            'jenis_pegawai_id' => $jenisPegawaiId,
-            'jabatan_terakhir' => 'Analis Kepegawaian',
-            'kepala_bagian_id' => $approver->id,
-            'is_kepala_lembaga' => false,
-            'role' => 'pegawai',
-        ]);
-        $employee->save();
+        if (! $employee->isActive() || $employee->status_pegawai_id !== $statusAktifId || $employee->jenis_pegawai_id !== $jenisPegawaiId || $employee->jabatan_terakhir !== 'Analis Kepegawaian' || $employee->kepala_bagian_id !== $approver->id || ($employee->role ?? null) !== 'pegawai') {
+            throw new \RuntimeException('QA fixture contract violated: demo pegawai employee mismatch - refusing to force');
+        }
 
-        // Form cuti membaca timeline penugasan aktual, bukan pointer legacy pada employee.
-        SupervisorAssignment::query()->updateOrCreate(
-            [
+        if ($user->role !== 'pegawai' || $user->employee_id !== $employee->id) {
+            throw new \RuntimeException('QA fixture contract violated: demo pegawai user role/employee_id mismatch - refusing to overwrite');
+        }
+
+        $existingAssignment = SupervisorAssignment::query()
+            ->where('employee_id', $employee->id)
+            ->where('tanggal_mulai', '2026-01-01')
+            ->first();
+
+        if ($existingAssignment === null) {
+            SupervisorAssignment::query()->create([
                 'employee_id' => $employee->id,
                 'tanggal_mulai' => '2026-01-01',
-            ],
-            [
                 'supervisor_id' => $approver->id,
                 'kepala_bagian_id' => $approver->id,
                 'tanggal_berakhir' => null,
-            ],
-        );
-
-        $user->fill([
-            'name' => 'QA Fase 7 Pegawai',
-            'role' => 'pegawai',
-            'employee_id' => $employee->id,
-        ]);
-        $user->save();
+            ]);
+        } elseif ($existingAssignment->supervisor_id !== $approver->id || $existingAssignment->kepala_bagian_id !== $approver->id || $existingAssignment->tanggal_berakhir !== null) {
+            throw new \RuntimeException('QA fixture contract violated: demo pegawai assignment mismatch - refusing to overwrite');
+        }
 
         return $employee;
     }
