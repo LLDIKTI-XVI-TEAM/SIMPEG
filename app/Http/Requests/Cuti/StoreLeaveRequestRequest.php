@@ -81,6 +81,18 @@ class StoreLeaveRequestRequest extends FormRequest
         ];
     }
 
+    /**
+     * Menjelaskan koreksi rentang tanggal dalam bahasa yang dipakai form pengajuan.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'tanggal_selesai.after_or_equal' => 'Tanggal selesai harus sama dengan atau setelah tanggal mulai.',
+        ];
+    }
+
     public function attributes(): array
     {
         return [

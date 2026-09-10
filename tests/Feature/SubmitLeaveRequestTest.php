@@ -999,6 +999,22 @@ class SubmitLeaveRequestTest extends TestCase
         $response->assertJsonValidationErrors(['jenis_cuti_id', 'tanggal_mulai', 'tanggal_selesai', 'alasan']);
     }
 
+    public function test_tanggal_selesai_sebelum_mulai_ditolak_dengan_pesan_bahasa_indonesia(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $response = $this->actingAs($aktor['user'])->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'tanggal_mulai' => '2026-07-10',
+            'tanggal_selesai' => '2026-07-06',
+        ]));
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['tanggal_selesai'])
+            ->assertJsonPath('errors.tanggal_selesai.0', 'Tanggal selesai harus sama dengan atau setelah tanggal mulai.');
+        $this->assertDatabaseCount('leave_requests', 0);
+    }
+
     public function test_gerbang_saldo_cocok_dengan_nama_jenis_cuti_terseed(): void
     {
         // Menguji terhadap baris referensi yang benar-benar di-seed agar pencocokan nama "Cuti Tahunan"
@@ -2299,7 +2315,7 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertMatchesRegularExpression('/<textarea\\b(?=[^>]*\\bid="alamat_selama_cuti")(?=[^>]*\\bname="alamat_selama_cuti")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="nomor_telepon")(?=[^>]*\\bname="nomor_telepon")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="lampiran")(?=[^>]*\\bname="lampiran")[^>]*\\bdisabled\\b[^>]*>/', $content);
-        $this->assertMatchesRegularExpression('/<button\\b(?=[^>]*\\btype="submit")(?=[^>]*:disabled="saldoError \\|\\| true")[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<button\\b(?=[^>]*\\btype="submit")(?=[^>]*:disabled="isSubmissionBlocked\\(\\) \\|\\| true")[^>]*>/', $content);
     }
 
     public function test_get_form_menampilkan_label_peran_chain_yang_sebenarnya(): void

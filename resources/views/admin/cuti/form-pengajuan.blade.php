@@ -103,22 +103,28 @@
                                 <label for="tanggal_mulai" class="block text-sm font-medium text-ink mb-1">Tanggal Mulai <span class="text-danger">*</span></label>
                                 <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="onStartDateChanged"
                                     value="{{ old('tanggal_mulai') }}"
+                                    :aria-invalid="(!dateInputsChanged && {{ $errors->has('tanggal_mulai') ? 'true' : 'false' }}) || !!workdayValidationError"
+                                    aria-describedby="workday-validation-error{{ $errors->has('tanggal_mulai') ? ' tanggal_mulai-error' : '' }}"
+                                    :aria-describedby="dateInputsChanged ? 'workday-validation-error' : 'workday-validation-error{{ $errors->has('tanggal_mulai') ? ' tanggal_mulai-error' : '' }}'"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                     {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_mulai')
-                                    <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                                    <p id="tanggal_mulai-error" class="mt-1 text-xs text-danger" x-show="!dateInputsChanged">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <!-- Tanggal Selesai -->
                             <div>
                                 <label for="tanggal_selesai" class="block text-sm font-medium text-ink mb-1">Tanggal Selesai <span class="text-danger">*</span></label>
-                                <input type="date" id="tanggal_selesai" name="tanggal_selesai" required x-model="endDate" @change="calculateDays"
+                                <input type="date" id="tanggal_selesai" name="tanggal_selesai" required x-model="endDate" @change="onEndDateChanged"
                                     value="{{ old('tanggal_selesai') }}"
+                                    :aria-invalid="(!dateInputsChanged && {{ $errors->has('tanggal_selesai') ? 'true' : 'false' }}) || !!workdayValidationError"
+                                    aria-describedby="workday-validation-error{{ $errors->has('tanggal_selesai') ? ' tanggal_selesai-error' : '' }}"
+                                    :aria-describedby="dateInputsChanged ? 'workday-validation-error' : 'workday-validation-error{{ $errors->has('tanggal_selesai') ? ' tanggal_selesai-error' : '' }}'"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                                     {{ $formLocked ? 'disabled' : '' }}>
                                 @error('tanggal_selesai')
-                                    <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                                    <p id="tanggal_selesai-error" class="mt-1 text-xs text-danger" x-show="!dateInputsChanged">{{ $message }}</p>
                                 @enderror
                             </div>
                         </div>
@@ -143,6 +149,7 @@
                                     <p class="text-warning-dark" x-text="warning"></p>
                                 </template>
                                 <p class="text-danger font-medium" x-show="workdayError" x-text="workdayError"></p>
+                                <p id="workday-validation-error" class="text-danger font-medium" x-show="workdayValidationError" x-text="workdayValidationError"></p>
                                 <p class="text-danger font-medium" x-show="saldoError" x-text="saldoErrorMsg"></p>
                             </div>
                         </div>
@@ -201,7 +208,7 @@
                         <x-ui.button href="{{ route('cuti') }}" variant="muted" size="md">
                             Batal
                         </x-ui.button>
-                        <x-ui.button type="submit" variant="primary" size="md" x-bind:disabled="saldoError || {{ $formLocked ? 'true' : 'false' }}">
+                        <x-ui.button type="submit" variant="primary" size="md" x-bind:disabled="isSubmissionBlocked() || {{ $formLocked ? 'true' : 'false' }}">
                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                             </svg>
@@ -306,9 +313,11 @@
             Alpine.data('cutiForm', (initialBalance, continuationLeaveCases, leaveTypeCodes) => ({
                 startDate: @js(old('tanggal_mulai', '')),
                 endDate: @js(old('tanggal_selesai', '')),
+                dateInputsChanged: false,
                 workDays: 0,
                 workdayWarnings: [],
                 workdayError: '',
+                workdayValidationError: '',
                 isCalculating: false,
                 workdayRequestId: 0,
                 selectedJenisCuti: @js(old('jenis_cuti_id', '')),
@@ -372,8 +381,15 @@
                 },
 
                 onStartDateChanged() {
+                    // Error dari submit lama hanya dibersihkan setelah tanggal benar-benar diedit, bukan saat pemulihan form.
+                    this.dateInputsChanged = true;
                     this.refreshBalance();
-                    this.calculateDays();
+                    return this.calculateDays();
+                },
+
+                onEndDateChanged() {
+                    this.dateInputsChanged = true;
+                    return this.calculateDays();
                 },
 
                 async refreshBalance() {
@@ -433,10 +449,17 @@
                     }
                 },
                 
+                isSubmissionBlocked() {
+                    // Kegagalan jaringan tetap memakai validasi backend; rentang yang diketahui tidak sah ditahan di form.
+                    return this.saldoError || this.isCalculating || this.workdayValidationError !== '';
+                },
+
                 async calculateDays() {
                     const requestId = ++this.workdayRequestId;
                     const startDate = this.startDate;
                     const endDate = this.endDate;
+                    this.workdayValidationError = '';
+                    this.workdayError = '';
 
                     if (!startDate || !endDate) {
                         this.workDays = 0;
@@ -452,6 +475,7 @@
                     const end = new Date(endDate);
                     
                     if (start > end) {
+                        this.workdayValidationError = 'Tanggal selesai harus sama dengan atau setelah tanggal mulai.';
                         this.workDays = 0;
                         this.workdayWarnings = [];
                         this.workdayError = '';
@@ -475,6 +499,9 @@
                             this.workDays = result.data?.jumlah_hari_kerja ?? 0;
                             this.workdayWarnings = result.data?.warnings ?? [];
                             this.workdayError = '';
+                            this.workdayValidationError = this.workDays <= 0
+                                ? 'Rentang tanggal tidak memiliki hari kerja. Pilih periode yang mencakup setidaknya satu hari kerja.'
+                                : '';
                             this.validateSaldo();
                         } else {
                             if (requestId !== this.workdayRequestId) {
