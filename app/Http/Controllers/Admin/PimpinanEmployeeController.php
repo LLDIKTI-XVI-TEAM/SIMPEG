@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Actions\Documents\PrepareDocumentDownloadAction;
 use App\Actions\Employees\ListEmployeesAction;
 use App\Actions\Employees\PrepareEmployeeHistoryAttachmentDownloadAction;
+use App\Actions\Employees\PreparePimpinanEmployeeDetailAction;
 use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Http\Controllers\Controller;
 use App\Models\Document;
@@ -12,6 +13,7 @@ use App\Models\Employee;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
+use App\Models\User;
 use App\Services\Documents\SkRequirementMatrixVersionService;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
@@ -118,9 +120,14 @@ class PimpinanEmployeeController extends Controller
         ));
     }
 
-    public function show(Employee $employee)
+    public function show(Employee $employee, PreparePimpinanEmployeeDetailAction $action)
     {
-        return redirect()->route('rbac.pegawai.show', $employee);
+        // Surface khusus Pimpinan: payload dimasking di level query (tanpa NIK)
+        // sehingga tidak bergantung pada endpoint API mentah lintas pegawai.
+        /** @var User $viewer */
+        $viewer = request()->user();
+
+        return view('pimpinan.pegawai.show', $action->execute($employee->id, $viewer));
     }
 
     public function downloadDocument(

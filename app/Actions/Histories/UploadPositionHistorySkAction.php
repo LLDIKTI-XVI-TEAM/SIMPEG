@@ -35,6 +35,7 @@ class UploadPositionHistorySkAction
                     'history_id' => $history->id,
                 ], [
                     'nama_dokumen' => 'SK Kenaikan Jabatan '.($history->jabatan?->nama ?? $history->nama_jabatan ?? ''),
+                    'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $storedPath,
                     'keterangan' => 'Unggah berkas riwayat jabatan.',

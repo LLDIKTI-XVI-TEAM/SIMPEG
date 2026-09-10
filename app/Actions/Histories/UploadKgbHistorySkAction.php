@@ -34,6 +34,7 @@ class UploadKgbHistorySkAction
                     'history_id' => $history->id,
                 ], [
                     'nama_dokumen' => 'SK KGB TMT '.($history->tmt_kgb ? $history->tmt_kgb->format('d-m-Y') : ''),
+                    'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $storedPath,
                     'keterangan' => 'Unggah berkas riwayat kenaikan gaji berkala.',

@@ -387,10 +387,11 @@ class EwsActivePageTest extends TestCase
         $user = User::factory()->adminKepegawaian()->create();
         $alert = $this->alert(now()->addDays(60)->toDateString(), 'KGB', 'Pegawai Link Detail');
 
+        // Kode: admin/ews/aktif.blade.php:206 memakai rbac.pegawai.show untuk non-super_admin.
         $this->actingAs($user)
             ->get(route('ews'))
             ->assertOk()
-            ->assertSee(route('pegawai.show', $alert->employee_id), false);
+            ->assertSee(route('rbac.pegawai.show', $alert->employee_id), false);
     }
 
     public function test_alert_pegawai_nonaktif_tidak_muncul_di_halaman_ews(): void

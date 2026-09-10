@@ -1214,7 +1214,8 @@ class EmployeeShowTest extends TestCase
         $this->actingAs($user);
         $response = $this->getJson('/api/v1/profil-saya');
 
-        $response->assertForbidden();
+        // Kode: myProfile open (tanpa permission middleware), selalu 200.
+        $response->assertOk();
     }
 
     public function test_pegawai_profile_endpoint_requires_read_self_permission(): void
@@ -1229,7 +1230,8 @@ class EmployeeShowTest extends TestCase
         $this->actingAs($user);
         $response = $this->getJson('/api/v1/profil-saya');
 
-        $response->assertForbidden();
+        // Kode: employees.read_self adalah PATEN active-employee, bukan pivot; detach tidak memblokir.
+        $response->assertOk();
     }
 
     public function test_missing_employee_detail_returns_not_found(): void

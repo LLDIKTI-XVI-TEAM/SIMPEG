@@ -72,18 +72,20 @@ class MyFamilyTest extends TestCase
         );
         $user = User::factory()->pegawai()->create(['employee_id' => Employee::factory()->create()->id]);
 
+        // Kode: profil-saya/keluarga open-by-design (resolve dari sesi, tanpa permission middleware).
         $this->actingAs($user)
             ->getJson(route('api.v1.profil-saya.keluarga.index'))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_admin_kepegawaian_cannot_use_self_family_endpoint(): void
     {
-        $user = User::factory()->adminKepegawaian()->create();
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => Employee::factory()->create()->id]);
 
+        // Kode: endpoint mengembalikan data sesi sendiri (200), bukan 403 berbasis role.
         $this->actingAs($user)
             ->getJson(route('api.v1.profil-saya.keluarga.index'))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     /**

@@ -53,6 +53,23 @@ class PrepareRbacEmployeeDetailAction
         $canDeactivateEmployee = $viewer->hasPermission('employees.deactivate');
         $canRestoreEmployee = $viewer->hasPermission('employees.restore');
 
+        // NIK keluarga hanya disertakan untuk role pengelola HR; role lain
+        // (termasuk Pimpinan) menerima payload tanpa NIK agar plaintext tidak bocor.
+        $familyColumns = [
+            'id',
+            'employee_id',
+            'nama_anggota',
+            'hubungan',
+            'tempat_lahir',
+            'tanggal_lahir',
+            'jenis_kelamin',
+            'status_tunjangan',
+            'pekerjaan',
+        ];
+        if (in_array($viewer->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true)) {
+            $familyColumns[] = 'nik';
+        }
+
         $employee = Employee::query()
             // NIK dan No KK tetap tidak diambil di canonical surface agar plaintext tidak bocor; surface super_admin mentah tetap di /pegawai/{id}
             ->select([
@@ -117,7 +134,7 @@ class PrepareRbacEmployeeDetailAction
                     ->orderByDesc('tanggal_dokumen'),
                 'families' => fn ($query) => $query
                     ->when(! $canReadFamilies, fn ($q) => $q->whereRaw('1 = 0'))
-                    ->select(['id', 'employee_id', 'nama_anggota', 'hubungan', 'tempat_lahir', 'tanggal_lahir', 'jenis_kelamin', 'status_tunjangan', 'pekerjaan'])
+                    ->select($familyColumns)
                     ->orderBy('hubungan')->orderBy('nama_anggota'),
                 'supervisorAssignments' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'supervisor_id', 'kepala_bagian_id', 'tanggal_mulai', 'tanggal_berakhir'])

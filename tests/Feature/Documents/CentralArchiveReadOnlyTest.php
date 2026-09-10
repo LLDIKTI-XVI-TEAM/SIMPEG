@@ -114,14 +114,15 @@ class CentralArchiveReadOnlyTest extends TestCase
         $this->get(route('dokumen.download', $document->id))->assertForbidden();
     }
 
-    public function test_pimpinan_dengan_dokumen_read_tetap_dilarang_mengakses_arsip_lintas_pegawai(): void
+    public function test_pimpinan_dengan_dokumen_read_dapat_mengakses_arsip_lintas_pegawai(): void
     {
         $this->actingAsRole('pimpinan');
         $document = $this->createBerkas();
 
-        $this->get(route('dokumen'))->assertForbidden();
-        $this->get(route('dokumen.show', $document->id))->assertForbidden();
-        $this->get(route('dokumen.download', $document->id))->assertForbidden();
+        // RBAC configurable: dokumen_sk.read + scope global (canBrowseArchive pure RBAC).
+        $this->get(route('dokumen'))->assertOk();
+        $this->get(route('dokumen.show', $document->id))->assertOk();
+        $this->get(route('dokumen.download', $document->id))->assertOk();
     }
 
     public function test_archive_search_matches_category_label_and_key(): void

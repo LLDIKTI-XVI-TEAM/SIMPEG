@@ -297,6 +297,10 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             ->where('employee_id', $pemohon->id)
             ->where('event_type', LeaveBalanceLedger::EVENT_BALANCE_RECALCULATED)
             ->count();
+        $activeStep = LeaveRequestStep::query()
+            ->where('leave_request_id', $request->id)
+            ->where('status', 'active')
+            ->firstOrFail();
 
         return [
             'pemohon' => $pemohon,
@@ -304,6 +308,9 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             'approver' => $approver,
             'approver_user' => $approverUser,
             'recalculation_before' => $recalculationBefore,
+            // Kode: worker membutuhkan active_step_id + revision_version (RaceWorker:102,116).
+            'active_step_id' => $activeStep->id,
+            'revision_version' => (int) $request->fresh()->revision_version,
         ];
     }
 
@@ -333,6 +340,8 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
                         'approver_employee_id' => $fixture['approver']->id,
                         'actor_user_id' => $fixture['approver_user']->id,
                         'operation' => $operation,
+                        'active_step_id' => $fixture['active_step_id'],
+                        'revision_version' => $fixture['revision_version'],
                         'ready' => $ready,
                         'barrier' => $barrier,
                         'result' => $result,

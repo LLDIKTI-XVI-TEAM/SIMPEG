@@ -16,6 +16,8 @@ use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Services\EmployeeDocumentStatusService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
+use App\Services\Employees\KepalaBagianScopeService;
+use App\Support\Documents\DocumentAuthorization;
 use App\Support\Employees\EmployeeProfilePresentation;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -34,13 +36,52 @@ class Show extends Component
     {
         $user = $request->user();
 
-        // Detail mentah hanya untuk Super Admin efektif. Semua role lain yang
-        // memiliki employees.read memakai surface RBAC dengan scope dan payload
-        // permission-driven.
-        if ($user?->getEffectiveRole() !== 'super_admin') {
-            $this->redirectRoute('rbac.pegawai.show', ['employee' => $id]);
+        // K-privasi: Pimpinan diarahkan ke surface masked khusus (payload tetap termasking)
+        if ($user !== null && $user->getEffectiveRole() === 'pimpinan') {
+            $maskedSurface = $this->maskedDetailSurface($user);
+            if ($maskedSurface !== null) {
+                $this->redirectRoute($maskedSurface, ['employee' => $id]);
 
-            return;
+                return;
+            }
+        }
+
+        // Jalur canonical RBAC: role dengan employees.read selain super_admin/admin_kepegawaian/pimpinan
+        // diarahkan ke surface RBAC permission-driven agar scope dan granular permission konsisten.
+        // admin_kepegawaian tetap pada surface mentah agar test legacy dan alur existing tetap 200
+        // (migrasi link UI sudah mengarah ke canonical bagi yang memakai RBAC surface).
+        // Untuk pegawai/kepala_bagian, redirect hanya bila scope mengizinkan; selain itu 403.
+        $effectiveRole = $user?->getEffectiveRole();
+        if ($user !== null && ! in_array($effectiveRole, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true) && $user->hasPermission('employees.read')) {
+            $isScopeAllowed = match ($effectiveRole) {
+                'pegawai' => is_string($user->employee_id) && hash_equals($user->employee_id, $id),
+                'kepala_bagian' => app(KepalaBagianScopeService::class)->hasDirectReport($user, $id),
+                default => true,
+            };
+            if ($isScopeAllowed) {
+                $this->redirectRoute('rbac.pegawai.show', ['employee' => $id]);
+
+                return;
+            }
+
+            abort(403, 'Detail pegawai mentah hanya tersedia untuk pengelola data kepegawaian. Gunakan surface ringkasan role Anda.');
+        }
+
+        // Lapisan privasi (K-privasi, terpisah dari RBAC aksi): halaman detail mentah
+        // memuat NIK anggota keluarga dan metadata dokumen. Route tetap permission-driven
+        // (employees.read membuka daftar & akses), tetapi payload mentah hanya untuk
+        // pengelola data kepegawaian (DocumentAuthorization); non-pengelola diarahkan ke
+        // surface masked masing-masing.
+        if (! DocumentAuthorization::canViewArchive($user)) {
+            $maskedSurface = $this->maskedDetailSurface($user);
+
+            if ($maskedSurface !== null) {
+                $this->redirectRoute($maskedSurface, ['employee' => $id]);
+
+                return;
+            }
+
+            abort(403, 'Detail pegawai mentah hanya tersedia untuk pengelola data kepegawaian. Gunakan surface ringkasan role Anda.');
         }
 
         $this->pegawaiId = $id;

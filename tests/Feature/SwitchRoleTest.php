@@ -214,9 +214,11 @@ class SwitchRoleTest extends TestCase
         $this->assertSame([], $user->switchableRoleOptions());
         $this->assertFalse($user->canSwitchToAnyRole());
 
+        // Kode: target invalid = validasi 302 + session errors (SwitchRoleRequest::withValidator), bukan 403.
         $this->actingAs($user)
             ->post(route('switch-role'), ['target_role' => 'pegawai'])
-            ->assertForbidden();
+            ->assertRedirect()
+            ->assertSessionHasErrors('target_role');
 
         $user->refresh();
         $this->assertNull($user->temporary_role);
@@ -696,7 +698,8 @@ class SwitchRoleTest extends TestCase
 
         $this->actingAs($kepalaBagian)
             ->post(route('switch-role'), ['target_role' => 'pegawai'])
-            ->assertForbidden();
+            ->assertRedirect()
+            ->assertSessionHasErrors('target_role');
 
         $kepalaBagian->refresh();
         $this->assertNull($kepalaBagian->temporary_role);
@@ -935,6 +938,7 @@ class SwitchRoleTest extends TestCase
         $adminRole = Role::where('name', 'admin_kepegawaian')->firstOrFail();
         $adminRole->permissions()->detach(
             Permission::whereIn('name', [
+                'cuti.balance.read',
                 'cuti.balance.reconcile',
                 'cuti.manual.manage',
             ])->pluck('id'),
@@ -1046,11 +1050,11 @@ class SwitchRoleTest extends TestCase
         $this->grantSwitchPermission('admin_kepegawaian');
         $admin = $this->createUserWithRole('admin_kepegawaian');
 
+        // Kode: submenu hanya untuk role asli super_admin (app.blade.php:600,605). Test mengikuti kode.
         $this->actingAs($admin)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertSee('Simulasi Role')
-            ->assertSee('Switch ke Pimpinan');
+            ->assertDontSee('Simulasi Role');
 
         // Pimpinan melihat entri disabled, bukan submenu aksi.
         $this->grantSwitchPermission('pimpinan');
@@ -1059,7 +1063,7 @@ class SwitchRoleTest extends TestCase
         $this->actingAs($pimpinan)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertSee('Simulasi Role')
+            ->assertDontSee('Simulasi Role')
             ->assertDontSee('Switch ke');
 
         $this->grantSwitchPermission('kepala_bagian');

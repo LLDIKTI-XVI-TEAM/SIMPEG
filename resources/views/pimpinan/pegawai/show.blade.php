@@ -52,21 +52,24 @@
         tabs: {{ \Illuminate\Support\Js::from(array_keys($detailTabs)) }},
         selectTab(tab) {
             this.activeTab = tab;
-            this.$nextTick(() => document.getElementById(`admin-tab-${tab}`)?.focus());
+            this.$nextTick(() => document.getElementById(`pimpinan-tab-${tab}`)?.focus());
         },
         moveTab(offset) {
             const current = this.tabs.indexOf(this.activeTab);
             this.selectTab(this.tabs[(current + offset + this.tabs.length) % this.tabs.length]);
         },
         kinerjaBaik: {{ $p->is_kinerja_baik ? 'true' : 'false' }},
-        kinerjaEndpoint: @js(route('pimpinan.pegawai.kinerja.update', $p->id)),
+        {{-- Surface read-only: endpoint mutasi pimpinan tidak ada; pemicu UI-nya
+            juga disembunyikan oleh gate permission di bawah. String kosong agar
+            render tidak 500 pada route() yang tidak terdaftar. --}}
+        kinerjaEndpoint: @js(''),
         isUpdatingKinerja: false,
         satyalancanaEligible: {{ $p->is_satyalancana_eligible ? 'true' : 'false' }},
         satyalancanaNote: @js($p->satyalancana_note ?? ''),
-        satyalancanaEndpoint: @js(route('pimpinan.pegawai.satyalancana.update', $p->id)),
+        satyalancanaEndpoint: @js(''),
         isUpdatingSatyalancana: false,
         showDeactivateModal: false,
-        supervisorLookupEndpoint: @js(route('pimpinan.pegawai.supervisor-lookup', $p->id)),
+        supervisorLookupEndpoint: @js(''),
         supervisorQuery: @js($selectedSupervisorName ?? ''),
         supervisorSelectedId: @js($selectedSupervisorId ?? ''),
         supervisorSelectedName: @js($selectedSupervisorName ?? ''),
@@ -89,18 +92,19 @@
         loadingArsip: false,
         disiplinFileMode: 'arsip',
 
-        keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'nik' => $f->nik, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
+        {{-- NIK sengaja tidak disertakan: surface read-only Pimpinan tidak boleh membawa identitas sensitif. --}}
+        keluargaList: {{ ($p->families ?? collect())->map(fn($f) => ['id' => $f->id, 'nama_anggota' => $f->nama_anggota, 'hubungan' => $f->hubungan, 'tempat_lahir' => $f->tempat_lahir, 'tanggal_lahir' => $f->tanggal_lahir, 'jenis_kelamin' => $f->jenis_kelamin === 'P' ? 'Perempuan' : 'Laki-laki', 'pekerjaan' => $f->pekerjaan, 'status' => $f->status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'])->toJson() }},
         keluargaLoading: false,
         isDeletingKeluarga: false,
         pendidikanSummary: @js([
             'pendidikan_terakhir' => $p->pendidikan_terakhir,
             'program_studi' => $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir,
         ]),
-        pangkatList: {{ $p->rankHistories->map(fn($r) => ['id' => $r->id, 'golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'file_sk' => $r->file_sk, 'download_url' => $r->admin_attachment_download_url])->toJson() }},
-        jabatanList: {{ $p->positionHistories->map(fn($j) => ['id' => $j->id, 'jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'file_sk' => $j->file_sk, 'download_url' => $j->admin_attachment_download_url])->toJson() }},
-        kgbList: {{ $p->salaryHistories->map(fn($s) => ['id' => $s->id, 'gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'file_sk' => $s->file_sk, 'download_url' => $s->admin_attachment_download_url])->toJson() }},
-        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->admin_attachment_download_url])->toJson() }},
-        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'program_studi_id' => $e->program_studi_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->programStudi?->nama ?? $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->admin_attachment_download_url])->toJson() }},
+        pangkatList: {{ $p->rankHistories->map(fn($r) => ['id' => $r->id, 'golongan' => $r->golongan->nama ?? '-', 'no_sk' => $r->no_sk, 'tgl_sk' => $r->tanggal_sk?->format('Y-m-d'), 'tmt' => $r->tmt_pangkat?->format('Y-m-d'), 'file_sk' => $r->file_sk, 'download_url' => $r->pimpinan_attachment_download_url])->toJson() }},
+        jabatanList: {{ $p->positionHistories->map(fn($j) => ['id' => $j->id, 'jabatan' => $j->jabatan?->nama ?? $j->nama_jabatan, 'unit' => $j->unitKerja->nama ?? '-', 'kelas_jabatan' => $j->kelas_jabatan, 'no_sk' => $j->no_sk, 'tgl_sk' => $j->tanggal_sk?->format('Y-m-d'), 'tmt' => $j->tmt_jabatan?->format('Y-m-d'), 'file_sk' => $j->file_sk, 'download_url' => $j->pimpinan_attachment_download_url])->toJson() }},
+        kgbList: {{ $p->salaryHistories->map(fn($s) => ['id' => $s->id, 'gaji' => 'Rp ' . number_format($s->gaji_pokok, 0, ',', '.'), 'no_sk' => $s->no_sk, 'tgl_sk' => $s->tanggal_sk?->format('Y-m-d'), 'tmt' => $s->tmt_kgb?->format('Y-m-d'), 'file_sk' => $s->file_sk, 'download_url' => $s->pimpinan_attachment_download_url])->toJson() }},
+        disiplinList: {{ $p->disciplineRecords->map(fn($d) => ['id' => $d->id, 'jenis' => $d->jenis_hukuman, 'alasan' => $d->deskripsi, 'no_sk' => $d->no_sk, 'tgl_sk' => $d->tanggal_sk?->format('Y-m-d'), 'tgl_mulai' => $d->tanggal_mulai?->format('Y-m-d'), 'tgl_akhir' => $d->tanggal_berakhir?->format('Y-m-d'), 'is_active' => $d->is_active, 'download_url' => $d->pimpinan_attachment_download_url])->toJson() }},
+        pendidikanList: {{ ($p->educationHistories ?? collect())->map(fn($e) => ['id' => $e->id, 'jenjang_id' => $e->jenjang_id, 'program_studi_id' => $e->program_studi_id, 'tingkat' => $e->jenjang?->urutan ?? $e->tingkat ?? '-', 'institusi' => $e->nama_institusi ?? '-', 'prodi' => $e->programStudi?->nama ?? $e->jurusan ?? '-', 'lulus' => $e->tahun_lulus ?? '-', 'no_ijazah' => $e->no_ijazah ?? '-', 'download_url' => $e->pimpinan_attachment_download_url])->toJson() }},
         pendidikanLoading: false,
         showEditPendidikan: false,
         editingPendidikan: null,
@@ -145,7 +149,7 @@
             'tanggal_sk' => $p->appointment->tanggal_sk?->format('Y-m-d'),
             'tmt_pengangkatan' => $p->appointment->tmt_pengangkatan?->format('Y-m-d'),
             'file_sk' => $p->appointment->file_sk,
-            'download_url' => $p->appointment->admin_attachment_download_url,
+            'download_url' => $p->appointment->pimpinan_attachment_download_url,
         ] : null),
         showAppointmentModal: false,
         isEditingAppointment: false,
@@ -188,53 +192,8 @@
         },
 
         async submitAppointment() {
-            if (!this.appointmentForm.jenis_pengangkatan || !this.appointmentForm.no_sk || !this.appointmentForm.tanggal_sk || !this.appointmentForm.tmt_pengangkatan) {
-                this.appointmentError = 'Mohon lengkapi semua kolom bertanda bintang (*).';
-                return;
-            }
-
-            this.isSavingAppointment = true;
-            this.appointmentError = '';
-
-            const fd = new FormData();
-            fd.append('jenis_pengangkatan', this.appointmentForm.jenis_pengangkatan);
-            fd.append('no_sk', this.appointmentForm.no_sk);
-            fd.append('tanggal_sk', this.appointmentForm.tanggal_sk);
-            fd.append('tmt_pengangkatan', this.appointmentForm.tmt_pengangkatan);
-            if (this.appointmentForm.file_sk) {
-                fd.append('file_sk', this.appointmentForm.file_sk);
-            }
-
-            try {
-                const response = await fetch(`/api/v1/pegawai/{{ $p->id }}/pengangkatan`, {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: fd,
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    this.appointmentData = result.appointment;
-                    this.clearDocumentArchiveCache();
-                    this.showAppointmentModal = false;
-                    this.toast = { show: true, message: result.message || 'Data SK Pengangkatan berhasil disimpan!', type: 'success' };
-                    setTimeout(() => this.toast.show = false, 3000);
-                } else {
-                    const err = await response.json();
-                    if (err.errors) {
-                        this.appointmentError = Object.values(err.errors).flat().join(' ');
-                    } else {
-                        this.appointmentError = err.message || 'Gagal menyimpan data pengangkatan.';
-                    }
-                }
-            } catch (e) {
-                this.appointmentError = 'Terjadi kesalahan jaringan saat menyimpan data.';
-            } finally {
-                this.isSavingAppointment = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
 
         // Upload / Ganti Berkas SK Riwayat (Kepangkatan, Jabatan, KGB, Pengangkatan)
@@ -258,88 +217,8 @@
         },
 
         async submitUploadSk() {
-            if (!this.uploadSkFile) {
-                this.uploadSkError = 'Silakan pilih berkas SK terlebih dahulu.';
-                return;
-            }
-
-            if (!this.uploadSkRecord || (!this.uploadSkRecord.id && this.uploadSkType !== 'pengangkatan')) {
-                this.uploadSkError = 'Data riwayat tidak valid.';
-                return;
-            }
-
-            this.isUploadingSk = true;
-            this.uploadSkError = '';
-
-            let endpoint = '';
-            if (this.uploadSkType === 'jabatan') {
-                endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan/${this.uploadSkRecord.id}/upload-sk`;
-            } else if (this.uploadSkType === 'kgb') {
-                endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb/${this.uploadSkRecord.id}/upload-sk`;
-            } else if (this.uploadSkType === 'pengangkatan') {
-                endpoint = `/api/v1/pegawai/{{ $p->id }}/pengangkatan/upload-sk`;
-            } else {
-                endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kepangkatan/${this.uploadSkRecord.id}/upload-sk`;
-            }
-
-            const fd = new FormData();
-            fd.append('file_sk', this.uploadSkFile);
-
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: fd,
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-
-                    if (this.uploadSkType === 'pengangkatan') {
-                        this.appointmentData = result.appointment;
-                    } else {
-                        const updated = result.history;
-                        if (this.uploadSkType === 'pangkat') {
-                            const idx = this.pangkatList.findIndex(item => item.id === this.uploadSkRecord.id);
-                            if (idx !== -1) {
-                                this.pangkatList[idx].download_url = updated.download_url;
-                                this.pangkatList[idx].file_sk = updated.file_sk;
-                            }
-                        } else if (this.uploadSkType === 'jabatan') {
-                            const idx = this.jabatanList.findIndex(item => item.id === this.uploadSkRecord.id);
-                            if (idx !== -1) {
-                                this.jabatanList[idx].download_url = updated.download_url;
-                                this.jabatanList[idx].file_sk = updated.file_sk;
-                            }
-                        } else if (this.uploadSkType === 'kgb') {
-                            const idx = this.kgbList.findIndex(item => item.id === this.uploadSkRecord.id);
-                            if (idx !== -1) {
-                                this.kgbList[idx].download_url = updated.download_url;
-                                this.kgbList[idx].file_sk = updated.file_sk;
-                            }
-                        }
-                    }
-
-                    this.clearDocumentArchiveCache();
-                    this.showUploadSkModal = false;
-                    this.toast = { show: true, message: result.message || 'Berkas SK berhasil diperbarui!', type: 'success' };
-                    setTimeout(() => this.toast.show = false, 3000);
-                } else {
-                    const err = await response.json();
-                    if (err.errors && err.errors.file_sk) {
-                        this.uploadSkError = err.errors.file_sk.join(' ');
-                    } else {
-                        this.uploadSkError = err.message || 'Gagal mengunggah berkas SK. Silakan coba lagi.';
-                    }
-                }
-            } catch (e) {
-                this.uploadSkError = 'Terjadi kesalahan jaringan saat mengunggah berkas.';
-            } finally {
-                this.isUploadingSk = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
 
         clearDocumentArchiveCache() {
@@ -357,55 +236,8 @@
         },
 
         async submitUploadBerkas() {
-            if (!this.newBerkas.file) {
-                this.uploadBerkasError = 'File berkas wajib dipilih.';
-                return;
-            }
-            this.isUploadingBerkas = true;
-            this.uploadBerkasError = '';
-            this.uploadBerkasErrors = {};
-
-            const fd = new FormData();
-            fd.append('nama_dokumen',     this.newBerkas.nama_dokumen);
-            fd.append('kategori_dokumen', this.newBerkas.kategori_dokumen);
-            fd.append('nomor_dokumen',    this.newBerkas.nomor_dokumen);
-            fd.append('tanggal_terbit',   this.newBerkas.tanggal_terbit);
-            fd.append('keterangan',       this.newBerkas.keterangan);
-            fd.append('berkas',           this.newBerkas.file);
-
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya`, {
-                    method: 'POST',
-                    headers: {
-                        'Accept':       'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: fd,
-                });
-
-                if (res.ok) {
-                    const json = await res.json();
-                    // Tambahkan dokumen baru ke daftar secara reaktif (tanpa reload)
-                    this.berkasList.unshift(json.document);
-                    this.clearDocumentArchiveCache();
-                    this.showUploadBerkas = false;
-                    this.newBerkas = { nama_dokumen: '', kategori_dokumen: 'ktp_kk', nomor_dokumen: '', tanggal_terbit: '', keterangan: '', file: null };
-                    const fileInput = document.getElementById('berkas_upload_input');
-                    if (fileInput) fileInput.value = '';
-                    this.toast = { show: true, message: 'Berkas berhasil diunggah.', type: 'success' };
-                    setTimeout(() => { this.toast.show = false; }, 3500);
-                } else if (res.status === 422) {
-                    const json = await res.json();
-                    this.uploadBerkasErrors = json.errors ?? {};
-                    this.uploadBerkasError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
-                } else {
-                    this.uploadBerkasError = 'Gagal mengunggah berkas. Silakan coba lagi.';
-                }
-            } catch (e) {
-                this.uploadBerkasError = 'Gagal mengunggah berkas. Periksa koneksi internet Anda.';
-            } finally {
-                this.isUploadingBerkas = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         openEditBerkas(doc) {
             if (!doc.can_mutate) return;
@@ -423,51 +255,8 @@
             this.showEditBerkas = true;
         },
         async submitUpdateBerkas() {
-            if (!this.editingBerkas) return;
-            this.isUpdatingBerkas = true;
-            this.editBerkasError = '';
-            this.editBerkasErrors = {};
-
-            const fd = new FormData();
-            fd.append('_method', 'PUT');
-            fd.append('nama_dokumen', this.editBerkas.nama_dokumen);
-            fd.append('kategori_dokumen', this.editBerkas.kategori_dokumen);
-            fd.append('nomor_dokumen', this.editBerkas.nomor_dokumen);
-            fd.append('tanggal_terbit', this.editBerkas.tanggal_terbit);
-            fd.append('keterangan', this.editBerkas.keterangan);
-            if (this.editBerkas.file) fd.append('berkas', this.editBerkas.file);
-
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya/${this.editingBerkas.id}`, {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                    body: fd,
-                });
-                const json = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    this.berkasList = this.berkasList.map((doc) => doc.id === json.document.id ? json.document : doc);
-                    this.clearDocumentArchiveCache();
-                    this.showEditBerkas = false;
-                    this.editingBerkas = null;
-                    const fileInput = document.getElementById('edit_berkas_upload_input');
-                    if (fileInput) fileInput.value = '';
-                    this.toast = { show: true, message: 'Berkas berhasil diperbarui.', type: 'success' };
-                    setTimeout(() => { this.toast.show = false; }, 3500);
-                } else if (res.status === 422) {
-                    this.editBerkasErrors = json.errors ?? {};
-                    this.editBerkasError = json.message ?? 'Terdapat kesalahan pada data yang dikirim.';
-                } else {
-                    this.editBerkasError = json.message ?? 'Gagal memperbarui berkas. Silakan coba lagi.';
-                }
-            } catch (e) {
-                this.editBerkasError = 'Gagal memperbarui berkas. Periksa koneksi internet Anda.';
-            } finally {
-                this.isUpdatingBerkas = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         openDeleteBerkas(doc) {
             if (!doc.can_mutate) return;
@@ -476,107 +265,16 @@
             this.showDeleteBerkas = true;
         },
         async submitDeleteBerkas() {
-            if (!this.deletingBerkas) return;
-            this.isDeletingBerkas = true;
-            this.deleteBerkasError = '';
-
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/berkas-lainnya/${this.deletingBerkas.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    },
-                });
-                const json = await res.json().catch(() => ({}));
-
-                if (res.ok) {
-                    const deletedId = this.deletingBerkas.id;
-                    this.berkasList = this.berkasList.filter((doc) => doc.id !== deletedId);
-                    this.clearDocumentArchiveCache();
-                    this.showDeleteBerkas = false;
-                    this.deletingBerkas = null;
-                    this.toast = { show: true, message: 'Berkas berhasil dihapus.', type: 'success' };
-                    setTimeout(() => { this.toast.show = false; }, 3500);
-                } else {
-                    this.deleteBerkasError = json.errors?.document?.[0] ?? json.message ?? 'Gagal menghapus berkas. Silakan coba lagi.';
-                }
-            } catch (e) {
-                this.deleteBerkasError = 'Gagal menghapus berkas. Periksa koneksi internet Anda.';
-            } finally {
-                this.isDeletingBerkas = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         async updateKinerjaBaik(value) {
-            const previous = !value;
-            this.isUpdatingKinerja = true;
-
-            try {
-                const response = await fetch(this.kinerjaEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({ is_kinerja_baik: value })
-                });
-
-                if (!response.ok) {
-                    this.kinerjaBaik = previous;
-                    this.toast = { show: true, message: 'Status kinerja gagal diperbarui.', type: 'error' };
-                    setTimeout(() => this.toast.show = false, 5000);
-
-                    return;
-                }
-
-                const result = await response.json();
-                this.kinerjaBaik = result.is_kinerja_baik;
-                this.toast = { show: true, message: result.message, type: 'success' };
-                setTimeout(() => this.toast.show = false, 3000);
-            } catch (error) {
-                this.kinerjaBaik = previous;
-                this.toast = { show: true, message: 'Terjadi kesalahan jaringan.', type: 'error' };
-                setTimeout(() => this.toast.show = false, 5000);
-            } finally {
-                this.isUpdatingKinerja = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         async updateSatyalancanaEligibility() {
-            this.isUpdatingSatyalancana = true;
-
-            try {
-                const response = await fetch(this.satyalancanaEndpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        is_satyalancana_eligible: this.satyalancanaEligible,
-                        satyalancana_note: this.satyalancanaNote
-                    })
-                });
-
-                if (!response.ok) {
-                    this.toast = { show: true, message: 'Kelayakan Satyalancana gagal diperbarui.', type: 'error' };
-                    setTimeout(() => this.toast.show = false, 5000);
-
-                    return;
-                }
-
-                const result = await response.json();
-                this.satyalancanaEligible = result.is_satyalancana_eligible;
-                this.satyalancanaNote = result.satyalancana_note || '';
-                this.toast = { show: true, message: result.message, type: 'success' };
-                setTimeout(() => this.toast.show = false, 3000);
-            } catch (error) {
-                this.toast = { show: true, message: 'Terjadi kesalahan jaringan.', type: 'error' };
-                setTimeout(() => this.toast.show = false, 5000);
-            } finally {
-                this.isUpdatingSatyalancana = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         searchSupervisor() {
             window.clearTimeout(this.supervisorSearchTimer);
@@ -599,34 +297,8 @@
             this.supervisorSearchTimer = window.setTimeout(() => this.fetchSupervisorCandidates(), 250);
         },
         async fetchSupervisorCandidates() {
-            const requestId = ++this.supervisorLookupRequestId;
-            this.supervisorLoading = true;
-            this.supervisorOpen = true;
-            this.supervisorActiveIndex = -1;
-
-            try {
-                const response = await fetch(`${this.supervisorLookupEndpoint}?q=${encodeURIComponent(this.supervisorQuery.trim())}`, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                });
-
-                if (!response.ok) {
-                    throw new Error('Lookup Kepala Bagian tidak tersedia.');
-                }
-
-                const result = await response.json();
-                if (requestId !== this.supervisorLookupRequestId) return;
-
-                this.supervisorResults = Array.isArray(result.data) ? result.data : [];
-            } catch (error) {
-                if (requestId !== this.supervisorLookupRequestId) return;
-
-                this.supervisorResults = [];
-                this.supervisorError = 'Pencarian Kepala Bagian gagal. Coba lagi.';
-            } finally {
-                if (requestId === this.supervisorLookupRequestId) {
-                    this.supervisorLoading = false;
-                }
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         selectSupervisor(candidate) {
             this.supervisorLookupRequestId++;
@@ -709,21 +381,8 @@
             }
         },
         async fetchArsipDisiplin() {
-            this.loadingArsip = true;
-            this.arsipDokumen = [];
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/arsip-dokumen?kategori=sk_hukuman_disiplin`, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                if (res.ok) {
-                    const json = await res.json();
-                    this.arsipDokumen = json.documents ?? [];
-                }
-            } catch (e) {
-                this.arsipDokumen = [];
-            } finally {
-                this.loadingArsip = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
         // ===== LAZY FETCH & CACHING KELUARGA + PENDIDIKAN =====
         _keluargaCacheKey:  'keluarga_{{ $p->id }}',
@@ -764,108 +423,21 @@
             if (this.activeTab === 'pendidikan') this.fetchPendidikan();
         },
 
+        // Read-only: daftar keluarga dirender server; tanpa refresh/hapus via API mentah.
         async fetchKeluarga() {
-            const cached = sessionStorage.getItem(this._keluargaCacheKey);
-            if (cached) {
-                try {
-                    this.keluargaList = JSON.parse(cached);
-                    return;
-                } catch (e) {
-                    sessionStorage.removeItem(this._keluargaCacheKey);
-                }
-            }
-            this.keluargaLoading = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/keluarga`, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const json = await res.json();
-                // Normalisasi format tanggal dan label sesuai tampilan tabel.
-                this.keluargaList = (json.families ?? []).map(f => ({
-                    id:            f.id,
-                    nama_anggota:  f.nama_anggota,
-                    nik:           f.nik,
-                    hubungan:      f.hubungan,
-                    tempat_lahir:  f.tempat_lahir,
-                    tanggal_lahir: f.tanggal_lahir,
-                    jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-                    pekerjaan:     f.pekerjaan,
-                    status:        f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung',
-                }));
-                sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
-            } catch (e) {
-                console.error('Gagal memuat data keluarga:', e);
-            } finally {
-                this.keluargaLoading = false;
-            }
+            this.keluargaLoading = false;
+            return;
         },
 
+        // Read-only: penghapusan keluarga tidak tersedia di surface Pimpinan.
         async deleteKeluarga(id, index) {
-            if (!window.confirm('Apakah Anda yakin ingin menghapus data anggota keluarga ini? Tindakan ini tidak dapat dibatalkan.')) return;
-            this.isDeletingKeluarga = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/keluarga/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    this.toast = { show: true, message: err.message ?? 'Gagal menghapus data keluarga.', type: 'error' };
-                    setTimeout(() => this.toast.show = false, 4000);
-                    return;
-                }
-                this.keluargaList.splice(index, 1);
-                sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
-                this.toast = { show: true, message: 'Anggota keluarga berhasil dihapus.', type: 'success' };
-                setTimeout(() => this.toast.show = false, 3000);
-            } catch (e) {
-                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
-                setTimeout(() => this.toast.show = false, 4000);
-            } finally {
-                this.isDeletingKeluarga = false;
-            }
+            return;
         },
 
+        // Read-only: daftar pendidikan dirender server; tanpa refresh via API mentah.
         async fetchPendidikan() {
-            // Coba baca dari sessionStorage — validasi versi + TTL sebelum dipakai.
-            const cached = sessionStorage.getItem(this._pendidikanCacheKey);
-            if (cached) {
-                try {
-                    const envelope = JSON.parse(cached);
-                    const isEnvelope = envelope && typeof envelope === 'object' && Array.isArray(envelope.data) && 'v' in envelope && 't' in envelope;
-                    if (isEnvelope) {
-                        const fresh = envelope.v === this._pendidikanCacheVersion && (Date.now() - envelope.t) < this._pendidikanCacheTTL;
-                        if (fresh) {
-                            this.pendidikanList = envelope.data;
-                            if (envelope.summary) this.pendidikanSummary = envelope.summary;
-                            return;
-                        }
-                    }
-                } catch (e) {
-                    // corrupted — biarkan jatuh ke fetch
-                }
-                sessionStorage.removeItem(this._pendidikanCacheKey);
-            }
-            this.pendidikanLoading = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan`, {
-                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const json = await res.json();
-                this.pendidikanList = json.histories ?? [];
-                this.applyEducationSummary(json.education_summary);
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: json.education_summary ?? null }));
-            } catch (e) {
-                console.error('Gagal memuat riwayat pendidikan:', e);
-            } finally {
-                this.pendidikanLoading = false;
-            }
+            this.pendidikanLoading = false;
+            return;
         },
 
         applyEducationSummary(summary) {
@@ -892,306 +464,23 @@
         },
 
         async submitEditPendidikan() {
-            this.editPendidikanError = '';
-            this.isUpdatingPendidikan = true;
-            const payload = { ...this.editPendidikanForm };
-            const cur = payload.program_studi_id || null;
-            const init = this._initialProgramStudiId ?? null;
-            if (cur === init) delete payload.program_studi_id;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${this.editingPendidikan.id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    body: JSON.stringify(payload),
-                });
-                const result = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    const msgs = result.errors
-                        ? Object.values(result.errors).flat().join(' ')
-                        : (result.message ?? 'Gagal memperbarui riwayat pendidikan.');
-                    this.editPendidikanError = msgs;
-                    return;
-                }
-                const h = result.history;
-                const idx = this.pendidikanList.findIndex(e => e.id === this.editingPendidikan.id);
-                if (idx !== -1) {
-                    this.pendidikanList[idx] = {
-                        id:        h.id,
-                        jenjang_id: h.jenjang_id,
-                        program_studi_id: h.program_studi_id,
-                        tingkat:   h.tingkat,
-                        institusi: h.nama_institusi,
-                        prodi:     h.program_studi ?? h.jurusan ?? '-',
-                        lulus:     h.tahun_lulus,
-                        no_ijazah: h.no_ijazah ?? '-',
-                        download_url: h.download_url,
-                    };
-                }
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
-                this.applyEducationSummary(result.education_summary);
-                this.showEditPendidikan = false;
-                this.editingPendidikan = null;
-                this.toast = { show: true, message: 'Riwayat pendidikan berhasil diperbarui.', type: 'success' };
-                setTimeout(() => this.toast.show = false, 3000);
-            } catch (e) {
-                this.editPendidikanError = 'Terjadi kesalahan jaringan. Coba lagi.';
-            } finally {
-                this.isUpdatingPendidikan = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
 
         async deletePendidikan(id, index) {
-            if (!window.confirm('Apakah Anda yakin ingin menghapus riwayat pendidikan ini? Tindakan ini tidak dapat dibatalkan.')) return;
-            this.isDeletingPendidikan = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                const result = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    this.toast = { show: true, message: result.message ?? 'Gagal menghapus riwayat pendidikan.', type: 'error' };
-                    return;
-                }
-                this.pendidikanList.splice(index, 1);
-                sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
-                this.applyEducationSummary(result.education_summary);
-                this.toast = { show: true, message: 'Riwayat pendidikan berhasil dihapus.', type: 'success' };
-                setTimeout(() => this.toast.show = false, 3000);
-            } catch (e) {
-                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
-            } finally {
-                this.isDeletingPendidikan = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
 
         async deleteDisiplin(id, index) {
-            if (!window.confirm('Apakah Anda yakin ingin menghapus riwayat hukuman disiplin ini? Berkas SK terkait juga akan dihapus. Tindakan ini tidak dapat dibatalkan.')) return;
-            this.isDeletingDisiplin = true;
-            try {
-                const res = await fetch(`/api/v1/pegawai/{{ $p->id }}/disiplin/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                const result = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    this.toast = { show: true, message: result.message ?? 'Gagal menghapus riwayat hukuman disiplin.', type: 'error' };
-                    setTimeout(() => this.toast.show = false, 4000);
-                    return;
-                }
-                this.disiplinList.splice(index, 1);
-                this.toast = { show: true, message: 'Riwayat hukuman disiplin berhasil dihapus.', type: 'success' };
-                setTimeout(() => this.toast.show = false, 3000);
-            } catch (e) {
-                this.toast = { show: true, message: 'Terjadi kesalahan jaringan. Coba lagi.', type: 'error' };
-                setTimeout(() => this.toast.show = false, 4000);
-            } finally {
-                this.isDeletingDisiplin = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         },
 
         async submitForm() {
-            this.modalError = '';
-            let payload = { type: this.modalType };
-            if (this.modalType === 'keluarga') {
-                payload = { ...payload, ...this.newKeluarga };
-            } else if (this.modalType === 'pangkat') {
-                payload = { ...payload, ...this.newPangkat };
-            } else if (this.modalType === 'jabatan') {
-                payload = { ...payload, ...this.newJabatan };
-            } else if (this.modalType === 'kgb') {
-                payload = { ...payload, ...this.newKgb };
-            } else if (this.modalType === 'disiplin') {
-                payload = { ...payload, ...this.newDisiplin };
-            } else if (this.modalType === 'pendidikan') {
-                payload = { ...payload, ...this.newPendidikan };
-            }
-
-            let endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-pendidikan`;
-            if (this.modalType === 'pangkat') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kepangkatan`;
-            else if (this.modalType === 'jabatan') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-jabatan`;
-            else if (this.modalType === 'kgb') endpoint = `/api/v1/pegawai/{{ $p->id }}/riwayat-kgb`;
-            else if (this.modalType === 'keluarga') endpoint = `/api/v1/pegawai/{{ $p->id }}/keluarga`;
-            else if (this.modalType === 'disiplin') endpoint = `/api/v1/pegawai/{{ $p->id }}/disiplin`;
-
-            this.isSubmitting = true;
-
-            try {
-                let fetchOptions;
-                if (this.modalType === 'disiplin') {
-                    const fd = new FormData();
-                    const d  = this.newDisiplin;
-                    fd.append('jenis_hukuman', d.jenis_hukuman);
-                    fd.append('deskripsi', d.deskripsi);
-                    fd.append('no_sk', d.no_sk);
-                    fd.append('tanggal_sk', d.tanggal_sk);
-                    fd.append('tanggal_mulai', d.tanggal_mulai);
-                    if (d.tanggal_berakhir) fd.append('tanggal_berakhir', d.tanggal_berakhir);
-                    if (d.file_sk)          fd.append('file_sk', d.file_sk);
-                    if (d.dokumen_id)       fd.append('dokumen_id', d.dokumen_id);
-                    fetchOptions = {
-                        method:  'POST',
-                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        body:    fd,
-                    };
-                } else if (['pangkat', 'jabatan', 'kgb'].includes(this.modalType)) {
-                    const history = this.modalType === 'pangkat'
-                        ? this.newPangkat
-                        : (this.modalType === 'jabatan' ? this.newJabatan : this.newKgb);
-                    const fd = new FormData();
-
-                    Object.entries(history).forEach(([key, value]) => {
-                        if (value !== null && value !== '') {
-                            fd.append(key, value);
-                        }
-                    });
-
-                    fetchOptions = {
-                        method:  'POST',
-                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        body:    fd,
-                    };
-                } else {
-                    fetchOptions = {
-                        method:  'POST',
-                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-                        body:    JSON.stringify(payload),
-                    };
-                }
-                const response = await fetch(endpoint, fetchOptions);
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    
-                    if (this.modalType === 'disiplin') {
-                        const r   = result.record;
-                        this.disiplinList.unshift({
-                            id:        r.id,
-                            jenis:     r.jenis_hukuman,
-                            alasan:    r.deskripsi,
-                            no_sk:     r.no_sk,
-                            tgl_sk:    r.tanggal_sk,
-                            tgl_mulai: r.tanggal_mulai,
-                            tgl_akhir: r.tanggal_berakhir,
-                            is_active: r.is_active,
-                            download_url: r.download_url,
-                        });
-                        this.newDisiplin = { jenis_hukuman: 'Ringan', deskripsi: '', no_sk: '', tanggal_sk: '', tanggal_mulai: '', tanggal_berakhir: '', file_sk: null, dokumen_id: '' };
-                        this.disiplinFileMode = 'arsip';
-                    } else if (this.modalType === 'kgb') {
-                        const h = result.history;
-                        this.kgbList.unshift({
-                            id: h.id,
-                            gaji: 'Rp ' + parseInt(this.newKgb.gaji_pokok).toLocaleString('id-ID'),
-                            no_sk: this.newKgb.no_sk,
-                            tgl_sk: this.newKgb.tanggal_sk,
-                            tmt: this.newKgb.tmt_kgb,
-                            download_url: h.download_url,
-                        });
-                        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
-                        document.getElementById('file_sk_kgb').value = '';
-                    } else if (this.modalType === 'jabatan') {
-                        const h = result.history;
-                        this.jabatanList.unshift({
-                            id: h.id,
-                            jabatan: h.jabatan?.nama ?? h.nama_jabatan ?? '-',
-                            unit: h.unit_kerja?.nama ?? '-',
-                            kelas_jabatan: h.kelas_jabatan,
-                            no_sk: h.no_sk,
-                            tgl_sk: h.tanggal_sk,
-                            tmt: h.tmt_jabatan,
-                            download_url: h.download_url,
-                        });
-                        this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
-                        document.getElementById('file_sk_jabatan').value = '';
-                    } else if (this.modalType === 'pangkat') {
-                        const h = result.history;
-                        this.pangkatList.unshift({
-                            id: h.id,
-                            golongan: h.golongan?.nama ?? '-',
-                            no_sk: h.no_sk,
-                            tgl_sk: h.tanggal_sk,
-                            tmt: h.tmt_pangkat,
-                            download_url: h.download_url,
-                        });
-                        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
-                        document.getElementById('file_sk_pangkat').value = '';
-                    } else if (this.modalType === 'keluarga') {
-                        const f = result.family;
-                        this.keluargaList.unshift({
-                            id: f.id,
-                            nama_anggota: f.nama_anggota,
-                            nik: f.nik,
-                            hubungan: f.hubungan,
-                            tempat_lahir: f.tempat_lahir,
-                            tanggal_lahir: f.tanggal_lahir,
-                            jenis_kelamin: f.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan',
-                            pekerjaan: f.pekerjaan,
-                            status: f.status_tunjangan ? 'Ditanggung' : 'Tidak Ditanggung'
-                        });
-                        this.newKeluarga = { nama_anggota: '', hubungan: 'Istri', nik: '', tempat_lahir: '', tanggal_lahir: '', jenis_kelamin: 'P', status_tunjangan: '0', pekerjaan: '' };
-                        // Perbarui cache agar navigasi kembali ke tab keluarga tetap sinkron.
-                        sessionStorage.setItem(this._keluargaCacheKey, JSON.stringify(this.keluargaList));
-                    } else if (this.modalType === 'pendidikan') {
-                        const h = result.history;
-                        this.pendidikanList.unshift({
-                            id:             h.id,
-                            tingkat:        h.tingkat,
-                            institusi:      h.nama_institusi,
-                            program_studi_id: h.program_studi_id,
-                            prodi:          h.program_studi ?? h.jurusan ?? '-',
-                            lulus:          h.tahun_lulus,
-                            no_ijazah:      h.no_ijazah ?? '-',
-                            download_url:   h.download_url,
-                        });
-                        // Perbarui cache sessionStorage agar navigasi kembali tetap sinkron.
-                        sessionStorage.setItem(this._pendidikanCacheKey, JSON.stringify({ v: this._pendidikanCacheVersion, t: Date.now(), data: this.pendidikanList, summary: result.education_summary ?? null }));
-                        this.applyEducationSummary(result.education_summary);
-                        this.newPendidikan = { jenjang_id: '', nama_institusi: '', program_studi_id: '', tahun_lulus: '', no_ijazah: '' };
-                    }
-
-                    if (['disiplin', 'kgb', 'jabatan', 'pangkat', 'pendidikan'].includes(this.modalType)) {
-                        this.clearDocumentArchiveCache();
-                    }
-
-                    // Matriks dihitung ulang di server dari riwayat resmi. Render
-                    // ulang komponen agar status dan arsip tidak memakai snapshot lama.
-                    if (['kgb', 'jabatan', 'pangkat'].includes(this.modalType)) {
-                        await this.$wire.$refresh();
-                    }
-                    
-                    this.showModal = false;
-                    this.toast = { show: true, message: 'Data berhasil disimpan!', type: 'success' };
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                    setTimeout(() => this.toast.show = false, 3000);
-                } else {
-                    const errorData = await response.json();
-                    if (errorData.errors) {
-                        const msgs = Object.values(errorData.errors).flat();
-                        this.modalError = msgs.join(' ');
-                    } else {
-                        this.modalError = errorData.message || 'Terdapat kesalahan. Silakan coba lagi.';
-                    }
-                }
-            } catch (error) {
-                this.toast = { show: true, message: 'Terjadi kesalahan jaringan', type: 'error' };
-                setTimeout(() => this.toast.show = false, 5000);
-            } finally {
-                this.isSubmitting = false;
-            }
+            // Read-only: tidak tersedia di surface Pimpinan.
+            return;
         }
     }" class="mx-auto max-w-5xl space-y-6">
         
@@ -1266,12 +555,12 @@
             </x-pegawai.detail.identity-header>
 
             {{-- TAB NAVIGATION --}}
-            <x-pegawai.detail.tabs :tabs="$detailTabs" id-prefix="admin" />
+            <x-pegawai.detail.tabs :tabs="$detailTabs" id-prefix="pimpinan" />
 
             <p class="history-export-unavailable hidden">Ekspor riwayat tidak tersedia</p>
 
             {{-- TAB 1: PROFIL LENGKAP --}}
-            <x-pegawai.detail.panel tab="profile" id-prefix="admin">
+            <x-pegawai.detail.panel tab="profile" id-prefix="pimpinan">
                 <x-pegawai.detail.profile
                     :employee="$p"
                     :status-presentation="$statusPresentation"
@@ -1280,8 +569,8 @@
                     :latest-status-history="$latestStatusHistory"
                     :active-supervisor-assignments="collect([$currentSupervisor])->filter()"
                     :retirement-date="$estimasiTanggalPensiun"
-                    :mask-sensitive="false"
-                    download-surface="admin"
+                    :can-read-histories="$canReadHistories"
+                    download-surface="pimpinan"
                 >
                     <x-slot:controls>
                 {{-- Toggle Flag Kinerja & Kepala Bagian --}}
@@ -1467,7 +756,7 @@
 
             {{-- TAB 2: DATA KELUARGA --}}
             @if($canReadFamilies)
-            <x-pegawai.detail.panel tab="keluarga" id-prefix="admin">
+            <x-pegawai.detail.panel tab="keluarga" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Data Keluarga"
                     description="Daftar istri/suami dan anak yang tercatat sebagai tanggungan."
@@ -1498,39 +787,28 @@
                     :show-actions="$canDeleteFamily"
                     x-show="!keluargaLoading"
                 >
-                            <template x-for="(fam, index) in keluargaList" :key="fam.id">
+                            {{-- Surface read-only: baris dirender server dengan NIK
+                                tersamarkan (partial mode server). Pimpinan tidak
+                                memakai refresh API mentah lintas pegawai. --}}
+                            @foreach(($p->families ?? collect()) as $family)
                                 <tr class="transition-colors hover:bg-soft/30 text-ink" data-family-readonly-row>
-                                    @include('pegawai.partials.detail.family-readonly-cells', ['mode' => 'alpine'])
-                                    @if($canDeleteFamily)
-                                            <td class="px-4 py-3 text-right">
-                                        <button
-                                            type="button"
-                                            @click="deleteKeluarga(fam.id, index)"
-                                            :disabled="isDeletingKeluarga"
-                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
-                                            title="Hapus anggota keluarga ini"
-                                        >
-                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                            </svg>
-                                            Hapus
-                                        </button>
-                                    </td>
-                                            @endif
+                                    @include('pegawai.partials.detail.family-readonly-cells')
                                 </tr>
-                            </template>
-                            <tr x-show="!keluargaLoading && keluargaList.length === 0">
+                            @endforeach
+                            @if(($p->families ?? collect())->isEmpty())
+                            <tr>
                                 <td colspan="{{ $canDeleteFamily ? 6 : 5 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki data anggota keluarga.
                                 </td>
                             </tr>
+                            @endif
                 </x-pegawai.detail.table>
             </x-pegawai.detail.panel>
             @endif
 
             {{-- TAB 3: RIWAYAT KEPANGKATAN --}}
             @if($canReadHistories)
-            <x-pegawai.detail.panel tab="kepangkatan" id-prefix="admin">
+            <x-pegawai.detail.panel tab="kepangkatan" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Riwayat Kepangkatan & Golongan"
                     description="Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas."
@@ -1596,7 +874,7 @@
 
             {{-- TAB 4: RIWAYAT JABATAN --}}
             @if($canReadHistoriesForTabs)
-            <x-pegawai.detail.panel tab="jabatan" id-prefix="admin">
+            <x-pegawai.detail.panel tab="jabatan" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Riwayat Jabatan & Struktural"
                     description="Catatan penugasan jabatan fungsional maupun struktural."
@@ -1663,7 +941,7 @@
 
             {{-- TAB 5: RIWAYAT KGB --}}
             @if($canReadHistoriesForTabs)
-            <x-pegawai.detail.panel tab="kgb" id-prefix="admin">
+            <x-pegawai.detail.panel tab="kgb" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Riwayat Kenaikan Gaji Berkala (KGB)"
                     description="Catatan penyesuaian gaji berkala setiap 2 tahun sekali."
@@ -1729,7 +1007,7 @@
 
             {{-- TAB 6: HUKUMAN DISIPLIN --}}
             @if($canReadDisciplineForTabs)
-            <x-pegawai.detail.panel tab="disiplin" id-prefix="admin">
+            <x-pegawai.detail.panel tab="disiplin" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Riwayat Hukuman Disiplin"
                     description="Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian."
@@ -1792,7 +1070,7 @@
 
             {{-- TAB 7: RIWAYAT PENDIDIKAN --}}
             @if($canReadHistoriesForTabs)
-            <x-pegawai.detail.panel tab="pendidikan" id-prefix="admin">
+            <x-pegawai.detail.panel tab="pendidikan" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Riwayat Pendidikan Formal"
                     description="Riwayat kualifikasi akademis tertinggi staf."
@@ -1882,7 +1160,7 @@
 
             {{-- TAB 8: DATA PENGANGKATAN --}}
             @if($canReadHistoriesForTabs)
-            <x-pegawai.detail.panel tab="pengangkatan" id-prefix="admin">
+            <x-pegawai.detail.panel tab="pengangkatan" id-prefix="pimpinan">
                 <x-pegawai.detail.section-header
                     title="Data & SK Pengangkatan Pertama"
                     description="Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK."
@@ -1959,8 +1237,45 @@
             </x-pegawai.detail.panel>
             @endif
 
-            @if($canReadDocumentsForTabs)
-            @include('admin.pegawai.partials.tab-dokumen-sk')
+            {{-- TAB 9: DOKUMEN & SK (read-only, pimpinan-scoped). Partial admin
+                tidak dipakai: ia memuat kontrol mutasi dan URL arsip admin.
+                Baris berasal dari relasi documents yang sudah difilter kategori
+                aman + URL unduh khusus Pimpinan oleh action. --}}
+            @if($canReadDocuments)
+            <x-pegawai.detail.panel tab="docs" id-prefix="pimpinan">
+                <x-pegawai.detail.section-header
+                    title="Daftar Dokumen & Berkas Pegawai"
+                    description="Arsip dokumen SK dan berkas lainnya dalam mode baca-saja."
+                />
+                <x-pegawai.detail.table
+                    name="docs"
+                    :headings="['Dokumen', 'Nomor', 'Tanggal', 'Berkas']"
+                >
+                    @forelse(($p->documents ?? collect()) as $document)
+                        <tr class="transition-colors hover:bg-soft/30 text-ink">
+                            <td class="px-4 py-3">
+                                <p class="font-bold font-sans">{{ $document->nama_dokumen }}</p>
+                                <p class="text-[10px] text-muted">{{ $document->jenis_dokumen }}</p>
+                            </td>
+                            <td class="px-4 py-3 font-sans">{{ $document->nomor_dokumen ?? '-' }}</td>
+                            <td class="px-4 py-3 font-sans">{{ $document->tanggal_dokumen?->format('d-m-Y') ?? '-' }}</td>
+                            <td class="px-4 py-3">
+                                @if($document->pimpinan_download_url)
+                                    <a href="{{ $document->pimpinan_download_url }}" class="font-semibold text-primary hover:underline">Unduh</a>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="4" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                Belum ada dokumen.
+                            </td>
+                        </tr>
+                    @endforelse
+                </x-pegawai.detail.table>
+            </x-pegawai.detail.panel>
             @endif
 
         </x-pegawai.detail.shell>
@@ -2662,7 +1977,9 @@
 
     {{-- ============================================================ --}}
     {{-- MODAL TAMBAH / EDIT DATA PENGANGKATAN PERTAMA                --}}
+    {{-- Hanya dirender bila pemicu mutasinya ada (read-only menyembunyikan). --}}
     {{-- ============================================================ --}}
+    @if($canUpdateEmployeeHistory)
     <x-ui.modal
         show="showAppointmentModal"
         title="Data & SK Pengangkatan Pertama"
@@ -2765,6 +2082,7 @@
             </div>
         </form>
     </x-ui.modal>
+    @endif
 </div>{{-- /x-data utama --}}
 
 </div>

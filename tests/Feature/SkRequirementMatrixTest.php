@@ -129,7 +129,7 @@ class SkRequirementMatrixTest extends TestCase
                 ->get($route)
                 ->assertOk()
                 ->assertSee($version, false)
-                ->assertSee('pegawai_mv${this.skRequirementVersion}_pp', false)
+                ->assertSee('pegawai_mv${this.skRequirementVersion}_vw', false)
                 ->assertSee("skRequirementStorageKey: 'simpeg:sk-requirements:version'", false)
                 ->assertSee("window.addEventListener('storage', this.skRequirementStorageListener);", false)
                 ->assertSee("window.removeEventListener('storage', this.skRequirementStorageListener);", false);

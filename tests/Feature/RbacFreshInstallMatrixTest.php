@@ -7,6 +7,7 @@ use App\Models\Role;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -15,7 +16,10 @@ use Tests\TestCase;
  * mapping untuk pasangan role-permission yang sudah ada. Migrasi pembuat role
  * wajib menanam matriks defaultnya sendiri agar install baru lengkap tanpa
  * mengorbankan proteksi revoke operator pada database berjalan.
+ *
+ * Dijalankan di lane serial: migrate:fresh di dalam test tidak aman paralel.
  */
+#[Group('serial')]
 class RbacFreshInstallMatrixTest extends TestCase
 {
     use RefreshDatabase;

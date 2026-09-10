@@ -78,6 +78,35 @@ class RbacPermissionMiddlewareTest extends TestCase
         }
     }
 
+    public function test_deleted_canonical_role_is_fail_closed_for_paten_and_rbac(): void
+    {
+        // Row role kanonis dihapus harus fail-closed untuk PATEN & RBAC — DB adalah source of truth.
+        foreach (['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $canonicalRole) {
+            $role = Role::where('name', $canonicalRole)->firstOrFail();
+            $roleId = $role->id;
+            $role->delete();
+
+            $user = User::factory()->create([
+                'role' => $canonicalRole,
+                'employee_id' => Employee::factory()->create()->id,
+            ]);
+
+            foreach (['notifications.read', 'hari_libur.read', 'employees.read_self', 'cuti.create'] as $permission) {
+                $this->assertFalse(
+                    $user->hasPermission($permission),
+                    "Role kanonis terhapus {$canonicalRole} harus fail-closed untuk {$permission}."
+                );
+            }
+
+            $this->assertFalse($user->hasPermission('employees.read'));
+            $this->assertFalse($user->hasPermission('audit_logs.read'));
+
+            // Kembalikan untuk iterasi berikutnya.
+            Role::create(['id' => $roleId, 'name' => $canonicalRole, 'display_name' => $canonicalRole]);
+            $this->seed(RbacSeeder::class);
+        }
+    }
+
     public function test_permission_records_are_seeded_idempotently(): void
     {
         // Re-seed tidak boleh menduplikasi permission (updateOrCreate + sync).

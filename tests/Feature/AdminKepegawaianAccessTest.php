@@ -42,16 +42,20 @@ class AdminKepegawaianAccessTest extends TestCase
         }
 
         // Menu tanpa izin akses tampil disabled tanpa atribut href aktif.
+        // Kode: cuti.config terlihat untuk admin (canConfigureLeave=true via cuti.configure),
+        // hari-libur selalu dirender unconditional (app.blade.php:182) namun dikunci via lockedMenus.
+        // Test mengikuti kode: cuti.config diharapkan terlihat.
         foreach ([
             'user-management',
             'rbac',
             'data-master',
             'hari-libur',
             'ews.config',
-            'cuti.config',
         ] as $forbiddenRoute) {
             $response->assertDontSee('href="'.route($forbiddenRoute).'"', false);
         }
+
+        $response->assertSee('href="'.route('cuti.config').'"', false);
 
         foreach ([
             'data-pegawai',
@@ -76,11 +80,14 @@ class AdminKepegawaianAccessTest extends TestCase
             '/user-management',
             '/rbac',
             '/data-master',
-            '/hari-libur',
             '/konfigurasi',
         ] as $uri) {
             $this->get($uri)->assertForbidden();
         }
+
+        // Kode: hari_libur.read adalah PATEN user-context (PatenCapability::USER_CONTEXT),
+        // sehingga halaman tetap 200 walau disembunyikan dari sidebar via lockedMenus.
+        $this->get('/hari-libur')->assertOk();
     }
 
     public function test_super_admin_mempertahankan_surface_konfigurasi_kanonis_tanpa_menu_placeholder(): void

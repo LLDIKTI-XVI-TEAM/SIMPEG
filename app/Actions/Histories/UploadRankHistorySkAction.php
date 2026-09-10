@@ -35,6 +35,7 @@ class UploadRankHistorySkAction
                     'history_id' => $history->id,
                 ], [
                     'nama_dokumen' => 'SK Kenaikan Pangkat '.($history->golongan?->kode ?? ''),
+                    'nomor_dokumen' => $history->no_sk,
                     'tanggal_dokumen' => $history->tanggal_sk,
                     'file_path' => $storedPath,
                     'keterangan' => 'Unggah berkas riwayat kepangkatan.',

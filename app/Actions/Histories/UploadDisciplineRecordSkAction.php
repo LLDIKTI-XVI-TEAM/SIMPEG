@@ -34,6 +34,7 @@ class UploadDisciplineRecordSkAction
                     'history_id' => $record->id,
                 ], [
                     'nama_dokumen' => 'SK Hukuman Disiplin '.$record->jenis_hukuman,
+                    'nomor_dokumen' => $record->no_sk,
                     'tanggal_dokumen' => $record->tanggal_sk,
                     'file_path' => $storedPath,
                     'keterangan' => 'Unggah berkas riwayat hukuman disiplin.',

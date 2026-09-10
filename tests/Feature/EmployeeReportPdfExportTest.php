@@ -187,8 +187,12 @@ class EmployeeReportPdfExportTest extends TestCase
             'jabatan_terakhir' => 'Analis Kepegawaian',
         ]);
 
+        // Scope laporan mengikuti aktor (EmployeeDashboardScopeService::for),
+        // sehingga render langsung wajib meneruskan admin sebagai aktor.
+        $admin = User::factory()->adminKepegawaian()->create();
+
         $html = view('admin.laporan.pdf-pegawai', [
-            'rows' => app(EmployeeExportDataService::class)->rows([]),
+            'rows' => app(EmployeeExportDataService::class)->rows([], true, $admin),
         ])->render();
 
         foreach ([
@@ -231,7 +235,7 @@ class EmployeeReportPdfExportTest extends TestCase
         ]);
 
         $html = view('admin.laporan.pdf-pegawai', [
-            'rows' => app(EmployeeExportDataService::class)->rows([]),
+            'rows' => app(EmployeeExportDataService::class)->rows([], true, $admin),
         ])->render();
 
         foreach ([

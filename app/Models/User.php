@@ -192,10 +192,9 @@ class User extends Authenticatable
      * Berlaku untuk seluruh evaluasi PATEN/RBAC agar role kosong/tidak valid
      * selalu fail-closed sesuai kontrak Issue #6.
      *
-     * Role kanonis (ROLE_RANKS) tidak memerlukan query: FK cascade pada
-     * role_permissions menjamin tidak ada mapping yatim bila row role dihapus,
-     * sehingga hasil pemeriksaan identik dengan query database. Role non-kanonis
-     * tetap diverifikasi ke database untuk mendukung role kustom.
+     * Semua nama role, termasuk kanonis (ROLE_RANKS), wajib dibuktikan via
+     * database sebagai source of truth — PATEN tidak meng-query pivot sehingga
+     * FK cascade pada role_permissions tidak cukup sebagai proof existence.
      */
     private function hasValidInternalRole(): bool
     {
@@ -203,10 +202,6 @@ class User extends Authenticatable
 
         if (! is_string($role) || $role === '') {
             return false;
-        }
-
-        if (isset(self::ROLE_RANKS[$role])) {
-            return true;
         }
 
         return Role::query()->where('name', $role)->exists();

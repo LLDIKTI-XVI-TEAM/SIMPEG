@@ -61,6 +61,7 @@ class EmployeeHistoryUploadSkTest extends TestCase
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
             'jenis_dokumen' => 'sk_pangkat',
+            'history_id' => $rank->id,
             'nomor_dokumen' => 'SK-PANGKAT-001',
             'file_path' => $rank->file_sk,
         ]);
@@ -100,6 +101,7 @@ class EmployeeHistoryUploadSkTest extends TestCase
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
             'jenis_dokumen' => 'sk_jabatan',
+            'history_id' => $position->id,
             'nomor_dokumen' => 'SK-JABATAN-002',
             'file_path' => $position->file_sk,
         ]);
@@ -137,6 +139,7 @@ class EmployeeHistoryUploadSkTest extends TestCase
         $this->assertDatabaseHas('documents', [
             'employee_id' => $employee->id,
             'jenis_dokumen' => 'sk_kgb',
+            'history_id' => $kgb->id,
             'nomor_dokumen' => 'KGB-2026-003',
             'file_path' => $kgb->file_sk,
         ]);

@@ -47,6 +47,8 @@ class SkMirrorHistoryIdentityTest extends TestCase
         $this->assertTrue($mirrors->has($second->id));
         $this->assertSame($first->fresh()->file_sk, $mirrors[$first->id]->file_path);
         $this->assertSame($second->fresh()->file_sk, $mirrors[$second->id]->file_path);
+        $this->assertSame('SK-SAMA-001', $mirrors[$first->id]->nomor_dokumen);
+        $this->assertSame('SK-SAMA-001', $mirrors[$second->id]->nomor_dokumen);
     }
 
     public function test_riwayat_tanpa_nomor_sk_mendapat_mirror_terpisah(): void
@@ -72,6 +74,8 @@ class SkMirrorHistoryIdentityTest extends TestCase
             'history_id' => $second->id,
             'file_path' => $second->fresh()->file_sk,
         ]);
+        // Null nomor tetap ter-sync.
+        $this->assertSame(2, Document::query()->where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_pangkat')->whereNull('nomor_dokumen')->count());
     }
 
     public function test_unggah_ulang_tidak_menyentuh_mirror_riwayat_lain(): void
@@ -100,6 +104,8 @@ class SkMirrorHistoryIdentityTest extends TestCase
             ->where('employee_id', $employee->id)
             ->where('jenis_dokumen', 'sk_pangkat')
             ->count());
+        $this->assertDatabaseHas('documents', ['history_id' => $first->id, 'nomor_dokumen' => 'SK-SAMA-002']);
+        $this->assertDatabaseHas('documents', ['history_id' => $second->id, 'nomor_dokumen' => 'SK-SAMA-002']);
     }
 
     private function rankHistory(string $employeeId, string $golonganId, ?string $noSk): RankHistory
