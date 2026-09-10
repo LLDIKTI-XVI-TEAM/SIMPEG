@@ -117,12 +117,23 @@ class CentralArchiveReadOnlyTest extends TestCase
     public function test_pimpinan_dengan_dokumen_read_dapat_mengakses_arsip_lintas_pegawai(): void
     {
         $this->actingAsRole('pimpinan');
-        $document = $this->createBerkas();
+        $ktpDoc = $this->createBerkas();
+        // Dokumen non-ktp untuk verifikasi pimpinan tetap dapat akses kategori allowed.
+        $employee = Employee::factory()->create();
+        $allowedDoc = Document::create([
+            'employee_id' => $employee->id,
+            'jenis_dokumen' => 'ijazah',
+            'nama_dokumen' => 'Ijazah Pimpinan',
+            'file_path' => $employee->id.'/ijazah/pimpinan.pdf',
+        ]);
+        Storage::disk(Document::STORAGE_DISK)->put($allowedDoc->file_path, 'ijazah');
 
-        // RBAC configurable: dokumen_sk.read + scope global (canBrowseArchive pure RBAC).
+        // P1 privacy: pimpinan tetap 200 tapi ktp_kk excluded.
         $this->get(route('dokumen'))->assertOk();
-        $this->get(route('dokumen.show', $document->id))->assertOk();
-        $this->get(route('dokumen.download', $document->id))->assertOk();
+        $this->get(route('dokumen.show', $ktpDoc->id))->assertNotFound();
+        $this->get(route('dokumen.download', $ktpDoc->id))->assertNotFound();
+        $this->get(route('dokumen.show', $allowedDoc->id))->assertOk();
+        $this->get(route('dokumen.download', $allowedDoc->id))->assertOk();
     }
 
     public function test_archive_search_matches_category_label_and_key(): void

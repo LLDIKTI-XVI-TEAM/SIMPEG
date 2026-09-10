@@ -61,7 +61,7 @@ class PimpinanEmployeeController extends Controller
         $serverRenderedDetailLinks = collect($initialRows)
             ->map(fn (array $employee): array => [
                 'name' => $employee['nama_lengkap'],
-                'url' => route('rbac.pegawai.show', $employee['id']),
+                'url' => route('pimpinan.pegawai.show', $employee['id']),
             ])
             ->all();
         // Permission-driven (kontrak RBAC): capability halaman mengikuti permission

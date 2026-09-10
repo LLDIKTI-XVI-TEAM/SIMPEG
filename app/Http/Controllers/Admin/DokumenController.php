@@ -36,6 +36,11 @@ class DokumenController extends Controller
         abort_unless(DocumentAuthorization::canBrowseArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
         $payload = $action->execute($id);
+        // P1 privacy: Pimpinan tetap 200 tapi ktp_kk excluded.
+        if ($user !== null && $user->getEffectiveRole() === 'pimpinan') {
+            $docJenis = Document::query()->whereKey($id)->value('jenis_dokumen');
+            abort_if($docJenis === 'ktp_kk', 404);
+        }
         if ($user !== null && $user->getEffectiveRole() === 'kepala_bagian') {
             $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');
             abort_unless(
@@ -75,6 +80,10 @@ class DokumenController extends Controller
         $user = $request->user();
         abort_unless(DocumentAuthorization::canBrowseArchive($user), 403, 'Arsip dokumen terpusat hanya tersedia untuk pengelola data kepegawaian.');
 
+        if ($user !== null && $user->getEffectiveRole() === 'pimpinan') {
+            $docJenis = Document::query()->whereKey($id)->value('jenis_dokumen');
+            abort_if($docJenis === 'ktp_kk', 404);
+        }
         if ($user !== null && $user->getEffectiveRole() === 'kepala_bagian') {
             $documentEmployeeId = Document::query()->whereKey($id)->value('employee_id');
             abort_unless(

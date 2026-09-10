@@ -69,10 +69,25 @@ class Show extends Component
 
         // Lapisan privasi (K-privasi, terpisah dari RBAC aksi): halaman detail mentah
         // memuat NIK anggota keluarga dan metadata dokumen. Route tetap permission-driven
-        // (employees.read membuka daftar & akses), tetapi payload mentah hanya untuk
-        // pengelola data kepegawaian (DocumentAuthorization); non-pengelola diarahkan ke
-        // surface masked masing-masing.
+        // (employees.read membuka daftar & akses). Jika dokumen_sk.read dicabut tetapi
+        // employees.read masih ada, arahkan ke RBAC granular (bukan 403) agar revoke
+        // dokumen tidak mematikan profil.
         if (! DocumentAuthorization::canViewArchive($user)) {
+            if ($user !== null && $user->hasPermission('employees.read')) {
+                $isScopeAllowed = match ($user->getEffectiveRole()) {
+                    'super_admin', 'admin_kepegawaian' => true,
+                    'pimpinan' => true,
+                    'pegawai' => is_string($user->employee_id) && hash_equals($user->employee_id, $id),
+                    'kepala_bagian' => app(KepalaBagianScopeService::class)->hasDirectReport($user, $id),
+                    default => false,
+                };
+                if ($isScopeAllowed) {
+                    $this->redirectRoute('rbac.pegawai.show', ['employee' => $id]);
+
+                    return;
+                }
+            }
+
             $maskedSurface = $this->maskedDetailSurface($user);
 
             if ($maskedSurface !== null) {

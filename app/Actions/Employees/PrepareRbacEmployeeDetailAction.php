@@ -131,6 +131,7 @@ class PrepareRbacEmployeeDetailAction
                 'educationHistories' => fn ($query) => $query->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with(['jenjang:id,nama,urutan', 'programStudi:id,nama'])->orderByDesc('tahun_lulus'),
                 'documents' => fn ($query) => $query
                     ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
+                    ->when($viewer->getEffectiveRole() === 'pimpinan', fn ($q) => $q->whereIn('jenis_dokumen', DocumentCategory::visibleToPimpinanKeys()))
                     ->orderByDesc('tanggal_dokumen'),
                 'families' => fn ($query) => $query
                     ->when(! $canReadFamilies, fn ($q) => $q->whereRaw('1 = 0'))
@@ -260,8 +261,9 @@ class PrepareRbacEmployeeDetailAction
         }
 
         if ($canReadDocuments) {
-            $employee->documents->each(function (Document $document) use ($employee): void {
-                $fileAvailable = $this->attachments->availableDocumentPath($employee, $document, DocumentCategory::keys()) !== null;
+            $allowedKeys = $viewer->getEffectiveRole() === 'pimpinan' ? DocumentCategory::visibleToPimpinanKeys() : DocumentCategory::keys();
+            $employee->documents->each(function (Document $document) use ($employee, $allowedKeys): void {
+                $fileAvailable = $this->attachments->availableDocumentPath($employee, $document, $allowedKeys) !== null;
                 $document->setAttribute('rbac_download_url', $fileAvailable ? route('rbac.pegawai.documents.download', ['employee' => $employee, 'document' => $document]) : null);
                 $document->setAttribute('rbac_file_size_label', $fileAvailable ? $document->fileSizeLabel() : 'File tidak ditemukan');
             });

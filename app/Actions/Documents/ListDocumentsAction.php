@@ -86,6 +86,9 @@ class ListDocumentsAction
                     $matchedCategoryKeys[] = $categoryKey;
                 }
             }
+            if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan') {
+                $matchedCategoryKeys = array_values(array_intersect($matchedCategoryKeys, DocumentCategory::visibleToPimpinanKeys()));
+            }
 
             $query->where(function ($q) use ($keyword, $matchedCategoryKeys): void {
                 $q->whereRaw('lower(documents.nama_dokumen) like ?', [$keyword])
@@ -103,7 +106,17 @@ class ListDocumentsAction
         }
 
         if (! empty($validated['kategori'])) {
-            $query->where('jenis_dokumen', $validated['kategori']);
+            // Pimpinan tetap 200 tapi ktp_kk excluded (P1 privacy).
+            if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan' && $validated['kategori'] === 'ktp_kk') {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('jenis_dokumen', $validated['kategori']);
+            }
+        }
+
+        // Pimpinan: global scope boleh, tapi ktp_kk tetap excluded.
+        if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan') {
+            $query->whereIn('jenis_dokumen', DocumentCategory::visibleToPimpinanKeys());
         }
 
         $paginator = $query->latest('documents.created_at')->paginate($perPage)->withQueryString();

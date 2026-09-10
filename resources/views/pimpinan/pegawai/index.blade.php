@@ -3,6 +3,6 @@
          permission-driven oleh PimpinanEmployeeController dan diwariskan include.
          Link detail diarahkan ke canonical RBAC agar scope dan permission granular konsisten. --}}
     @include('admin.pegawai.index', [
-        'employeeShowUrlPrefix' => url('/rbac/pegawai')
+        'employeeShowUrlPrefix' => url('/pimpinan/pegawai')
     ])
 </x-layouts.app>

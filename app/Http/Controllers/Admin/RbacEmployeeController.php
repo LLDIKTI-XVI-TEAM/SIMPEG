@@ -26,7 +26,11 @@ class RbacEmployeeController extends Controller
 
     public function downloadDocument(Employee $employee, string $document, PrepareDocumentDownloadAction $action)
     {
-        $download = $action->execute($document, $employee->id, DocumentCategory::keys(), rejectAmbiguousMetadata: true);
+        $viewer = request()->user();
+        $allowed = $viewer !== null && $viewer->getEffectiveRole() === 'pimpinan'
+            ? DocumentCategory::visibleToPimpinanKeys()
+            : DocumentCategory::keys();
+        $download = $action->execute($document, $employee->id, $allowed, rejectAmbiguousMetadata: true);
 
         return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
             'Cache-Control' => 'private, no-store, max-age=0',
