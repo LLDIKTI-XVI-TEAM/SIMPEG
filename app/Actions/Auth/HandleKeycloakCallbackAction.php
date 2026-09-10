@@ -214,107 +214,122 @@ class HandleKeycloakCallbackAction
      */
     private function resolveUserForEmployee(Employee $employee, string $keycloakId, ?string $username, ?string $name, string $matchedEmail, Request $request): User
     {
-        $state = DB::transaction(function () use ($employee, $keycloakId, $username, $name, $matchedEmail, $request): array {
-            // Serialisasi callback paralel untuk pegawai yang sama: kunci baris employee
-            // sebelum re-check identitas (TOCTOU guard pada boundary database).
-            Employee::query()->whereKey($employee->id)->lockForUpdate()->first();
+        $mysqlBootstrapLockAcquired = false;
 
-            // Re-check subject di dalam transaksi: initial lookup di execute() terjadi
-            // SEBELUM lock — admin mapping atau callback lain bisa saja mengikat subject
-            // yang sama ke user berbeda di sela waktu. Tanpa re-check ini, save akan
-            // menabrak unique constraint dan retry resolver yang sama tetap buta terhadap
-            // binding baru tersebut.
-            $userBySubject = User::where('keycloak_id', $keycloakId)->lockForUpdate()->first();
-            $userByEmployee = User::where('employee_id', $employee->id)->lockForUpdate()->first();
-            $usersByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])
-                ->lockForUpdate()
-                ->limit(2)
-                ->get();
+        try {
+            $state = DB::transaction(function () use ($employee, $keycloakId, $username, $name, $matchedEmail, $request, &$mysqlBootstrapLockAcquired): array {
+                // Serialisasi callback paralel untuk pegawai yang sama: kunci baris employee
+                // sebelum re-check identitas (TOCTOU guard pada boundary database).
+                Employee::query()->whereKey($employee->id)->lockForUpdate()->first();
 
-            // Email hanya fallback terkontrol. Data legacy dapat memuat variasi
-            // kapitalisasi yang lolos constraint unik database; memilih satu secara
-            // arbitrer berisiko menautkan subject ke identitas yang salah.
-            if ($usersByEmail->count() > 1) {
-                return ['reject' => ['reason' => 'identity_conflict', 'user' => $usersByEmail->first()]];
-            }
+                // Re-check subject di dalam transaksi: initial lookup di execute() terjadi
+                // SEBELUM lock — admin mapping atau callback lain bisa saja mengikat subject
+                // yang sama ke user berbeda di sela waktu. Tanpa re-check ini, save akan
+                // menabrak unique constraint dan retry resolver yang sama tetap buta terhadap
+                // binding baru tersebut.
+                $userBySubject = User::where('keycloak_id', $keycloakId)->lockForUpdate()->first();
+                $userByEmployee = User::where('employee_id', $employee->id)->lockForUpdate()->first();
+                $usersByEmail = User::whereRaw('lower(email) = ?', [$matchedEmail])
+                    ->lockForUpdate()
+                    ->limit(2)
+                    ->get();
 
-            $userByEmail = $usersByEmail->first();
-
-            if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
-                // Dua user berbeda menunjuk identitas yang sama → fail-closed, jangan menebak.
-                return ['reject' => ['reason' => 'identity_conflict', 'user' => $userByEmployee]];
-            }
-
-            $user = $userByEmployee ?? $userByEmail;
-
-            // Rekonsiliasi tiga arah: subject yang sudah dimiliki user BERBEDA dari
-            // kandidat employee/email berarti percobaan rebind identitas — hentikan
-            // tanpa rebind (idempotent hanya bila subject menunjuk kandidat yang sama).
-            if ($userBySubject && ($user === null || $userBySubject->isNot($user))) {
-                return ['reject' => ['reason' => 'sso_subject_conflict', 'user' => $userBySubject]];
-            }
-
-            if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
-                return ['reject' => ['reason' => 'employee_mismatch', 'user' => $user]];
-            }
-
-            if ($user && $user->employee_id === null && $user->role !== 'pegawai') {
-                return ['reject' => ['reason' => 'manual_binding_required', 'user' => $user]];
-            }
-
-            if ($user && $user->keycloak_id !== null && $user->keycloak_id !== $keycloakId) {
-                return ['reject' => ['reason' => 'sso_subject_conflict', 'user' => $user]];
-            }
-
-            if ($user) {
-                // Reuse user existing: email internal TIDAK ditimpa agar identitas kanonis
-                // aplikasi tetap; yang diikat hanyalah subject Keycloak dan metadata login.
-                // Status verifikasi email JUGA tidak disentuh di sini: verifikasi hanya
-                // sah untuk email yang benar-benar diverifikasi IdP (diputuskan pemanggil).
-                $user->fill([
-                    'name' => $name ?: $username ?: $employee->nama_lengkap,
-                    'keycloak_id' => $keycloakId,
-                    'employee_id' => $employee->id,
-                ]);
-            } else {
-                // Keputusan bootstrap dan INSERT user pertama harus berada dalam
-                // transaksi/global lock yang sama. Mengunci lalu mengembalikan User
-                // belum tersimpan akan membuka kembali race dua callback pertama.
-                if (DB::getDriverName() === 'pgsql') {
-                    DB::statement('select pg_advisory_xact_lock(?)', [self::BOOTSTRAP_LOCK_KEY]);
+                // Email hanya fallback terkontrol. Data legacy dapat memuat variasi
+                // kapitalisasi yang lolos constraint unik database; memilih satu secara
+                // arbitrer berisiko menautkan subject ke identitas yang salah.
+                if ($usersByEmail->count() > 1) {
+                    return ['reject' => ['reason' => 'identity_conflict', 'user' => $usersByEmail->first()]];
                 }
 
-                $user = new User(['email' => $matchedEmail]);
-                $user->fill([
-                    'name' => $name ?: $username ?: $employee->nama_lengkap,
-                    'keycloak_id' => $keycloakId,
-                    'employee_id' => $employee->id,
-                    'email_verified_at' => now(),
-                ]);
+                $userByEmail = $usersByEmail->first();
 
-                // SSO hanya membuktikan identitas: role internal akun baru selalu default
-                // Pegawai; akun pertama sistem diberi super_admin sebagai bootstrap agar
-                // dapat dikonfigurasi (keputusan stakeholder, bukan otorisasi dari email).
-                $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
-                $user->password = Str::random(48);
+                if ($userByEmployee && $userByEmail && $userByEmployee->isNot($userByEmail)) {
+                    // Dua user berbeda menunjuk identitas yang sama → fail-closed, jangan menebak.
+                    return ['reject' => ['reason' => 'identity_conflict', 'user' => $userByEmployee]];
+                }
+
+                $user = $userByEmployee ?? $userByEmail;
+
+                // Rekonsiliasi tiga arah: subject yang sudah dimiliki user BERBEDA dari
+                // kandidat employee/email berarti percobaan rebind identitas — hentikan
+                // tanpa rebind (idempotent hanya bila subject menunjuk kandidat yang sama).
+                if ($userBySubject && ($user === null || $userBySubject->isNot($user))) {
+                    return ['reject' => ['reason' => 'sso_subject_conflict', 'user' => $userBySubject]];
+                }
+
+                if ($user && $user->employee_id !== null && $user->employee_id !== $employee->id) {
+                    return ['reject' => ['reason' => 'employee_mismatch', 'user' => $user]];
+                }
+
+                if ($user && $user->employee_id === null && $user->role !== 'pegawai') {
+                    return ['reject' => ['reason' => 'manual_binding_required', 'user' => $user]];
+                }
+
+                if ($user && $user->keycloak_id !== null && $user->keycloak_id !== $keycloakId) {
+                    return ['reject' => ['reason' => 'sso_subject_conflict', 'user' => $user]];
+                }
+
+                if ($user) {
+                    // Reuse user existing: email internal TIDAK ditimpa agar identitas kanonis
+                    // aplikasi tetap; yang diikat hanyalah subject Keycloak dan metadata login.
+                    // Status verifikasi email JUGA tidak disentuh di sini: verifikasi hanya
+                    // sah untuk email yang benar-benar diverifikasi IdP (diputuskan pemanggil).
+                    $user->fill([
+                        'name' => $name ?: $username ?: $employee->nama_lengkap,
+                        'keycloak_id' => $keycloakId,
+                        'employee_id' => $employee->id,
+                    ]);
+                } else {
+                    // Keputusan bootstrap dan INSERT user pertama harus berada dalam
+                    // transaksi/global lock yang sama. Mengunci lalu mengembalikan User
+                    // belum tersimpan akan membuka kembali race dua callback pertama.
+                    $driver = DB::getDriverName();
+                    if ($driver === 'pgsql') {
+                        DB::statement('select pg_advisory_xact_lock(?)', [self::BOOTSTRAP_LOCK_KEY]);
+                    } elseif (in_array($driver, ['mysql', 'mariadb'], true)) {
+                        DB::statement("SELECT GET_LOCK('simpeg.bootstrap.super_admin', 10)");
+                        $mysqlBootstrapLockAcquired = true;
+                    }
+
+                    $user = new User(['email' => $matchedEmail]);
+                    $user->fill([
+                        'name' => $name ?: $username ?: $employee->nama_lengkap,
+                        'keycloak_id' => $keycloakId,
+                        'employee_id' => $employee->id,
+                        'email_verified_at' => now(),
+                    ]);
+
+                    // SSO hanya membuktikan identitas: role internal akun baru selalu default
+                    // Pegawai; akun pertama sistem diberi super_admin sebagai bootstrap agar
+                    // dapat dikonfigurasi (keputusan stakeholder, bukan otorisasi dari email).
+                    $user->role = User::query()->exists() ? 'pegawai' : 'super_admin';
+                    $user->password = Str::random(48);
+                }
+
+                // Guard benturan sebagai fast-path saja: pemeriksaan ulang di boundary
+                // database tetap dilakukan lewat unique constraint saat save (loginMappedUser).
+                if ($this->usernameIsAvailable($user, $username)) {
+                    $user->keycloak_username = $username;
+                }
+
+                if (! $user->exists) {
+                    // Persist sebelum advisory transaction lock dilepas. Audit ikut satu
+                    // transaksi supaya bootstrap tanpa evidence tidak pernah committed.
+                    $user->save();
+                    $this->auditIdentityBinding($user, $request);
+                    $this->auditRoleInitialization($user, null, $request);
+                }
+
+                return ['user' => $user];
+            });
+        } finally {
+            if ($mysqlBootstrapLockAcquired) {
+                try {
+                    DB::statement("SELECT RELEASE_LOCK('simpeg.bootstrap.super_admin')");
+                } catch (Throwable) {
+                }
             }
-
-            // Guard benturan sebagai fast-path saja: pemeriksaan ulang di boundary
-            // database tetap dilakukan lewat unique constraint saat save (loginMappedUser).
-            if ($this->usernameIsAvailable($user, $username)) {
-                $user->keycloak_username = $username;
-            }
-
-            if (! $user->exists) {
-                // Persist sebelum advisory transaction lock dilepas. Audit ikut satu
-                // transaksi supaya bootstrap tanpa evidence tidak pernah committed.
-                $user->save();
-                $this->auditIdentityBinding($user, $request);
-                $this->auditRoleInitialization($user, null, $request);
-            }
-
-            return ['user' => $user];
-        });
+        }
 
         if (isset($state['reject'])) {
             $this->auditMappingRejected($state['reject']['user'], $state['reject']['reason'], $matchedEmail, $employee->id, $request);

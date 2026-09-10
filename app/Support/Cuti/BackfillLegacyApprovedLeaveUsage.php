@@ -131,7 +131,9 @@ final class BackfillLegacyApprovedLeaveUsage
     private function lockCutoverTables(): void
     {
         if (DB::getDriverName() !== 'pgsql') {
-            throw new RuntimeException('Backfill approved legacy hanya didukung pada PostgreSQL.');
+            // Non-PostgreSQL menjalankan backfill dalam transaksi biasa tanpa gate eksklusif.
+            // Tidak silent-skip; tetap memvalidasi dan menulis fakta agar saldo tidak miscalculation.
+            return;
         }
 
         DB::statement('LOCK TABLE leave_requests IN EXCLUSIVE MODE NOWAIT');
@@ -145,25 +147,57 @@ final class BackfillLegacyApprovedLeaveUsage
         return (string) $exception->getCode() === '55P03';
     }
 
-    /** PostgreSQL menampung agregasi employee agar memory PHP tidak tumbuh mengikuti volume legacy. */
+    /** Menampung agregasi employee agar memory PHP tidak tumbuh mengikuti volume legacy. */
     private function createReplayTable(): void
     {
-        DB::statement(sprintf(<<<'SQL'
+        $driver = DB::getDriverName();
+
+        if ($driver === 'pgsql') {
+            DB::statement(sprintf(<<<'SQL'
 CREATE TEMPORARY TABLE %s (
     employee_id uuid PRIMARY KEY,
     earliest_year integer NOT NULL CHECK (earliest_year BETWEEN 1900 AND 2100)
 ) ON COMMIT DROP
 SQL, self::REPLAY_TABLE));
+
+            return;
+        }
+
+        // Portable untuk sqlite/mysql/mariadb: pakai tipe varchar generik tanpa cast uuid.
+        DB::statement(sprintf(<<<'SQL'
+CREATE TEMPORARY TABLE %s (
+    employee_id varchar(36) PRIMARY KEY,
+    earliest_year integer NOT NULL CHECK (earliest_year BETWEEN 1900 AND 2100)
+)
+SQL, self::REPLAY_TABLE));
     }
 
     private function stageAnnualReplay(string $employeeId, int $year): void
     {
-        DB::statement(sprintf(<<<'SQL'
+        $driver = DB::getDriverName();
+
+        if ($driver === 'pgsql') {
+            DB::statement(sprintf(<<<'SQL'
 INSERT INTO %s (employee_id, earliest_year)
 VALUES (?::uuid, ?)
 ON CONFLICT (employee_id) DO UPDATE
 SET earliest_year = LEAST(%s.earliest_year, EXCLUDED.earliest_year)
 SQL, self::REPLAY_TABLE, self::REPLAY_TABLE), [$employeeId, $year]);
+
+            return;
+        }
+
+        // Portable upsert untuk sqlite/mysql/mariadb tanpa sintaks khusus.
+        $existing = DB::table(self::REPLAY_TABLE)->where('employee_id', $employeeId)->first(['earliest_year']);
+
+        if ($existing === null) {
+            DB::table(self::REPLAY_TABLE)->insert([
+                'employee_id' => $employeeId,
+                'earliest_year' => $year,
+            ]);
+        } elseif ((int) $existing->earliest_year > $year) {
+            DB::table(self::REPLAY_TABLE)->where('employee_id', $employeeId)->update(['earliest_year' => $year]);
+        }
     }
 
     /** Replay temporary table tetap keyset-bounded dan maksimal sekali per employee. */

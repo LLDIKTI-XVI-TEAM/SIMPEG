@@ -128,6 +128,7 @@ class UpdateEmployeeAction
                         }
                     } else {
                         $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                        $storedPangkatPath = null;
                         if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                             if (! $canDoc) {
                                 $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -135,19 +136,7 @@ class UpdateEmployeeAction
                                 $file = $request->file('file_sk_pangkat');
                                 $pangkatData['file_sk'] = $this->files->storeEmployeeDocument($file, 'ranks/sk');
                                 $storedEmployeeDocumentPaths[] = $pangkatData['file_sk'];
-
-                                $golonganLabel = isset($pangkatData['golongan_id'])
-                                    ? (RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
-                                    : 'Pangkat Baru';
-                                Document::create([
-                                    'employee_id' => $employee->id,
-                                    'jenis_dokumen' => 'sk_pangkat',
-                                    'nama_dokumen' => 'SK Kenaikan Pangkat '.$golonganLabel,
-                                    'nomor_dokumen' => $pangkatData['no_sk'] ?? null,
-                                    'tanggal_dokumen' => $pangkatData['tanggal_sk'] ?? null,
-                                    'file_path' => $pangkatData['file_sk'],
-                                    'keterangan' => 'Diunggah otomatis saat edit pegawai',
-                                ]);
+                                $storedPangkatPath = $pangkatData['file_sk'];
                             }
                         } elseif ($request->filled('existing_document_id_pangkat')) {
                             if (! $canDoc) {
@@ -170,8 +159,24 @@ class UpdateEmployeeAction
 
                         // Riwayat (pangkat/jabatan/KGB) bersifat append-only: form edit hanya boleh menambah record baru.
                         $pangkatData['is_latest'] = false;
-                        $employee->rankHistories()->create($pangkatData);
+                        $pangkatHistory = $employee->rankHistories()->create($pangkatData);
                         $rankHistoryChanged = true;
+
+                        if ($storedPangkatPath !== null) {
+                            $golonganLabel = isset($pangkatData['golongan_id'])
+                                ? (RefGolongan::find($pangkatData['golongan_id'])?->kode ?? 'Pangkat Baru')
+                                : 'Pangkat Baru';
+                            Document::create([
+                                'employee_id' => $employee->id,
+                                'history_id' => $pangkatHistory->id,
+                                'jenis_dokumen' => 'sk_pangkat',
+                                'nama_dokumen' => 'SK Kenaikan Pangkat '.$golonganLabel,
+                                'nomor_dokumen' => $pangkatData['no_sk'] ?? null,
+                                'tanggal_dokumen' => $pangkatData['tanggal_sk'] ?? null,
+                                'file_path' => $pangkatData['file_sk'],
+                                'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                            ]);
+                        }
                     }
                 }
             } elseif ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
@@ -210,6 +215,7 @@ class UpdateEmployeeAction
                     ];
 
                     $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                    $storedJabatanPath = null;
                     if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                         if (! $canDoc) {
                             $this->warnings[] = 'Berkas SK jabatan tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -217,16 +223,7 @@ class UpdateEmployeeAction
                             $file = $request->file('file_sk_jabatan');
                             $jabatanData['file_sk'] = $this->files->storeEmployeeDocument($file, 'positions/sk');
                             $storedEmployeeDocumentPaths[] = $jabatanData['file_sk'];
-
-                            Document::create([
-                                'employee_id' => $employee->id,
-                                'jenis_dokumen' => 'sk_jabatan',
-                                'nama_dokumen' => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
-                                'nomor_dokumen' => $jabatanData['no_sk'] ?? null,
-                                'tanggal_dokumen' => $jabatanData['tanggal_sk'] ?? null,
-                                'file_path' => $jabatanData['file_sk'],
-                                'keterangan' => 'Diunggah otomatis saat edit pegawai',
-                            ]);
+                            $storedJabatanPath = $jabatanData['file_sk'];
                         }
                     } elseif ($request->filled('existing_document_id_jabatan')) {
                         if (! $canDoc) {
@@ -248,8 +245,21 @@ class UpdateEmployeeAction
                     }
 
                     $jabatanData['is_latest'] = false;
-                    $employee->positionHistories()->create($jabatanData);
+                    $jabatanHistory = $employee->positionHistories()->create($jabatanData);
                     $positionHistoryChanged = true;
+
+                    if ($storedJabatanPath !== null) {
+                        Document::create([
+                            'employee_id' => $employee->id,
+                            'history_id' => $jabatanHistory->id,
+                            'jenis_dokumen' => 'sk_jabatan',
+                            'nama_dokumen' => 'SK Jabatan '.($jabatanData['nama_jabatan'] ?? 'Baru'),
+                            'nomor_dokumen' => $jabatanData['no_sk'] ?? null,
+                            'tanggal_dokumen' => $jabatanData['tanggal_sk'] ?? null,
+                            'file_path' => $jabatanData['file_sk'],
+                            'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                        ]);
+                    }
                 }
             } elseif ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                 $this->warnings[] = 'Berkas SK jabatan tidak diunggah: data riwayat jabatan tidak lengkap.';
@@ -276,6 +286,7 @@ class UpdateEmployeeAction
                     ];
 
                     $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                    $storedKgbPath = null;
                     if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                         if (! $canDoc) {
                             $this->warnings[] = 'Berkas SK KGB tidak diunggah: butuh permission dokumen_sk.create/update.';
@@ -283,16 +294,7 @@ class UpdateEmployeeAction
                             $file = $request->file('file_sk_kgb');
                             $kgbData['file_sk'] = $this->files->storeEmployeeDocument($file, 'salaries/sk');
                             $storedEmployeeDocumentPaths[] = $kgbData['file_sk'];
-
-                            Document::create([
-                                'employee_id' => $employee->id,
-                                'jenis_dokumen' => 'sk_kgb',
-                                'nama_dokumen' => 'SK KGB',
-                                'nomor_dokumen' => $kgbData['no_sk'] ?? null,
-                                'tanggal_dokumen' => $kgbData['tanggal_sk'] ?? null,
-                                'file_path' => $kgbData['file_sk'],
-                                'keterangan' => 'Diunggah otomatis saat edit pegawai',
-                            ]);
+                            $storedKgbPath = $kgbData['file_sk'];
                         }
                     } elseif ($request->filled('existing_document_id_kgb')) {
                         if (! $canDoc) {
@@ -314,8 +316,21 @@ class UpdateEmployeeAction
                     }
 
                     $kgbData['is_latest'] = false;
-                    $employee->salaryHistories()->create($kgbData);
+                    $kgbHistory = $employee->salaryHistories()->create($kgbData);
                     $salaryHistoryChanged = true;
+
+                    if ($storedKgbPath !== null) {
+                        Document::create([
+                            'employee_id' => $employee->id,
+                            'history_id' => $kgbHistory->id,
+                            'jenis_dokumen' => 'sk_kgb',
+                            'nama_dokumen' => 'SK KGB',
+                            'nomor_dokumen' => $kgbData['no_sk'] ?? null,
+                            'tanggal_dokumen' => $kgbData['tanggal_sk'] ?? null,
+                            'file_path' => $kgbData['file_sk'],
+                            'keterangan' => 'Diunggah otomatis saat edit pegawai',
+                        ]);
+                    }
                 }
             } elseif ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                 $this->warnings[] = 'Berkas SK KGB tidak diunggah: data riwayat KGB tidak lengkap.';
@@ -341,24 +356,63 @@ class UpdateEmployeeAction
                 if (! $canHistoryEff) {
                     $this->warnings[] = 'Riwayat pengangkatan tidak dibuat: butuh permission employee_histories.create/update.';
                 } else {
-                    $appointmentData = [
-                        'jenis_pengangkatan' => $validated['pengangkatan_jenis_pengangkatan'] ?? $request->input('pengangkatan_jenis_pengangkatan'),
-                        'tmt_pengangkatan' => $validated['pengangkatan_tmt_pengangkatan'] ?? $request->input('pengangkatan_tmt_pengangkatan'),
-                        'no_sk' => $validated['pengangkatan_no_sk'] ?? $request->input('pengangkatan_no_sk'),
-                        'tanggal_sk' => $validated['pengangkatan_tanggal_sk'] ?? $request->input('pengangkatan_tanggal_sk'),
-                    ];
+                    // Validasi inti sebelum menyimpan berkas agar tidak menghasilkan Document orphan.
+                    $hasCore = $request->filled('pengangkatan_jenis_pengangkatan');
+                    if (! $hasCore) {
+                        if ($request->hasFile('file_sk_pengangkatan') || $request->filled('existing_document_id_pengangkatan')) {
+                            $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: data riwayat pengangkatan tidak lengkap.';
+                        }
+                    } else {
+                        $appointmentData = [
+                            'jenis_pengangkatan' => $validated['pengangkatan_jenis_pengangkatan'] ?? $request->input('pengangkatan_jenis_pengangkatan'),
+                            'tmt_pengangkatan' => $validated['pengangkatan_tmt_pengangkatan'] ?? $request->input('pengangkatan_tmt_pengangkatan'),
+                            'no_sk' => $validated['pengangkatan_no_sk'] ?? $request->input('pengangkatan_no_sk'),
+                            'tanggal_sk' => $validated['pengangkatan_tanggal_sk'] ?? $request->input('pengangkatan_tanggal_sk'),
+                        ];
 
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
-                    if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
-                        if (! $canDoc) {
-                            $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
+                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                        $storedPengangkatanPath = null;
+                        if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
+                            if (! $canDoc) {
+                                $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
+                            } else {
+                                $file = $request->file('file_sk_pengangkatan');
+                                $appointmentData['file_sk'] = $this->files->storeEmployeeDocument($file, 'appointments/sk');
+                                $storedEmployeeDocumentPaths[] = $appointmentData['file_sk'];
+                                $storedPengangkatanPath = $appointmentData['file_sk'];
+                            }
+                        } elseif ($request->filled('existing_document_id_pengangkatan')) {
+                            if (! $canDoc) {
+                                $this->warnings[] = 'Berkas SK pengangkatan tidak diambil dari arsip: butuh permission dokumen_sk.create/update.';
+                            } else {
+                                $existingDoc = Document::where('id', $request->input('existing_document_id_pengangkatan'))
+                                    ->where('employee_id', $employee->id)
+                                    ->first();
+                                if ($existingDoc) {
+                                    $appointmentData['file_sk'] = $existingDoc->file_path;
+                                    if (empty($appointmentData['no_sk']) && $existingDoc->nomor_dokumen) {
+                                        $appointmentData['no_sk'] = $existingDoc->nomor_dokumen;
+                                    }
+                                    if (empty($appointmentData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
+                                        $appointmentData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
+                                    }
+                                }
+                            }
+                        }
+
+                        $appointment = $employee->appointment;
+                        if ($appointment) {
+                            $appointment->update($appointmentData);
+                            $appointmentChanged = true;
                         } else {
-                            $file = $request->file('file_sk_pengangkatan');
-                            $appointmentData['file_sk'] = $this->files->storeEmployeeDocument($file, 'appointments/sk');
-                            $storedEmployeeDocumentPaths[] = $appointmentData['file_sk'];
+                            $appointment = $employee->appointment()->create($appointmentData);
+                            $appointmentChanged = true;
+                        }
 
+                        if ($storedPengangkatanPath !== null) {
                             Document::create([
                                 'employee_id' => $employee->id,
+                                'history_id' => $appointment->id,
                                 'jenis_dokumen' => 'sk_pengangkatan',
                                 'nama_dokumen' => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
                                 'nomor_dokumen' => $appointmentData['no_sk'] ?? null,
@@ -366,40 +420,6 @@ class UpdateEmployeeAction
                                 'file_path' => $appointmentData['file_sk'],
                                 'keterangan' => 'Diunggah otomatis saat edit pegawai',
                             ]);
-                        }
-                    } elseif ($request->filled('existing_document_id_pengangkatan')) {
-                        if (! $canDoc) {
-                            $this->warnings[] = 'Berkas SK pengangkatan tidak diambil dari arsip: butuh permission dokumen_sk.create/update.';
-                        } else {
-                            $existingDoc = Document::where('id', $request->input('existing_document_id_pengangkatan'))
-                                ->where('employee_id', $employee->id)
-                                ->first();
-                            if ($existingDoc) {
-                                $appointmentData['file_sk'] = $existingDoc->file_path;
-                                if (empty($appointmentData['no_sk']) && $existingDoc->nomor_dokumen) {
-                                    $appointmentData['no_sk'] = $existingDoc->nomor_dokumen;
-                                }
-                                if (empty($appointmentData['tanggal_sk']) && $existingDoc->tanggal_dokumen) {
-                                    $appointmentData['tanggal_sk'] = $existingDoc->tanggal_dokumen;
-                                }
-                            }
-                        }
-                    }
-
-                    // Hanya buat/update jika ada data inti
-                    $hasCore = $request->filled('pengangkatan_jenis_pengangkatan');
-                    if (! $hasCore) {
-                        if ($request->hasFile('file_sk_pengangkatan') || $request->filled('existing_document_id_pengangkatan')) {
-                            $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: data riwayat pengangkatan tidak lengkap.';
-                        }
-                    } else {
-                        $appointment = $employee->appointment;
-                        if ($appointment) {
-                            $appointment->update($appointmentData);
-                            $appointmentChanged = true;
-                        } else {
-                            $employee->appointment()->create($appointmentData);
-                            $appointmentChanged = true;
                         }
 
                         $jenisNama = $appointmentData['jenis_pengangkatan'] ?? $validated['pengangkatan_jenis_pengangkatan'] ?? null;

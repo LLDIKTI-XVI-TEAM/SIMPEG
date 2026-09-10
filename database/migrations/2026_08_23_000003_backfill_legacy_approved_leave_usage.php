@@ -9,11 +9,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (DB::getDriverName() !== 'pgsql') {
-            return;
-        }
-
         // Cutover DB-only memastikan upgrade tidak meninggalkan request final tanpa fakta pemakaian.
+        // Portable: jalankan backfill untuk semua driver; PostgreSQL memakai gate eksklusif, driver lain
+        // memakai transaksi biasa tanpa LOCK TABLE NOWAIT agar tidak silent-skip dan mencegah saldo miscalculation.
         app(BackfillLegacyApprovedLeaveUsage::class)->execute();
     }
 

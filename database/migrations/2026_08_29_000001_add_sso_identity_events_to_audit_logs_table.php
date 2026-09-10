@@ -46,6 +46,11 @@ return new class extends Migration
         // subject Keycloak pada user, dan penolakan mapping/konflik identitas.
         'SSO_BINDING',
         'SSO_MAPPING_REJECTED',
+        // Cancellation lifecycle harus tetap diizinkan agar backdated migration tidak menolak
+        // baris audit yang sudah ada dari migration 2026_09_03 pada DB existing.
+        'LEAVE_CANCELLATION_REQUESTED',
+        'LEAVE_CANCELLATION_APPROVED',
+        'LEAVE_CANCELLATION_REJECTED',
     ];
 
     /**

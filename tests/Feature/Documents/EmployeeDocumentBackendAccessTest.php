@@ -78,10 +78,11 @@ class EmployeeDocumentBackendAccessTest extends TestCase
         $this->actingAsRole('admin_kepegawaian');
         $document = $this->createBerkas();
 
-        $this->get(route('dokumen'))->assertForbidden();
-        $this->get(route('dokumen.show', $document->id))->assertForbidden();
-        $this->get(route('dokumen.download', $document->id))->assertForbidden();
-        $this->getJson('/api/v1/dokumen')->assertForbidden();
+        // Pure RBAC: dokumen_sk.read saja cukup untuk arsip (P1 fix).
+        $this->get(route('dokumen'))->assertOk();
+        $this->get(route('dokumen.show', $document->id))->assertOk();
+        $this->get(route('dokumen.download', $document->id))->assertOk();
+        $this->getJson('/api/v1/dokumen')->assertOk();
     }
 
     public function test_admin_without_dokumen_update_cannot_mutate_berkas_lainnya(): void
