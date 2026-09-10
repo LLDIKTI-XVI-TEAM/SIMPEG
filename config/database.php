@@ -89,10 +89,8 @@ return [
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
-            // Saat suite berjalan paralel (paratest menyetel TEST_TOKEN per worker),
-            // tiap proses memakai database sendiri agar migrate:fresh tidak saling
-            // menghapus. Tanpa TEST_TOKEN (serial, lokal, production) nama tidak berubah.
-            'database' => env('DB_DATABASE', 'laravel').env('TEST_TOKEN', ''),
+            // Laravel ParallelTesting mengisolasi worker dengan suffix _test_{token}.
+            'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8'),

@@ -1,3 +1,8 @@
+@pushOnce('head')
+    @vite('resources/js/pages/chain-batch-editor.js')
+    @vite('resources/js/pages/cuti-config-navigation.js')
+@endPushOnce
+
 <x-layouts.app title="Konfigurasi Approval Cuti">
     @php
         $oldSteps = old('steps');
@@ -73,9 +78,37 @@
             $kepalaBagianError = $errors->first('steps.'.count($verifierSteps).'.approver_employee_id');
             $pybmcError = $errors->first('steps.'.(count($verifierSteps) + 1).'.approver_employee_id');
         }
+
+        // Redirect validasi memulihkan draft belum tersimpan, bukan baseline bersih.
+        // Kehadiran key tetap dihitung saat pilihan dikosongkan; editor tanpa izin tidak dipulihkan.
+        $restoredEditor = null;
+        $oldInput = session()->getOldInput();
+        if ($errors->any() && is_array($oldInput)) {
+            if ($hasGlobalIdentityScope
+                && (array_key_exists('approver_employee_id', $oldInput) || array_key_exists('pybmc_reason', $oldInput))) {
+                $restoredEditor = 'pybmc';
+            } elseif ($selectedEmployee && $canAssignKepalaBagian
+                && (array_key_exists('kepala_bagian_id', $oldInput) || array_key_exists('effective_date', $oldInput))) {
+                $restoredEditor = 'atasan';
+            } elseif ($selectedEmployee
+                && (array_key_exists('steps', $oldInput) || array_key_exists('reason', $oldInput))) {
+                $restoredEditor = 'pegawai';
+            }
+        }
     @endphp
 
-    <div class="space-y-6" x-data="{
+    <div
+        class="space-y-6"
+        x-data="{
+        ...cutiConfigNavigation({
+            initialTab: @js($initialTab ?? 'pegawai'),
+            initialStep: @js($initialStep ?? 'susun'),
+            restoredEditor: @js($restoredEditor),
+            canViewAudit: @js((bool) ($canViewAudit ?? false)),
+            hasGlobalIdentityScope: @js((bool) $hasGlobalIdentityScope),
+            successUrl: @js(route('cuti.config')),
+            batchSuccessCounts: @js(session('cuti_batch_success_counts')),
+        }),
         nextVerifierKey: @js(count($verifierSteps)),
         verifiers: @js($verifierSteps),
         pybmcEmployeeId: @js($pybmcEmployeeId),
@@ -83,25 +116,31 @@
         pybmcError: @js($pybmcError),
         announcement: '',
         maxVerifierSteps: 8,
-        approverLookupEndpoint: @js(route('cuti.employee-lookup')),
+        approverLookupEndpoint: @js(route('cuti.config.batch.approvers')),
         approverSearch: @js($approverSearch),
+        approverSearchSequence: 0,
         approverSearchLoading: false,
         approverSearchMessage: '',
         approverSearchError: '',
         initialApproverCandidateIds: @js($approverCandidates->pluck('id')->map(fn (mixed $id): string => (string) $id)->values()),
         approverLookupCandidates: [],
-        backfillHelpOpen: false,
-        openBackfillHelp() {
-            this.backfillHelpOpen = true;
-        },
-        closeBackfillHelp() {
-            if (! this.backfillHelpOpen) return;
-            this.backfillHelpOpen = false;
-        },
-        async searchApproverCandidates() {
-            const query = this.approverSearch.trim();
+        invalidateApproverSearch() {
+            this.approverSearchSequence++;
+            this.approverSearchLoading = false;
             this.approverSearchMessage = '';
             this.approverSearchError = '';
+            const selectedIds = new Set([
+                ...this.verifiers.map((verifier) => verifier.approver_employee_id),
+                this.pybmcEmployeeId,
+            ].filter(Boolean));
+            // Pilihan editor tetap sah; hanya hasil pencarian yang belum dipilih yang dibuang.
+            this.approverLookupCandidates = this.approverLookupCandidates
+                .filter((candidate) => selectedIds.has(candidate.id));
+        },
+        async searchApproverCandidates() {
+            this.invalidateApproverSearch();
+            const sequence = this.approverSearchSequence;
+            const query = this.approverSearch.trim();
 
             if (query.length < 2) {
                 this.approverSearchError = 'Ketik minimal 2 karakter.';
@@ -119,6 +158,8 @@
                 }
 
                 const result = await response.json();
+                // Respons usang tidak boleh mengganti kandidat, pesan, atau loading pencarian terbaru.
+                if (sequence !== this.approverSearchSequence) return;
                 const candidates = Array.isArray(result.data) ? result.data : [];
                 const selectedIds = new Set([
                     ...this.verifiers.map((verifier) => verifier.approver_employee_id),
@@ -137,9 +178,10 @@
                     ? `${candidates.length} kandidat ditemukan.`
                     : 'Kandidat tidak ditemukan.';
             } catch (error) {
+                if (sequence !== this.approverSearchSequence) return;
                 this.approverSearchError = 'Pencarian kandidat gagal. Coba lagi.';
             } finally {
-                this.approverSearchLoading = false;
+                if (sequence === this.approverSearchSequence) this.approverSearchLoading = false;
             }
         },
         addVerifier() {
@@ -156,6 +198,7 @@
                     approver_employee_id: '',
                 },
             });
+            this.markDirty('pegawai');
             this.announce('Verifikator ditambahkan.');
             this.$nextTick(() => this.focusVerifier(clientKey));
         },
@@ -164,6 +207,7 @@
                 ?? this.verifiers[index - 1]?.client_key
                 ?? null;
             this.verifiers.splice(index, 1);
+            this.markDirty('pegawai');
             this.announce('Verifikator dihapus.');
             this.$nextTick(() => {
                 if (neighborKey) {
@@ -178,6 +222,7 @@
             if (nextIndex < 0 || nextIndex >= this.verifiers.length) return;
             const verifier = this.verifiers[index];
             [this.verifiers[index], this.verifiers[nextIndex]] = [this.verifiers[nextIndex], this.verifiers[index]];
+            this.markDirty('pegawai');
             this.announce(direction < 0
                 ? 'Verifikator dipindahkan naik.'
                 : 'Verifikator dipindahkan turun.');
@@ -191,7 +236,15 @@
             this.announcement = '';
             this.$nextTick(() => { this.announcement = message; });
         },
-    }">
+    }"
+        @submit.capture="guardSubmit($event)"
+        @click.capture="guardLink($event)"
+        @input.capture="trackFormChange($event)"
+        @change.capture="trackFormChange($event)"
+        @cuti-config-state.window="syncBatchState($event.detail)"
+        @cuti-config-step.window="syncBatchStep($event.detail.step)"
+        @cuti-config-applied.window="finishBatch($event.detail)"
+    >
         {{-- PAGE HEADER & BREADCRUMB --}}
         <p class="sr-only" aria-live="polite" aria-atomic="true" x-text="announcement"></p>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -210,9 +263,10 @@
         @if (session('error'))
             <x-ui.alert variant="danger">{{ session('error') }}</x-ui.alert>
         @endif
+        <p x-show="navigationNotice" x-cloak x-text="navigationNotice" class="rounded-xl border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-ink" role="status"></p>
 
         {{-- Ringkasan status konfigurasi: dibaca sekilas sebelum admin menyusun chain. --}}
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div @class(['grid gap-4', 'sm:grid-cols-3' => $canViewAudit ?? false, 'sm:grid-cols-2' => ! ($canViewAudit ?? false)])>
             <div class="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
@@ -235,6 +289,7 @@
                     <p class="text-xs text-muted">PYBMC global saat ini</p>
                 </div>
             </div>
+            @if ($canViewAudit ?? false)
             <div class="flex items-center gap-4 rounded-xl border border-border bg-surface p-4 shadow-sm">
                 <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary" aria-hidden="true">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
@@ -246,10 +301,27 @@
                     <p class="text-xs text-muted">Perubahan tercatat terakhir</p>
                 </div>
             </div>
+            @endif
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-3 xl:items-start">
-        <div class="space-y-6 xl:col-span-2">
+        <x-ui.tabs label="Bagian konfigurasi approval cuti" @keydown="handleTabKey($event)" class="scrollbar-none">
+            <x-ui.tab active="activeTab === 'pegawai'" click="switchTab('pegawai')" id="cuti-config-tab-pegawai" data-config-tab="pegawai" aria-controls="cuti-config-panel-pegawai" ::tabindex="activeTab === 'pegawai' ? 0 : -1" class="min-h-11">Per Pegawai</x-ui.tab>
+            <x-ui.tab active="activeTab === 'rangkaian'" click="switchTab('rangkaian')" id="cuti-config-tab-rangkaian" data-config-tab="rangkaian" aria-controls="cuti-config-panel-rangkaian" ::tabindex="activeTab === 'rangkaian' ? 0 : -1" class="min-h-11">
+                Terapkan Rangkaian
+                <span x-show="batchApplying" x-cloak class="ml-1 text-xs font-semibold" aria-label="Penerapan sedang berlangsung">Memproses</span>
+                <span x-show="!batchApplying && batchNotice" x-cloak class="ml-1 h-2 w-2 rounded-full bg-warning" :aria-label="batchNotice" title="Ada pembaruan pada penerapan massal"></span>
+            </x-ui.tab>
+            @if ($hasGlobalIdentityScope)
+                <x-ui.tab active="activeTab === 'pybmc'" click="switchTab('pybmc')" id="cuti-config-tab-pybmc" data-config-tab="pybmc" aria-controls="cuti-config-panel-pybmc" ::tabindex="activeTab === 'pybmc' ? 0 : -1" class="min-h-11">PYBMC Global</x-ui.tab>
+            @endif
+            @if ($canViewAudit ?? false)
+                <x-ui.tab active="activeTab === 'riwayat'" click="switchTab('riwayat')" id="cuti-config-tab-riwayat" data-config-tab="riwayat" aria-controls="cuti-config-panel-riwayat" ::tabindex="activeTab === 'riwayat' ? 0 : -1" class="min-h-11">Riwayat Perubahan</x-ui.tab>
+            @endif
+        </x-ui.tabs>
+
+        <div id="cuti-config-panel-pegawai" role="tabpanel" aria-labelledby="cuti-config-tab-pegawai" x-show="activeTab === 'pegawai'" x-cloak>
+        <div>
+        <div class="space-y-6">
         <section class="rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="employee-chain-heading">
             <div class="border-b border-border bg-soft/30 px-5 py-4">
                 <h3 id="employee-chain-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Chain Approval Pegawai</h3>
@@ -258,6 +330,7 @@
             <x-cuti.employee-combobox
                 id="employee-search"
                 :action="route('cuti.config')"
+                :lookup-endpoint="route('cuti.config.batch.targets')"
                 name="employee_id"
                 query-name="search"
                 :query-value="$search"
@@ -271,16 +344,20 @@
                 help="Ketik minimal 2 karakter."
                 submit-label="Cari Pegawai"
                 class="border-b border-border px-5 py-4"
+                data-config-employee-picker
+                data-config-selection-restore-id="{{ $selectedEmployee?->id }}"
+                data-config-selection-restore-label="{{ $selectedEmployee ? $selectedEmployee->nama_lengkap . ' (' . $selectedEmployee->nip . ')' : '' }}"
+                x-on:config-selection-restore="selectedId = $el.dataset.configSelectionRestoreId; selectedLabel = $el.dataset.configSelectionRestoreLabel; query = selectedLabel; results = []; open = false"
             />
 
             @if ($selectedEmployee)
                 @if ($selectedKepalaBagian)
-                    <form method="GET" action="{{ route('cuti.config') }}" @submit.prevent="searchApproverCandidates()" class="space-y-1 border-b border-border bg-soft/20 px-5 py-4">
+                    <form method="GET" action="{{ route('cuti.config') }}" @submit.prevent="searchApproverCandidates()" data-config-local-form class="space-y-1 border-b border-border bg-soft/20 px-5 py-4">
                         <input type="hidden" name="search" value="{{ $search }}">
                         <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
                         <label for="approver-search" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kandidat Approver</label>
                         <div class="flex items-start gap-3">
-                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" x-model="approverSearch" placeholder="Nama atau NIP" aria-describedby="approver-search-help approver-search-status" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" x-model="approverSearch" @input="invalidateApproverSearch()" placeholder="Nama atau NIP" aria-describedby="approver-search-help approver-search-status" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <x-ui.button type="submit" variant="secondary" class="min-h-11 shrink-0" ::disabled="approverSearchLoading" x-text="approverSearchLoading ? 'Mencari...' : 'Cari Kandidat'">Cari Kandidat</x-ui.button>
                         </div>
                         <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC.</p>
@@ -294,6 +371,8 @@
                 @php
                     $kabagFormOpen = ! $selectedKepalaBagian
                         || $errors->hasAny(['kepala_bagian_id', 'effective_date', 'redirect_to']);
+                    $rawOldKepalaBagianId = old('kepala_bagian_id', '');
+                    $oldKepalaBagianId = is_string($rawOldKepalaBagianId) ? $rawOldKepalaBagianId : '';
                 @endphp
 
                 @if ($canAssignKepalaBagian)
@@ -302,14 +381,14 @@
                         x-data="{
                             kabagFormOpen: @js((bool) $kabagFormOpen),
                             kabagLookupEndpoint: @js(route('pegawai.supervisor-lookup', $selectedEmployee->id)),
-                            kabagQuery: '',
+                            kabagQuery: @js($oldKepalaBagianLabel ?? ''),
                             kabagResults: [],
                             kabagOpen: false,
                             kabagLoading: false,
                             kabagError: '',
                             kabagSelectionError: '',
-                            kabagSelectedId: @js((string) old('kepala_bagian_id', '')),
-                            kabagSelectedName: '',
+                            kabagSelectedId: @js($oldKepalaBagianId),
+                            kabagSelectedName: @js($oldKepalaBagianLabel ?? ''),
                             kabagActiveIndex: -1,
                             kabagRequestId: 0,
                             kabagSearchTimer: null,
@@ -363,6 +442,7 @@
                                 this.kabagResults = [];
                                 this.kabagActiveIndex = -1;
                                 this.kabagOpen = false;
+                                this.markDirty('atasan');
                             },
                             closeKabagLookup() {
                                 window.setTimeout(() => { this.kabagOpen = false; }, 120);
@@ -410,6 +490,7 @@
                             method="POST"
                             action="{{ route('pegawai.assign-atasan', $selectedEmployee->id) }}"
                             @submit="guardKabagSubmit($event)"
+                            data-config-form="atasan"
                             class="mt-4"
                         >
                             @csrf
@@ -499,7 +580,7 @@
                     </div>
                 @endif
 
-                <form method="POST" action="{{ route('cuti.config.employee-chain.store', $selectedEmployee) }}" class="divide-y divide-border">
+                <form method="POST" action="{{ route('cuti.config.employee-chain.store', $selectedEmployee) }}" data-config-form="pegawai" class="divide-y divide-border">
                     @csrf
                     <div class="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
@@ -555,7 +636,7 @@
 
                             <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator.</p>
                             @error('steps')
-                                <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                <p data-config-error-summary tabindex="-1" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
                             @enderror
 
                             <template x-for="(verifier, index) in verifiers" :key="verifier.client_key">
@@ -572,7 +653,7 @@
                                             <select :id="`verifier-${verifier.client_key}`" :name="`steps[${index}][approver_employee_id]`" x-model="verifier.approver_employee_id" required :aria-describedby="verifier.validation_errors.approver_employee_id ? `verifier-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.approver_employee_id)" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                                 <option value="">Pilih verifikator</option>
                                                 @foreach ($approverCandidates as $approver)
-                                                    <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
+                                                    <option value="{{ $approver->id }}" @disabled(! $approver->is_selectable)>{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
                                                 @endforeach
                                                 <template x-for="approver in approverLookupCandidates" :key="`lookup-verifier-${approver.id}`">
                                                     <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
@@ -605,7 +686,7 @@
                                 <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" :aria-describedby="`employee-pybmc-help ${pybmcError ? 'employee-pybmc-error' : ''}`.trim()" :aria-invalid="Boolean(pybmcError)" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                     <option value="">Gunakan PYBMC global</option>
                                     @foreach ($approverCandidates as $approver)
-                                        <option value="{{ $approver->id }}">{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
+                                        <option value="{{ $approver->id }}" @disabled(! $approver->is_selectable)>{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
                                     @endforeach
                                     <template x-for="approver in approverLookupCandidates" :key="`lookup-pybmc-${approver.id}`">
                                         <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
@@ -652,7 +733,11 @@
         </section>
         </div>
 
-        <div class="space-y-6">
+        </div>
+        </div>
+
+        <div id="cuti-config-panel-pybmc" role="tabpanel" aria-labelledby="cuti-config-tab-pybmc" x-show="activeTab === 'pybmc'" x-cloak>
+        @if ($hasGlobalIdentityScope)
         <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="global-pybmc-heading">
             <div class="border-b border-border bg-soft/30 px-5 py-4">
                 <h3 id="global-pybmc-heading" class="text-xs font-bold uppercase tracking-wider text-ink">PYBMC Global</h3>
@@ -667,15 +752,17 @@
                     $pybmcCurrentLabel = $globalPybmc?->approver
                         ? $globalPybmc->approver->nama_lengkap.' ('.$globalPybmc->approver->nip.')'
                         : '';
-                    $pybmcPrefillId = (string) old('approver_employee_id', $globalPybmc?->approver_employee_id ?? '');
-                    $pybmcPrefillLabel = old('approver_employee_id') === null ? $pybmcCurrentLabel : '';
+                    $rawPybmcPrefillId = old('approver_employee_id', $globalPybmc?->approver_employee_id ?? '');
+                    $pybmcPrefillId = is_string($rawPybmcPrefillId) ? $rawPybmcPrefillId : '';
+                    $pybmcPrefillLabel = old('approver_employee_id') === null ? $pybmcCurrentLabel : ($oldGlobalPybmcLabel ?? '');
                 @endphp
                 <form
                     method="POST"
                     action="{{ route('cuti.config.pybmc-global') }}"
+                    data-config-form="pybmc"
                     class="space-y-3"
                     x-data="{
-                        pybmcLookupEndpoint: @js(route('cuti.employee-lookup')),
+                        pybmcLookupEndpoint: @js(route('cuti.config.batch.approvers')),
                         pybmcQuery: @js($pybmcPrefillLabel),
                         pybmcResults: [],
                         pybmcOpen: false,
@@ -737,6 +824,7 @@
                             this.pybmcResults = [];
                             this.pybmcActiveIndex = -1;
                             this.pybmcOpen = false;
+                            this.markDirty('pybmc');
                         },
                         closePybmcLookup() {
                             window.setTimeout(() => { this.pybmcOpen = false; }, 120);
@@ -830,93 +918,16 @@
             </div>
         </section>
 
-        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="backfill-heading">
-            <div class="flex items-start justify-between gap-3 border-b border-border bg-soft/30 px-5 py-4">
-                <div>
-                    <h3 id="backfill-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Backfill Chain Dinamis</h3>
-                    <p class="mt-0.5 text-xs text-muted">Buat chain massal untuk pegawai yang belum punya chain.</p>
-                </div>
-                <button
-                    type="button"
-                    @click="openBackfillHelp()"
-                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-surface text-sm font-bold text-primary shadow-sm transition-colors hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    aria-label="Pelajari Backfill Chain Dinamis"
-                    aria-haspopup="dialog"
-                    :aria-expanded="backfillHelpOpen"
-                    aria-controls="backfill-help-dialog"
-                >?</button>
-            </div>
-            <div class="space-y-4 px-5 py-5">
-                <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Dapat diulang — pegawai yang sudah punya chain aktif dilewati.</p>
-                <form method="POST" action="{{ route('cuti.config.backfill') }}" class="space-y-3">
-                    @csrf
-                    <x-form.textarea name="backfill_reason" id="backfill-reason" label="Alasan Backfill (opsional)" rows="3" placeholder="Contoh: Backfill awal konfigurasi approval" />
-                    <x-ui.button type="submit" class="w-full">Jalankan Backfill Chain</x-ui.button>
-                </form>
-            </div>
-        </section>
-
-        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="unit-template-heading">
-            <div class="border-b border-border bg-soft/30 px-5 py-4">
-                <h3 id="unit-template-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Terapkan Chain ke Unit Kerja</h3>
-                <p class="mt-0.5 text-xs text-muted">Salin chain pegawai terpilih ke seluruh anggota satu unit kerja.</p>
-            </div>
-            <div class="space-y-4 px-5 py-5">
-                <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Hanya unit yang dipilih, tidak termasuk sub-unit di bawahnya. Keanggotaan unit diambil dari riwayat jabatan terkini pegawai. Chain yang sudah ada akan ditimpa, chain lama dinonaktifkan bukan dihapus.</p>
-
-                @if ($selectedEmployee === null)
-                    <p class="rounded-xl border border-border bg-soft/30 px-4 py-3 text-sm text-muted">Pilih pegawai pada panel Chain Approval Pegawai terlebih dahulu untuk dipakai sebagai sumber.</p>
-                @elseif (! $templateSourceHasActiveChain)
-                    <p class="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-ink">{{ $selectedEmployee->nama_lengkap }} belum memiliki chain aktif, jadi belum ada yang dapat disalin. Simpan chain pegawai ini lebih dulu.</p>
-                @else
-                    <form method="POST" action="{{ route('cuti.config.unit-template.apply') }}" class="space-y-3">
-                        @csrf
-                        <input type="hidden" name="source_employee_id" value="{{ $selectedEmployee->id }}">
-
-                        <div class="rounded-xl border border-border bg-soft/30 px-4 py-3">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-muted">Sumber Chain</p>
-                            <p class="mt-1 text-sm font-semibold text-ink">{{ $selectedEmployee->nama_lengkap }}</p>
-                            @if ($selectedEmployee->nip)
-                                <p class="text-xs text-muted">NIP {{ $selectedEmployee->nip }}</p>
-                            @endif
-                        </div>
-
-                        <div>
-                            <label for="unit-kerja-id" class="mb-1.5 block text-sm font-semibold text-ink">Unit Kerja Tujuan <span class="text-danger">*</span></label>
-                            <select
-                                name="unit_kerja_id"
-                                id="unit-kerja-id"
-                                required
-                                aria-describedby="unit-kerja-id-hint"
-                                class="w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-ink shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                                <option value="">Pilih unit kerja</option>
-                                @foreach ($unitKerjaOptions as $unitKerja)
-                                    <option value="{{ $unitKerja->id }}" @selected(old('unit_kerja_id', $templateSourceUnitKerjaId) === $unitKerja->id)>{{ $unitKerja->nama }}</option>
-                                @endforeach
-                            </select>
-                            <p id="unit-kerja-id-hint" class="mt-1 text-xs text-muted">Unit kerja pegawai sumber dipilih otomatis bila tersedia.</p>
-                            @error('unit_kerja_id')
-                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        @error('source_employee_id')
-                            <p class="text-xs text-danger">{{ $message }}</p>
-                        @enderror
-
-                        <x-form.textarea name="template_reason" id="template-reason" label="Alasan Penerapan" :required="true" rows="3" placeholder="Contoh: Menyeragamkan chain approval Bagian Keuangan" />
-
-                        <x-ui.button type="submit" class="w-full">Terapkan ke Unit Kerja</x-ui.button>
-                    </form>
-                @endif
-            </div>
-        </section>
+        @endif
 
         </div>
+
+        <div id="cuti-config-panel-rangkaian" role="tabpanel" aria-labelledby="cuti-config-tab-rangkaian" x-show="activeTab === 'rangkaian'" x-cloak>
+        @include('admin.cuti.partials.chain-batch-composer')
         </div>
 
-        <section class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" aria-labelledby="audit-heading">
+        @if ($canViewAudit ?? false)
+        <section id="cuti-config-panel-riwayat" role="tabpanel" aria-labelledby="cuti-config-tab-riwayat" x-show="activeTab === 'riwayat'" x-cloak class="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
             <div class="flex items-center justify-between border-b border-border bg-soft/30 px-5 py-4">
                 <div>
                     <h3 id="audit-heading" class="text-xs font-bold uppercase tracking-wider text-ink">Log Perubahan Konfigurasi</h3>
@@ -976,45 +987,19 @@
                 @endforelse
             </div>
         </section>
+        @endif
 
-        <x-ui.modal
-            id="backfill-help-dialog"
-            show="backfillHelpOpen"
-            title="Apa itu Backfill Chain Dinamis?"
-            title-id="backfill-help-title"
-            description-id="backfill-help-description"
-            close-action="closeBackfillHelp()"
-            max-width="lg"
-        >
-            <div id="backfill-help-description" class="space-y-5 text-sm leading-relaxed text-muted">
-                <p>Backfill membuat alur persetujuan cuti secara otomatis untuk pegawai aktif yang belum mempunyai chain.</p>
-
-                <div class="rounded-xl border border-primary/15 bg-soft px-4 py-3 text-center font-semibold text-primary">
-                    Verifikator (jika tersedia) -> Atasan Langsung -> PYBMC
+        <x-ui.modal id="cuti-config-leave-confirmation" show="leaveConfirmOpen" title="Buang perubahan yang belum disimpan?"
+            description-id="cuti-config-leave-description" close-action="cancelDeparture()" max-width="md"
+            panel-class="[&_button]:min-h-11 [&_button]:min-w-11">
+            <p id="cuti-config-leave-description" class="text-sm leading-relaxed text-ink">Anda memiliki perubahan yang belum disimpan. Tetap di halaman untuk melanjutkan, atau buang perubahan dan lanjutkan.</p>
+            <x-slot:footer>
+                <div class="flex flex-wrap justify-end gap-3">
+                    <x-ui.button type="button" variant="secondary" @click="cancelDeparture()" data-modal-initial-focus="true">Tetap di Halaman</x-ui.button>
+                    <x-ui.button type="button" variant="danger" @click="confirmDeparture()">Buang dan Lanjutkan</x-ui.button>
                 </div>
-
-                <ul class="list-disc space-y-2 pl-5">
-                    <li>Chain dibuat dari Verifikator lama, penugasan Atasan Langsung efektif, dan PYBMC lama yang tersedia.</li>
-                    <li>Pegawai yang sudah mempunyai chain aktif dilewati dan tidak diubah.</li>
-                    <li>Pegawai tanpa penugasan Atasan Langsung efektif atau tanpa approver final belum dapat dibuatkan chain.</li>
-                    <li>Backfill dapat dijalankan kembali setelah data pegawai diperbaiki.</li>
-                    <li>Alasan Backfill bersifat opsional dan, bila diisi, disimpan pada setiap chain yang berhasil dibuat serta catatan auditnya.</li>
-                </ul>
-
-                <p class="rounded-xl bg-warning/10 px-4 py-3 text-ink">
-                    Gunakan Backfill untuk membuat konfigurasi awal secara massal. Untuk mengubah chain pegawai tertentu, gunakan konfigurasi khusus pegawai.
-                </p>
-
-                <div class="flex justify-end">
-                    <button
-                        id="backfill-help-close"
-                        type="button"
-                        @click="closeBackfillHelp()"
-                        data-modal-initial-focus="true"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:ring-offset-2"
-                    >Mengerti</button>
-                </div>
-            </div>
+            </x-slot:footer>
         </x-ui.modal>
+
     </div>
 </x-layouts.app>

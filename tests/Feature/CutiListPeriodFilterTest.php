@@ -187,9 +187,10 @@ class CutiListPeriodFilterTest extends TestCase
     public function test_filter_tahun_tidak_sah_diabaikan_tanpa_menggagalkan_halaman(): void
     {
         $this->seedThreeYears();
+        $actor = User::factory()->superAdmin()->create();
 
         foreach (['abc', '202', '20255'] as $tahunTidakSah) {
-            $response = $this->actingAs(User::factory()->superAdmin()->create())
+            $response = $this->actingAs($actor)
                 ->get(route('cuti', ['tahun' => $tahunTidakSah]));
 
             $response->assertOk();
@@ -256,6 +257,7 @@ class CutiListPeriodFilterTest extends TestCase
     {
         $jenis = $this->createJenis();
         $employee = Employee::factory()->create(['nama_lengkap' => 'Pegawai Uji Warna']);
+        $actor = User::factory()->superAdmin()->create();
 
         foreach ([
             'menunggu_approval' => 'text-warning',
@@ -269,7 +271,7 @@ class CutiListPeriodFilterTest extends TestCase
             LeaveRequest::query()->delete();
             $this->createLeave($employee, $jenis, '2026-04-06', $status);
 
-            $response = $this->actingAs(User::factory()->superAdmin()->create())->get(route('cuti'));
+            $response = $this->actingAs($actor)->get(route('cuti'));
 
             $response->assertOk();
             $this->assertMatchesRegularExpression(

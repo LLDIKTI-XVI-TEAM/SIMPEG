@@ -10,6 +10,7 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\MessageBag;
+use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
@@ -115,21 +116,24 @@ class CutiConfigPageTest extends TestCase
             ->assertSee(':name="pybmcEmployeeId ? \'steps[_pybmc][approver_employee_id]\' : null" x-model="pybmcEmployeeId"', false)
             ->assertSee('PYBMC Global')
             ->assertSee('Override global mengubah PYBMC pada semua chain aktif', false)
-            ->assertSee('Pelajari Backfill Chain Dinamis')
-            ->assertSee('aria-haspopup="dialog"', false)
-            ->assertSee('id="backfill-help-dialog"', false)
+            ->assertSee('Terapkan Rangkaian ke Pegawai')
+            ->assertSee('Susun Rangkaian')
+            ->assertSee('Pilih Pegawai')
+            ->assertSee('Tinjau Penerapan')
+            ->assertSee('id="batch-confirmation"', false)
             ->assertSee('role="dialog"', false)
             ->assertSee('aria-modal="true"', false)
-            ->assertSee('aria-labelledby="backfill-help-title"', false)
-            ->assertSee('aria-describedby="backfill-help-description"', false)
-            ->assertSee('Apa itu Backfill Chain Dinamis?')
+            ->assertSee('aria-describedby="batch-confirmation-description"', false)
+            ->assertSee('Konfirmasi Penerapan Rangkaian')
             ->assertSee('Atasan Langsung')
             ->assertSee('Verifikator')
             ->assertSee('PYBMC')
-            ->assertSee('Alasan Backfill (opsional)')
-            ->assertSee('Alasan Backfill bersifat opsional dan, bila diisi, disimpan pada setiap chain yang berhasil dibuat serta catatan auditnya.')
+            ->assertSee('Hanya pegawai yang belum memiliki rangkaian')
+            ->assertSee('Perbarui rangkaian pegawai terpilih')
+            ->assertDontSee('Backfill Chain Dinamis')
+            ->assertDontSee('Terapkan Chain ke Unit Kerja')
             ->assertSee('data-modal-initial-focus="true"', false)
-            ->assertSee('closeBackfillHelp()', false)
+            ->assertSee('closeConfirmation()', false)
             ->assertSee('hidden overflow-x-auto md:block', false)
             ->assertSee('space-y-3 p-5 md:hidden', false)
             ->assertSee('break-words text-ink', false)
@@ -158,6 +162,29 @@ class CutiConfigPageTest extends TestCase
         $this->assertIsString($component);
         $this->assertStringContainsString('name="{{ $queryName }}"', $component);
         $this->assertStringContainsString(':name="selectedId ? null : @js($queryName)"', $component);
+    }
+
+    public function test_audit_historis_penerapan_unit_tetap_terbaca_setelah_endpoint_dipensiunkan(): void
+    {
+        $actor = User::factory()->superAdmin()->create();
+        $audit = AuditLog::query()->create([
+            'user_id' => $actor->id,
+            'user_name' => 'Pengelola Histori Unit',
+            'event' => 'CONFIG_UPDATE',
+            'auditable_type' => 'RefUnitKerja',
+            'auditable_id' => (string) Str::uuid(),
+            'old_values' => [],
+            'new_values' => ['reason' => 'Menyeragamkan rantai unit keuangan.'],
+        ]);
+
+        $response = $this->actingAs($actor)->get(route('cuti.config'))->assertOk();
+        $row = collect($response->viewData('auditRows'))->firstWhere('id', $audit->id);
+
+        $this->assertNotNull($row);
+        $this->assertSame('Template unit', $row['source']);
+        $this->assertSame('CONFIG_UPDATE', $row['event']);
+        $this->assertSame('Menyeragamkan rantai unit keuangan.', $row['reason']);
+        $response->assertSee('Pengelola Histori Unit')->assertSee('Menyeragamkan rantai unit keuangan.');
     }
 
     public function test_pencarian_pegawai_dibatasi_lima_puluh_hasil(): void
@@ -405,12 +432,20 @@ class CutiConfigPageTest extends TestCase
             ->assertSee('PYBMC tidak dapat digunakan.')
             ->assertSee('Chain approval tidak valid.')
             ->assertSee(':aria-describedby="verifier.validation_errors.role_label ? `verifier-label-error-${verifier.client_key}` : null"', false)
-            ->assertSee(':id="`verifier-label-error-${verifier.client_key}`"', false)
-            ->assertSee('<option value="'.$verifikatorPertama->id.'">Kandidat AJAX Verifikator Pertama (198001012026000101)</option>', false)
-            ->assertSee('<option value="'.$verifikatorKedua->id.'">Kandidat AJAX Verifikator Kedua (198001012026000102)</option>', false)
-            ->assertSee('<option value="'.$pybmc->id.'">Kandidat AJAX PYBMC (198001012026000103)</option>', false);
+            ->assertSee(':id="`verifier-label-error-${verifier.client_key}`"', false);
 
         $html = $response->getContent();
+        foreach ([
+            [$verifikatorPertama, 'Kandidat AJAX Verifikator Pertama', '198001012026000101'],
+            [$verifikatorKedua, 'Kandidat AJAX Verifikator Kedua', '198001012026000102'],
+            [$pybmc, 'Kandidat AJAX PYBMC', '198001012026000103'],
+        ] as [$candidate, $name, $nip]) {
+            $this->assertMatchesRegularExpression(
+                '/<option value="'.preg_quote($candidate->id, '/').'"(?![^>]*disabled)[^>]*>'
+                    .preg_quote($name.' ('.$nip.')', '/').'<\/option>/',
+                $html,
+            );
+        }
         $firstRowStart = strpos($html, 'Verifier Stabil Pertama');
         $secondRowStart = strpos($html, 'Verifier Stabil Kedua');
         $verifierStateEnd = strpos($html, 'pybmcEmployeeId:', $secondRowStart ?: 0);

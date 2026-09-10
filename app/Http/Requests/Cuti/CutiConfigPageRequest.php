@@ -10,6 +10,10 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class CutiConfigPageRequest extends FormRequest
 {
+    private const TABS = ['pegawai', 'rangkaian', 'pybmc', 'riwayat'];
+
+    private const STEPS = ['susun', 'pilih', 'tinjau'];
+
     public function authorize(): bool
     {
         $actor = $this->user();
@@ -22,8 +26,27 @@ class CutiConfigPageRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:100'],
-            'employee_id' => ['nullable', 'uuid', 'exists:employees,id'],
+            // Keberadaan dan scope diperiksa sebagai satu query di Action agar ID asing
+            // tidak menjadi existence oracle melalui perbedaan pesan validasi.
+            'employee_id' => ['nullable', 'uuid'],
             'approver_search' => ['nullable', 'string', 'max:100'],
+            'tab' => ['required', 'string', 'in:'.implode(',', self::TABS)],
+            'step' => ['required', 'string', 'in:'.implode(',', self::STEPS)],
         ];
+    }
+
+    /**
+     * Menormalkan state presentasi saja; filter pencarian dan scope pegawai tetap
+     * melewati kontrak validasi serta pemeriksaan Action yang sudah ada.
+     */
+    protected function prepareForValidation(): void
+    {
+        $tab = $this->input('tab');
+        $step = $this->input('step');
+
+        $this->merge([
+            'tab' => is_string($tab) && in_array($tab, self::TABS, true) ? $tab : 'pegawai',
+            'step' => is_string($step) && in_array($step, self::STEPS, true) ? $step : 'susun',
+        ]);
     }
 }

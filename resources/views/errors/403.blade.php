@@ -9,7 +9,7 @@
         </div>
         <h1 class="text-2xl font-bold text-gray-800 mb-3">Tidak Mendapatkan Akses</h1>
         <p class="text-gray-600">
-            Anda tidak memiliki izin untuk mengakses halaman ini.
+            {{ ($exception ?? null)?->getMessage() ?: 'Anda tidak memiliki izin untuk mengakses halaman ini.' }}
             Silakan hubungi administrator jika Anda merasa ini adalah kesalahan.
         </p>
     </div>

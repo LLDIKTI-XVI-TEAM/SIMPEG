@@ -4,6 +4,7 @@ namespace App\Http\Requests\Cuti;
 
 use App\Models\Employee;
 use App\Models\LeavePybmcGlobalConfig;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,8 +22,35 @@ class EmployeeApprovalChainRequest extends FormRequest
     public function authorize(): bool
     {
         $actor = $this->user();
+        $employee = $this->route('employee');
 
-        return $actor !== null && $actor->hasPermission('cuti.configure');
+        if ($actor === null || ! $actor->hasPermission('cuti.configure')) {
+            return false;
+        }
+
+        if ($employee instanceof Employee) {
+            abort_unless(
+                app(EmployeeDashboardScopeService::class)->forIdentity($actor)->whereKey($employee->id)->exists(),
+                404,
+            );
+        }
+
+        return true;
+    }
+
+    /**
+     * Kegagalan validasi selalu kembali ke editor target hasil route binding,
+     * bukan ke referer atau parameter redirect yang dapat dipengaruhi pengguna.
+     */
+    protected function getRedirectUrl(): string
+    {
+        $employee = $this->route('employee');
+        $employeeId = $employee instanceof Employee ? $employee->id : (string) $employee;
+
+        return route('cuti.config', [
+            'tab' => 'pegawai',
+            'employee_id' => $employeeId,
+        ]);
     }
 
     /**
@@ -82,6 +110,8 @@ class EmployeeApprovalChainRequest extends FormRequest
             'steps.*.role_label' => ['required', 'string', 'max:100'],
             'steps.*.approver_employee_id' => [
                 'required',
+                'bail',
+                'uuid',
                 // Klasifikasi aktif dari kelompok referensi — satu sumber dengan
                 // Employee::whereActiveStatus()/isActive() (termasuk Aktif/khusus).
                 Rule::exists('employees', 'id')

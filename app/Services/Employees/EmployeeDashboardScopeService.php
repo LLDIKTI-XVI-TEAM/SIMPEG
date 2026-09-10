@@ -21,11 +21,38 @@ class EmployeeDashboardScopeService
     /** @return Builder<Employee> */
     public function for(?User $actor): Builder
     {
-        if ($actor === null) {
-            return $this->none();
-        }
+        return $actor === null
+            ? $this->none()
+            : $this->forRole($actor, $actor->getEffectiveRole());
+    }
 
-        return match ($actor->getEffectiveRole()) {
+    /**
+     * Menentukan scope dari role asli agar Switch Role tidak mengganti identitas,
+     * ownership, atau himpunan pegawai yang boleh dijangkau aktor.
+     *
+     * @return Builder<Employee>
+     */
+    public function forIdentity(?User $actor): Builder
+    {
+        return $actor === null
+            ? $this->none()
+            : $this->forRole($actor, $actor->role);
+    }
+
+    /**
+     * Menandai identitas dengan scope organisasi global tanpa menjadikannya
+     * pengganti pemeriksaan permission efektif pada capability terkait.
+     */
+    public function hasGlobalIdentityScope(?User $actor): bool
+    {
+        return $actor !== null
+            && in_array($actor->role, ['super_admin', 'admin_kepegawaian', 'pimpinan'], true);
+    }
+
+    /** @return Builder<Employee> */
+    private function forRole(User $actor, ?string $role): Builder
+    {
+        return match ($role) {
             'super_admin', 'admin_kepegawaian', 'pimpinan' => Employee::query(),
             'kepala_bagian' => $this->kepalaBagianScope->directReports($actor),
             'pegawai' => $this->ownEmployee($actor),

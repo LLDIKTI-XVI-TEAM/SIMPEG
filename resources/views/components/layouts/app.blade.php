@@ -295,6 +295,28 @@
                 ];
             }
 
+            // Override menu per role tidak boleh menghilangkan capability yang didelegasikan.
+            // Entry ini hanya membuka konfigurasi cuti, bukan menu administrasi lain.
+            if ($layoutCapabilities['cuti.configure'] ?? false) {
+                $hasCutiConfigMenu = collect($menuGroups)
+                    ->flatMap(fn (array $group) => $group['items'])
+                    ->contains(fn (array $item) => $item['route'] === 'cuti.config');
+
+                if (! $hasCutiConfigMenu) {
+                    foreach ($menuGroups as &$menuGroup) {
+                        if ($menuGroup['group'] === 'Cuti') {
+                            $menuGroup['items'][] = [
+                                'label' => 'Konfigurasi Approval Cuti',
+                                'route' => 'cuti.config',
+                                'icon' => 'cog-6-tooth',
+                            ];
+                            break;
+                        }
+                    }
+                    unset($menuGroup);
+                }
+            }
+
             $allMenuRoutes = [];
             foreach ($menuGroups as $g) {
                 foreach ($g['items'] as $item) {
