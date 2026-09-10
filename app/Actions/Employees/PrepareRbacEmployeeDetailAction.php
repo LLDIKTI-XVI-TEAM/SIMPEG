@@ -149,7 +149,7 @@ class PrepareRbacEmployeeDetailAction
 
         $employee->loadMissing(['programStudi', 'educationHistories.programStudi']);
 
-        $this->prepareAttachmentDownloadUrls($employee, $canReadHistories, $canReadDiscipline, $canReadDocuments);
+        $this->prepareAttachmentDownloadUrls($employee, $canReadHistories, $canReadDiscipline, $canReadDocuments, $viewer);
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true) ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
         $latestRank = $employee->rankHistories->firstWhere('is_latest', true);
@@ -225,7 +225,7 @@ class PrepareRbacEmployeeDetailAction
         ];
     }
 
-    private function prepareAttachmentDownloadUrls(Employee $employee, bool $canReadHistories, bool $canReadDiscipline, bool $canReadDocuments): void
+    private function prepareAttachmentDownloadUrls(Employee $employee, bool $canReadHistories, bool $canReadDiscipline, bool $canReadDocuments, User $viewer): void
     {
         $this->attachments->primeDocumentReferences(collect([
             ...$employee->rankHistories->pluck('file_sk'),

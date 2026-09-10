@@ -315,7 +315,7 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
     }
 
     /**
-     * @param  array{request: LeaveRequest, approver: Employee, approver_user: User}  $fixture
+     * @param  array{request: LeaveRequest, approver: Employee, approver_user: User, active_step_id: string, revision_version: int}  $fixture
      * @return Collection<int, array<string, mixed>>
      */
     private function runRace(array $fixture, array $operations = ['approve', 'approve']): Collection
