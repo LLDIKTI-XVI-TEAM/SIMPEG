@@ -201,28 +201,7 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         }
 
         if ($user === null && $employee === null) {
-            // Both missing: create via upsertEmployee (qa-phase7 style) - first time only
-            $employee = $this->upsertEmployee(
-                $email,
-                '198001012026000004',
-                'Demo Klabat (Admin Kepegawaian)',
-                'admin_kepegawaian',
-                $jenisPegawaiId,
-                $statusAktifId,
-            );
-            $user = new User;
-            $user->fill([
-                'name' => 'Demo Klabat (Admin Kepegawaian)',
-                'email' => $email,
-                'keycloak_username' => 'demo-klabat-kepeg',
-                'role' => 'admin_kepegawaian',
-                'employee_id' => $employee->id,
-                'email_verified_at' => now(),
-                'password' => 'demo-klabat-kepeg',
-            ]);
-            $user->save();
-
-            return $user;
+            throw new \RuntimeException('QA fixture contract violated: admin persona SSO prerequisite missing - run SsoRoleMappedAccountSeeder, refusing to create demo-klabat-kepeg');
         }
 
         if ($user === null || $employee === null) {
@@ -277,24 +256,28 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private function resolveDemoApprover(?string $jenisPegawaiId, ?string $statusAktifId): Employee
     {
-        $user = User::query()
-            ->where('keycloak_username', self::DEMO_APPROVER_USERNAME)
-            ->firstOrFail();
-
-        $employee = $user->employee_id !== null
-            ? Employee::query()->find($user->employee_id)
-            : Employee::query()->where('email', $user->email)->first();
-
-        if ($employee === null) {
-            throw new \RuntimeException('Employee untuk demo-klabat-kabag belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
+        $email = 'kepala-bagian@example.test';
+        $expectedUsername = self::DEMO_APPROVER_USERNAME;
+        // Canonical SSO resolver: fixture email -> Employee -> User via employee_id
+        $employeeCandidates = Employee::query()
+            ->whereRaw('lower(email) = ? OR lower(email_pribadi) = ?', [strtolower($email), strtolower($email)])
+            ->limit(2)
+            ->get();
+        if ($employeeCandidates->count() !== 1) {
+            throw new \RuntimeException('QA fixture contract violated: ambiguous or missing active Employee for demo approver email '.$email);
         }
-
+        $employee = $employeeCandidates->first();
         if (! $employee->isActive() || $employee->status_pegawai_id !== $statusAktifId || $employee->jenis_pegawai_id !== $jenisPegawaiId || $employee->jabatan_terakhir !== 'Kepala Bagian' || ($employee->role ?? null) !== 'kepala_bagian') {
             throw new \RuntimeException('QA fixture contract violated: demo approver employee not Aktif/kepala_bagian - refusing to force');
         }
 
-        if ($user->role !== 'kepala_bagian' || $user->employee_id !== $employee->id) {
-            throw new \RuntimeException('QA fixture contract violated: demo approver user role/employee_id mismatch - refusing to overwrite');
+        $user = User::query()->where('employee_id', $employee->id)->first();
+        if ($user === null) {
+            throw new \RuntimeException('QA fixture contract violated: demo approver User not found via employee_id for '.$email);
+        }
+
+        if ($user->role !== 'kepala_bagian' || $user->keycloak_username !== $expectedUsername || $user->employee_id !== $employee->id) {
+            throw new \RuntimeException('QA fixture contract violated: demo approver user role/keycloak_username/employee_id mismatch - refusing to overwrite');
         }
 
         return $employee;
@@ -308,24 +291,27 @@ class PhaseSevenBrowserQaSeeder extends Seeder
         ?string $statusAktifId,
         Employee $approver,
     ): Employee {
-        $user = User::query()
-            ->where('keycloak_username', self::DEMO_PEGAWAI_USERNAME)
-            ->firstOrFail();
-
-        $employee = $user->employee_id !== null
-            ? Employee::query()->find($user->employee_id)
-            : Employee::query()->where('email', $user->email)->first();
-
-        if ($employee === null) {
-            throw new \RuntimeException('Employee untuk demo-klabat-pegawai belum tersedia. Jalankan DemoSsoUserSeeder terlebih dahulu.');
+        $email = 'pegawai@example.test';
+        $expectedUsername = self::DEMO_PEGAWAI_USERNAME;
+        $employeeCandidates = Employee::query()
+            ->whereRaw('lower(email) = ? OR lower(email_pribadi) = ?', [strtolower($email), strtolower($email)])
+            ->limit(2)
+            ->get();
+        if ($employeeCandidates->count() !== 1) {
+            throw new \RuntimeException('QA fixture contract violated: ambiguous or missing active Employee for demo pegawai email '.$email);
         }
-
+        $employee = $employeeCandidates->first();
         if (! $employee->isActive() || $employee->status_pegawai_id !== $statusAktifId || $employee->jenis_pegawai_id !== $jenisPegawaiId || $employee->jabatan_terakhir !== 'Analis Kepegawaian' || $employee->kepala_bagian_id !== $approver->id || ($employee->role ?? null) !== 'pegawai') {
             throw new \RuntimeException('QA fixture contract violated: demo pegawai employee mismatch - refusing to force');
         }
 
-        if ($user->role !== 'pegawai' || $user->employee_id !== $employee->id) {
-            throw new \RuntimeException('QA fixture contract violated: demo pegawai user role/employee_id mismatch - refusing to overwrite');
+        $user = User::query()->where('employee_id', $employee->id)->first();
+        if ($user === null) {
+            throw new \RuntimeException('QA fixture contract violated: demo pegawai User not found via employee_id for '.$email);
+        }
+
+        if ($user->role !== 'pegawai' || $user->keycloak_username !== $expectedUsername || $user->employee_id !== $employee->id) {
+            throw new \RuntimeException('QA fixture contract violated: demo pegawai user role/keycloak_username/employee_id mismatch - refusing to overwrite');
         }
 
         $existingAssignment = SupervisorAssignment::query()
