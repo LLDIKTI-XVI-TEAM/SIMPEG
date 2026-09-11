@@ -32,31 +32,33 @@
     x-data="manualExternalApprovalEditor(@js($initialApprovalSteps), @js($currentApprovalChainPreview), @js(route('cuti.manual.approver-lookup')), @js($editorId), @js($approvalStepFieldErrors))"
 >
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+        <div class="min-w-0 max-w-xl">
             <h4 id="{{ $editorId }}-title" class="text-sm font-semibold text-ink">Riwayat Persetujuan Eksternal</h4>
             <p class="mt-1 text-xs leading-relaxed text-muted">
                 Susun 2-10 tahap: maksimal 8 Verifikator, tepat satu Atasan Langsung, lalu tepat satu PYBMC pada tahap terakhir.
             </p>
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex shrink-0 flex-wrap gap-2 sm:flex-nowrap">
             @if ($allowCurrentPreview)
-            <button
+            <x-ui.button
                 type="button"
+                variant="secondary"
                 x-on:click="openPreview()"
-                class="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-3 py-2 text-xs font-semibold text-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                class="shrink-0"
             >
                 Pratinjau Rangkaian Saat Ini
-            </button>
+            </x-ui.button>
             @endif
-            <button
+            <x-ui.button
                 type="button"
+                variant="secondary"
                 x-on:click="addStep()"
                 x-bind:disabled="steps.length >= 10"
                 data-manual-approval-add="{{ $editorId }}"
-                class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
+                class="shrink-0"
             >
                 Tambah Tahap
-            </button>
+            </x-ui.button>
         </div>
     </div>
 

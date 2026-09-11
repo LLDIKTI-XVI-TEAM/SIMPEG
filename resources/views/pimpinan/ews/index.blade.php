@@ -16,6 +16,8 @@
                 searchName="search" 
                 :searchValue="request('search')"
                 searchPlaceholder="Cari pegawai"
+                searchLabel="Cari pegawai"
+                searchLabelSrOnly
                 gridClass="grid-cols-1 md:grid-cols-3"
             >
                 <div>
@@ -58,7 +60,7 @@
                                 $remaining = $alert['sisa_hari'] < 0 ? 'Lewat '.abs($alert['sisa_hari']).' hari' : $alert['sisa_hari'].' hari';
                             @endphp
                             <x-ui.table-row class="hover:bg-soft transition-colors border-b border-border/50 group">
-                                <x-ui.table-td class="px-5 py-3"><a href="{{ route('pimpinan.pegawai.show', $alert['pegawai_id']) }}" class="font-semibold text-ink transition hover:text-primary focus:outline-none rounded">{{ $alert['nama'] }}</a><span class="mt-1 block font-sans text-[10px] text-muted">NIP. {{ $alert['nip'] }}</span></x-ui.table-td>
+                                <x-ui.table-td class="px-5 py-3"><a href="{{ route('pimpinan.pegawai.show', $alert['pegawai_id']) }}" class="rounded font-semibold text-ink transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2">{{ $alert['nama'] }}</a><span class="mt-1 block font-sans text-xs text-muted">NIP. {{ $alert['nip'] }}</span></x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ $alert['jenis_event'] }}<p class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</p></x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5 text-sm text-ink">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</x-ui.table-td>
                                 <x-ui.table-td class="px-4 py-3.5"><x-ui.badge :variant="$alert['urgency']" size="sm" dot>{{ $remaining }}</x-ui.badge></x-ui.table-td>
@@ -72,29 +74,28 @@
                 </x-ui.table>
             </div>
             
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
-                <form method="GET" action="{{ route('pimpinan.ews.index') }}" class="flex items-center gap-3 text-sm text-muted">
+            <div class="flex flex-col items-start justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row sm:items-center">
+                <div class="flex flex-wrap items-center gap-4 text-sm text-muted">
+                    <form method="GET" action="{{ route('pimpinan.ews.index') }}" class="flex items-center gap-2">
                     <input type="hidden" name="search" value="{{ request('search') }}">
                     <input type="hidden" name="event" value="{{ request('event') }}">
                     <input type="hidden" name="status" value="{{ request('status') }}">
                     <span class="whitespace-nowrap">Tampilkan</span>
-                    <select name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                    <label for="pimpinan-ews-per-page" class="sr-only">Jumlah baris per halaman</label>
+                    <select id="pimpinan-ews-per-page" name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
                         @foreach ([10, 25, 50] as $optPerPage)
                             <option value="{{ $optPerPage }}" @selected((int) request('per_page', 10) === $optPerPage)>{{ $optPerPage }}</option>
                         @endforeach
                     </select>
-                    <span class="hidden sm:inline">data</span>
-
-                    @if($alerts->total() > 0)
-                        <div class="hidden md:block ml-2 border-l border-border pl-4">
-                            Menampilkan <span class="font-medium text-ink">{{ $alerts->firstItem() }}</span>
-                            - <span class="font-medium text-ink">{{ $alerts->lastItem() }}</span>
-                            dari <span class="font-medium text-ink">{{ $alerts->total() }}</span>
-                        </div>
-                    @endif
+                    <span class="whitespace-nowrap">data</span>
                 </form>
+                    <span class="hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
+                    <p class="whitespace-nowrap">
+                        Menampilkan {{ $alerts->firstItem() ?? 0 }} - {{ $alerts->lastItem() ?? 0 }} dari {{ $alerts->total() }}
+                    </p>
+                </div>
 
-                <div class="w-full sm:w-auto">
+                <div class="flex w-full justify-start sm:w-auto sm:justify-end">
                     {{ $alerts->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>

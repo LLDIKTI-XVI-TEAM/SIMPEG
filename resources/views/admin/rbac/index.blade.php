@@ -93,7 +93,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
         {{-- PAGE HEADER & BREADCRUMBS --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Role & Permission / RBAC</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Role & Permission / RBAC</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Role & Permission']
@@ -107,14 +107,9 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
         @endif
 
         {{-- INFO ARCHITECTURE CARD --}}
-        <div class="rounded-lg border border-info/20 bg-info/5 p-4 text-xs text-info flex gap-3">
-            <svg class="w-5 h-5 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-            </svg>
-            <div>
-                <span class="font-bold">Informasi Otorisasi:</span> Sistem menggunakan Keycloak SSO murni untuk autentikasi identitas login. Seluruh hak akses, role, dan permission dibaca serta dikonfigurasi melalui database internal SIMPEG (RBAC). Perubahan peran (role) akan berlaku saat pegawai melakukan login berikutnya.
-            </div>
-        </div>
+        <x-ui.alert variant="info" size="sm">
+            <span class="font-bold">Informasi Otorisasi:</span> Sistem menggunakan Keycloak SSO murni untuk autentikasi identitas login. Seluruh hak akses, role, dan permission dibaca serta dikonfigurasi melalui database internal SIMPEG (RBAC). Perubahan peran (role) akan berlaku saat pegawai melakukan login berikutnya.
+        </x-ui.alert>
 
         {{-- SUMMARY ROLES CARDS --}}
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -130,7 +125,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                                 default => 'muted',
                             };
                         @endphp
-                        <x-ui.badge :variant="$roleVariant" size="xs" uppercase>
+                        <x-ui.badge :variant="$roleVariant" size="sm" uppercase>
                             {{ $role->name }}
                         </x-ui.badge>
                         <p class="mt-2 text-xs font-sans text-muted line-clamp-2">
@@ -153,7 +148,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                 {{-- TABLE HEADER SEARCH --}}
                 <div class="px-6 py-4 border-b border-border bg-surface flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h3 class="text-sm font-semibold text-ink font-sans">Matriks Konfigurasi RBAC</h3>
+                        <h3 class="text-lg font-semibold text-ink font-sans">Matriks Konfigurasi RBAC</h3>
                         <p class="text-xs text-muted">Tentukan daftar permission dan modul yang diizinkan untuk setiap level peran.</p>
                     </div>
                     <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -241,7 +236,7 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                                             <div class="flex flex-wrap items-center gap-1.5">
                                                 <span class="text-xs font-bold text-primary">{{ $displayPath }}</span>
                                                 @if($isSensitive)
-                                                    <span class="inline-flex items-center text-xs font-bold uppercase tracking-wider text-danger leading-none">⚠️ High Risk / Sensitif</span>
+                                                    <x-ui.badge variant="danger" size="sm" uppercase>High Risk / Sensitif</x-ui.badge>
                                                 @endif
                                             </div>
                                             <div class="mt-0.5 text-xs leading-relaxed text-muted">
@@ -254,10 +249,18 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                                         </x-ui.table-td>
                                         @foreach($roles as $role)
                                             <x-ui.table-td align="center" class="align-middle hover:bg-soft/40 transition">
+                                                @php
+                                                    $checkboxId = 'rbac-' . $role->id . '-' . $permission->id;
+                                                    $checkboxLabel = $role->name === 'super_admin'
+                                                        ? 'Izin ' . $displayPath . ' wajib aktif untuk Super Admin'
+                                                        : 'Izinkan ' . $displayPath . ' untuk ' . str_replace('_', ' ', $role->name);
+                                                @endphp
                                                 @if($role->name === 'super_admin')
                                                     {{-- Super Admin is always checked and disabled to prevent lockout --}}
                                                     <div class="flex items-center justify-center">
                                                         <x-form.checkbox
+                                                            id="{{ $checkboxId }}"
+                                                            aria-label="{{ $checkboxLabel }}"
                                                             checked
                                                             disabled
                                                             class="text-primary/45 bg-soft focus:ring-0"
@@ -268,8 +271,10 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                                                 @else
                                                     <div class="flex items-center justify-center">
                                                         <x-form.checkbox
+                                                            id="{{ $checkboxId }}"
                                                             name="matrix[{{ $role->id }}][]"
                                                             value="{{ $permission->id }}"
+                                                            aria-label="{{ $checkboxLabel }}"
                                                             x-model="currentData[{{ json_encode($role->id) }}]"
                                                             @change="checkDirty()"
                                                             class="transition"
@@ -344,14 +349,9 @@ $permissionGroupsForFilter = $permissionsByModule->map(function ($permissions, $
                 variant="primary"
             >
                 <div class="space-y-4">
-                    <div class="rounded-lg border border-warning/20 bg-warning/5 p-4 text-xs text-warning flex gap-3">
-                        <svg class="w-5 h-5 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                        </svg>
-                        <div>
-                            <span class="font-bold">⚠️ TINDAKAN SENSITIF:</span> Mengubah matriks RBAC (Role-Based Access Control) akan berdampak secara real-time dan langsung mempengaruhi hak akses seluruh pengguna aktif di sistem SIMPEG.
-                        </div>
-                    </div>
+                    <x-ui.alert variant="warning" size="sm">
+                        <span class="font-bold">Tindakan sensitif:</span> Mengubah matriks RBAC (Role-Based Access Control) akan berdampak secara real-time dan langsung mempengaruhi hak akses seluruh pengguna aktif di sistem SIMPEG.
+                    </x-ui.alert>
                     <p class="text-xs text-ink/80 leading-relaxed font-sans">
                         Perubahan pada hak akses modul sensitif (seperti <strong>User Management</strong>, <strong>Role & Permission</strong>, <strong>Audit Log</strong>, atau <strong>Konfigurasi EWS</strong>) berisiko tinggi. Pastikan wewenang yang diberikan telah sesuai dengan instruksi kedinasan.
                     </p>

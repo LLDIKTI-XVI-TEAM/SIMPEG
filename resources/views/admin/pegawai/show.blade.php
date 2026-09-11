@@ -1046,7 +1046,7 @@
                             <div>
                             <span class="text-xs font-bold text-ink font-sans block">Toggle Flag "Kinerja Baik"</span>
                             <p class="text-xs text-muted">Flag ini menggantikan penilaian SKP yang belum tersedia di Fase 1. Akan digantikan oleh modul Penilaian Kinerja di fase selanjutnya.</p>
-                            <p x-show="isUpdatingKinerja" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
+                            <p x-show="isUpdatingKinerja" class="mt-1 text-xs text-primary font-sans" style="display: none;">
                                 Menyimpan status kinerja.
                             </p>
                         </div>
@@ -1056,7 +1056,7 @@
                             @else
                             <input type="checkbox" x-model="kinerjaBaik" disabled aria-label="Toggle Kinerja Baik" class="sr-only peer">
                             @endif
-                            <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                            <div class="h-6 w-11 rounded-full bg-border peer peer-checked:bg-success peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:content-[''] after:transition-transform"></div>
                         </label>
                         </div>
                     </div>
@@ -1067,7 +1067,7 @@
                             <div>
                                 <span class="text-xs font-bold text-ink font-sans block">Kelayakan Satyalancana</span>
                                 <p class="text-xs text-muted">Flag dan catatan manual untuk EWS Satyalancana 10/20/30 tahun.</p>
-                                <p x-show="isUpdatingSatyalancana" class="mt-1 text-[10px] text-primary font-sans" style="display: none;">
+                                <p x-show="isUpdatingSatyalancana" class="mt-1 text-xs text-primary font-sans" style="display: none;">
                                     Menyimpan kelayakan Satyalancana.
                                 </p>
                             </div>
@@ -1077,11 +1077,11 @@
                                 @else
                                 <input type="checkbox" x-model="satyalancanaEligible" disabled aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
                                 @endif
-                                <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                                <div class="h-6 w-11 rounded-full bg-border peer peer-checked:bg-success peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-white after:content-[''] after:transition-transform"></div>
                             </label>
                         </div>
                         <div class="space-y-1">
-                            <label for="satyalancana-note" class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
+                            <label for="satyalancana-note" class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
                             @if(! $canUpdateEmployee)
                             <textarea id="satyalancana-note" x-model="satyalancanaNote" rows="2" readonly class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:outline-none focus:ring-0 opacity-70 resize-none"></textarea>
                             @else
@@ -1156,7 +1156,7 @@
                                                 aria-describedby="kepala_bagian_lookup_help kepala_bagian_lookup_selection_error {{ $errors->has('kepala_bagian_id') ? 'kepala_bagian_lookup_error' : '' }}"
                                                 :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
                                                 placeholder="Ketik minimal 2 karakter nama atau NIP"
-                                                class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                                class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
                                             >
                                             <div
                                                 id="kepala_bagian_lookup_results"
@@ -1194,7 +1194,7 @@
                                         <p id="kepala_bagian_lookup_help" class="text-xs text-muted font-sans">Cari nama atau NIP, minimal 2 karakter. Penugasan lampau dan masa depan berlaku sesuai tanggal efektif.</p>
                                         <p id="kepala_bagian_lookup_selection_error" x-show="supervisorSelectionError" x-cloak x-text="supervisorSelectionError" class="text-xs font-semibold text-danger font-sans" role="alert"></p>
                                         @error('kepala_bagian_id')
-                                            <p id="kepala_bagian_lookup_error" class="text-[11px] font-semibold text-danger font-sans">{{ $message }}</p>
+                                            <p id="kepala_bagian_lookup_error" class="text-xs font-semibold text-danger font-sans">{{ $message }}</p>
                                         @enderror
                                         <p x-show="supervisorSelectedName" class="text-xs text-muted">Dipilih: <span x-text="supervisorSelectedName" class="font-semibold text-ink"></span></p>
                                     </div>
@@ -1262,7 +1262,7 @@
                                             type="button"
                                             @click="deleteKeluarga(fam.id, index)"
                                             :disabled="isDeletingKeluarga"
-                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                            class="inline-flex items-center gap-1 text-xs font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
                                             title="Hapus anggota keluarga ini"
                                         >
                                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -1463,11 +1463,11 @@
                 </x-pegawai.detail.section-header>
                 <div class="grid gap-3 rounded-lg border border-border bg-soft/30 p-4 sm:grid-cols-2">
                     <div>
-                        <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Pendidikan Terakhir</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-muted">Pendidikan Terakhir</p>
                         <p class="mt-1 text-sm font-semibold text-ink" x-text="pendidikanSummary.pendidikan_terakhir ?? '-'">{{ $p->pendidikan_terakhir ?? '-' }}</p>
                     </div>
                     <div>
-                        <p class="text-[10px] font-bold uppercase tracking-wide text-muted">Program Studi</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-muted">Program Studi</p>
                         <p class="mt-1 text-sm font-semibold text-ink" x-text="pendidikanSummary.program_studi ?? '-'">{{ $p->programStudi?->nama ?? $p->prodi_pendidikan_terakhir ?? '-' }}</p>
                     </div>
                 </div>
@@ -1504,14 +1504,14 @@
                                                 type="button"
                                                 @click="openEditPendidikan(edu)"
                                                 :disabled="isDeletingPendidikan"
-                                                class="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                class="text-xs font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
                                                 title="Edit riwayat pendidikan"
                                             >Edit</button>
                                             <button
                                                 type="button"
                                                 @click="deletePendidikan(edu.id, index)"
                                                 :disabled="isDeletingPendidikan"
-                                                class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
+                                                class="inline-flex items-center gap-1 text-xs font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
                                                 title="Hapus riwayat pendidikan"
                                             >
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -1556,7 +1556,7 @@
                 {{-- Centering spacer --}}
                 <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
                 
-                <div class="relative z-10 inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
+                <div class="relative z-10 inline-block transform overflow-hidden rounded-lg border border-border bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-[opacity,transform] sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle">
                     <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
                         <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
                         <button @click="showModal = false" class="text-muted hover:text-ink cursor-pointer">
@@ -1568,18 +1568,9 @@
 
                     {{-- Modal Error --}}
                     <template x-if="modalError">
-                        <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-red-800" x-text="modalError"></h3>
-                                </div>
-                            </div>
-                        </div>
+                        <x-ui.alert variant="danger" class="mb-4">
+                            <span x-text="modalError"></span>
+                        </x-ui.alert>
                     </template>
 
                     <form @submit.prevent="submitForm()" class="space-y-4">
@@ -1702,7 +1693,7 @@
                                             @click="newPangkat.file_sk = null; document.getElementById('file_sk_pangkat').value = ''"
                                             class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
                                     </div>
-                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
+                                    <p class="text-xs text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
                             </div>
                         </template>
@@ -1778,7 +1769,7 @@
                                             @click="newJabatan.file_sk = null; document.getElementById('file_sk_jabatan').value = ''"
                                             class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
                                     </div>
-                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
+                                    <p class="text-xs text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
                             </div>
                         </template>
@@ -1818,7 +1809,7 @@
                                             @click="newKgb.file_sk = null; document.getElementById('file_sk_kgb').value = ''"
                                             class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
                                     </div>
-                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
+                                    <p class="text-xs text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
                                 </div>
                             </div>
                         </template>
@@ -1857,12 +1848,12 @@
                                         <button type="button"
                                             @click="disiplinFileMode = 'arsip'; newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
                                             :class="disiplinFileMode === 'arsip' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
-                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
+                                            class="cursor-pointer rounded-md px-3 py-1 text-xs font-semibold font-sans transition-colors"
                                         >Dari Arsip</button>
                                         <button type="button"
                                             @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''; newDisiplin.no_sk = ''; newDisiplin.tanggal_sk = ''"
                                             :class="disiplinFileMode === 'baru' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
-                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
+                                            class="cursor-pointer rounded-md px-3 py-1 text-xs font-semibold font-sans transition-colors"
                                         >Unggah Baru</button>
                                     </div>
 
@@ -1887,7 +1878,7 @@
                                                         </option>
                                                     </template>
                                                 </x-form.select>
-                                                <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
+                                                <p x-show="arsipDokumen.length === 0" class="text-xs text-muted italic font-sans">
                                                     Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
                                                     <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
                                                 </p>
@@ -1923,7 +1914,7 @@
                                                 class="shrink-0 text-xs text-danger hover:underline font-sans"
                                             >Hapus</button>
                                         </div>
-                                        <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG, maks. 10 MB. File akan masuk ke Arsip Dokumen otomatis.</p>
+                                        <p class="text-xs text-muted italic font-sans">Format PDF/JPG/PNG, maks. 10 MB. File akan masuk ke Arsip Dokumen otomatis.</p>
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
@@ -1936,7 +1927,7 @@
                                         <input type="date" x-model="newDisiplin.tanggal_berakhir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                     </div>
                                 </div>
-                                <p class="text-[10px] text-muted italic font-sans">* Kosongkan tanggal berakhir jika masa berlaku tidak ditentukan (aktif selamanya).</p>
+                                <p class="text-xs text-muted italic font-sans">* Kosongkan tanggal berakhir jika masa berlaku tidak ditentukan (aktif selamanya).</p>
                             </div>
                         </template>
 

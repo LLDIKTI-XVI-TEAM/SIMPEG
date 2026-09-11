@@ -9,29 +9,27 @@
             default => 'Aktif',
         };
         $canFollowup = in_array(auth()->user()?->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true);
-        $ewsRoute = function (array $overrides = []) use ($filterEvent, $filterStatus, $filterSearch, $alerts) {
-            $query = array_merge([
-                'event' => $filterEvent,
-                'status' => $filterStatus,
-                'search' => $filterSearch,
-                'per_page' => $alerts->perPage(),
-            ], $overrides);
-            $query = array_filter($query, fn ($value) => $value !== null && $value !== '');
-
-            return route('ews', $query);
-        };
         $statusVariant = fn (string $status): string => match ($status) {
             'ditangani' => 'success',
             'tidak_perlu' => 'muted',
             'kedaluwarsa' => 'warning',
             default => 'primary',
         };
+        $hasActiveEwsFilters = $filterEvent !== '' || $filterSearch !== '' || $currentStatus !== 'aktif';
     @endphp
 
     <div class="space-y-6" x-data="{
         followup: { open: false, action: '', status: '', label: '', employee: '', type: '', note: '' },
-        openFollowup(action, status, label, employee, type) {
-            this.followup = { open: true, action, status, label, employee, type, note: '' };
+        openFollowup(dataset) {
+            this.followup = {
+                open: true,
+                action: dataset.followupAction,
+                status: dataset.followupStatus,
+                label: dataset.followupLabel,
+                employee: dataset.followupEmployee,
+                type: dataset.followupType,
+                note: '',
+            };
         },
         closeFollowup() {
             this.followup.open = false;
@@ -41,7 +39,7 @@
         {{-- ================================================================ --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Daftar EWS {{ $statusHeading }}</h2>
+                <h1 class="text-2xl font-semibold text-ink">Daftar EWS {{ $statusHeading }}</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'EWS & Notifikasi'],
@@ -69,7 +67,7 @@
                 </x-slot:icon>
             </x-ui.stat-card>
 
-            <x-ui.stat-card label="Sangat Mendesak" value="{{ $countMerah }}" unit="Kurang dari 30 Hari" variant="danger" accent>
+            <x-ui.stat-card label="Sangat Mendesak" value="{{ $countMerah }}" unit="< 30 Hari" variant="danger" accent>
                 <x-slot:icon>
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2.25m0 1.5h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -85,7 +83,7 @@
                 </x-slot:icon>
             </x-ui.stat-card>
 
-            <x-ui.stat-card label="Pemantauan Rutin" value="{{ $countHijau }}" unit="Lebih dari 90 Hari" variant="success" accent>
+            <x-ui.stat-card label="Pemantauan Rutin" value="{{ $countHijau }}" unit="> 90 Hari" variant="success" accent>
                 <x-slot:icon>
                     <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -107,36 +105,12 @@
                 </div>
             </div>
 
-            <div class="border-b border-border bg-soft/30 px-6 py-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                
-                {{-- Event & Status Filter Links --}}
-                <div class="flex flex-col gap-2">
-                    <div class="flex flex-wrap gap-1 bg-soft p-1 rounded-lg">
-                        <a href="{{ $ewsRoute(['event' => '', 'page' => null]) }}" class="rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200 {{ $filterEvent === '' ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
-                            Semua Event
-                        </a>
-                        @foreach($typeLabels as $eventLabel)
-                            <a href="{{ $ewsRoute(['event' => $eventLabel, 'page' => null]) }}" class="rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200 {{ $filterEvent === $eventLabel ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
-                                {{ $eventLabel }}
-                            </a>
-                        @endforeach
-                    </div>
-                    <div class="flex flex-wrap gap-1 bg-soft p-1 rounded-lg">
-                        @foreach($followupStatusLabels as $status => $label)
-                            <a href="{{ $ewsRoute(['status' => $status, 'page' => null]) }}" class="rounded-md px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200 {{ $currentStatus === $status ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink' }}">
-                                {{ $label }}
-                            </a>
-                        @endforeach
-                    </div>
-                </div>
-
-                {{-- Search Box --}}
-                <form method="GET" action="{{ route('ews') }}" class="flex w-full shrink-0 items-center gap-2 sm:w-96 lg:self-start">
-                    <input type="hidden" name="event" value="{{ $filterEvent }}">
-                    <input type="hidden" name="status" value="{{ $filterStatus }}">
+            <div class="border-b border-border bg-soft/30 px-6 py-4">
+                <form method="GET" action="{{ route('ews') }}" class="flex flex-col gap-3 lg:flex-row lg:items-end">
                     <input type="hidden" name="per_page" value="{{ $alerts->perPage() }}">
-                    <label for="ews-search" class="sr-only">Cari nama atau NIP pegawai</label>
-                    <div class="relative min-w-0 flex-1">
+
+                    <div class="relative min-w-0 lg:flex-1">
+                        <label for="ews-search" class="sr-only">Cari nama atau NIP pegawai</label>
                         <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                             <svg class="h-4 w-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.603 10.603Z" />
@@ -148,12 +122,29 @@
                             name="search"
                             value="{{ $filterSearch }}"
                             placeholder="Cari nama atau NIP"
-                            class="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            class="min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-4 text-sm text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                         />
                     </div>
-                    <x-ui.button type="submit" variant="secondary" size="md" class="shrink-0" aria-label="Terapkan pencarian EWS">
-                        Cari
-                    </x-ui.button>
+
+                    <x-form.select id="ews-event" name="event" label="Filter event" label-sr-only wrapper-class="w-full shrink-0 lg:w-60" class="min-h-11">
+                        <option value="" @selected($filterEvent === '')>Semua Event</option>
+                        @foreach($typeLabels as $eventLabel)
+                            <option value="{{ $eventLabel }}" @selected($filterEvent === $eventLabel)>{{ $eventLabel }}</option>
+                        @endforeach
+                    </x-form.select>
+
+                    <x-form.select id="ews-status" name="status" label="Filter status" label-sr-only wrapper-class="w-full shrink-0 lg:w-52" class="min-h-11">
+                        <option value="semua" @selected($filterStatus === 'semua')>Semua Status</option>
+                        @foreach($followupStatusLabels as $status => $label)
+                            <option value="{{ $status }}" @selected($currentStatus === $status)>{{ $label }}</option>
+                        @endforeach
+                    </x-form.select>
+
+                    <div class="flex w-full shrink-0 lg:w-auto">
+                        <x-ui.button type="submit" variant="secondary" size="md" class="w-full lg:w-auto" aria-label="Terapkan filter EWS">
+                            Terapkan Filter
+                        </x-ui.button>
+                    </div>
                 </form>
             </div>
 
@@ -183,7 +174,7 @@
                                     $sisaBadgeClass = 'text-danger';
                                 } elseif ($alert['sisa_hari'] <= 90) {
                                     $rowColorClass = 'hover:bg-warning/[0.01]';
-                                    $sisaBadgeClass = 'text-warning';
+                                    $sisaBadgeClass = 'text-warning-dark';
                                 } else {
                                     $rowColorClass = 'hover:bg-success/[0.01]';
                                     $sisaBadgeClass = 'text-success';
@@ -214,13 +205,13 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="text-sm font-semibold text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</div>
-                                    <div class="mt-1 text-[11px] font-medium text-muted">Tanggal target</div>
+                                    <div class="mt-1 text-xs font-medium text-muted">Tanggal target</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <span class="inline-flex items-center text-xs font-semibold {{ $sisaBadgeClass }}">
                                         {{ $alert['sisa_hari'] }} Hari
                                     </span>
-                                    <div class="mt-1 text-[11px] font-medium text-muted">
+                                    <div class="mt-1 text-xs font-medium text-muted">
                                         @if($alert['sisa_hari'] < 30)
                                             Sangat mendesak
                                         @elseif($alert['sisa_hari'] <= 90)
@@ -252,7 +243,7 @@
                                             </div>
                                             <div class="space-y-1">
                                                 @foreach($alert['eligibility_checks'] as $check)
-                                                    <div class="flex items-center gap-1.5 text-[11px] font-medium {{ $check['passed'] ? 'text-success' : 'text-danger' }}">
+                                                    <div class="flex items-center gap-1.5 text-xs font-medium {{ $check['passed'] ? 'text-success' : 'text-danger' }}">
                                                         <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full {{ $check['passed'] ? 'bg-success/10' : 'bg-danger/10' }}">
                                                             @if($check['passed'])
                                                                 <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -297,9 +288,14 @@
                                                     <x-ui.tooltip text="Tandai Ditangani" position="top">
                                                         <x-ui.button
                                                             variant="success"
-                                                            size="icon"
-                                                            @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('ditangani'), @js('Ditangani'), @js($alert['nama']), @js($alert['type']))"
+                                                            size="compact-icon"
+                                                            @click="openFollowup($event.currentTarget.dataset)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
+                                                            data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
+                                                            data-followup-status="ditangani"
+                                                            data-followup-label="Ditangani"
+                                                            data-followup-employee="{{ $alert['nama'] }}"
+                                                            data-followup-type="{{ $alert['type'] }}"
                                                             aria-label="Tandai Ditangani untuk {{ $alert['nama'] }}"
                                                         >
                                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -311,9 +307,14 @@
                                                     <x-ui.tooltip text="Tandai Tidak Perlu" position="top">
                                                         <x-ui.button
                                                             variant="danger"
-                                                            size="icon"
-                                                            @click="openFollowup(@js(route('ews.followup.update', $alert['alert_id'])), @js('tidak_perlu'), @js('Tidak Perlu'), @js($alert['nama']), @js($alert['type']))"
+                                                            size="compact-icon"
+                                                            @click="openFollowup($event.currentTarget.dataset)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
+                                                            data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
+                                                            data-followup-status="tidak_perlu"
+                                                            data-followup-label="Tidak Perlu"
+                                                            data-followup-employee="{{ $alert['nama'] }}"
+                                                            data-followup-type="{{ $alert['type'] }}"
                                                             aria-label="Tandai Tidak Perlu untuk {{ $alert['nama'] }}"
                                                         >
                                                             <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -325,7 +326,7 @@
                                             @endif
                                         </div>
                                         @if($alert['followup_status'] !== 'aktif')
-                                            <div class="space-y-1 text-[11px] text-muted">
+                                            <div class="space-y-1 text-xs text-muted">
                                                 @if($alert['handled_at'])
                                                     <p class="font-medium text-ink">{{ date('d M Y H:i', strtotime($alert['handled_at'])) }}</p>
                                                 @endif
@@ -346,8 +347,11 @@
                             </x-ui.table-row>
                         @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="7" align="center" class="px-6 py-12 text-muted text-sm">
-                                    Tidak ada data EWS untuk filter yang dipilih.
+                                <x-ui.table-td colspan="7" padding="none">
+                                    <x-ui.empty-state
+                                        icon="none"
+                                        :title="$hasActiveEwsFilters ? 'Tidak ada EWS yang sesuai dengan filter.' : 'Belum ada peringatan EWS aktif.'"
+                                    />
                                 </x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse
@@ -400,7 +404,12 @@
                 @csrf
                 @method('PATCH')
 
-                <input type="hidden" name="followup_status" :value="followup.status">
+                <template x-if="followup.status === 'ditangani'">
+                    <input type="hidden" name="followup_status" value="ditangani">
+                </template>
+                <template x-if="followup.status === 'tidak_perlu'">
+                    <input type="hidden" name="followup_status" value="tidak_perlu">
+                </template>
 
                 <div class="rounded-lg border border-border bg-soft/60 px-4 py-3 text-sm">
                     <p class="font-semibold text-ink" x-text="followup.label"></p>

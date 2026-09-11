@@ -20,6 +20,18 @@ use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /** @var list<string> Permission yang dipakai oleh item menu pada layout aplikasi. */
+    private const LAYOUT_MENU_PERMISSIONS = [
+        'employees.read',
+        'cuti.balance.reconcile',
+        'cuti.manual.manage',
+        'cuti.cancellation.manage',
+        'cuti.configure',
+        'notifications.read',
+        'hari_libur.read',
+        'audit_logs.read',
+    ];
+
     /**
      * Register any application services.
      */
@@ -66,24 +78,10 @@ class AppServiceProvider extends ServiceProvider
         View::composer('components.layouts.app', function (ViewInstance $view): void {
             $authenticated = auth()->user();
             $actor = $authenticated instanceof User ? $authenticated : null;
-            $permissionNames = [
-                'employees.read',
-                'cuti.balance.reconcile',
-                'cuti.manual.manage',
-                'cuti.configure',
-                'audit_logs.read',
-            ];
-
-            if (in_array($actor?->role, ['super_admin', 'admin_kepegawaian'], true)) {
-                $permissionNames = [
-                    ...$permissionNames,
-                    'cuti.cancellation.manage',
-                ];
-            }
 
             $view->with(
                 'layoutCapabilities',
-                app(UiPermissionCapabilityService::class)->resolve($actor, $permissionNames),
+                app(UiPermissionCapabilityService::class)->resolve($actor, self::LAYOUT_MENU_PERMISSIONS),
             );
         });
     }

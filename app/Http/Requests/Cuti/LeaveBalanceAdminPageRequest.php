@@ -37,6 +37,7 @@ class LeaveBalanceAdminPageRequest extends ListCutiRekapRequest
             'leave_type' => ['bail', 'nullable', 'uuid', 'exists:ref_jenis_cuti,id'],
             'sort' => ['bail', 'nullable', 'string', Rule::in(['effective_date', 'created_at', 'usage_year', 'workdays'])],
             'direction' => ['bail', 'nullable', 'string', Rule::in(['asc', 'desc'])],
+            'per_page_ledger' => ['bail', 'nullable', 'integer', Rule::in([10, 25, 50])],
             'per_page_usage' => ['bail', 'nullable', 'integer', Rule::in([10, 25, 50])],
             'page_pegawai' => ['bail', 'nullable', 'integer', 'min:1'],
             'page_ledger' => ['bail', 'nullable', 'integer', 'min:1'],

@@ -112,6 +112,19 @@ class UserMappingControllerTest extends TestCase
             ->assertSee('this.lastFocusedElement.focus()', false);
     }
 
+    public function test_index_membedakan_kegagalan_memuat_dari_empty_state_tabel(): void
+    {
+        Employee::factory()->create();
+
+        $this->actingAs(User::factory()->superAdmin()->create())
+            ->get(route('user-management'))
+            ->assertOk()
+            ->assertSee('loadError: false', false)
+            ->assertSee('this.rows = [];', false)
+            ->assertSee('x-if="!isLoading && loadError"', false)
+            ->assertSee('Data pemetaan pengguna tidak dapat dimuat.');
+    }
+
     public function test_index_prefers_canonical_employee_mapping_over_email_matching(): void
     {
         $admin = User::factory()->superAdmin()->create();

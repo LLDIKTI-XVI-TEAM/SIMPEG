@@ -66,6 +66,8 @@ class DashboardEwsTest extends TestCase
         $this->assertStringContainsString('0 sepanjang tahun ini', $html);
         $this->assertStringContainsString('Tidak ada kenaikan pangkat pada bulan ini.', $html);
         $this->assertStringContainsString('Belum ada aktivitas audit terbaru.', $html);
+        $this->assertStringContainsString("dashboardChart({ type: 'doughnut'", $html);
+        $this->assertStringContainsString("dashboardChart({ type: 'line'", $html);
         $this->assertStringNotContainsString('Data belum tersedia.', $html);
     }
 
@@ -85,6 +87,58 @@ class DashboardEwsTest extends TestCase
         $this->assertStringNotContainsString('Ringkasan operasional sedang disiapkan.', $html);
         $this->assertStringNotContainsString('Sebagian ringkasan operasional belum tersedia.', $html);
         $this->assertStringContainsString('Data belum tersedia.', $html);
+    }
+
+    public function test_admin_dashboard_keeps_unclassified_ranks_out_of_chart_and_explains_them(): void
+    {
+        $this->actingAs(User::factory()->superAdmin()->create(['name' => 'Admin Dashboard']));
+
+        $payload = $this->completeK3Payload();
+        $payload['distribusiGolongan']['Belum Diisi'] = 2;
+        $payload['distribusiGolongan']['IX'] = 1;
+
+        $html = view('admin.dashboard', $payload)->render();
+
+        $this->assertStringContainsString('1.250 pegawai bergolongan', $html);
+        $this->assertStringContainsString(
+            '3 pegawai tidak ditampilkan pada grafik karena golongannya belum diisi atau memakai nilai legacy (belum diisi, IX).',
+            $html,
+        );
+    }
+
+    public function test_admin_rank_chart_uses_all_active_employees_for_tooltip_percentage(): void
+    {
+        $this->actingAs(User::factory()->superAdmin()->create(['name' => 'Admin Dashboard']));
+
+        $payload = $this->completeK3Payload();
+        $payload['totalPegawaiAktif'] = 2;
+        $payload['distribusiGolongan'] = [
+            'III/a' => 1,
+            'Belum Diisi' => 1,
+        ];
+
+        $html = view('admin.dashboard', $payload)->render();
+
+        $this->assertStringContainsString('data: [1], tooltipTotal: 2', $html);
+    }
+
+    public function test_admin_dashboard_keeps_chart_tone_paired_to_filtered_composition_row(): void
+    {
+        $this->actingAs(User::factory()->superAdmin()->create(['name' => 'Admin Dashboard']));
+
+        $payload = $this->completeK3Payload();
+        $payload['totalPegawaiAktif'] = 4;
+        $payload['komposisiPegawai'] = [
+            'PNS' => 0,
+            'PPPK' => 4,
+            'CPNS' => 0,
+        ];
+
+        $html = view('admin.dashboard', $payload)->render();
+
+        $this->assertStringContainsString('labels: ["PPPK"]', $html);
+        $this->assertStringContainsString('tones: ["secondary"]', $html);
+        $this->assertStringContainsString('bg-secondary', $html);
     }
 
     /**

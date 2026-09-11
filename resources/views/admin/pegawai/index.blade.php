@@ -722,7 +722,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
+                <h1 class="text-2xl font-semibold text-ink">Data Pegawai</h1>
                 <x-ui.breadcrumb :items="[
         ['label' => 'Dashboard', 'url' => route('dashboard')],
         ['label' => 'Data Pegawai'],
@@ -742,10 +742,10 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
+                    <span>Refresh</span>
                 </x-ui.button>
                 @if(!$isReadOnly)
-                <x-ui.button type="button" variant="primary" onclick="exportFilteredData()" id="export-btn">
+                <x-ui.button type="button" variant="secondary" onclick="exportFilteredData()" id="export-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -753,14 +753,14 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </svg>
                     Export Excel
                 </x-ui.button>
-                <x-ui.button type="button" variant="primary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
+                <x-ui.button type="button" variant="secondary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
                     </svg>
                     Export PDF
                 </x-ui.button>
                 @if ($canManageSkRequirements)
-                <x-ui.button type="button" variant="primary" id="sk-requirement-btn" @click="openSkRequirementModal()"
+                <x-ui.button type="button" variant="secondary" id="sk-requirement-btn" @click="openSkRequirementModal()"
                     aria-label="Atur SK Wajib per Jenis Pegawai">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.281Z" />
@@ -819,7 +819,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         @php
             $tableColumns = [
                 ['key' => 'nama_lengkap', 'label' => 'Pegawai', 'sortable' => true],
-                ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true],
+                ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true, 'width' => 'min-w-64'],
                 ['key' => 'golongan_terakhir', 'label' => 'Golongan & Jenis', 'sortable' => true, 'width' => 'whitespace-nowrap'],
                 ['key' => 'tmt', 'label' => 'TMT'],
                 ['key' => 'status_nama', 'label' => 'Status'],
@@ -833,9 +833,10 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         <x-ui.data-table rows="pegawaiRows" meta="meta" :columns="$tableColumns" fetchPage="fetchPage(page)"
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
-            searchPlaceholder="Cari nama atau NIP" emptyTitle="Tidak ada data pegawai yang sesuai."
+            searchPlaceholder="Cari nama atau NIP" hasActiveFilters="filters.search || filters.golongan || filters.unit_kerja_id || filters.jenis_pegawai_id || (filters.status_pegawai_id && filters.status_pegawai_id !== 'all')" emptyTitle="Belum ada data pegawai."
             emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null"
-            filterClass="lg:grid-cols-6" searchCols="col-span-1 sm:col-span-2 lg:col-span-2">
+            filterClass="lg:grid-cols-6 xl:grid-cols-[minmax(12rem,1.05fr)_minmax(11rem,1fr)_minmax(9rem,.8fr)_minmax(9rem,.8fr)_minmax(13.5rem,1.2fr)]"
+            searchCols="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-1">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
                 {{-- Filter Golongan --}}
@@ -930,7 +931,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                         </td>
 
                         {{-- Jabatan & Unit --}}
-                        <td class="px-4 py-3">
+                        <td class="min-w-64 px-4 py-3">
                             <p class="text-sm font-medium text-ink" x-text="p.jabatan"></p>
                             <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
                         </td>
@@ -948,33 +949,27 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
 
                         {{-- Status --}}
                         <td class="px-4 py-3">
-                            <span
-                                class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md"
-                                :class="{
+                            <x-ui.badge
+                                variant="none"
+                                size="md"
+                                dot
+                                x-bind:class="{
                                 'bg-success/10 text-success': p.status_key === 'aktif',
                                 'bg-warning/10 text-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
                                 'bg-danger/10 text-danger':   p.status_key === 'nonaktif' || p.status_key === 'pensiun',
                                 'bg-muted/10 text-muted':     !['aktif','cuti','mutasi','nonaktif','pensiun'].includes(p.status_key),
                             }">
-                                <span class="h-1.5 w-1.5 rounded-full" :class="{
-                                    'bg-success': p.status_key === 'aktif',
-                                    'bg-warning': p.status_key === 'cuti' || p.status_key === 'mutasi',
-                                    'bg-danger':  p.status_key === 'nonaktif' || p.status_key === 'pensiun',
-                                    'bg-muted':   !['aktif','cuti','mutasi','nonaktif','pensiun'].includes(p.status_key),
-                                }"></span>
                                 <span x-text="p.status_nama"></span>
-                            </span>
+                            </x-ui.badge>
                         </td>
 
                         {{-- Dokumen --}}
                         <td class="px-4 py-3">
                             @if ($isReadOnly)
-                            <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap"
-                                :class="docBadgeClass(p.is_lengkap)" title="Status kelengkapan dokumen">
-                                <span class="h-1.5 w-1.5 rounded-full shrink-0"
-                                    :class="docDotClass(p.is_lengkap)"></span>
+                            <x-ui.badge variant="none" size="md" dot x-bind:class="docBadgeClass(p.is_lengkap)"
+                                title="Status kelengkapan dokumen">
                                 <span x-text="docStatusWithCount(p)"></span>
-                            </span>
+                            </x-ui.badge>
                             @else
                             <button type="button" @click="openDocumentStatus(p)"
                                 class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -1116,12 +1111,9 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             x-text="documentStatusEmployee?.nama_lengkap ?? 'Pegawai'"></p>
                         <p class="text-xs text-muted" x-text="'NIP. ' + (documentStatusEmployee?.nip ?? '-')"></p>
                     </div>
-                    <span class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold"
-                        :class="docBadgeClass(documentStatus.status_kelengkapan)">
-                        <span class="h-1.5 w-1.5 rounded-full shrink-0"
-                            :class="docDotClass(documentStatus.status_kelengkapan)"></span>
+                    <x-ui.badge variant="none" size="md" dot x-bind:class="docBadgeClass(documentStatus.status_kelengkapan)">
                         <span x-text="docStatusLabel(documentStatus.status_kelengkapan)"></span>
-                    </span>
+                    </x-ui.badge>
                 </div>
 
                 <template x-if="isLoadingDocumentStatus">
@@ -1215,20 +1207,17 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                     :class="document.file_tersedia ? 'border-border bg-surface' : 'border-warning/30 bg-warning/5'">
                                     <div class="flex items-start justify-between gap-3">
                                         <div class="min-w-0">
-                                            <span class="text-[10px] font-bold uppercase tracking-wide text-muted"
+                                            <span class="text-xs font-bold uppercase tracking-wide text-muted"
                                                 x-text="document.kategori"></span>
                                             <p class="truncate text-sm font-semibold text-ink" x-text="document.nama">
                                             </p>
                                             <p class="mt-0.5 truncate text-xs text-muted" x-text="document.keterangan">
                                             </p>
                                         </div>
-                                        <span
-                                            class="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold"
-                                            :class="document.file_tersedia ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
-                                            <span class="h-1.5 w-1.5 rounded-full"
-                                                :class="document.file_tersedia ? 'bg-success' : 'bg-warning'"></span>
+                                        <x-ui.badge variant="none" size="sm" dot
+                                            x-bind:class="document.file_tersedia ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'">
                                             <span x-text="document.status_label"></span>
-                                        </span>
+                                        </x-ui.badge>
                                     </div>
                                     <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
                                         <span x-text="'No. Dokumen: ' + document.nomor"></span>
@@ -1293,7 +1282,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                 </table>
             </div>
 
-            <div class="rounded-lg border border-primary/15 bg-primary/5 p-3 text-[11px] text-muted font-sans">
+            <div class="rounded-lg border border-primary/15 bg-primary/5 p-3 text-xs text-muted font-sans">
                 Centang SK yang wajib untuk setiap jenis pegawai. Konfigurasi awal PNS dan CPNS adalah empat SK.
                 PPPK tidak memiliki konfigurasi awal dan dapat dikustom sesuai kebutuhan. Jenis tanpa SK aktif berstatus Tidak Dinilai.
             </div>
@@ -1306,7 +1295,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                         Batal
                     </x-ui.button>
                     <x-ui.button type="button" size="sm" @click="saveSkRequirementMatrix()" ::disabled="skMatrixBusy">
-                        <span x-text="skMatrixBusy ? 'Menyimpan...' : 'Simpan Matriks'"></span>
+                        <span x-text="skMatrixBusy ? 'Menyimpan...' : 'Simpan'"></span>
                     </x-ui.button>
                 </div>
             </x-slot:footer>
@@ -1358,7 +1347,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     <textarea id="deactivate-alasan" x-model="deletePegawaiAlasan" rows="2"
                         class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
                         placeholder="Contoh: Mutasi keluar, pengunduran diri, atau sanksi administratif"></textarea>
-                    <p class="text-[10px] text-muted italic font-sans">
+                    <p class="text-xs text-muted italic font-sans">
                         Tercatat pada riwayat status dan audit log.
                     </p>
                 </div>
@@ -1371,7 +1360,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     <textarea id="deactivate-note" x-model="deletePegawaiNote" rows="3"
                         class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
                         placeholder="Biarkan kosong untuk pesan bawaan"></textarea>
-                    <p class="text-[10px] text-muted italic font-sans">
+                    <p class="text-xs text-muted italic font-sans">
                         Jika kosong, pegawai akan menerima pesan bawaan: "AKUN ANDA TELAH DI NONAKTIFKAN, SILAHKAN HUBUNGI ADMIN!!"
                     </p>
                 </div>
@@ -1439,7 +1428,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     <textarea id="restore-alasan" x-model="restorePegawaiAlasan" rows="2"
                         class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
                         placeholder="Contoh: Masa sanksi berakhir atau keputusan administrasi ditarik"></textarea>
-                    <p class="text-[10px] text-muted italic font-sans">
+                    <p class="text-xs text-muted italic font-sans">
                         Tercatat pada riwayat status dan audit log.
                     </p>
                 </div>

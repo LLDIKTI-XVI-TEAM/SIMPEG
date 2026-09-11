@@ -175,7 +175,7 @@
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Arsip Dokumen Kepegawaian</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Arsip Dokumen'],
@@ -194,7 +194,7 @@
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
+                    <span>Refresh</span>
                 </x-ui.button>
             </div>
         </div>
@@ -224,10 +224,14 @@
             perPage="perPage"
             setPerPage="perPage = parseInt($event.target.value)"
             searchModel="filters.search"
-            searchPlaceholder="Cari dokumen, nama, atau NIP pegawai..."
-            emptyTitle="Tidak ada dokumen ditemukan"
+            searchPlaceholder="Cari dokumen atau pegawai"
+            hasActiveFilters="filters.search || filters.kategori"
+            emptyTitle="Belum ada dokumen"
+            emptyMessage=""
+            filteredEmptyMessage=""
             emptyIcon="none"
             :colspanCount="7"
+            filterClass="lg:grid-cols-[18rem_15.5rem_minmax(0,1fr)]"
         >
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
@@ -300,18 +304,12 @@
 
                         {{-- Status --}}
                         <td class="px-4 py-3.5 whitespace-nowrap">
-                            <span class="inline-flex items-center gap-1.5 font-medium font-sans leading-none px-2.5 py-1 text-xs rounded-md whitespace-nowrap"
-                                :class="{
+                            <x-ui.badge variant="none" size="md" dot x-bind:class="{
                                     'bg-success/10 text-success': doc.status_dokumen === 'tersedia',
                                     'bg-danger/10 text-danger':   doc.status_dokumen === 'file_tidak_ditemukan',
                                 }">
-                                <span class="h-1.5 w-1.5 rounded-full shrink-0"
-                                    :class="{
-                                        'bg-success': doc.status_dokumen === 'tersedia',
-                                        'bg-danger':  doc.status_dokumen === 'file_tidak_ditemukan',
-                                    }"></span>
                                 <span class="whitespace-nowrap" x-text="doc.status_label"></span>
-                            </span>
+                            </x-ui.badge>
                         </td>
 
                         {{-- Aksi --}}
@@ -321,7 +319,7 @@
                                     as="a"
                                     ::href="'/dashboard/dokumen/' + doc.id"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Lihat Detail"
                                     tooltip-position="top-end"
                                     ::aria-label="'Lihat detail ' + doc.nama"
@@ -335,7 +333,7 @@
                                     as="a"
                                     ::href="'/dashboard/dokumen/' + doc.id + '/download'"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Unduh"
                                     tooltip-position="top-end"
                                     ::aria-label="'Unduh ' + doc.nama"

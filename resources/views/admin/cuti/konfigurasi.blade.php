@@ -357,11 +357,11 @@
                         <input type="hidden" name="employee_id" value="{{ $selectedEmployee->id }}">
                         <label for="approver-search" class="text-xs font-bold uppercase tracking-wider text-ink">Cari Kandidat Approver</label>
                         <div class="flex items-start gap-3">
-                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" x-model="approverSearch" @input="invalidateApproverSearch()" placeholder="Nama atau NIP" aria-describedby="approver-search-help approver-search-status" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                            <input id="approver-search" name="approver_search" type="search" value="{{ $approverSearch }}" x-model="approverSearch" @input="invalidateApproverSearch()" placeholder="Nama atau NIP" aria-describedby="approver-search-help approver-search-status" class="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <x-ui.button type="submit" variant="secondary" class="min-h-11 shrink-0" ::disabled="approverSearchLoading" x-text="approverSearchLoading ? 'Mencari...' : 'Cari Kandidat'">Cari Kandidat</x-ui.button>
                         </div>
-                        <p id="approver-search-help" class="text-[11px] text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC.</p>
-                        <p id="approver-search-status" class="text-[11px]" aria-live="polite" aria-atomic="true">
+                        <p id="approver-search-help" class="text-xs text-muted">Hasil pencarian mengisi pilihan Verifikator dan PYBMC.</p>
+                        <p id="approver-search-status" class="text-xs" aria-live="polite" aria-atomic="true">
                             <span x-show="approverSearchMessage" x-text="approverSearchMessage" class="text-muted"></span>
                             <span x-show="approverSearchError" x-text="approverSearchError" class="font-semibold text-danger"></span>
                         </p>
@@ -477,9 +477,9 @@
                                 </p>
                             </div>
                             @if ($selectedKepalaBagian)
-                                <button type="button" @click="kabagFormOpen = ! kabagFormOpen" :aria-expanded="kabagFormOpen.toString()" aria-controls="kabag-inline-form" class="inline-flex shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <x-ui.button type="button" variant="secondary" size="sm" @click="kabagFormOpen = ! kabagFormOpen" ::aria-expanded="kabagFormOpen.toString()" aria-controls="kabag-inline-form" class="shrink-0">
                                     <span x-text="kabagFormOpen ? 'Tutup Form' : 'Ubah Atasan Langsung'"></span>
-                                </button>
+                                </x-ui.button>
                             @endif
                         </div>
 
@@ -520,7 +520,7 @@
                                             aria-describedby="kabag_inline_lookup_help kabag_inline_selection_error {{ $errors->has('kepala_bagian_id') ? 'kabag_inline_lookup_error' : '' }}"
                                             :aria-invalid="{{ $errors->has('kepala_bagian_id') ? 'true' : 'false' }}"
                                             placeholder="Ketik minimal 2 karakter nama atau NIP"
-                                            class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                            class="w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('kepala_bagian_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
                                         >
                                         <div
                                             id="kabag_inline_lookup_results"
@@ -553,13 +553,13 @@
                                             </template>
                                         </div>
                                     </div>
-                                    <p id="kabag_inline_lookup_help" class="text-[11px] text-muted">Ketik minimal 2 karakter nama atau NIP.</p>
-                                    <p id="kabag_inline_selection_error" x-show="kabagSelectionError" x-cloak x-text="kabagSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
+                                    <p id="kabag_inline_lookup_help" class="text-xs text-muted">Ketik minimal 2 karakter nama atau NIP.</p>
+                                    <p id="kabag_inline_selection_error" x-show="kabagSelectionError" x-cloak x-text="kabagSelectionError" class="text-xs font-semibold text-danger" role="alert"></p>
                                     @error('kepala_bagian_id')
-                                        <p id="kabag_inline_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                        <p id="kabag_inline_lookup_error" class="text-xs font-semibold text-danger" role="alert">{{ $message }}</p>
                                     @enderror
                                     @error('redirect_to')
-                                        <p class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                        <p class="text-xs font-semibold text-danger" role="alert">{{ $message }}</p>
                                     @enderror
                                     <p x-show="kabagSelectedName" x-cloak class="text-xs text-muted">Dipilih: <span x-text="kabagSelectedName" class="font-semibold text-ink"></span></p>
                                     <p x-show="kabagSelectedId && !kabagSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
@@ -616,7 +616,7 @@
                                 :aria-invalid="Boolean(kepalaBagianError)"
                                 class="mt-1 w-full rounded-xl border border-border bg-soft px-4 py-2 text-sm text-ink shadow-sm"
                             >
-                            <p id="kepala-bagian-error" x-show="kepalaBagianError" x-text="kepalaBagianError" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                            <p id="kepala-bagian-error" x-show="kepalaBagianError" x-text="kepalaBagianError" class="mt-1 text-xs font-semibold text-danger" role="alert"></p>
                         </div>
                     </div>
 
@@ -634,9 +634,9 @@
                                 <x-ui.button type="button" variant="secondary" size="sm" class="min-h-11" x-ref="addVerifierButton" @click="addVerifier()" ::disabled="verifiers.length >= maxVerifierSteps">Tambah Verifikator</x-ui.button>
                             </div>
 
-                            <p id="verifier-limit-help" class="text-[11px] text-muted">Maksimum 8 verifikator.</p>
+                            <p id="verifier-limit-help" class="text-xs text-muted">Maksimum 8 verifikator.</p>
                             @error('steps')
-                                <p data-config-error-summary tabindex="-1" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                                <p data-config-error-summary tabindex="-1" class="text-xs font-semibold text-danger" role="alert">{{ $message }}</p>
                             @enderror
 
                             <template x-for="(verifier, index) in verifiers" :key="verifier.client_key">
@@ -645,12 +645,12 @@
                                         <input type="hidden" :name="`steps[${index}][step_type]`" value="verifier">
                                         <div>
                                             <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-label-${verifier.client_key}`" x-text="`Label Verifikator ${index + 1}`"></label>
-                                            <input data-verifier-label :id="`verifier-label-${verifier.client_key}`" :name="`steps[${index}][role_label]`" x-model="verifier.role_label" required maxlength="100" :aria-describedby="verifier.validation_errors.role_label ? `verifier-label-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.role_label)" class="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                                            <p :id="`verifier-label-error-${verifier.client_key}`" x-show="verifier.validation_errors.role_label" x-text="verifier.validation_errors.role_label" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                            <input data-verifier-label :id="`verifier-label-${verifier.client_key}`" :name="`steps[${index}][role_label]`" x-model="verifier.role_label" required maxlength="100" :aria-describedby="verifier.validation_errors.role_label ? `verifier-label-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.role_label)" class="mt-1 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <p :id="`verifier-label-error-${verifier.client_key}`" x-show="verifier.validation_errors.role_label" x-text="verifier.validation_errors.role_label" class="mt-1 text-xs font-semibold text-danger" role="alert"></p>
                                         </div>
                                         <div>
                                             <label class="text-xs font-bold uppercase tracking-wider text-ink" :for="`verifier-${verifier.client_key}`" x-text="`Pegawai Verifikator ${index + 1}`"></label>
-                                            <select :id="`verifier-${verifier.client_key}`" :name="`steps[${index}][approver_employee_id]`" x-model="verifier.approver_employee_id" required :aria-describedby="verifier.validation_errors.approver_employee_id ? `verifier-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.approver_employee_id)" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                            <select :id="`verifier-${verifier.client_key}`" :name="`steps[${index}][approver_employee_id]`" x-model="verifier.approver_employee_id" required :aria-describedby="verifier.validation_errors.approver_employee_id ? `verifier-error-${verifier.client_key}` : null" :aria-invalid="Boolean(verifier.validation_errors.approver_employee_id)" class="mt-1 w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                                 <option value="">Pilih verifikator</option>
                                                 @foreach ($approverCandidates as $approver)
                                                     <option value="{{ $approver->id }}" @disabled(! $approver->is_selectable)>{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
@@ -659,13 +659,13 @@
                                                     <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
                                                 </template>
                                             </select>
-                                            <p :id="`verifier-error-${verifier.client_key}`" x-show="verifier.validation_errors.approver_employee_id" x-text="verifier.validation_errors.approver_employee_id" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                            <p :id="`verifier-error-${verifier.client_key}`" x-show="verifier.validation_errors.approver_employee_id" x-text="verifier.validation_errors.approver_employee_id" class="mt-1 text-xs font-semibold text-danger" role="alert"></p>
                                         </div>
                                     </div>
                                     <div class="flex flex-wrap gap-2" aria-label="Aksi urutan verifikator">
-                                        <button type="button" @click="moveVerifier(index, -1)" :disabled="index === 0" aria-label="Naikkan urutan verifikator" title="Naikkan urutan verifikator" class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-all duration-200 hover:bg-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8">↑</button>
-                                        <button type="button" @click="moveVerifier(index, 1)" :disabled="index === verifiers.length - 1" aria-label="Turunkan urutan verifikator" title="Turunkan urutan verifikator" class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted transition-all duration-200 hover:bg-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8">↓</button>
-                                        <button type="button" @click="removeVerifier(index)" :aria-label="`Hapus verifikator ${index + 1}`" title="Hapus verifikator" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-danger/20 bg-surface text-danger shadow-sm transition-all duration-200 hover:bg-danger/5 focus:outline-none focus:ring-2 focus:ring-danger/20 sm:h-8 sm:w-8">×</button>
+                                        <x-ui.button type="button" variant="ghost" size="compact-icon" @click="moveVerifier(index, -1)" x-bind:disabled="index === 0" aria-label="Naikkan urutan verifikator" title="Naikkan urutan verifikator" class="h-11 w-11 sm:h-8 sm:w-8">↑</x-ui.button>
+                                        <x-ui.button type="button" variant="ghost" size="compact-icon" @click="moveVerifier(index, 1)" x-bind:disabled="index === verifiers.length - 1" aria-label="Turunkan urutan verifikator" title="Turunkan urutan verifikator" class="h-11 w-11 sm:h-8 sm:w-8">↓</x-ui.button>
+                                        <x-ui.button type="button" variant="danger" size="compact-icon" @click="removeVerifier(index)" ::aria-label="`Hapus verifikator ${index + 1}`" title="Hapus verifikator" class="h-11 w-11 sm:h-8 sm:w-8">×</x-ui.button>
                                     </div>
                                 </div>
                             </template>
@@ -683,7 +683,7 @@
                             <div>
                                 <input type="hidden" name="steps[_pybmc][step_type]" value="pybmc" x-bind:disabled="! pybmcEmployeeId">
                                 <input type="hidden" name="steps[_pybmc][role_label]" value="PYBMC" x-bind:disabled="! pybmcEmployeeId">
-                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" :aria-describedby="`employee-pybmc-help ${pybmcError ? 'employee-pybmc-error' : ''}`.trim()" :aria-invalid="Boolean(pybmcError)" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-all duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                <select id="employee-pybmc" :name="pybmcEmployeeId ? 'steps[_pybmc][approver_employee_id]' : null" x-model="pybmcEmployeeId" :aria-describedby="`employee-pybmc-help ${pybmcError ? 'employee-pybmc-error' : ''}`.trim()" :aria-invalid="Boolean(pybmcError)" class="w-full rounded-xl border border-border bg-surface py-2 pl-4 pr-10 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                     <option value="">Gunakan PYBMC global</option>
                                     @foreach ($approverCandidates as $approver)
                                         <option value="{{ $approver->id }}" @disabled(! $approver->is_selectable)>{{ $approver->nama_lengkap }} ({{ $approver->nip }})</option>
@@ -692,8 +692,8 @@
                                         <option :value="approver.id" x-text="`${approver.nama_lengkap} (${approver.nip})`"></option>
                                     </template>
                                 </select>
-                                <p id="employee-pybmc-help" class="mt-1 text-[11px] text-muted">Perubahan chain berlaku untuk pengajuan berikutnya.</p>
-                                <p id="employee-pybmc-error" x-show="pybmcError" x-text="pybmcError" class="mt-1 text-[11px] font-semibold text-danger" role="alert"></p>
+                                <p id="employee-pybmc-help" class="mt-1 text-xs text-muted">Perubahan chain berlaku untuk pengajuan berikutnya.</p>
+                                <p id="employee-pybmc-error" x-show="pybmcError" x-text="pybmcError" class="mt-1 text-xs font-semibold text-danger" role="alert"></p>
                             </div>
                         </div>
 
@@ -873,7 +873,7 @@
                                 aria-describedby="pybmc_global_selection_error {{ $errors->has('approver_employee_id') ? 'pybmc_global_lookup_error' : '' }}"
                                 :aria-invalid="{{ $errors->has('approver_employee_id') ? 'true' : 'false' }}"
                                 placeholder="Ketik minimal 2 karakter nama atau NIP"
-                                class="min-h-11 w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('approver_employee_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
+                                class="min-h-11 w-full rounded-xl border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 {{ $errors->has('approver_employee_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border' }}"
                             >
                             <div
                                 id="pybmc_global_lookup_results"
@@ -906,9 +906,9 @@
                                 </template>
                             </div>
                         </div>
-                        <p id="pybmc_global_selection_error" x-show="pybmcSelectionError" x-cloak x-text="pybmcSelectionError" class="text-[11px] font-semibold text-danger" role="alert"></p>
+                        <p id="pybmc_global_selection_error" x-show="pybmcSelectionError" x-cloak x-text="pybmcSelectionError" class="text-xs font-semibold text-danger" role="alert"></p>
                         @error('approver_employee_id')
-                            <p id="pybmc_global_lookup_error" class="text-[11px] font-semibold text-danger" role="alert">{{ $message }}</p>
+                            <p id="pybmc_global_lookup_error" class="text-xs font-semibold text-danger" role="alert">{{ $message }}</p>
                         @enderror
                         <p x-show="pybmcSelectedId && !pybmcSelectedName" x-cloak class="text-xs text-muted">Pilihan sebelumnya dipertahankan. Cari ulang untuk mengganti.</p>
                     </div>

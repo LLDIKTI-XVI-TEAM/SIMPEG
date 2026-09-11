@@ -137,7 +137,7 @@
         <span
             x-show="unreadCount > 0"
             x-text="unreadCount > 99 ? '99+' : unreadCount"
-            class="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white leading-none"
+            class="absolute top-0 right-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-xs font-bold text-white leading-none"
             style="display: none;"
         ></span>
     </button>

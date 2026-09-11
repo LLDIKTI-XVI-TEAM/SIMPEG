@@ -106,7 +106,7 @@
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Hari Libur</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Hari Libur</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Hari Libur']
@@ -301,7 +301,7 @@
                         Akhir Pekan
                     </span>
                 </div>
-                <div class="text-muted text-[11px] font-sans">
+                <div class="text-muted text-xs font-sans">
                     * Klik tanggal yang memiliki indikator untuk melihat detail nama libur
                 </div>
             </div>
@@ -362,7 +362,7 @@
                             <span class="mt-1 space-y-0.5">
                                 <template x-for="ev in d.events" :key="ev.id">
                                     <span
-                                        class="block text-[10px] leading-tight font-semibold rounded px-1 py-0.5 truncate"
+                                        class="block text-xs leading-tight font-semibold rounded px-1 py-0.5 truncate"
                                         :class="ev.is_cuti_bersama ? 'bg-secondary/20 text-ink' : 'bg-primary/15 text-primary'"
                                         x-text="ev.nama"
                                     ></span>
@@ -390,7 +390,7 @@
                     <template x-for="ev in (selectedEvent ? selectedEvent.events : [])" :key="ev.id">
                         <div class="p-3 rounded-lg border space-y-1" :class="ev.is_cuti_bersama ? 'bg-secondary/10 border-secondary/30' : 'bg-primary/5 border-primary/20'">
                             <span
-                                class="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider font-sans"
+                                class="inline-block px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider font-sans"
                                 :class="ev.is_cuti_bersama ? 'bg-secondary/20 text-ink' : 'bg-primary/15 text-primary'"
                                 x-text="ev.label_tipe"
                             ></span>
@@ -586,6 +586,7 @@
                     label="Tipe Libur"
                     labelSrOnly
                     size="sm"
+                    radius="lg"
                     :value="$filters['tipe']"
                     onchange="this.form.submit()"
                     wrapperClass="w-full sm:w-44"
@@ -605,13 +606,13 @@
                 <x-ui.table>
                     <x-ui.table-head>
                         <x-ui.table-row>
-                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Tanggal</x-ui.table-th>
-                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Hari</x-ui.table-th>
-                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Nama Hari Libur</x-ui.table-th>
-                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Jenis Libur</x-ui.table-th>
-                            <x-ui.table-th class="px-6 py-3.5 text-[11px]">Tahun</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-xs">Tanggal</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-xs">Hari</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-xs">Nama Hari Libur</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-xs">Jenis Libur</x-ui.table-th>
+                            <x-ui.table-th class="px-6 py-3.5 text-xs">Tahun</x-ui.table-th>
                             @if ($hasHariLiburMutation)
-                                <x-ui.table-th data-hari-libur-column="actions" class="px-6 py-3.5 text-[11px]">Aksi</x-ui.table-th>
+                                <x-ui.table-th data-hari-libur-column="actions" class="px-6 py-3.5 text-xs">Aksi</x-ui.table-th>
                             @endif
                         </x-ui.table-row>
                     </x-ui.table-head>
@@ -652,7 +653,7 @@
                                                     data-tipe="{{ $item->tipe() }}"
                                                     data-hari-libur-action="update"
                                                     variant="secondary"
-                                                    size="icon"
+                                                    size="compact-icon"
                                                     title="Edit {{ $item->nama }}"
                                                     aria-label="Edit {{ $item->nama }}"
                                                 >

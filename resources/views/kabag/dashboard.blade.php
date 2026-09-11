@@ -35,12 +35,12 @@
 
         <!-- Content Left -->
         <div class="relative z-10 w-full lg:w-[70%] flex flex-col justify-center">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
-            <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
+            <p class="mb-0.5 text-xs font-bold uppercase tracking-widest text-white/70">Selamat datang kembali</p>
+            <h1 class="text-xl font-extrabold leading-tight text-white sm:text-2xl">
                 {{ preg_replace('/\s*\(.*?\)/', '', $namaKepalaBagian) }}
-            </h2>
+            </h1>
             
-            <p class="mt-1 text-[12px] text-white/80 font-sans max-w-lg">
+            <p class="mt-1 max-w-lg text-xs text-white/80 font-sans">
                 Semangat menjalankan tugas hari ini. Tetap produktif dan berikan pelayanan terbaik.
             </p>
 
@@ -52,8 +52,8 @@
                     </div>
                     <div class="w-px h-6 bg-white/20"></div>
                     <div class="flex flex-col mt-0.5">
-                        <span class="text-[12px] font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
-                        <span class="text-[10px] text-white/70 mt-0.5">Hari ini</span>
+                        <span class="text-xs font-medium leading-none text-white/90">{{ now()->translatedFormat('l, d F Y') }}</span>
+                        <span class="mt-0.5 text-xs text-white/70">Hari ini</span>
                     </div>
                 </div>
 
@@ -64,8 +64,8 @@
                     </div>
                     <div class="w-px h-6 bg-white/20"></div>
                     <div class="flex flex-col mt-0.5">
-                        <span class="text-[12px] font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
-                        <span class="text-[10px] text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
+                        <span class="text-xs font-medium leading-none text-white/90">Sistem Informasi Kepegawaian</span>
+                        <span class="mt-0.5 text-xs text-white/70">LLDIKTI Wilayah XVI</span>
                     </div>
                 </div>
             </div>
@@ -216,13 +216,13 @@
                                 <x-ui.table-td class="px-6 py-3.5">
                                     <div class="flex items-center gap-3">
                                         <x-ui.tooltip text="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}" position="right">
-                                            <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail cuti">
+                                    <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition-colors hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail cuti">
                                                 <span>{{ substr($leave->employee?->nama_lengkap ?? 'P', 0, 1) }}</span>
                                             </a>
                                         </x-ui.tooltip>
                                         <div class="min-w-0">
                                             <x-ui.tooltip text="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}" position="right">
-                                                <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}</a>
+                                                <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="block truncate text-xs font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">{{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}</a>
                                             </x-ui.tooltip>
                                             <span class="block truncate text-xs text-muted">NIP. {{ $leave->employee?->nip ?? '-' }}</span>
                                         </div>
@@ -235,46 +235,46 @@
                                     <div class="flex items-center justify-end gap-1">
                                         {{-- 1. SETUJUI --}}
                                         <x-ui.tooltip text="Setujui" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', {{ $leave->revision_version }}, '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DISETUJUI')" class="flex h-11 w-11 items-center justify-center rounded-md bg-success/10 text-success transition hover:bg-success/20 border border-success/20 focus:outline-none focus:ring-2 focus:ring-success/30" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <x-ui.button type="button" variant="success" size="compact-icon" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', {{ $leave->revision_version }}, '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DISETUJUI')" aria-label="Setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </x-ui.tooltip>
 
                                         {{-- 2. DITANGGUHKAN --}}
                                         <x-ui.tooltip text="Tangguhkan" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', {{ $leave->revision_version }}, '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DITANGGUHKAN')" class="flex h-11 w-11 items-center justify-center rounded-md bg-warning/10 text-warning transition hover:bg-warning/20 border border-warning/20 focus:outline-none focus:ring-2 focus:ring-warning/30" aria-label="Tangguhkan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <x-ui.button type="button" variant="warning" size="compact-icon" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', {{ $leave->revision_version }}, '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'DITANGGUHKAN')" aria-label="Tangguhkan pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </x-ui.tooltip>
 
                                         {{-- 3. TIDAK DISETUJUI --}}
                                         <x-ui.tooltip text="Tidak Disetujui" position="top">
-                                            <button type="button" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', {{ $leave->revision_version }}, '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'TIDAK_DISETUJUI')" class="flex h-11 w-11 items-center justify-center rounded-md bg-danger/10 text-danger transition hover:bg-danger/20 border border-danger/20 focus:outline-none focus:ring-2 focus:ring-danger/30" aria-label="Tidak setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
+                                            <x-ui.button type="button" variant="danger" size="compact-icon" @click="openDecision('{{ $leave->id }}', '{{ $leave->steps->first()?->id }}', {{ $leave->revision_version }}, '{{ addslashes($leave->employee?->nama_lengkap ?? '') }}', 'TIDAK_DISETUJUI')" aria-label="Tidak setujui pengajuan cuti {{ $leave->employee?->nama_lengkap }}">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
                                                 </svg>
-                                            </button>
+                                            </x-ui.button>
                                         </x-ui.tooltip>
 
                                         {{-- 4. DETAIL --}}
                                         <x-ui.tooltip text="Tinjau Detail" position="top-end">
-                                            <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="flex h-11 w-11 items-center justify-center rounded-md border border-border bg-surface text-primary transition hover:bg-soft shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Tinjau detail cuti">
+                                    <x-ui.button as="a" href="{{ route('kepala-bagian.cuti.show', $leave) }}" variant="secondary" size="compact-icon" aria-label="Tinjau detail cuti">
                                                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                                 </svg>
-                                            </a>
+                                    </x-ui.button>
                                         </x-ui.tooltip>
                                     </div>
                                 </x-ui.table-td>
                             </x-ui.table-row>
                             @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="3" class="px-6 py-8 text-center text-sm text-muted">
+                                <x-ui.table-td colspan="3" align="center" class="px-6 py-8 text-sm text-muted">
                                     Tidak ada pengajuan cuti yang menunggu tindakan Anda.
                                 </x-ui.table-td>
                             </x-ui.table-row>
@@ -314,7 +314,7 @@
                                     :class="{'border-danger focus:border-danger focus:ring-danger/20': decisionType !== 'DISETUJUI' && note.trim().length > 0 && note.trim().length < 5}"
                                     class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans"
                                     placeholder="Tulis alasan keputusan..."></textarea>
-                                <div class="flex items-center justify-between text-[11px] font-sans mt-1">
+                                <div class="mt-1 flex items-center justify-between text-xs font-sans">
                                     <span class="text-danger font-medium flex items-center gap-1" x-show="decisionType !== 'DISETUJUI' && note.trim().length > 0 && note.trim().length < 5">
                                         ⚠ Catatan keputusan minimal berisi 5 karakter.
                                     </span>
@@ -366,13 +366,13 @@
                                 <x-ui.table-td class="px-6 py-3.5">
                                     <div class="flex items-center gap-3">
                                         <x-ui.tooltip text="Buka detail {{ $alert['nama'] }}" position="right">
-                                            <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $alert['nama'] }}">
+                                            <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition-colors hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil {{ $alert['nama'] }}">
                                                 <span>{{ substr($alert['nama'], 0, 1) }}</span>
                                             </a>
                                         </x-ui.tooltip>
                                         <div class="min-w-0">
                                             <x-ui.tooltip text="Buka detail {{ $alert['nama'] }}" position="right">
-                                                <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $alert['nama'] }}</a>
+                                                <a href="{{ route('kepala-bagian.bawahan.show', $alert['pegawai_id']) }}" class="block truncate text-xs font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">{{ $alert['nama'] }}</a>
                                             </x-ui.tooltip>
                                             <span class="block truncate text-xs text-muted">NIP. {{ $alert['nip'] ?? '-' }}</span>
                                         </div>
@@ -389,7 +389,7 @@
                             </x-ui.table-row>
                             @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="2" class="px-6 py-8 text-center text-sm text-muted">
+                                <x-ui.table-td colspan="2" align="center" class="px-6 py-8 text-sm text-muted">
                                     Tidak ada peringatan EWS aktif untuk bawahan langsung.
                                 </x-ui.table-td>
                             </x-ui.table-row>
@@ -432,13 +432,13 @@
                             <x-ui.table-td class="px-6 py-3.5">
                                 <div class="flex items-center gap-3">
                                     <x-ui.tooltip text="Buka detail {{ $employee->nama_lengkap }}" position="right">
-                                        <a href="{{ route('kepala-bagian.bawahan.show', $employee) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil">
+                                        <a href="{{ route('kepala-bagian.bawahan.show', $employee) }}" class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition-colors hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30" aria-label="Buka detail profil">
                                             <span>{{ substr($employee->nama_lengkap, 0, 1) }}</span>
                                         </a>
                                     </x-ui.tooltip>
                                     <div class="min-w-0">
                                         <x-ui.tooltip text="Buka detail {{ $employee->nama_lengkap }}" position="right">
-                                            <a href="{{ route('kepala-bagian.bawahan.show', $employee) }}" class="block truncate text-xs font-semibold text-ink transition hover:text-primary focus:outline-none rounded leading-tight">{{ $employee->nama_lengkap }}</a>
+                                            <a href="{{ route('kepala-bagian.bawahan.show', $employee) }}" class="block truncate text-xs font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">{{ $employee->nama_lengkap }}</a>
                                         </x-ui.tooltip>
                                         <p class="text-xs text-muted">NIP. {{ $employee->nip }}</p>
                                     </div>
@@ -455,7 +455,7 @@
                                 @endif
                             </x-ui.table-td>
                             <x-ui.table-td align="right" class="px-6 py-3.5">
-                                <x-ui.button as="a" href="{{ route('kepala-bagian.bawahan.show', $employee) }}" variant="secondary" size="icon" title="Lihat Detail" tooltip-position="top-end">
+                                <x-ui.button as="a" href="{{ route('kepala-bagian.bawahan.show', $employee) }}" variant="secondary" size="compact-icon" title="Lihat Detail" tooltip-position="top-end">
                                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -465,7 +465,7 @@
                         </x-ui.table-row>
                         @empty
                         <x-ui.table-row>
-                            <x-ui.table-td colspan="4" class="px-6 py-8 text-center text-sm text-muted">
+                            <x-ui.table-td colspan="4" align="center" class="px-6 py-8 text-sm text-muted">
                                 Belum ada bawahan langsung yang aktif.
                             </x-ui.table-td>
                         </x-ui.table-row>

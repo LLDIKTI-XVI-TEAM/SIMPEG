@@ -11,6 +11,7 @@ use App\Models\LeaveRequestStep;
 use App\Models\RankHistory;
 use App\Models\RefGolongan;
 use App\Models\RefJenisCuti;
+use App\Models\RefJenisPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -120,12 +121,58 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertSee(route('pimpinan.cuti.show', $leave), false)
             ->assertSee(route('pimpinan.ews.index', ['event' => 'Kenaikan Pangkat']), false)
             ->assertSee(route('pimpinan.cuti.index', ['status' => 'menunggu']), false)
-            ->assertSee('Pengajuan Cuti')
             ->assertSee('href="'.route('cuti').'"', false)
             ->assertSee('globalSearch($el.dataset.searchUrl)', false)
+            ->assertSee("dashboardChart({ type: 'doughnut'", false)
+            ->assertSee("dashboardChart({ type: 'horizontal-bar'", false)
+            ->assertSee('data: [1], tooltipTotal: 2', false)
+            ->assertSee("dashboardChart({ type: 'line'", false)
+            ->assertSee('0 disetujui · 0 ditangguhkan')
             ->assertDontSee('Ahmad Fauzi')
             ->assertDontSee('Nadia Kusuma')
             ->assertDontSee('Admin HR');
+    }
+
+    public function test_donut_komposisi_mencakup_pegawai_tanpa_jenis_pegawai(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        $pns = RefJenisPegawai::query()->firstOrCreate(['nama' => 'PNS']);
+        Employee::factory()->create([
+            'jenis_pegawai_id' => $pns->id,
+            'status_aktif' => 'Aktif',
+        ]);
+        Employee::factory()->create([
+            'jenis_pegawai_id' => null,
+            'status_aktif' => 'Aktif',
+        ]);
+
+        $user = User::factory()->pimpinan()->create();
+
+        $response = $this->actingAs($user)
+            ->get(route('pimpinan.dashboard'));
+
+        $response->assertOk()->assertSee('Lainnya / Belum Diisi');
+
+        $totalPegawai = (int) $response->viewData('totalPegawai');
+        $komposisi = $response->viewData('komposisi');
+        $knownCounts = [
+            $komposisi['PNS'] ?? 0,
+            $komposisi['PPPK'] ?? 0,
+            $komposisi['CPNS'] ?? 0,
+        ];
+        $expectedData = [
+            ...$knownCounts,
+            max(0, $totalPegawai - array_sum($knownCounts)),
+        ];
+
+        $this->assertSame($totalPegawai, array_sum($expectedData));
+        $expectedDataset = preg_quote((string) json_encode($expectedData), '/');
+        $this->assertMatchesRegularExpression(
+            "/data:\\s*(?:JSON\\.parse\\(')?{$expectedDataset}(?:'\\))?/",
+            (string) $response->getContent(),
+            'Dataset doughnut harus menjumlah ke total pegawai aktif, termasuk kategori yang belum diklasifikasikan.',
+        );
     }
 
     public function test_tren_pegawai_aktif_excludes_non_aktif_and_mutasi_employees(): void

@@ -4,6 +4,7 @@
     'columns',
     'fetchPage',
     'isLoading' => 'isLoading',
+    'error' => 'false',
     'perPage' => 'perPage',
     'setPerPage' => 'setPerPage($event.target.value)',
     'sort' => null,
@@ -12,6 +13,11 @@
     'searchModel' => null,
     'searchPlaceholder' => 'Cari...',
     'emptyTitle' => 'Tidak ada data',
+    'emptyMessage' => 'Belum ada data yang dapat ditampilkan.',
+    'filteredEmptyMessage' => 'Tidak ada data yang sesuai dengan filter atau kata kunci pencarian.',
+    'errorTitle' => 'Data tidak dapat dimuat.',
+    'errorMessage' => 'Coba muat ulang halaman. Jika masalah berlanjut, hubungi administrator.',
+    'hasActiveFilters' => null,
     'emptyIcon' => 'none',
     'caption' => null,
     'colspanCount' => null,
@@ -20,11 +26,18 @@
     'checkAllShow' => null, // Alpine expression boolean; saat false checkbox select-all disembunyikan dan dinonaktifkan
     'filterClass' => null,
     'searchCols' => null,
+    'searchControlClass' => '',
 ])
 
 @php
     // Auto-calculate colspan if not provided
     $colspanCount = $colspanCount ?? count($columns);
+    $hasActiveFiltersExpression = $hasActiveFilters
+        ?? ($searchModel ? "({$searchModel} && {$searchModel}.trim() !== '')" : 'false');
+    $emptyMessageExpression = "({$hasActiveFiltersExpression}) ? "
+        . json_encode($filteredEmptyMessage, JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG)
+        . ' : '
+        . json_encode($emptyMessage, JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT | JSON_HEX_TAG);
 @endphp
 
 <div class="space-y-4">
@@ -34,6 +47,7 @@
             :searchModel="$searchModel"
             :searchPlaceholder="$searchPlaceholder"
             :searchCols="$searchCols"
+            :searchControlClass="$searchControlClass"
             :class="$filterClass"
             @search-enter="$data.handleSearch ? $data.handleSearch() : ($data.applyFilter ? $data.applyFilter() : null)"
         >
@@ -97,12 +111,25 @@
                         </tr>
                     </template>
 
+                    {{-- Error State --}}
+                    <template x-if="!{{ $isLoading }} && {{ $error }}">
+                        <tr>
+                            <td colspan="{{ $colspanCount }}">
+                                <x-ui.empty-state
+                                    icon="document"
+                                    :title="$errorTitle"
+                                    :message="$errorMessage"
+                                />
+                            </td>
+                        </tr>
+                    </template>
+
                     @if ($slot->isNotEmpty())
                         {{-- Custom body slot: caller renders its own x-for rows --}}
                         {{ $slot }}
                     @else
                         {{-- Default: auto-render rows from $rows + column definitions --}}
-                        <template x-if="!{{ $isLoading }} && {{ $rows }} && {{ $rows }}.length > 0">
+                        <template x-if="!{{ $isLoading }} && !({{ $error }}) && {{ $rows }} && {{ $rows }}.length > 0">
                             <template x-for="(row, index) in {{ $rows }}" :key="row.id || index">
                                 <x-ui.table-row class="hover:bg-soft/40 transition-colors">
                                     @foreach ($columns as $col)
@@ -124,13 +151,14 @@
                     @endif
 
                     {{-- Empty State (works for both default and custom slot modes) --}}
-                    <template x-if="!{{ $isLoading }} && (!{{ $rows }} || {{ $rows }}.length === 0)">
+                    <template x-if="!{{ $isLoading }} && !({{ $error }}) && (!{{ $rows }} || {{ $rows }}.length === 0)">
                         <tr>
                             <td colspan="{{ $colspanCount }}">
                                 <x-ui.empty-state
                                     icon="{{ $emptyIcon }}"
                                     title="{{ $emptyTitle }}"
-                                    message="Coba sesuaikan filter atau kata kunci pencarian Anda."
+                                    :message="$emptyMessage"
+                                    :message-expression="$emptyMessageExpression"
                                 />
                             </td>
                         </tr>

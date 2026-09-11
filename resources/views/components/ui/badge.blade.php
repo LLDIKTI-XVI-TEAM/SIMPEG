@@ -27,7 +27,7 @@
             'dot' => 'bg-danger',
         ],
         'warning' => [
-            'box' => 'bg-warning/10 text-warning',
+            'box' => 'bg-warning/10 text-warning-dark',
             'dot' => 'bg-warning',
         ],
         'orange' => [
@@ -35,7 +35,7 @@
             'dot' => 'bg-orange',
         ],
         'info' => [
-            'box' => 'bg-info/10 text-info',
+            'box' => 'bg-info/10 text-info-dark',
             'dot' => 'bg-info',
         ],
         'muted' => [

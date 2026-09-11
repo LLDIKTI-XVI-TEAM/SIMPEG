@@ -6,6 +6,7 @@ use App\Actions\Cuti\StoreManualLeaveUsageAction;
 use App\Models\Employee;
 use App\Models\LeaveApprovalChain;
 use App\Models\LeaveApprovalChainStep;
+use App\Models\LeaveBalanceLedger;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestCase;
 use App\Models\LeaveUsageDocument;
@@ -230,7 +231,7 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertSame(1, (new DOMXPath($document))->query('//main')->length);
         $tabList = (new DOMXPath($document))->query('//*[@role="tablist" and @aria-label="Kategori administrasi pemakaian cuti"]')->item(0);
         $this->assertInstanceOf(DOMElement::class, $tabList);
-        $this->assertSame('vertical', $tabList->getAttribute('aria-orientation'));
+        $this->assertSame('horizontal', $tabList->getAttribute('aria-orientation'));
         $initial->assertDontSee('Muat Editor Cuti Eksternal', false);
         $initial->assertDontSee(route('cuti.manual.store', $employee), false);
 
@@ -877,9 +878,9 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertSame(array_map('strval', array_merge($parameters, ['page_usage' => 2])), $this->queryParameters($rows->url(2)));
         $listHtmlBytes = strlen($response->getContent());
         $listQueryCount = $this->pageQueryCount($url);
-        // Header aplikasi dan kontrol aksesibel bersifat tetap; 122 KiB masih menjaga
+        // Header aplikasi, layout shell, dan kontrol aksesibel bersifat tetap; 140 KiB menjaga
         // respons list tetap bounded tanpa memotong markup operasional yang diperlukan.
-        $this->assertLessThan(122 * 1024, $listHtmlBytes);
+        $this->assertLessThan(140 * 1024, $listHtmlBytes);
         $this->assertLessThanOrEqual(22, $listQueryCount);
 
         $editorParameters = array_merge($parameters, [
@@ -893,8 +894,78 @@ class LeaveUsageAdminPageTest extends TestCase
         $editorResponse->assertSee(route('cuti.manual.correct', $editorParameters['edit_usage']), false);
         $editorHtmlBytes = strlen($editorResponse->getContent());
         $editorQueryCount = $this->pageQueryCount($editorUrl);
-        $this->assertLessThan(122 * 1024, $editorHtmlBytes);
+        $this->assertLessThan(140 * 1024, $editorHtmlBytes);
         $this->assertLessThanOrEqual(23, $editorQueryCount);
+    }
+
+    public function test_ledger_saldo_memakai_per_page_tervalidasi_dan_mempertahankan_filter(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        foreach (range(1, 12) as $index) {
+            LeaveBalanceLedger::query()->create([
+                'employee_id' => $employee->id,
+                'tahun' => 2026,
+                'event_type' => LeaveBalanceLedger::EVENT_USAGE_FACT_RECORDED,
+                'amount' => -1,
+                'source_year' => 2026,
+                'reason' => "Mutasi saldo fixture {$index}.",
+                'dedup_key' => "ledger-pagination-{$index}",
+                'occurred_at' => sprintf('2026-04-%02d 08:00:00', $index),
+            ]);
+        }
+
+        $parameters = [
+            'pegawai' => $employee->id,
+            'status' => 'semua_pegawai',
+            'tab' => 'riwayat',
+            'per_page_ledger' => 10,
+            'per_page_usage' => 25,
+        ];
+        $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', $parameters));
+
+        $response->assertOk();
+        $response->assertSee('name="per_page_ledger"', false);
+        $response->assertSee('Jumlah mutasi saldo per halaman', false);
+        $ledgerRows = $response->viewData('ledgerRows');
+        $this->assertSame(12, $ledgerRows->total());
+        $this->assertSame(10, $ledgerRows->perPage());
+        $this->assertSame(10, $ledgerRows->count());
+        $this->assertSame(
+            array_map('strval', array_merge($parameters, ['page_ledger' => 2])),
+            $this->queryParameters($ledgerRows->url(2)),
+        );
+    }
+
+    public function test_ledger_per_page_mengirim_tab_aktif_yang_diubah_secara_lokal(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+
+        $response = $this->actingAs($admin)->get(route('cuti.saldo.administrasi', [
+            'pegawai' => $employee->id,
+            'status' => 'semua_pegawai',
+            'tab' => 'pendaftaran',
+        ]));
+
+        $response->assertOk();
+
+        $document = new DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $tabInput = (new DOMXPath($document))->query(
+            '//select[@id="ledger-per-page"]/ancestor::form//input[@name="tab"]',
+        )->item(0);
+
+        $this->assertInstanceOf(DOMElement::class, $tabInput);
+        $this->assertSame('activeTab', $tabInput->getAttribute('x-bind:value'));
+
+        $usageTabInput = (new DOMXPath($document))->query(
+            '//select[@id="usage-per-page"]/ancestor::form//input[@name="tab"]',
+        )->item(0);
+
+        $this->assertInstanceOf(DOMElement::class, $usageTabInput);
+        $this->assertSame('activeTab', $usageTabInput->getAttribute('x-bind:value'));
     }
 
     public function test_workspace_buat_pemakaian_manual_memuat_preview_dan_opsi_rangkaian_tetap_bounded(): void
@@ -949,8 +1020,8 @@ class LeaveUsageAdminPageTest extends TestCase
                     && $row->getAttribute('workspace_usage_type_name') === 'Cuti Melahirkan'));
 
         // Header, navigasi berizin, dan kontrol aksesibel menambah markup tetap;
-        // anggaran workspace 122 KiB tetap membatasi payload opsi dan riwayat.
-        $this->assertLessThan(122 * 1024, strlen($response->getContent()));
+        // anggaran workspace 140 KiB tetap membatasi payload opsi dan riwayat.
+        $this->assertLessThan(140 * 1024, strlen($response->getContent()));
         $this->assertLessThanOrEqual(23, $this->pageQueryCount($url));
     }
 

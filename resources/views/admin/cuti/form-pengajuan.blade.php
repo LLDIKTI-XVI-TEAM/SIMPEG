@@ -2,7 +2,7 @@
     <div class="space-y-6">
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Form Pengajuan Cuti</h2>
+                <h1 class="text-2xl font-semibold text-ink">Form Pengajuan Cuti</h1>
                 <nav class="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
                     <span>/</span>
@@ -31,96 +31,52 @@
                         @endphp
 
                         @if($hasActiveLeaveWorkflow)
-                        <div role="alert" class="rounded-lg border border-warning/40 bg-warning/10 p-4">
-                            <p class="text-sm font-semibold text-ink">Pengajuan aktif masih perlu diselesaikan.</p>
-                            <p class="mt-1 text-sm text-warning-dark">
+                        <x-ui.alert variant="warning" title="Pengajuan aktif masih perlu diselesaikan." class="items-start">
+                            <p>
                                 Selesaikan proses pengajuan atau permohonan pembatalan yang sedang berjalan sebelum membuat pengajuan baru.
                             </p>
-                            <a href="{{ route('cuti') }}" wire:navigate class="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                            <x-ui.button href="{{ route('cuti') }}" wire:navigate variant="link" size="sm" class="mt-2 min-h-11">
                                 Lihat pengajuan cuti
-                            </a>
-                        </div>
+                            </x-ui.button>
+                        </x-ui.alert>
                         @endif
 
                         <!-- Peringatan bila rantai approval cuti belum dikonfigurasi -->
                         @unless($chainReady)
-                        <div role="alert" class="rounded-lg border border-warning/40 bg-warning/10 p-4">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-semibold text-ink">
-                                        Konfigurasi approval cuti belum tersedia.
-                                    </p>
-                                    <p class="mt-1 text-sm text-warning-dark">
-                                        Silakan hubungi Admin Kepegawaian untuk mengatur rantai approval sebelum mengajukan cuti.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+                        <x-ui.alert variant="warning" title="Konfigurasi approval cuti belum tersedia." class="items-start">
+                            <p>Silakan hubungi Admin Kepegawaian untuk mengatur rantai approval sebelum mengajukan cuti.</p>
+                        </x-ui.alert>
                         @endunless
 
                         <!-- Jenis Cuti -->
                         <div>
-                            <label for="jenis_cuti_id" class="block text-sm font-medium text-ink mb-1">Jenis Cuti <span class="text-danger">*</span></label>
-                            <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" required x-model="selectedJenisCuti" @change="onLeaveTypeChanged"
+                            <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" label="Jenis Cuti" required x-model="selectedJenisCuti" @change="onLeaveTypeChanged"
                                 :disabled="$formLocked">
                                 <option value="">Pilih Jenis Cuti</option>
                                 @foreach($jenisCuti as $jenis)
                                     <option value="{{ $jenis->id }}" data-code="{{ $jenis->code }}" @selected(old('jenis_cuti_id') === $jenis->id)>{{ $jenis->nama }}</option>
                                 @endforeach
                             </x-form.select>
-                            @error('jenis_cuti_id')
-                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                            @enderror
                         </div>
 
                         {{-- Pengajuan lintas tahun disambungkan ke rangkaian eksplisit milik pemohon,
                             bukan disimpulkan dari teks alasan yang dapat berubah. --}}
                         <div x-show="requiresLeaveCase()" x-cloak>
-                            <label for="leave_request_case_id" class="mb-1 block text-sm font-medium text-ink">Rangkaian Pengajuan</label>
-                            <x-form.select id="leave_request_case_id" name="leave_request_case_id" x-model="selectedLeaveRequestCase"
-                                :disabled="$formLocked" aria-describedby="leave_request_case_id-help">
+                            <x-form.select id="leave_request_case_id" name="leave_request_case_id" label="Rangkaian Pengajuan" x-model="selectedLeaveRequestCase"
+                                :disabled="$formLocked" help="Pilih rangkaian yang sama bila Cuti Melahirkan atau CLTN perlu dibuat sebagai pengajuan lanjutan di tahun kalender berbeda. Batas durasi dihitung untuk seluruh rangkaian.">
                                 <option value="">Pengajuan baru (bukan kelanjutan rangkaian sebelumnya)</option>
                                 <template x-for="leaveCase in casesForSelectedType()" :key="leaveCase.id">
                                     <option :value="leaveCase.id" :selected="leaveCase.id === selectedLeaveRequestCase" x-text="leaveCase.label"></option>
                                 </template>
                             </x-form.select>
-                            <p id="leave_request_case_id-help" class="mt-1 text-xs text-muted">
-                                Pilih rangkaian yang sama bila Cuti Melahirkan atau CLTN perlu dibuat sebagai pengajuan lanjutan di tahun kalender berbeda. Batas durasi dihitung untuk seluruh rangkaian.
-                            </p>
-                            @error('leave_request_case_id')
-                                <p class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>
-                            @enderror
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <!-- Tanggal Mulai -->
-                            <div>
-                                <label for="tanggal_mulai" class="block text-sm font-medium text-ink mb-1">Tanggal Mulai <span class="text-danger">*</span></label>
-                                <input type="date" id="tanggal_mulai" name="tanggal_mulai" required x-model="startDate" @change="onStartDateChanged"
-                                    value="{{ old('tanggal_mulai') }}"
-                                    class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                    {{ $formLocked ? 'disabled' : '' }}>
-                                @error('tanggal_mulai')
-                                    <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                                @enderror
-                            </div>
+                            <x-form.date id="tanggal_mulai" name="tanggal_mulai" label="Tanggal Mulai" required size="lg" x-model="startDate" @change="onStartDateChanged" :disabled="$formLocked" />
 
                             <!-- Tanggal Selesai -->
-                            <div>
-                                <label for="tanggal_selesai" class="block text-sm font-medium text-ink mb-1">Tanggal Selesai <span class="text-danger">*</span></label>
-                                <input type="date" id="tanggal_selesai" name="tanggal_selesai" required x-model="endDate" @change="calculateDays"
-                                    value="{{ old('tanggal_selesai') }}"
-                                    class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                    {{ $formLocked ? 'disabled' : '' }}>
-                                @error('tanggal_selesai')
-                                    <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                                @enderror
-                            </div>
+                            <x-form.date id="tanggal_selesai" name="tanggal_selesai" label="Tanggal Selesai" required size="lg" x-model="endDate" @change="calculateDays" :disabled="$formLocked" />
                         </div>
 
                         <!-- Jumlah Hari Kerja (Readonly, calculated via AJAX) -->
@@ -129,7 +85,7 @@
                             <div class="relative">
                                 <input type="number" id="jumlah_hari_kerja" name="jumlah_hari_kerja" readonly x-model="workDays"
                                     :aria-busy="isCalculating" aria-describedby="jumlah_hari_kerja-help"
-                                    class="w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-sm text-muted cursor-not-allowed transition-all">
+                                    class="w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-sm text-muted cursor-not-allowed transition-[border-color,box-shadow] duration-200">
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-3" x-show="isCalculating">
                                     <svg class="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -148,53 +104,18 @@
                         </div>
 
                         <!-- Alasan -->
-                        <div>
-                            <label for="alasan" class="block text-sm font-medium text-ink mb-1">Alasan Cuti <span class="text-danger">*</span></label>
-                            <textarea id="alasan" name="alasan" rows="3" required
-                                class="w-full resize-none rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                placeholder="Jelaskan alasan cuti Anda secara singkat..."
-                                {{ $formLocked ? 'disabled' : '' }}>{{ old('alasan') }}</textarea>
-                            @error('alasan')
-                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        <x-form.textarea id="alasan" name="alasan" label="Alasan Cuti" rows="3" required
+                            placeholder="Jelaskan alasan cuti Anda secara singkat..." :disabled="$formLocked" />
 
-                        <div>
-                            <label for="alamat_selama_cuti" class="block text-sm font-medium text-ink mb-1">Alamat Selama Cuti <span class="text-danger">*</span></label>
-                            <textarea id="alamat_selama_cuti" name="alamat_selama_cuti" rows="2" maxlength="1000" required autocomplete="street-address" aria-describedby="{{ $errors->has('alamat_selama_cuti') ? 'alamat_selama_cuti-help alamat_selama_cuti-error' : 'alamat_selama_cuti-help' }}"
-                                @if ($errors->has('alamat_selama_cuti')) aria-invalid="true" @endif
-                                class="w-full resize-none rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                {{ $formLocked ? 'disabled' : '' }}>{{ old('alamat_selama_cuti') }}</textarea>
-                            <p id="alamat_selama_cuti-help" class="mt-1 text-xs text-muted">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
-                            @error('alamat_selama_cuti')
-                                <p id="alamat_selama_cuti-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        <x-form.textarea id="alamat_selama_cuti" name="alamat_selama_cuti" label="Alamat Selama Cuti" rows="2" maxlength="1000" required autocomplete="street-address"
+                            help="Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti." :disabled="$formLocked" />
 
-                        <div>
-                            <label for="nomor_telepon" class="block text-sm font-medium text-ink mb-1">Nomor Telepon <span class="text-danger">*</span></label>
-                            <input id="nomor_telepon" name="nomor_telepon" type="tel" inputmode="tel" maxlength="20" required autocomplete="tel" aria-describedby="{{ $errors->has('nomor_telepon') ? 'nomor_telepon-help nomor_telepon-error' : 'nomor_telepon-help' }}"
-                                @if ($errors->has('nomor_telepon')) aria-invalid="true" @endif
-                                value="{{ old('nomor_telepon') }}"
-                                class="w-full rounded-lg border border-border bg-surface px-4 py-2.5 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                                {{ $formLocked ? 'disabled' : '' }}>
-                            <p id="nomor_telepon-help" class="mt-1 text-xs text-muted">Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti.</p>
-                            @error('nomor_telepon')
-                                <p id="nomor_telepon-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        <x-form.input id="nomor_telepon" name="nomor_telepon" type="tel" label="Nomor Telepon" inputmode="tel" maxlength="20" required autocomplete="tel"
+                            help="Digunakan pada formulir Cuti resmi dan untuk menghubungi Anda selama cuti." :disabled="$formLocked" />
 
                         <!-- Lampiran -->
-                        <div>
-                            <label for="lampiran" class="block text-sm font-medium text-ink mb-1">File Lampiran <span class="text-muted font-normal">(Opsional)</span></label>
-                            <input type="file" id="lampiran" name="lampiran" accept=".pdf,.jpg,.jpeg,.png" aria-describedby="lampiran-help"
-                                class="w-full text-sm text-muted file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 transition-all border border-border rounded-lg bg-surface"
-                                {{ $formLocked ? 'disabled' : '' }}>
-                            <p id="lampiran-help" class="mt-1 text-xs text-muted">Format: PDF, JPG, PNG. Maksimal ukuran file: 10MB.</p>
-                            @error('lampiran')
-                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                            @enderror
-                        </div>
+                        <x-form.file-upload id="lampiran" name="lampiran" label="File Lampiran (opsional)" accept=".pdf,.jpg,.jpeg,.png"
+                            help="Format: PDF, JPG, PNG. Maksimal ukuran file: 10MB." :disabled="$formLocked" />
                     </div>
 
                     <div class="bg-soft border-t border-border px-6 py-4 flex items-center justify-end gap-3">

@@ -68,12 +68,12 @@
     {{ $slot }}
 
     @if ($help)
-        <p id="{{ $helpId }}" class="text-[11px] text-muted font-sans">{{ $help }}</p>
+        <p id="{{ $helpId }}" class="text-xs text-muted font-sans">{{ $help }}</p>
     @endif
 
     @if ($fieldErrorKey)
         @if ($hasError)
-            <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
+            <p id="{{ $errorId }}" class="text-xs text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
         @endif
     @endif
 </div>

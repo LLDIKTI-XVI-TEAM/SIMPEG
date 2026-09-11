@@ -17,7 +17,7 @@
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Konfigurasi Channel Notifikasi</h2>
+                <h1 class="text-2xl font-semibold text-ink">Konfigurasi Channel Notifikasi</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Channel Notifikasi']
@@ -26,20 +26,18 @@
         </div>
 
         @if(session('success'))
-            <div role="status" aria-live="polite" class="rounded-lg border border-success/25 bg-success/5 px-4 py-3 text-sm font-medium text-success">
-                {{ session('success') }}
-            </div>
+            <x-ui.alert variant="success" size="sm">{{ session('success') }}</x-ui.alert>
         @endif
 
         @if($errors->any())
-            <div role="alert" class="rounded-lg border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-danger">
+            <x-ui.alert variant="danger" size="sm">
                 <p class="font-semibold">Perubahan belum dapat disimpan.</p>
                 <ul class="mt-2 list-disc space-y-1 pl-5">
                     @foreach($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
                 </ul>
-            </div>
+            </x-ui.alert>
         @endif
 
         <section aria-labelledby="add-channel-title" class="rounded-2xl border border-border bg-surface p-5 shadow-sm" x-data="{ showAddForm: {{ $hasAddChannelError ? 'true' : 'false' }} }">
@@ -51,7 +49,7 @@
                 <x-ui.button
                     type="button"
                     variant="secondary"
-                    size="sm"
+                    size="compact"
                     @click="showAddForm = !showAddForm"
                     x-bind:aria-expanded="showAddForm.toString()"
                     aria-controls="add-channel-panel"
@@ -102,7 +100,7 @@
                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <!-- Left: Channel Icon & Identity -->
                             <div class="flex items-center gap-4 min-w-0">
-                                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {{ $channel['code'] === 'in_app' ? 'bg-primary/10 text-primary' : ($channel['code'] === 'email' ? 'bg-info/10 text-info' : ($channel['code'] === 'whatsapp_business' ? 'bg-emerald-50 text-emerald-600' : 'bg-soft text-ink')) }}">
+                                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {{ $channel['code'] === 'in_app' ? 'bg-primary/10 text-primary' : ($channel['code'] === 'email' ? 'bg-info/10 text-info-dark' : ($channel['code'] === 'whatsapp_business' ? 'bg-success/10 text-success' : 'bg-soft text-ink')) }}">
                                     @if($channel['code'] === 'in_app')
                                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" /></svg>
                                     @elseif($channel['code'] === 'email')
@@ -118,22 +116,16 @@
                                         <h3 class="truncate text-base font-semibold text-ink">{{ $channel['name'] }}</h3>
                                         <code class="rounded bg-soft px-2 py-0.5 text-xs font-mono text-muted">{{ $channel['code'] }}</code>
                                         @if($channel['is_core'])
-                                            <span class="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">Inti</span>
+                                            <x-ui.badge variant="primary" size="sm" uppercase>Inti</x-ui.badge>
                                         @endif
                                     </div>
                                     <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                                         @if(!$channel['adapter_available'])
-                                            <span class="inline-flex items-center gap-1 font-semibold text-ink">
-                                                <span class="h-1.5 w-1.5 rounded-full bg-warning"></span> Runtime belum tersedia
-                                            </span>
+                                            <x-ui.badge variant="warning" size="sm" pill dot>Runtime belum tersedia</x-ui.badge>
                                         @elseif($channel['is_enabled'])
-                                            <span class="inline-flex items-center gap-1 font-semibold text-success">
-                                                <span class="h-1.5 w-1.5 rounded-full bg-success"></span> Master Aktif
-                                            </span>
+                                            <x-ui.badge variant="success" size="sm" pill dot>Master Aktif</x-ui.badge>
                                         @else
-                                            <span class="inline-flex items-center gap-1 font-semibold text-muted">
-                                                <span class="h-1.5 w-1.5 rounded-full bg-border"></span> Master Nonaktif
-                                            </span>
+                                            <x-ui.badge variant="muted" size="sm" pill dot>Master Nonaktif</x-ui.badge>
                                         @endif
                                     </div>
                                 </div>
@@ -141,40 +133,42 @@
 
                             <!-- Right: Status Badge, Action Controls & Switch -->
                             <div class="flex flex-wrap items-center justify-between md:justify-end gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-border">
-                                <button
+                                <x-ui.button
                                     type="button"
+                                    variant="secondary"
+                                    size="compact"
                                     @click="openRename = !openRename"
-                                    :aria-expanded="openRename.toString()"
+                                    ::aria-expanded="openRename.toString()"
                                     aria-controls="rename-panel-{{ $channel['id'] }}"
-                                    class="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-muted hover:border-ink hover:text-ink transition-colors"
                                 >
                                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                     <span x-text="openRename ? 'Tutup' : 'Ubah nama'">Ubah nama</span>
-                                </button>
+                                </x-ui.button>
 
                                 @if($channel['code'] === 'whatsapp_business' && $channel['whatsapp_config'] !== null)
-                                    <button
+                                    <x-ui.button
                                         type="button"
                                         @click="openWaConfig = !openWaConfig"
-                                        :aria-expanded="openWaConfig.toString()"
+                                        ::aria-expanded="openWaConfig.toString()"
                                         aria-controls="whatsapp-config-panel-{{ $channel['id'] }}"
-                                        class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors"
+                                        variant="success"
+                                        size="compact"
                                     >
                                         <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                         <span x-text="openWaConfig ? 'Tutup konfigurasi' : 'Konfigurasi WhatsApp'">Konfigurasi WhatsApp</span>
-                                    </button>
+                                    </x-ui.button>
                                 @endif
 
                                 @if(!$channel['adapter_available'])
-                                    <x-ui.button type="button" variant="muted" size="sm" disabled aria-describedby="unavailable-{{ $channel['id'] }}">Belum tersedia</x-ui.button>
+                                    <x-ui.button type="button" variant="muted" size="compact" disabled aria-describedby="unavailable-{{ $channel['id'] }}">Belum tersedia</x-ui.button>
                                     <span id="unavailable-{{ $channel['id'] }}" class="text-xs text-muted sr-only">Adapter runtime belum tersedia.</span>
                                 @elseif($channel['code'] === 'in_app' && $channel['is_enabled'])
-                                    <x-ui.button type="button" variant="danger" size="sm" aria-haspopup="dialog" aria-controls="in-app-disable-dialog" onclick="document.getElementById('in-app-disable-dialog').showModal()">Nonaktifkan</x-ui.button>
+                                    <x-ui.button type="button" variant="danger" size="compact" aria-haspopup="dialog" aria-controls="in-app-disable-dialog" onclick="document.getElementById('in-app-disable-dialog').showModal()">Nonaktifkan</x-ui.button>
                                 @else
                                     <form action="{{ route('data-master.channel-notifikasi.status', $channel['id']) }}" method="POST" x-data="{ submitting: false }" @submit="submitting = true" class="inline-flex">
                                         @csrf
                                         <input type="hidden" name="is_enabled" value="{{ $channel['is_enabled'] ? '0' : '1' }}">
-                                        <x-ui.button type="submit" variant="{{ $channel['is_enabled'] ? 'danger' : 'success' }}" size="sm" ::disabled="submitting">
+                                        <x-ui.button type="submit" variant="{{ $channel['is_enabled'] ? 'danger' : 'success' }}" size="compact" ::disabled="submitting">
                                             {{ $channel['is_enabled'] ? 'Nonaktifkan' : 'Aktifkan' }}
                                         </x-ui.button>
                                     </form>
@@ -183,7 +177,7 @@
                                 @if(!$channel['is_core'])
                                     <form action="{{ route('data-master.channel-notifikasi.destroy', $channel['id']) }}" method="POST" class="inline-flex" x-data="{ submitting: false }" @submit="if (!confirm('Hapus channel yang belum dipakai ini?')) { $event.preventDefault(); return; } submitting = true">
                                         @csrf
-                                        <x-ui.button type="submit" variant="danger" size="sm" ::disabled="submitting">Hapus</x-ui.button>
+                                        <x-ui.button type="submit" variant="danger" size="compact" ::disabled="submitting">Hapus</x-ui.button>
                                     </form>
                                 @endif
                             </div>
@@ -230,7 +224,7 @@
                                         <div>
                                             <div class="mb-1 flex items-center justify-between gap-3">
                                                 <label for="wa-access-token-{{ $channel['id'] }}" class="block text-xs font-semibold text-ink">Access token Qontak</label>
-                                                <span class="text-[11px] font-medium {{ $channel['whatsapp_config']['access_token_configured'] ? 'text-success' : 'text-muted' }}">
+                                                <span class="text-xs font-medium {{ $channel['whatsapp_config']['access_token_configured'] ? 'text-success' : 'text-muted' }}">
                                                     {{ $channel['whatsapp_config']['access_token_configured'] ? 'Token akses tersimpan' : 'Token akses belum tersimpan' }}
                                                 </span>
                                             </div>
@@ -246,7 +240,7 @@
                                         <div>
                                             <div class="mb-1 flex items-center justify-between gap-3">
                                                 <label for="wa-channel-integration-id-{{ $channel['id'] }}" class="block text-xs font-semibold text-ink">Channel Integration ID</label>
-                                                <span class="text-[11px] font-medium {{ $channel['whatsapp_config']['channel_integration_id_configured'] ? 'text-success' : 'text-muted' }}">
+                                                <span class="text-xs font-medium {{ $channel['whatsapp_config']['channel_integration_id_configured'] ? 'text-success' : 'text-muted' }}">
                                                     {{ $channel['whatsapp_config']['channel_integration_id_configured'] ? 'Channel ID tersimpan' : 'Channel ID belum tersimpan' }}
                                                 </span>
                                             </div>
@@ -316,7 +310,7 @@
                             @foreach($channels as $channel)
                                 <th scope="col" class="min-w-52 border-b border-border px-4 py-3 font-semibold">
                                     <span class="block text-ink">{{ $channel['name'] }}</span>
-                                    <code class="mt-0.5 block text-[10px] font-normal text-muted">{{ $channel['code'] }}</code>
+                                    <code class="mt-0.5 block text-xs font-normal text-muted">{{ $channel['code'] }}</code>
                                 </th>
                             @endforeach
                         </tr>
@@ -330,7 +324,7 @@
                                 <tr data-event-key="{{ $event['key'] }}" class="align-top hover:bg-soft/30">
                                     <th scope="row" class="sticky left-0 z-10 border-r border-border bg-surface px-4 py-3 font-medium text-ink">
                                         <span class="block">{{ $event['label'] }}</span>
-                                        <code class="mt-1 block text-[10px] font-normal text-muted">{{ $event['key'] }}</code>
+                                        <code class="mt-1 block text-xs font-normal text-muted">{{ $event['key'] }}</code>
                                     </th>
                                     @foreach($channels as $channel)
                                         @php($policy = $channel['policies'][$event['key']])
@@ -350,13 +344,13 @@
                                                     <button type="submit" :disabled="submitting" aria-label="{{ $policy['raw_enabled'] ? 'Nonaktifkan' : 'Aktifkan' }} {{ $channel['name'] }} untuk {{ $event['label'] }}" aria-describedby="{{ $policyStatusId }}" class="w-full rounded-lg border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60 {{ $policy['effective_enabled'] ? 'border-success/30 bg-success/5 text-success' : ($policy['raw_enabled'] ? 'border-warning/30 bg-warning/5 text-ink' : 'border-border bg-surface text-muted hover:bg-soft') }}">
                                                         @if($policy['effective_enabled'])
                                                             <span class="block text-xs font-semibold"><span aria-hidden="true">✓</span> Aktif</span>
-                                                            <span class="mt-0.5 block text-[10px]">Policy dan master aktif</span>
+                                                            <span class="mt-0.5 block text-xs">Policy dan master aktif</span>
                                                         @elseif($policy['raw_enabled'])
                                                             <span class="block text-xs font-semibold"><span aria-hidden="true">!</span> Dipilih, belum efektif</span>
-                                                            <span class="mt-0.5 block text-[10px]">Master channel nonaktif</span>
+                                                            <span class="mt-0.5 block text-xs">Master channel nonaktif</span>
                                                         @else
                                                             <span class="block text-xs font-semibold"><span aria-hidden="true">○</span> Nonaktif</span>
-                                                            <span class="mt-0.5 block text-[10px]">Policy tidak dipilih</span>
+                                                            <span class="mt-0.5 block text-xs">Policy tidak dipilih</span>
                                                         @endif
                                                     </button>
                                                 </form>

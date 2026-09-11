@@ -92,7 +92,7 @@
                         aria-describedby="berkas_file_help berkas_file_error"
                         class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:font-semibold file:text-primary"
                     >
-                    <p id="berkas_file_help" class="text-[10px] text-muted">PDF, DOC, DOCX, JPG, JPEG, atau PNG; maksimum 10 MB.</p>
+                    <p id="berkas_file_help" class="text-xs text-muted">PDF, DOC, DOCX, JPG, JPEG, atau PNG; maksimum 10 MB.</p>
                     <p id="berkas_file_error" x-show="uploadBerkasErrors.berkas" x-text="uploadBerkasErrors.berkas?.[0]" class="text-xs text-danger"></p>
                 </div>
             </div>
@@ -209,7 +209,7 @@
                         aria-describedby="edit_berkas_file_help edit_berkas_file_error"
                         class="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink file:mr-3 file:rounded-md file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:font-semibold file:text-primary"
                     >
-                    <p id="edit_berkas_file_help" class="text-[10px] text-muted">Kosongkan bila file tidak berubah. Format PDF, DOC, DOCX, JPG, JPEG, atau PNG; maksimum 10 MB.</p>
+                    <p id="edit_berkas_file_help" class="text-xs text-muted">Kosongkan bila file tidak berubah. Format PDF, DOC, DOCX, JPG, JPEG, atau PNG; maksimum 10 MB.</p>
                     <p id="edit_berkas_file_error" x-show="editBerkasErrors.berkas" x-text="editBerkasErrors.berkas?.[0]" class="text-xs text-danger"></p>
                 </div>
             </div>
@@ -318,12 +318,12 @@
         >
             <x-slot:actions>
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-ui.badge :variant="$documentStatusBadgeVariants[$statusKey] ?? 'muted'" size="md">
-                        {{ $documentStatusLabels[$statusKey] ?? 'Status Tidak Dikenal' }}
-                        @if($documentStatus['is_dinilai'])
+                    @if($documentStatus['is_dinilai'])
+                        <x-ui.badge :variant="$documentStatusBadgeVariants[$statusKey] ?? 'muted'" size="md">
+                            {{ $documentStatusLabels[$statusKey] ?? 'Status Tidak Dikenal' }}
                             ({{ $documentStatus['tersedia_count'] }}/{{ $documentStatus['total_wajib'] }})
-                        @endif
-                    </x-ui.badge>
+                        </x-ui.badge>
+                    @endif
                     @if($canManageDocuments)
                         <x-ui.button
                             type="button"
@@ -398,7 +398,7 @@
                                         as="a"
                                         href="{{ $requiredSk['file_url'] }}"
                                         variant="secondary"
-                                        size="icon"
+                                        size="compact-icon"
                                         title="Unduh"
                                         tooltip-position="top-end"
                                         aria-label="Unduh {{ $requiredSk['label'] }}"
@@ -412,7 +412,7 @@
                                     as="a"
                                     href="{{ route('pegawai.show', $p).'?tab='.$managementTab }}"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Kelola"
                                     tooltip-position="top-end"
                                     aria-label="Kelola {{ $requiredSk['label'] }} dari data sumber"
@@ -458,7 +458,7 @@
                                 as="a"
                                 href="{{ $archive['detail_url'] }}"
                                 variant="secondary"
-                                size="icon"
+                                size="compact-icon"
                                 title="Detail"
                                 tooltip-position="top-end"
                                 aria-label="Lihat detail {{ $archive['nama_dokumen'] }}"
@@ -473,7 +473,7 @@
                                     as="a"
                                     href="{{ $archive['download_url'] }}"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Unduh"
                                     tooltip-position="top-end"
                                     aria-label="Unduh {{ $archive['nama_dokumen'] }}"
@@ -526,7 +526,7 @@
                                 as="a"
                                 ::href="doc.detail_url"
                                 variant="secondary"
-                                size="icon"
+                                size="compact-icon"
                                 title="Detail"
                                 tooltip-position="top-end"
                                 ::aria-label="'Lihat detail ' + doc.nama_dokumen"
@@ -542,7 +542,7 @@
                                     as="a"
                                     ::href="doc.download_url"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Unduh"
                                     tooltip-position="top-end"
                                     ::aria-label="'Unduh ' + doc.nama_dokumen"
@@ -561,7 +561,7 @@
                                             type="button"
                                             @click="openEditBerkas(doc)"
                                             variant="secondary"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="Ubah"
                                             tooltip-position="top-end"
                                             ::aria-label="'Ubah ' + doc.nama_dokumen"
@@ -575,7 +575,7 @@
                                             type="button"
                                             @click="openDeleteBerkas(doc)"
                                             variant="danger"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="Hapus"
                                             tooltip-position="top-end"
                                             ::aria-label="'Hapus ' + doc.nama_dokumen"

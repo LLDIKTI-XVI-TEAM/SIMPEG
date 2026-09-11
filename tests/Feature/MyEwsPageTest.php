@@ -46,11 +46,35 @@ class MyEwsPageTest extends TestCase
         $this->actingAs($user)
             ->get(route('ews.saya'))
             ->assertOk()
-            ->assertSee('EWS Saya', false)
+            ->assertSee('<h1 class="text-2xl font-semibold text-ink">EWS Saya</h1>', false)
             ->assertSee('KGB', false)
             ->assertDontSee('Pensiun', false)
             ->assertDontSee('Ditangani', false)
             ->assertDontSee('Tidak Perlu', false);
+    }
+
+    public function test_personal_ews_only_accepts_page_sizes_available_in_the_interface(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        foreach ([10, 25, 50] as $perPage) {
+            $response = $this->actingAs($user)->get(route('ews.saya', ['per_page' => $perPage]));
+
+            $response->assertOk();
+            $this->assertSame($perPage, $response->viewData('alerts')->perPage());
+        }
+
+        $emptyPageSize = $this->actingAs($user)->get(route('ews.saya').'?per_page=');
+
+        $emptyPageSize->assertOk();
+        $this->assertSame(10, $emptyPageSize->viewData('alerts')->perPage());
+
+        $this->actingAs($user)
+            ->from(route('ews.saya'))
+            ->get(route('ews.saya', ['per_page' => 73]))
+            ->assertRedirect(route('ews.saya'))
+            ->assertSessionHasErrors('per_page');
     }
 
     public function test_withheld_promotion_alert_still_appears_on_personal_page(): void

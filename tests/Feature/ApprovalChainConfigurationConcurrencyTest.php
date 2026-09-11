@@ -781,8 +781,10 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
         try {
             $firstWriter();
             $process->start();
-            $bootedTerlihat = $this->tungguFile($paths['booted'], 30_000);
-            $readyTerlihat = $bootedTerlihat && $this->tungguFile($paths['ready'], 30_000);
+            // Worker CLI juga perlu melakukan bootstrap Laravel dan membuka koneksi PostgreSQL.
+            // Pada suite serial yang padat, 30 detik tidak cukup meskipun aksi yang diuji benar.
+            $bootedTerlihat = $this->tungguFile($paths['booted'], 60_000);
+            $readyTerlihat = $bootedTerlihat && $this->tungguFile($paths['ready'], 60_000);
             $selesaiSaatLockDitahan = $readyTerlihat && $this->tungguFile($paths['result'], 5_000);
             DB::commit();
         } catch (Throwable $exception) {
@@ -928,7 +930,7 @@ class ApprovalChainConfigurationConcurrencyTest extends TestCase
             PHP_BINARY,
             base_path('tests/Fixtures/ApprovalChainConfigurationLockWorker.php'),
             base64_encode(json_encode($input, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 90);
+        ], base_path(), timeout: 150);
     }
 
     private function tungguFile(string $path, int $timeoutMilliseconds): bool

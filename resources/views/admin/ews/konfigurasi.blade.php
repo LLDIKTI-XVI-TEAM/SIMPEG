@@ -132,7 +132,7 @@
         {{-- ================================================================ --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Konfigurasi EWS</h2>
+                <h1 class="text-2xl font-semibold text-ink">Konfigurasi EWS</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Konfigurasi EWS']
@@ -151,7 +151,7 @@
             class="rounded-lg border border-border bg-surface px-5 py-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div class="flex items-center gap-3">
                 <div>
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider block">Status
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider block">Status
                         Scheduler</span>
                     <x-ui.badge
                         :variant="$schedulerStatus['status'] === 'gagal' ? 'danger' : ($schedulerStatus['status'] === 'berhasil' ? 'success' : 'muted')"
@@ -173,38 +173,30 @@
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1 max-w-2xl">
                 <div>
-                    <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Waktu Harian</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider block">Waktu Harian</span>
                     <span class="text-xs font-semibold text-ink"><span x-text="ews_scheduler_time"></span>
                         WITA</span>
                 </div>
                 <div>
-                    <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Terakhir Jalan</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider block">Terakhir Jalan</span>
                     <span class="text-xs font-semibold text-ink">{{ $schedulerStatus['last_run'] }}</span>
                 </div>
                 <div>
-                    <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Total Pegawai</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider block">Total Pegawai</span>
                     <span class="text-xs font-semibold text-ink">{{ $schedulerStatus['employees_checked'] }}
                         diperiksa</span>
                 </div>
                 <div>
-                    <span class="text-[9px] font-bold text-muted uppercase tracking-wider block">Peringatan</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider block">Peringatan</span>
                     <x-ui.badge variant="warning" size="sm">{{ $schedulerStatus['alerts_created'] }} peringatan</x-ui.badge>
                 </div>
             </div>
         </div>
 
         @if($schedulerStatus['status'] === 'gagal' && !empty($schedulerStatus['error_message']))
-            <div class="rounded-lg border border-danger/25 bg-danger/5 px-5 py-3 mt-3">
-                <div class="flex items-start gap-2.5">
-                    <svg class="w-4 h-4 shrink-0 text-danger mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                    </svg>
-                    <div>
-                        <span class="text-xs font-semibold text-danger">Pesan Error Eksekusi Terakhir:</span>
-                        <p class="text-xs text-danger mt-1 whitespace-pre-wrap">{{ $schedulerStatus['error_message'] }}</p>
-                    </div>
-                </div>
-            </div>
+            <x-ui.alert variant="danger" size="sm" title="Pesan error eksekusi terakhir" class="mt-3">
+                <span class="whitespace-pre-wrap">{{ $schedulerStatus['error_message'] }}</span>
+            </x-ui.alert>
         @endif
 
         {{-- ================================================================ --}}
@@ -213,15 +205,11 @@
         <div class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
             <div class="px-5 py-4 border-b border-border bg-soft/30 flex items-center justify-between">
                 <div>
-                    <h3 class="text-xs font-bold text-ink uppercase tracking-wider">Daftar Parameter Ambang Batas EWS
-                    </h3>
+                    <h2 class="text-lg font-semibold text-ink">Daftar Parameter Ambang Batas EWS
+                    </h2>
                 </div>
                 <div class="flex items-center gap-2.5">
-                    <span
-                        class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-success">
-                        <span class="h-1.5 w-1.5 rounded-full bg-success"></span>
-                        Dapat Diubah
-                    </span>
+                    <x-ui.badge variant="success" size="sm" dot>Dapat diubah</x-ui.badge>
                 </div>
             </div>
 
@@ -241,19 +229,19 @@
                             <span class="text-xs font-semibold text-danger">Peringatan Urutan Threshold:</span>
                         </div>
                         <template x-for="w in thresholdWarnings" :key="w">
-                            <p class="text-[11px] text-danger pl-6" x-text="'• ' + w"></p>
+                            <p class="text-xs text-danger pl-6" x-text="'• ' + w"></p>
                         </template>
                     </div>
                 </template>
 
                 <!-- Header Tabel Desktop -->
-                <div class="px-5 py-3 bg-soft/40 border-b border-border grid grid-cols-1 sm:grid-cols-12 gap-4 text-[10px] font-bold text-muted uppercase tracking-wider hidden sm:grid select-none">
+                <div class="px-5 py-3 bg-soft/40 border-b border-border grid grid-cols-1 sm:grid-cols-12 gap-4 text-xs font-bold text-muted uppercase tracking-wider hidden sm:grid select-none">
                     <div class="sm:col-span-5 flex items-center gap-3">
                         <span>Parameter Notifikasi</span>
                     </div>
                     <div class="sm:col-span-7 grid grid-cols-3 gap-6 text-center">
                         <div class="text-success bg-success/5 border border-success/10 rounded-md py-1">Tahap 1 (Awal)</div>
-                        <div class="text-warning bg-warning/5 border border-warning/10 rounded-md py-1">Tahap 2 (Dekat)</div>
+                        <div class="text-warning-dark bg-warning/5 border border-warning/10 rounded-md py-1">Tahap 2 (Dekat)</div>
                         <div class="text-danger bg-danger/5 border border-danger/10 rounded-md py-1">Tahap 3 (Mendesak)</div>
                     </div>
                 </div>
@@ -292,50 +280,49 @@
                         <p class="mt-0.5 text-xs leading-relaxed text-muted">Ubah durasi dasar setiap event. Perubahan langsung dipakai scheduler untuk data lama dan baru. Nilai BUP global <strong>0</strong> mempertahankan BUP berdasarkan jabatan.</p>
                     </div>
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                        <label class="rounded-xl border border-border bg-surface p-3">
+                        <label class="flex flex-col rounded-xl border border-border bg-surface p-3">
                             <span class="block text-xs font-semibold text-ink">Kenaikan Pangkat</span>
-                            <span class="mt-0.5 block text-[10px] text-muted">TMT pangkat + tahun</span>
-                            <span class="mt-2 flex items-center gap-2">
+                            <span class="mt-0.5 block text-xs text-muted">TMT pangkat + tahun</span>
+                            <span class="mt-auto flex items-center gap-2 pt-2">
                                 <input type="number" name="pangkat_required_years" min="1" max="100" step="1" value="{{ old('pangkat_required_years', $configs['pangkat_required_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                 <span class="text-xs font-medium text-muted">tahun</span>
                             </span>
                             @error('pangkat_required_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                         </label>
-                        <label class="rounded-xl border border-border bg-surface p-3">
+                        <label class="flex flex-col rounded-xl border border-border bg-surface p-3">
                             <span class="block text-xs font-semibold text-ink">KGB</span>
-                            <span class="mt-0.5 block text-[10px] text-muted">TMT KGB + tahun</span>
-                            <span class="mt-2 flex items-center gap-2">
+                            <span class="mt-0.5 block text-xs text-muted">TMT KGB + tahun</span>
+                            <span class="mt-auto flex items-center gap-2 pt-2">
                                 <input type="number" name="kgb_required_years" min="1" max="100" step="1" value="{{ old('kgb_required_years', $configs['kgb_required_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                 <span class="text-xs font-medium text-muted">tahun</span>
                             </span>
                             @error('kgb_required_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                         </label>
-                        <label class="rounded-xl border border-border bg-surface p-3">
+                        <label class="flex flex-col rounded-xl border border-border bg-surface p-3">
                             <span class="block text-xs font-semibold text-ink">BUP Pensiun Global</span>
-                            <span class="mt-0.5 block text-[10px] text-muted">0 = mengikuti BUP jabatan</span>
-                            <span class="mt-2 flex items-center gap-2">
+                            <span class="mt-0.5 block text-xs text-muted">0 = mengikuti BUP jabatan</span>
+                            <span class="mt-auto flex items-center gap-2 pt-2">
                                 <input type="number" name="pensiun_required_age_years" min="0" max="100" step="1" value="{{ old('pensiun_required_age_years', $configs['pensiun_required_age_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                 <span class="text-xs font-medium text-muted">tahun</span>
                             </span>
                             @error('pensiun_required_age_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                         </label>
-                        <label class="rounded-xl border border-border bg-surface p-3">
+                        <label class="flex flex-col rounded-xl border border-border bg-surface p-3">
                             <span class="block text-xs font-semibold text-ink">Masa Kontrak PPPK</span>
-                            <span class="mt-0.5 block text-[10px] text-muted">Dipakai jika tanggal akhir kosong</span>
-                            <span class="mt-2 flex items-center gap-2">
+                            <span class="mt-0.5 block text-xs text-muted">Dipakai jika tanggal akhir kosong</span>
+                            <span class="mt-auto flex items-center gap-2 pt-2">
                                 <input type="number" name="pppk_contract_years" min="1" max="100" step="1" value="{{ old('pppk_contract_years', $configs['pppk_contract_years']) }}" class="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                                 <span class="text-xs font-medium text-muted">tahun</span>
                             </span>
                             @error('pppk_contract_years')<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
                         </label>
-                        <div class="rounded-xl border border-border bg-surface p-3">
+                        <div class="flex flex-col rounded-xl border border-border bg-surface p-3">
                             <span class="block text-xs font-semibold text-ink">Milestone Satyalancana</span>
-                            <span class="mt-0.5 block text-[10px] text-muted">Harus berurutan dari kecil ke besar</span>
-                            <span class="mt-2 flex items-center gap-1.5">
+                            <span class="mt-0.5 block text-xs text-muted">Nilai tahun, urutkan dari kecil ke besar</span>
+                            <span class="mt-auto grid grid-cols-3 gap-1.5 pt-2">
                                 @foreach(['satyalancana_years_1', 'satyalancana_years_2', 'satyalancana_years_3'] as $field)
-                                    <input type="number" name="{{ $field }}" min="1" max="100" step="1" value="{{ old($field, $configs[$field]) }}" class="w-14 rounded-lg border border-border bg-surface px-1 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" aria-label="{{ $field }} dalam tahun">
+                                    <input type="number" name="{{ $field }}" min="1" max="100" step="1" value="{{ old($field, $configs[$field]) }}" class="min-w-0 w-full rounded-lg border border-border bg-surface px-1 py-1.5 text-center text-xs text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" aria-label="{{ $field }} dalam tahun">
                                 @endforeach
-                                <span class="text-xs font-medium text-muted">th</span>
                             </span>
                             @foreach(['satyalancana_years_1', 'satyalancana_years_2', 'satyalancana_years_3'] as $field)
                                 @error($field)<p class="mt-1 text-xs text-danger">{{ $message }}</p>@enderror
@@ -362,36 +349,36 @@
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <span class="text-xs font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pangkat_h90" x-model="pangkat_h90" min="1" step="1"
                                     aria-label="Kenaikan Pangkat Tahap 1 (Awal) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + p90Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
+                            <span class="text-xs font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pangkat_h90)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <span class="text-xs font-bold text-warning-dark uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pangkat_h60" x-model="pangkat_h60" min="1" step="1"
                                     aria-label="Kenaikan Pangkat Tahap 2 (Dekat) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + p60Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
+                            <span class="text-xs font-bold text-warning-dark min-w-[68px] text-center" x-text="humanLabel(pangkat_h60)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <span class="text-xs font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pangkat_h30" x-model="pangkat_h30" min="1" step="1"
                                     aria-label="Kenaikan Pangkat Tahap 3 (Mendesak) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + p30Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
+                            <span class="text-xs font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pangkat_h30)"></span>
                         </div>
                     </div>
                 </div>
@@ -414,36 +401,36 @@
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <span class="text-xs font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="kgb_h60" x-model="kgb_h60" min="1" step="1"
                                     aria-label="Kenaikan Gaji Berkala Tahap 1 (Awal) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + k60Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
+                            <span class="text-xs font-bold text-success min-w-[68px] text-center" x-text="humanLabel(kgb_h60)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <span class="text-xs font-bold text-warning-dark uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="kgb_h30" x-model="kgb_h30" min="1" step="1"
                                     aria-label="Kenaikan Gaji Berkala Tahap 2 (Dekat) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + k30Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
+                            <span class="text-xs font-bold text-warning-dark min-w-[68px] text-center" x-text="humanLabel(kgb_h30)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <span class="text-xs font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="kgb_h14" x-model="kgb_h14" min="1" step="1"
                                     aria-label="Kenaikan Gaji Berkala Tahap 3 (Mendesak) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + k14Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
+                            <span class="text-xs font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(kgb_h14)"></span>
                         </div>
                     </div>
                 </div>
@@ -466,36 +453,36 @@
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <span class="text-xs font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pensiun_y1" x-model="pensiun_y1" min="1" step="1"
                                     aria-label="Batas Usia Pensiun Tahap 1 (Awal) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + py1Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
+                            <span class="text-xs font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pensiun_y1)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <span class="text-xs font-bold text-warning-dark uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pensiun_m6" x-model="pensiun_m6" min="1" step="1"
                                     aria-label="Batas Usia Pensiun Tahap 2 (Dekat) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pm6Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
+                            <span class="text-xs font-bold text-warning-dark min-w-[68px] text-center" x-text="humanLabel(pensiun_m6)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <span class="text-xs font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pensiun_m3" x-model="pensiun_m3" min="1" step="1"
                                     aria-label="Batas Usia Pensiun Tahap 3 (Mendesak) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pm3Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
+                            <span class="text-xs font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pensiun_m3)"></span>
                         </div>
                     </div>
                 </div>
@@ -518,36 +505,36 @@
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <span class="text-xs font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pppk_m6" x-model="pppk_m6" min="1" step="1"
                                     aria-label="Kontrak PPPK Tahap 1 (Awal) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pp6Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
+                            <span class="text-xs font-bold text-success min-w-[68px] text-center" x-text="humanLabel(pppk_m6)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <span class="text-xs font-bold text-warning-dark uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pppk_m3" x-model="pppk_m3" min="1" step="1"
                                     aria-label="Kontrak PPPK Tahap 2 (Dekat) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pp3Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
+                            <span class="text-xs font-bold text-warning-dark min-w-[68px] text-center" x-text="humanLabel(pppk_m3)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <span class="text-xs font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="pppk_m1" x-model="pppk_m1" min="1" step="1"
                                     aria-label="Kontrak PPPK Tahap 3 (Mendesak) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + pp1Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
+                            <span class="text-xs font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(pppk_m1)"></span>
                         </div>
                     </div>
                 </div>
@@ -570,36 +557,36 @@
                     <div class="sm:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <!-- Tahap 1 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-success/5 border border-success/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
+                            <span class="text-xs font-bold text-success uppercase tracking-wider block sm:hidden">Tahap 1 (Awal)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="satyalancana_h180" x-model="satyalancana_h180" min="1" step="1"
                                     aria-label="Satyalancana Tahap 1 (Awal) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + sl180Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-success min-w-[68px] text-center" x-text="humanLabel(satyalancana_h180)"></span>
+                            <span class="text-xs font-bold text-success min-w-[68px] text-center" x-text="humanLabel(satyalancana_h180)"></span>
                         </div>
                         <!-- Tahap 2 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-warning/5 border border-warning/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-warning uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
+                            <span class="text-xs font-bold text-warning-dark uppercase tracking-wider block sm:hidden">Tahap 2 (Dekat)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="satyalancana_h90" x-model="satyalancana_h90" min="1" step="1"
                                     aria-label="Satyalancana Tahap 2 (Dekat) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + sl90Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-warning min-w-[68px] text-center" x-text="humanLabel(satyalancana_h90)"></span>
+                            <span class="text-xs font-bold text-warning-dark min-w-[68px] text-center" x-text="humanLabel(satyalancana_h90)"></span>
                         </div>
                         <!-- Tahap 3 -->
                         <div class="flex items-center sm:flex-col justify-between sm:justify-center gap-2 bg-danger/5 border border-danger/15 rounded-xl px-3 py-2.5">
-                            <span class="text-[10px] font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
+                            <span class="text-xs font-bold text-danger uppercase tracking-wider block sm:hidden">Tahap 3 (Mendesak)</span>
                             <div class="flex items-center gap-1.5">
                                 <input type="number" name="satyalancana_h30" x-model="satyalancana_h30" min="1" step="1"
                                     aria-label="Satyalancana Tahap 3 (Mendesak) dalam hari"
                                     :class="'w-20 sm:w-24 text-center rounded-lg border px-2 py-1.5 text-xs text-ink focus:outline-none focus:ring-2 bg-surface ' + sl30Class()">
-                                <span class="text-[10px] font-semibold text-muted" aria-hidden="true">hari</span>
+                                <span class="text-xs font-semibold text-muted" aria-hidden="true">hari</span>
                             </div>
-                            <span class="text-[10px] font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(satyalancana_h30)"></span>
+                            <span class="text-xs font-bold text-danger min-w-[68px] text-center" x-text="humanLabel(satyalancana_h30)"></span>
                         </div>
                     </div>
                 </div>
@@ -684,7 +671,7 @@
                                 <x-ui.table-td padding="wide" class="text-muted whitespace-nowrap">{{ $row['time'] }}</x-ui.table-td>
                                 <x-ui.table-td padding="wide">
                                     <span class="font-semibold text-ink block">{{ $row['actor'] }}</span>
-                                    <span class="text-[9px] text-muted block">{{ $row['ip_address'] }}</span>
+                                    <span class="text-xs text-muted block">{{ $row['ip_address'] }}</span>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="wide" class="font-medium">{{ $row['field'] }}</x-ui.table-td>
                                 <x-ui.table-td align="right" padding="wide" class="text-muted">{{ $row['before'] }}</x-ui.table-td>
@@ -701,7 +688,7 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 text-xs">
                                         {{-- Event --}}
                                         <div class="space-y-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Event
+                                            <span class="text-xs font-bold uppercase tracking-wider text-muted">Event
                                                 Type</span>
                                             <p class="text-sm font-semibold text-ink">
                                                 {{ $row['event'] ?? 'UPDATE_EWS_CONFIG' }}
@@ -709,14 +696,14 @@
                                         </div>
                                         {{-- IP Address --}}
                                         <div class="space-y-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">IP
+                                            <span class="text-xs font-bold uppercase tracking-wider text-muted">IP
                                                 Address</span>
                                             <p class="text-sm text-ink">{{ $row['ip_address'] ?? '127.0.0.1' }}
                                             </p>
                                         </div>
                                         {{-- User Agent --}}
                                         <div class="space-y-1 sm:col-span-2">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">User
+                                            <span class="text-xs font-bold uppercase tracking-wider text-muted">User
                                                 Agent</span>
                                             <p class="text-xs text-muted truncate"
                                                 title="{{ $row['user_agent'] ?? 'Mozilla/5.0' }}">
@@ -725,7 +712,7 @@
                                         </div>
                                         {{-- Old Values --}}
                                         <div class="space-y-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Nilai
+                                            <span class="text-xs font-bold uppercase tracking-wider text-muted">Nilai
                                                 Lama (JSON)</span>
                                             <div class="rounded-md border border-danger/20 bg-danger/5 px-3 py-2">
                                                 <code
@@ -734,7 +721,7 @@
                                         </div>
                                         {{-- New Values --}}
                                         <div class="space-y-1">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Nilai
+                                            <span class="text-xs font-bold uppercase tracking-wider text-muted">Nilai
                                                 Baru (JSON)</span>
                                             <div class="rounded-md border border-success/20 bg-success/5 px-3 py-2">
                                                 <code
@@ -743,7 +730,7 @@
                                         </div>
                                         {{-- Reason --}}
                                         <div class="space-y-1 sm:col-span-2 font-sans">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-muted">Alasan
+                                            <span class="text-xs font-bold uppercase tracking-wider text-muted">Alasan
                                                 Perubahan Lengkap</span>
                                             <p class="text-sm text-ink leading-relaxed">
                                                 {{ $row['reason'] ?? 'Penyesuaian konfigurasi rutin' }}
@@ -840,7 +827,7 @@
                         </dd>
                     </div>
                     <div class="pt-2 mt-2">
-                        <dt class="font-bold text-muted uppercase tracking-wide text-[10px]">Alasan Perubahan</dt>
+                        <dt class="font-bold text-muted uppercase tracking-wide text-xs">Alasan Perubahan</dt>
                         <dd class="mt-1 text-ink leading-relaxed italic" x-text="reason"></dd>
                     </div>
                 </dl>

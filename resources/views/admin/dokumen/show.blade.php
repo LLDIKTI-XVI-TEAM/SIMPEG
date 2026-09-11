@@ -4,7 +4,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Detail Dokumen Kepegawaian</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Detail Dokumen Kepegawaian</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Arsip Dokumen', 'url' => route('dokumen')],

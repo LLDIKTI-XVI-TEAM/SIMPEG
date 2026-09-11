@@ -1,4 +1,5 @@
 <x-layouts.app title="Audit Log">
+    @vite('resources/js/pages/audit-log.js')
 
     @php
         // Tautan pengurutan mempertahankan penyaring yang sedang aktif dan hanya membalik arah
@@ -10,80 +11,28 @@
 
             return request()->fullUrlWithQuery(['sort' => $kolom, 'direction' => $arah, 'page' => null]);
         };
+        $hasActiveAuditFilters = collect($activeFilters)
+            ->except(['sort', 'direction', 'per_page'])
+            ->contains(fn ($value): bool => filled($value));
+
+        // Payload dipisahkan dari ekspresi Alpine agar data audit legacy yang
+        // mengandung karakter khusus tidak ikut dikompilasi sebagai JavaScript.
+        $auditLogsPayload = json_encode(
+            $auditLogs->items(),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
     @endphp
 
-    <div x-data="{
-        selectedLogId: null,
-        showDrawer: false,
-        logs: @js($auditLogs->items()),
-        getRingkasan(log) {
-            if (!log) return '';
-            if (log.event === 'LOGIN') return 'LOGIN: Login berhasil';
-            if (log.event === 'LOGOUT') return 'LOGOUT: Logout dari sistem';
-            if (log.event === 'SESSION_TIMEOUT') return 'SESSION_TIMEOUT: Sesi berakhir karena idle timeout';
-            // Kosakata keputusan cuti lama dan baru diringkas sama karena baris audit lama memakai
-            // APPROVE dan POSTPONE, sedangkan baris baru memakai istilah keputusan resmi.
-            if (['APPROVE', 'POSTPONE', 'VERIFY', 'DECIDE', 'CHANGE_REQUESTED', 'DEFER', 'NOT_APPROVED'].includes(log.event)) {
-                return `${log.event_label}: Mengubah status pengajuan cuti`;
-            }
-
-            let target = log.modul;
-            if (log.event === 'CREATE') {
-                return `CREATE: Membuat data ${target} #${log.record_id}`;
-            }
-            if (log.event === 'UPDATE') {
-                const fields = log.new_values ? Object.keys(log.new_values) : [];
-                const fieldStr = fields.length > 0 ? fields.join(', ') : 'data';
-                return `UPDATE: Mengubah ${fieldStr}`;
-            }
-            if (log.event === 'SOFT_DELETE') {
-                return `SOFT_DELETE: Menonaktifkan data ${target} #${log.record_id}`;
-            }
-            if (log.event === 'RESTORE') {
-                return `RESTORE: Mengaktifkan kembali data ${target} #${log.record_id}`;
-            }
-
-            return `${log.event_label}: pada ${target} #${log.record_id}`;
-        },
-        get selectedLog() {
-            return this.logs.find(l => l.id === this.selectedLogId) || this.logs[0] || {};
-        },
-        getDiffFields(log) {
-            if (!log) return [];
-            const diffs = [];
-            const oldVals = log.old_values || {};
-            const newVals = log.new_values || {};
-
-            const allKeys = Array.from(new Set([...Object.keys(oldVals), ...Object.keys(newVals)]));
-
-            for (const key of allKeys) {
-                const oldVal = oldVals[key];
-                const newVal = newVals[key];
-
-                if (log.event === 'UPDATE') {
-                    if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
-                        diffs.push({
-                            field: key,
-                            old: oldVal !== undefined && oldVal !== null ? oldVal : '-',
-                            new: newVal !== undefined && newVal !== null ? newVal : '-'
-                        });
-                    }
-                } else {
-                    diffs.push({
-                        field: key,
-                        old: oldVal !== undefined && oldVal !== null ? oldVal : '-',
-                        new: newVal !== undefined && newVal !== null ? newVal : '-'
-                    });
-                }
-            }
-            return diffs;
-        }
-    }" class="space-y-6">
+    <div
+        x-data="auditLogPage($el)"
+        data-audit-logs='{{ $auditLogsPayload }}'
+        class="space-y-6"
+    >
 
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-bold text-ink font-sans">Audit Log</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Audit Log</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Audit Log']
@@ -184,11 +133,11 @@
 
             {{-- Table render --}}
             <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-soft border-b border-border">
-                        <tr>
+                <x-ui.table caption="Rekam jejak aktivitas">
+                    <x-ui.table-head>
+                        <x-ui.table-row>
                             @foreach (['timestamp' => 'Waktu', 'operator' => 'User', 'event' => 'Jenis Event', 'modul' => 'Modul/Tabel'] as $kolom => $judul)
-                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none {{ $kolom === 'timestamp' ? 'w-48 min-w-48 whitespace-nowrap tabular-nums' : '' }}">
+                                <x-ui.table-th class="select-none {{ $kolom === 'timestamp' ? 'w-48 min-w-48 tabular-nums' : '' }}">
                                     <a href="{{ $tautanUrut($kolom) }}" class="flex items-center gap-1.5 hover:text-primary transition-colors">
                                         {{ $judul }}
                                         @if ($sortAktif === $kolom)
@@ -201,12 +150,12 @@
                                             <svg class="w-3 h-3 text-muted/40 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg>
                                         @endif
                                     </a>
-                                </th>
+                                </x-ui.table-th>
                             @endforeach
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Ringkasan Perubahan</th>
-                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted font-sans select-none">Aksi</th>
-                        </tr>
-                    </thead>
+                            <x-ui.table-th class="select-none">Ringkasan Perubahan</x-ui.table-th>
+                            <x-ui.table-th class="select-none">Aksi</x-ui.table-th>
+                        </x-ui.table-row>
+                    </x-ui.table-head>
                     <tbody class="divide-y divide-border">
                         @forelse ($auditLogs as $log)
                             @php
@@ -221,27 +170,27 @@
                                     in_array($log['event'], ['CREATE', 'IMPORT', 'RESTORE'], true) => ['text-success', 'bg-success'],
                                     $log['event'] === 'LOGIN' => ['text-primary', 'bg-primary'],
                                     in_array($log['event'], ['SOFT_DELETE', 'DELETE', 'LOGOUT'], true) => ['text-danger', 'bg-danger'],
-                                    default => ['text-warning', 'bg-warning'],
+                                    default => ['text-warning-dark', 'bg-warning'],
                                 };
                             @endphp
-                            <tr @click="selectedLogId = '{{ $log['id'] }}'; showDrawer = true" class="transition-colors hover:bg-soft/50 cursor-pointer">
-                                <td class="w-48 min-w-48 whitespace-nowrap px-4 py-3.5 text-xs tabular-nums text-ink">{{ $log['timestamp'] }}</td>
-                                <td class="px-4 py-3.5 text-sm font-semibold text-ink font-sans">{{ $log['operator'] }}</td>
-                                <td class="px-4 py-3.5">
+                            <x-ui.table-row interactive @click="selectedLogId = '{{ $log['id'] }}'; showDrawer = true">
+                                <x-ui.table-td class="w-48 min-w-48 whitespace-nowrap tabular-nums">{{ $log['timestamp'] }}</x-ui.table-td>
+                                <x-ui.table-td class="text-sm font-semibold">{{ $log['operator'] }}</x-ui.table-td>
+                                <x-ui.table-td>
                                     <span class="inline-flex items-center gap-1.5 text-xs font-semibold font-sans {{ $warnaTeks }}">
                                         <span class="h-1.5 w-1.5 rounded-full {{ $warnaTitik }}"></span>
                                         <span>{{ $log['event_label'] }}</span>
                                     </span>
-                                </td>
-                                <td class="px-4 py-3.5 text-xs text-muted font-sans">{{ $log['modul'] }}</td>
-                                <td class="px-4 py-3.5 text-xs text-ink font-sans" x-text="getRingkasan(logs.find(l => l.id === '{{ $log['id'] }}'))"></td>
-                                <td class="px-4 py-3.5" @click.stop>
+                                </x-ui.table-td>
+                                <x-ui.table-td class="text-muted">{{ $log['modul'] }}</x-ui.table-td>
+                                <x-ui.table-td x-text="getRingkasan(logs.find(l => l.id === '{{ $log['id'] }}'))"></x-ui.table-td>
+                                <x-ui.table-td @click.stop="$event.stopPropagation()">
                                     <div class="flex items-center gap-1.5">
                                         <x-ui.tooltip text="Detail Drawer" position="top">
                                             <x-ui.button
                                                 type="button"
                                                 variant="secondary"
-                                                size="icon"
+                                                size="compact-icon"
                                                 @click.stop="selectedLogId = '{{ $log['id'] }}'; showDrawer = true"
                                                 aria-label="Buka ringkasan audit"
                                             >
@@ -252,28 +201,33 @@
                                             </x-ui.button>
                                         </x-ui.tooltip>
                                         <x-ui.tooltip text="Halaman Detail" position="top-end">
-                                            <a
+                                            <x-ui.button
                                                 href="{{ route('audit-log.show', $log['id']) }}"
-                                                class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-muted transition hover:bg-soft hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 shadow-sm"
+                                                variant="secondary"
+                                                size="compact-icon"
                                                 aria-label="Buka halaman detail audit"
                                             >
                                                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                                 </svg>
-                                            </a>
+                                            </x-ui.button>
                                         </x-ui.tooltip>
                                     </div>
-                                </td>
-                            </tr>
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @empty
-                            <tr>
-                                <td colspan="6" class="px-6 py-8 text-center text-xs text-muted font-sans">
-                                    Tidak ada log aktivitas yang cocok dengan filter pencarian.
-                                </td>
-                            </tr>
+                            <x-ui.table-row>
+                                <x-ui.table-td colspan="6" padding="none">
+                                    <x-ui.empty-state
+                                        :icon="$hasActiveAuditFilters ? 'search' : 'document'"
+                                        :title="$hasActiveAuditFilters ? 'Tidak ada log yang sesuai dengan filter.' : 'Belum ada aktivitas yang tercatat.'"
+                                        :message="$hasActiveAuditFilters ? 'Ubah atau reset filter untuk melihat log aktivitas lainnya.' : 'Log aktivitas akan muncul setelah ada tindakan yang tercatat di sistem.'"
+                                    />
+                                </x-ui.table-td>
+                            </x-ui.table-row>
                         @endforelse
                     </tbody>
-                </table>
+                </x-ui.table>
             </div>
 
             {{-- TABLE FOOTER --}}
@@ -316,15 +270,15 @@
         </div>
 
         {{-- Slide-over Drawer --}}
-        <div x-show="showDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition>
-            <div class="absolute inset-0 bg-ink/30 transition-opacity z-40" @click="showDrawer = false"></div>
-            <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex z-50">
-                <div class="w-screen max-w-md bg-surface border-l border-border shadow-xl flex flex-col justify-between relative z-50" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
+        <div x-show="showDrawer" class="fixed inset-0 z-50 overflow-hidden" style="display: none;" x-transition @keydown.escape.window="showDrawer = false">
+            <div class="absolute inset-0 z-40 bg-ink/30 transition-opacity" aria-hidden="true" @click="showDrawer = false"></div>
+            <div class="fixed inset-y-0 right-0 z-50 flex max-w-full pl-10">
+                <div role="dialog" aria-modal="true" aria-labelledby="audit-drawer-title" class="relative z-50 flex w-screen max-w-md flex-col justify-between border-l border-border bg-surface shadow-xl" x-transition:enter="transform transition ease-in-out duration-300 sm:duration-300" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transform transition ease-in-out duration-300 sm:duration-300" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
 
                     {{-- Drawer Header --}}
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between bg-surface">
                         <div>
-                            <h3 class="text-sm font-bold text-ink font-sans">Detail Log Aktivitas</h3>
+                            <h3 id="audit-drawer-title" class="text-sm font-bold text-ink font-sans">Detail Log Aktivitas</h3>
                             <p class="text-xs text-muted">Metadata operasional dan perubahan database.</p>
                         </div>
                         <x-ui.button type="button" variant="ghost" size="icon" @click="showDrawer = false" aria-label="Tutup panel">

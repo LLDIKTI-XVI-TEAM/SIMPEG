@@ -72,10 +72,12 @@ class ReferenceStatusControlPlaneConcurrencyTest extends TestCase
 
         try {
             $usageWorker->start();
-            $this->assertTrue($this->waitFor($paths['usage_inserted'], 30_000));
+            // Beri ruang untuk bootstrap worker dan migrasi database serial sebelum
+            // menyimpulkan bahwa marker interleaving tidak akan dibuat.
+            $this->assertTrue($this->waitFor($paths['usage_inserted'], 60_000));
 
             $updateWorker->start();
-            $this->assertTrue($this->waitFor($paths['update_ready'], 30_000));
+            $this->assertTrue($this->waitFor($paths['update_ready'], 60_000));
             $updatePid = (int) File::get($paths['update_ready']);
 
             $this->assertTrue(
@@ -134,7 +136,7 @@ class ReferenceStatusControlPlaneConcurrencyTest extends TestCase
             PHP_BINARY,
             base_path('tests/Fixtures/ReferenceStatusControlPlaneRaceWorker.php'),
             base64_encode(json_encode($input, JSON_THROW_ON_ERROR)),
-        ], base_path(), timeout: 60);
+        ], base_path(), timeout: 120);
     }
 
     private function waitFor(string $path, int $timeoutMilliseconds): bool

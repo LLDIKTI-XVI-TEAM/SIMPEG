@@ -11,6 +11,7 @@
     ];
 
     $paddings = [
+        'none' => '',
         'xs' => 'px-3 py-2',
         'sm' => 'px-4 py-3',
         'md' => 'px-4 py-3.5',

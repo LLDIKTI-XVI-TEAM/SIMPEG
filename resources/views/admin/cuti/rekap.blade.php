@@ -16,12 +16,16 @@
             'perlu_perubahan' => 'text-danger',
             'tidak_disetujui' => 'text-danger',
         ];
+        $hasActiveCutiFilters = request()->filled('periode')
+            || request()->filled('unit')
+            || request()->filled('pegawai')
+            || request()->filled('jenis');
     @endphp
 
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Rekap Cuti</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Rekap Cuti']
@@ -38,14 +42,16 @@
             </div>
         </div>
 
-        <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Filter rekap cuti">
+        <section class="rounded-xl border border-border bg-surface px-5 py-5 shadow-sm" aria-label="Filter rekap cuti">
             <form id="rekap-filter" method="GET" action="{{ route('cuti.rekap') }}" class="space-y-5">
                 <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
-                <x-cuti.period-filter :period="$periode" id-prefix="rekap" />
+                <div class="border-b border-border pb-5">
+                    <x-cuti.period-filter :period="$periode" id-prefix="rekap" layout="inline" />
+                </div>
 
-                <div class="grid gap-4 md:grid-cols-3">
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)_auto] xl:items-start">
                     <div class="space-y-1">
-                        <label for="rekap-unit" class="text-xs font-bold uppercase tracking-wider text-ink">Unit Kerja</label>
+                        <label for="rekap-unit" class="text-xs font-semibold text-ink">Unit Kerja</label>
                         <select id="rekap-unit" name="unit" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <option value="">Semua unit kerja</option>
                             @foreach($unitOptions as $option)
@@ -54,14 +60,14 @@
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label for="rekap-jenis" class="text-xs font-bold uppercase tracking-wider text-ink">Jenis Cuti</label>
+                        <label for="rekap-jenis" class="text-xs font-semibold text-ink">Jenis Cuti</label>
                         <select id="rekap-jenis" name="jenis" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <option value="">Semua jenis cuti</option>
                             @foreach($jenisOptions as $option)
                                 <option value="{{ $option['id'] }}" @selected($jenisId === $option['id'])>{{ $option['nama'] }}</option>
                             @endforeach
                         </select>
-                    </div>
+                        </div>
                     <x-cuti.employee-combobox
                         id="rekap-pegawai"
                         :action="route('cuti.rekap')"
@@ -73,11 +79,10 @@
                         :embedded="true"
                         :auto-submit="false"
                     />
-                </div>
-
-                <div class="flex flex-wrap gap-2 border-t border-border pt-4">
-                    <x-ui.button type="submit">Terapkan Filter</x-ui.button>
-                    <x-ui.button href="{{ route('cuti.rekap') }}" variant="secondary" data-filter-reset>Reset</x-ui.button>
+                    <div class="flex flex-wrap gap-2 xl:justify-end xl:pt-5">
+                        <x-ui.button type="submit" variant="primary">Terapkan Filter</x-ui.button>
+                        <x-ui.button href="{{ route('cuti.rekap') }}" variant="ghost" data-filter-reset>Reset</x-ui.button>
+                    </div>
                 </div>
             </form>
         </section>
@@ -124,7 +129,7 @@
                                     <x-ui.table-th align="right">Terpakai</x-ui.table-th>
                                     <x-ui.table-th align="right">Sisa</x-ui.table-th>
                                     <x-ui.table-th>Status</x-ui.table-th>
-                                    <x-ui.table-th align="right">Aksi</x-ui.table-th>
+                                    <x-ui.table-th>Aksi</x-ui.table-th>
                                 </x-ui.table-row>
                             </x-ui.table-head>
                             <x-ui.table-body>
@@ -144,17 +149,31 @@
                                         <x-ui.table-td padding="sm">
                                             <span class="text-xs font-semibold {{ $statusClass[$row['status']] ?? 'text-muted' }}">{{ $row['status_label'] }}</span>
                                         </x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm">
+                                        <x-ui.table-td padding="sm">
                                             @if($canAdministerBalance)
-                                                <a href="{{ route('cuti.saldo.administrasi', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']])) }}"
-                                                    class="text-xs font-semibold text-primary hover:underline">Administrasi Pemakaian</a>
+                                                <x-ui.button
+                                                    as="a"
+                                                    :href="route('cuti.saldo.administrasi', array_filter(['pegawai' => $row['employee_id'], 'periode' => $row['tahun']]))"
+                                                    variant="secondary"
+                                                    size="compact-icon"
+                                                    title="Administrasi Pemakaian"
+                                                    tooltip-position="top-end"
+                                                    aria-label="Kelola pemakaian cuti {{ $row['nama'] }}"
+                                                >
+                                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 13.5V3.75m0 9.75a1.5 1.5 0 1 0 0 3m0-3a1.5 1.5 0 0 0 0 3m0 3.75V16.5m12-3V3.75m0 9.75a1.5 1.5 0 1 1 0 3m0-3a1.5 1.5 0 1 0 0 3m0 3.75V16.5m-6-9V3.75m0 3.75a1.5 1.5 0 1 1 0 3m0-3a1.5 1.5 0 1 0 0 3m0 9.75V10.5" />
+                                                        </svg>
+                                                </x-ui.button>
                                             @endif
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @empty
                                     <x-ui.table-row>
-                                        <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-muted">
-                                            Tidak ada data rekap saldo cuti sesuai filter.
+                                        <x-ui.table-td colspan="8" padding="none">
+                                            <x-ui.empty-state
+                                                icon="none"
+                                                :title="$hasActiveCutiFilters ? 'Tidak ada rekap saldo yang sesuai dengan filter.' : 'Belum ada rekap saldo cuti.'"
+                                            />
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @endforelse
@@ -214,40 +233,44 @@
                         <p class="text-xs text-muted font-sans mt-0.5">Daftar riwayat dan rincian transaksi pemakaian cuti pegawai pada periode terpilih.</p>
                     </div>
                     <div class="overflow-x-auto">
-                        <x-ui.table>
+                        <x-ui.table class="min-w-[76rem]">
                             <x-ui.table-head>
                                 <x-ui.table-row>
-                                    <x-ui.table-th>No</x-ui.table-th>
-                                    <x-ui.table-th>Pegawai</x-ui.table-th>
-                                    <x-ui.table-th>Jenis Cuti</x-ui.table-th>
-                                    <x-ui.table-th>Tanggal Mulai</x-ui.table-th>
-                                    <x-ui.table-th>Tanggal Selesai</x-ui.table-th>
-                                    <x-ui.table-th align="right">Hari</x-ui.table-th>
-                                    <x-ui.table-th>Sumber</x-ui.table-th>
-                                    <x-ui.table-th>Status</x-ui.table-th>
+                                    <x-ui.table-th class="w-14">No</x-ui.table-th>
+                                    <x-ui.table-th class="min-w-64">Pegawai</x-ui.table-th>
+                                    <x-ui.table-th class="min-w-56">Jenis Cuti</x-ui.table-th>
+                                    <x-ui.table-th class="min-w-36">Tanggal Mulai</x-ui.table-th>
+                                    <x-ui.table-th class="min-w-36">Tanggal Selesai</x-ui.table-th>
+                                    <x-ui.table-th align="right" class="min-w-16">Hari</x-ui.table-th>
+                                    <x-ui.table-th class="min-w-36">Sumber</x-ui.table-th>
+                                    <x-ui.table-th class="min-w-56">Status</x-ui.table-th>
                                 </x-ui.table-row>
                             </x-ui.table-head>
                             <x-ui.table-body>
                                 @forelse($usageRows as $row)
                                     <x-ui.table-row :interactive="true">
-                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm">
-                                            <p class="text-sm font-semibold text-ink">{{ $row->nama }}</p>
+                                        <x-ui.table-td padding="sm" class="w-14 text-sm text-muted">{{ $loop->iteration }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="min-w-64">
+                                            <p class="whitespace-nowrap text-sm font-semibold text-ink">{{ $row->nama }}</p>
                                             <p class="text-xs text-muted">{{ $row->nip }}</p>
                                         </x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row->jenis }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row->tanggalMulai->translatedFormat('d M Y') }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $row->tanggalSelesai->translatedFormat('d M Y') }}</x-ui.table-td>
-                                        <x-ui.table-td align="right" padding="sm" class="text-sm">{{ $row->hari }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm" class="text-sm">{{ $row->sourceLabel }}</x-ui.table-td>
-                                        <x-ui.table-td padding="sm">
-                                            <span class="text-xs font-semibold {{ $statusClass[$row->status] ?? 'text-muted' }}">{{ $row->statusLabel }}</span>
+                                        <x-ui.table-td padding="sm" class="min-w-56 whitespace-nowrap text-sm">{{ $row->jenis }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="min-w-36 whitespace-nowrap text-sm text-muted">{{ $row->tanggalMulai->translatedFormat('d M Y') }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="min-w-36 whitespace-nowrap text-sm text-muted">{{ $row->tanggalSelesai->translatedFormat('d M Y') }}</x-ui.table-td>
+                                        <x-ui.table-td align="right" padding="sm" class="min-w-16 text-sm">{{ $row->hari }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="min-w-36 whitespace-nowrap text-sm">{{ $row->sourceLabel }}</x-ui.table-td>
+                                        <x-ui.table-td padding="sm" class="min-w-56">
+                                            <span class="whitespace-nowrap text-xs font-semibold {{ $statusClass[$row->status] ?? 'text-muted' }}">{{ $row->statusLabel }}</span>
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @empty
                                     <x-ui.table-row>
-                                        <x-ui.table-td colspan="8" align="center" class="px-5 py-8 text-muted">
-                                            Tidak ada data penggunaan cuti sesuai filter.
+                                        <x-ui.table-td colspan="8" padding="none">
+                                            <x-ui.empty-state
+                                                :icon="$hasActiveCutiFilters ? 'search' : 'document'"
+                                                :title="$hasActiveCutiFilters ? 'Tidak ada penggunaan cuti yang sesuai dengan filter.' : 'Belum ada penggunaan cuti.'"
+                                                :message="$hasActiveCutiFilters ? 'Ubah atau reset filter untuk melihat transaksi lainnya.' : 'Riwayat penggunaan akan tersedia setelah ada cuti yang diproses.'"
+                                            />
                                         </x-ui.table-td>
                                     </x-ui.table-row>
                                 @endforelse

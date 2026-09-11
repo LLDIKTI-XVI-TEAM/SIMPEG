@@ -275,19 +275,21 @@ class CutiContactSnapshotTest extends TestCase
         ])->get(route('cuti.create'));
 
         $response->assertOk();
-        $response->assertSee('<label for="alamat_selama_cuti"', false);
-        $response->assertSee('<label for="nomor_telepon"', false);
-        $response->assertSee('Alamat Selama Cuti <span class="text-danger">*</span>', false);
-        $response->assertSee('Nomor Telepon <span class="text-danger">*</span>', false);
+        $response->assertSee('for="alamat_selama_cuti"', false);
+        $response->assertSee('for="nomor_telepon"', false);
+        $response->assertSee('Alamat Selama Cuti', false);
+        $response->assertSee('Nomor Telepon', false);
         $this->assertContactControlAccessibility($response->getContent(), true);
-        $response->assertSee('<p id="alamat_selama_cuti-error"', false);
-        $response->assertSee('<p id="nomor_telepon-error"', false);
-        $response->assertSee('Alamat selama cuti wajib diisi.</p>', false);
-        $response->assertSee('Nomor telepon tidak valid.</p>', false);
+        $response->assertSee('<p id="alamat_selama_cuti_error"', false);
+        $response->assertSee('<p id="nomor_telepon_error"', false);
+        $response->assertSee('Alamat selama cuti wajib diisi.', false);
+        $response->assertSee('Nomor telepon tidak valid.', false);
         $response->assertSee(e($alamatLama), false);
         $response->assertSee(e($teleponLama), false);
         $response->assertDontSee($alamatLama, false);
         $response->assertDontSee($teleponLama, false);
+        $this->assertSame(1, substr_count($response->getContent(), e($alamatLama)));
+        $this->assertSame(1, substr_count($response->getContent(), e($teleponLama)));
         $response->assertSee('formulir Cuti resmi', false);
     }
 
@@ -540,19 +542,21 @@ class CutiContactSnapshotTest extends TestCase
         ])->get(route('cuti.show', $leave));
 
         $response->assertOk();
-        $response->assertSee('<label for="alamat_selama_cuti"', false);
-        $response->assertSee('<label for="nomor_telepon"', false);
-        $response->assertSee('Alamat Selama Cuti <span class="text-danger">*</span>', false);
-        $response->assertSee('Nomor Telepon <span class="text-danger">*</span>', false);
+        $response->assertSee('for="alamat_selama_cuti"', false);
+        $response->assertSee('for="nomor_telepon"', false);
+        $response->assertSee('Alamat Selama Cuti', false);
+        $response->assertSee('Nomor Telepon', false);
         $this->assertContactControlAccessibility($response->getContent(), true);
-        $response->assertSee('<p id="alamat_selama_cuti-error"', false);
-        $response->assertSee('<p id="nomor_telepon-error"', false);
-        $response->assertSee('Alamat selama cuti wajib diisi.</p>', false);
-        $response->assertSee('Nomor telepon tidak valid.</p>', false);
+        $response->assertSee('<p id="alamat_selama_cuti_error"', false);
+        $response->assertSee('<p id="nomor_telepon_error"', false);
+        $response->assertSee('Alamat selama cuti wajib diisi.', false);
+        $response->assertSee('Nomor telepon tidak valid.', false);
         $response->assertSee(e($alamatLama), false);
         $response->assertSee(e($teleponLama), false);
         $response->assertDontSee($alamatLama, false);
         $response->assertDontSee($teleponLama, false);
+        $this->assertSame(1, substr_count($response->getContent(), e($alamatLama)));
+        $this->assertSame(1, substr_count($response->getContent(), e($teleponLama)));
         $response->assertSee('formulir Cuti resmi', false);
     }
 
@@ -710,20 +714,36 @@ class CutiContactSnapshotTest extends TestCase
     private function assertContactControlAccessibility(string $html, bool $hasErrors): void
     {
         $addressDescription = $hasErrors
-            ? 'alamat_selama_cuti-help alamat_selama_cuti-error'
-            : 'alamat_selama_cuti-help';
+            ? 'alamat_selama_cuti_help alamat_selama_cuti_error'
+            : 'alamat_selama_cuti_help';
         $phoneDescription = $hasErrors
-            ? 'nomor_telepon-help nomor_telepon-error'
-            : 'nomor_telepon-help';
-        $invalidAttribute = $hasErrors ? '(?=[^>]*\baria-invalid="true")' : '(?![^>]*\baria-invalid="true")';
+            ? 'nomor_telepon_help nomor_telepon_error'
+            : 'nomor_telepon_help';
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
 
-        $this->assertMatchesRegularExpression(
-            '#<textarea(?=[^>]*\bid="alamat_selama_cuti")(?=[^>]*\bname="alamat_selama_cuti")(?=[^>]*\brows="2")(?=[^>]*\bmaxlength="1000")(?=[^>]*\brequired)(?=[^>]*\bautocomplete="street-address")(?=[^>]*\baria-describedby="'.$addressDescription.'")'.$invalidAttribute.'[^>]*>#s',
-            $html,
-        );
-        $this->assertMatchesRegularExpression(
-            '#<input(?=[^>]*\bid="nomor_telepon")(?=[^>]*\bname="nomor_telepon")(?=[^>]*\btype="tel")(?=[^>]*\binputmode="tel")(?=[^>]*\bmaxlength="20")(?=[^>]*\brequired)(?=[^>]*\bautocomplete="tel")(?=[^>]*\baria-describedby="'.$phoneDescription.'")'.$invalidAttribute.'[^>]*>#s',
-            $html,
-        );
+        $address = $document->getElementById('alamat_selama_cuti');
+        $phone = $document->getElementById('nomor_telepon');
+
+        $this->assertNotNull($address);
+        $this->assertSame('textarea', $address->tagName);
+        $this->assertSame('alamat_selama_cuti', $address->getAttribute('name'));
+        $this->assertSame('2', $address->getAttribute('rows'));
+        $this->assertSame('1000', $address->getAttribute('maxlength'));
+        $this->assertTrue($address->hasAttribute('required'));
+        $this->assertSame('street-address', $address->getAttribute('autocomplete'));
+        $this->assertSame($addressDescription, $address->getAttribute('aria-describedby'));
+        $this->assertSame($hasErrors ? 'true' : '', $address->getAttribute('aria-invalid'));
+
+        $this->assertNotNull($phone);
+        $this->assertSame('input', $phone->tagName);
+        $this->assertSame('nomor_telepon', $phone->getAttribute('name'));
+        $this->assertSame('tel', $phone->getAttribute('type'));
+        $this->assertSame('tel', $phone->getAttribute('inputmode'));
+        $this->assertSame('20', $phone->getAttribute('maxlength'));
+        $this->assertTrue($phone->hasAttribute('required'));
+        $this->assertSame('tel', $phone->getAttribute('autocomplete'));
+        $this->assertSame($phoneDescription, $phone->getAttribute('aria-describedby'));
+        $this->assertSame($hasErrors ? 'true' : '', $phone->getAttribute('aria-invalid'));
     }
 }

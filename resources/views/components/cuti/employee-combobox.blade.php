@@ -18,6 +18,7 @@
     'submitLabel' => 'Terapkan',
     'embedded' => false,
     'autoSubmit' => true,
+    'hideLabel' => false,
     'lookupEndpoint' => null,
 ])
 
@@ -176,7 +177,7 @@
     @endif
 
     <div class="space-y-1">
-        <label for="{{ $id }}" class="text-xs font-bold uppercase tracking-wider text-ink">{{ $label }}</label>
+        <label for="{{ $id }}" class="{{ $hideLabel ? 'sr-only' : 'text-xs font-bold uppercase tracking-wider text-ink' }}">{{ $label }}</label>
         <div class="flex items-start gap-3">
         <div class="relative min-w-0 flex-1" @click.outside="close()">
         <div class="relative">
@@ -202,7 +203,7 @@
                 aria-describedby="{{ $helpId }} {{ $statusId }}"
                 placeholder="{{ $placeholder }}"
                 autocomplete="off"
-                class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-all duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm transition-[border-color,box-shadow] duration-200 placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-muted" x-show="loading" x-cloak aria-hidden="true">
                 <svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -243,17 +244,17 @@
         </div>
 
         @if($embedded)
-            <button x-show="selectedId" x-cloak type="button" @click="clearSelection()" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Bersihkan</button>
+            <x-ui.button x-show="selectedId" x-cloak type="button" @click="clearSelection()" variant="secondary" size="md" class="min-h-11 shrink-0">Bersihkan</x-ui.button>
         @elseif ($clearUrl)
-            <a x-show="selectedId" x-cloak href="{{ $clearUrl }}" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2 text-sm font-semibold text-primary shadow-sm transition-all duration-200 hover:bg-soft focus:outline-none focus:ring-2 focus:ring-primary/20">Bersihkan</a>
+            <x-ui.button x-show="selectedId" x-cloak href="{{ $clearUrl }}" variant="secondary" size="md" class="min-h-11 shrink-0">Bersihkan</x-ui.button>
         @endif
 
         @unless($embedded)
-            <button x-show="false" type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-transparent bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">{{ $submitLabel }}</button>
+            <x-ui.button x-show="false" type="submit" variant="primary" size="md" class="min-h-11 shrink-0">{{ $submitLabel }}</x-ui.button>
         @endunless
         </div>
 
-        <p id="{{ $helpId }}" class="text-[11px] text-muted">{{ $help }}</p>
+        <p id="{{ $helpId }}" class="text-xs text-muted">{{ $help }}</p>
         <p id="{{ $statusId }}" class="sr-only" aria-live="polite" x-text="statusMessage()"></p>
 
     @unless($embedded)

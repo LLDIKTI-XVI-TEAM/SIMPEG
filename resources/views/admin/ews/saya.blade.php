@@ -11,7 +11,7 @@
     <div class="space-y-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">EWS Saya</h2>
+                <h1 class="text-2xl font-semibold text-ink">EWS Saya</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'EWS Saya']

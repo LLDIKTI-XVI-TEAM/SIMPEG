@@ -2,7 +2,7 @@
     <div class="space-y-6">
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Laporan Riwayat Kepangkatan</h2>
+                <h1 class="text-2xl font-semibold text-ink">Laporan Riwayat Kepangkatan</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('pimpinan.dashboard')],
                     ['label' => 'Laporan'],
@@ -23,8 +23,8 @@
 
         <div x-data="{ filterOpen: true }">
             <x-ui.card padding="none" class="overflow-hidden">
-                <button type="button" @click="filterOpen = !filterOpen"
-                    class="w-full flex items-center justify-between px-6 py-4 border-b border-border bg-surface hover:bg-soft transition">
+                <button type="button" @click="filterOpen = !filterOpen" :aria-expanded="filterOpen.toString()" aria-controls="kepangkatan-filter-panel"
+                    class="flex w-full items-center justify-between border-b border-border bg-surface px-6 py-4 transition-colors hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/30">
                     <div class="flex items-center gap-3">
                         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                             <svg class="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
@@ -42,7 +42,7 @@
                     </svg>
                 </button>
 
-                <div x-show="filterOpen" x-collapse class="bg-soft/30">
+                <div id="kepangkatan-filter-panel" x-show="filterOpen" x-collapse class="bg-soft/30">
                     <div class="p-6">
             <form id="filter-form" action="{{ route('pimpinan.laporan.kepangkatan') }}" method="GET" class="space-y-4" aria-describedby="rank-report-help">
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -113,27 +113,25 @@
             </div>
 
             {{-- Footer: Paginasi --}}
-            <div class="flex flex-col gap-4 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between bg-surface print:hidden mt-4">
-                <div class="flex items-center gap-4">
+            <div class="mt-4 flex flex-col items-start justify-between gap-4 border-t border-border bg-surface px-6 py-4 print:hidden sm:flex-row sm:items-center">
+                <div class="flex flex-wrap items-center gap-4 text-sm text-muted">
                     <div class="flex items-center gap-2">
-                        <span class="text-sm text-muted font-sans">Tampilkan</span>
-                        <select form="filter-form" name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center w-auto">
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="pimpinan-kepangkatan-per-page" class="sr-only">Jumlah baris per halaman</label>
+                        <select id="pimpinan-kepangkatan-per-page" form="filter-form" name="per_page" onchange="this.form.submit()" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
                             <option value="10" @selected(request('per_page', 10) == 10)>10</option>
                             <option value="25" @selected(request('per_page') == 25)>25</option>
                             <option value="50" @selected(request('per_page') == 50)>50</option>
                         </select>
-                        <span class="text-sm text-muted font-sans">data per halaman</span>
+                        <span class="whitespace-nowrap">data</span>
                     </div>
-                </div>
-                <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <p class="text-sm text-muted font-sans">
-                        Menampilkan
-                        <span class="font-medium">{{ $previewData->firstItem() ?? 0 }}</span>–<span class="font-medium">{{ $previewData->lastItem() ?? 0 }}</span>
-                        dari <span class="font-medium">{{ $previewData->total() }}</span> data
+                    <span class="hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
+                    <p class="whitespace-nowrap">
+                        Menampilkan {{ $previewData->firstItem() ?? 0 }} - {{ $previewData->lastItem() ?? 0 }} dari {{ $previewData->total() }}
                     </p>
-                    <div class="flex items-center gap-1.5">
-                        {{ $previewData->appends(request()->query())->links('vendor.pagination.simpeg') }}
-                    </div>
+                </div>
+                <div class="flex w-full justify-start sm:w-auto sm:justify-end">
+                    {{ $previewData->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>
         </x-ui.card>

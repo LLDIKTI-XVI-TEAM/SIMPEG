@@ -2,7 +2,7 @@
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-2xl font-semibold text-ink">EWS Bawahan</h2>
+            <h1 class="text-2xl font-semibold text-ink">EWS Bawahan</h1>
             <x-ui.breadcrumb :items="[
                 ['label' => 'Dashboard', 'url' => route('kepala-bagian.dashboard')],
                 ['label' => 'EWS Bawahan']
@@ -71,10 +71,12 @@
                 :searchValue="$filterSearch"
                 searchPlaceholder="Cari nama atau NIP"
                 searchLabel="Cari nama atau NIP pegawai"
-                gridClass="sm:grid-cols-3 lg:grid-cols-5"
+                searchLabelSrOnly
+                searchCols="col-span-1 sm:col-span-2 lg:col-span-1"
+                gridClass="grid-cols-1 sm:grid-cols-2 lg:grid-cols-[20rem_16rem_auto]"
             >
-                <div class="relative">
-                    <x-form.select name="event" onchange="this.form.submit()">
+                <div>
+                    <x-form.select id="event" name="event" onchange="this.form.submit()">
                         <option value="">Semua Event</option>
                         @foreach($type_labels as $label)
                             <option value="{{ $label }}" @selected(request('event') === $label)>{{ $label }}</option>
@@ -82,9 +84,9 @@
                     </x-form.select>
                 </div>
                 <div class="flex items-end">
-                    <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30">
+                    <x-ui.button type="submit" class="h-10 w-full sm:w-auto">
                         Cari
-                    </button>
+                    </x-ui.button>
                 </div>
             </x-ui.filter-bar>
         </form>
@@ -139,13 +141,13 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-sans text-sm font-semibold text-ink">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</div>
-                                    <div class="mt-1 text-[11px] font-medium text-muted">Tanggal target</div>
+                                    <div class="mt-1 text-xs font-medium text-muted">Tanggal target</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <span class="inline-flex items-center text-xs font-semibold {{ $sisaBadgeClass }}">
                                         {{ $remaining }}
                                     </span>
-                                    <div class="mt-1 text-[11px] font-medium text-muted">
+                                    <div class="mt-1 text-xs font-medium text-muted">
                                         @if($alert['sisa_hari'] < 30)
                                             Sangat mendesak
                                         @elseif($alert['sisa_hari'] <= 90)
@@ -164,7 +166,7 @@
                                     <x-ui.badge variant="{{ $tindakLanjutColor }}" size="md" dot>
                                         {{ $alert['followup_status_label'] }}
                                     </x-ui.badge>
-                                    @if ($alert['handled_note'])<p class="mt-1 max-w-xs text-[11px] text-muted">{{ $alert['handled_note'] }}</p>@endif
+                                    @if ($alert['handled_note'])<p class="mt-1 max-w-xs text-xs text-muted">{{ $alert['handled_note'] }}</p>@endif
                                 </x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div x-data="{ open: false }" class="max-w-[240px]">
@@ -211,8 +213,8 @@
             </div>
             
             {{-- TABLE FOOTER --}}
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border px-6 py-4 bg-soft/20">
-                <div class="flex items-center gap-3 text-sm text-muted">
+            <div class="flex flex-col items-start justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row sm:items-center">
+                <div class="flex flex-wrap items-center gap-4 text-sm text-muted">
                     <form method="GET" action="{{ route('kepala-bagian.ews.index') }}" class="flex items-center gap-2">
                         @if(request('search'))
                             <input type="hidden" name="search" value="{{ request('search') }}">
@@ -236,18 +238,16 @@
                                 <option value="{{ $opsi }}" @selected((int) request('per_page', 10) === $opsi)>{{ $opsi }}</option>
                             @endforeach
                         </select>
-                        <span class="hidden sm:inline">data</span>
+                        <span class="whitespace-nowrap">data</span>
                     </form>
 
-                    {{-- Meta Info --}}
-                    <div class="hidden md:block ml-2 border-l border-border pl-4">
-                        Menampilkan <span class="font-medium text-ink">{{ $alerts->firstItem() ?? 0 }}</span>
-                        - <span class="font-medium text-ink">{{ $alerts->lastItem() ?? 0 }}</span>
-                        dari <span class="font-medium text-ink">{{ $alerts->total() }}</span>
-                    </div>
+                    <span class="hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
+                    <p class="whitespace-nowrap">
+                        Menampilkan {{ $alerts->firstItem() ?? 0 }} - {{ $alerts->lastItem() ?? 0 }} dari {{ $alerts->total() }}
+                    </p>
                 </div>
 
-                <div class="flex items-center gap-1.5">
+                <div class="flex w-full justify-start sm:w-auto sm:justify-end">
                     {{ $alerts->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>

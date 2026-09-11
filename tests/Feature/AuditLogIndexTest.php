@@ -105,6 +105,27 @@ class AuditLogIndexTest extends TestCase
         $response->assertJsonPath('data.99.id', $secondOldest->id);
     }
 
+    public function test_halaman_audit_memisahkan_payload_data_dari_ekspresi_alpine(): void
+    {
+        $admin = User::factory()->adminKepegawaian()->create();
+
+        $this->createAuditLog([
+            'user_id' => $admin->id,
+            'event' => 'UPDATE',
+            'auditable_type' => 'Employee',
+            'user_agent' => "Browser 'legacy' <khusus>",
+            'new_values' => ['catatan' => "Nilai 'khusus' <aman>"],
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('audit-log'));
+
+        $response
+            ->assertOk()
+            ->assertSee('x-data="auditLogPage($el)"', false)
+            ->assertSee('data-audit-logs=', false)
+            ->assertDontSee('logs: JSON.parse(', false);
+    }
+
     /**
      * Membuat audit log dengan timestamp eksplisit agar tes filter periode deterministik.
      *

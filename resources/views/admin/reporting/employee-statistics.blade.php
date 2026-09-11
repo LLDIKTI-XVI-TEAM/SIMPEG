@@ -157,7 +157,7 @@
                                                 <canvas id="chart-{{ $key }}" aria-hidden="true"></canvas>
                                                 <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
                                                     <span class="text-2xl font-bold text-ink">{{ $totalInDim }}</span>
-                                                    <span class="text-[10px] uppercase tracking-wider text-muted font-medium">Pegawai</span>
+                                                    <span class="text-xs uppercase tracking-wider text-muted font-medium">Pegawai</span>
                                                 </div>
                                             </div>
                                         </div>

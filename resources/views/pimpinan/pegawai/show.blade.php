@@ -283,7 +283,7 @@
                                         <span class="font-bold text-ink">{{ $document->nama_dokumen }}</span>
                                     @endif
                                     @if($document->keterangan)
-                                        <p class="truncate text-[10px] text-muted">{{ $document->keterangan }}</p>
+                                        <p class="truncate text-xs text-muted">{{ $document->keterangan }}</p>
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-muted">{{ \App\Support\Documents\DocumentCategory::label($document->jenis_dokumen) }}</td>

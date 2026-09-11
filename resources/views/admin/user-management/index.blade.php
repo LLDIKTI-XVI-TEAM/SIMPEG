@@ -10,6 +10,7 @@
         rows: [],
         meta: { current_page: 1, last_page: 1, from: 0, to: 0, total: 0, per_page: 10 },
         isLoading: false,
+        loadError: false,
         perPage: 10,
         filters: { search: '', role: '', status: '' },
 
@@ -29,6 +30,8 @@
 
         async fetchPage(page) {
             if (page < 1 || (this.meta.last_page > 0 && page > this.meta.last_page)) return;
+
+            this.loadError = false;
 
             // ── Cek cache sessionStorage terlebih dahulu ──
             const cKey = this.cacheKey + `_p${page}`;
@@ -63,7 +66,8 @@
                 this.perPage = json.meta.per_page;
                 sessionStorage.setItem(cKey, JSON.stringify({ rows: json.data, meta: json.meta }));
             } catch (e) {
-                console.error('Gagal fetch data user-mapping:', e);
+                this.rows = [];
+                this.loadError = true;
             } finally {
                 this.isLoading = false;
             }
@@ -233,7 +237,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Kelola Akses User</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Kelola Akses User</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Kelola Akses User']
@@ -252,20 +256,15 @@
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                     </svg>
-                    <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
+                    <span>Refresh</span>
                 </x-ui.button>
             </div>
         </div>
 
         {{-- INFO ARCHITECTURE CARD --}}
-        <div class="rounded-lg border border-info/20 bg-info/5 p-4 text-xs text-info flex gap-3">
-            <svg class="w-5 h-5 shrink-0 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
-            </svg>
-            <div>
-                <span class="font-bold">Informasi Otorisasi:</span> Sistem menggunakan Keycloak SSO murni untuk autentikasi identitas login. Seluruh hak akses, role, dan permission dibaca serta dikonfigurasi melalui database internal SIMPEG (RBAC). Perubahan peran (role) akan berlaku saat pegawai melakukan login berikutnya.
-            </div>
-        </div>
+        <x-ui.alert variant="info" size="sm">
+            <span class="font-bold">Informasi Otorisasi:</span> Sistem menggunakan Keycloak SSO murni untuk autentikasi identitas login. Seluruh hak akses, role, dan permission dibaca serta dikonfigurasi melalui database internal SIMPEG (RBAC). Perubahan peran (role) akan berlaku saat pegawai melakukan login berikutnya.
+        </x-ui.alert>
 
         {{-- NOTIFICATIONS --}}
         @if(session('success'))
@@ -286,7 +285,7 @@
                 ['key' => 'keycloak_id',           'label' => 'KEYCLOAK ID'],
                 ['key' => 'role_label',            'label' => 'ROLE'],
                 ['key' => 'mapping_status_label',  'label' => 'STATUS SSO'],
-                ['key' => 'aksi',                  'label' => 'AKSI', 'align' => 'right'],
+                ['key' => 'aksi',                  'label' => 'AKSI'],
             ];
         @endphp
 
@@ -296,12 +295,17 @@
             :columns="$tableColumns"
             fetchPage="fetchPage(page)"
             isLoading="isLoading"
+            error="loadError"
             perPage="perPage"
             setPerPage="setPerPage($event.target.value)"
             searchModel="filters.search"
             searchPlaceholder="Cari nama, NIP, atau email pegawai..."
+            hasActiveFilters="filters.search || filters.role || filters.status"
+            emptyTitle="Belum ada data pemetaan pengguna"
+            errorTitle="Data pemetaan pengguna tidak dapat dimuat."
+            errorMessage="Coba Refresh untuk memuat ulang data. Jika masalah berlanjut, hubungi administrator."
             searchCols="col-span-1 sm:col-span-2 lg:col-span-4"
-            emptyTitle="Tidak ada pegawai yang sesuai filter"
+            searchControlClass="min-h-11"
             emptyIcon="none"
             :colspanCount="count($tableColumns)"
             filterClass="lg:grid-cols-12"
@@ -311,11 +315,12 @@
                 {{-- Filter Role --}}
                 <div class="col-span-1 lg:col-span-3">
                     <label for="user-mapping-role-filter" class="sr-only">Filter role internal SIMPEG</label>
-                    <select
+                    <x-form.select
                         id="user-mapping-role-filter"
                         x-model="filters.role"
                         @change="applyFilter()"
-                        class="h-[44px] w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans shadow-sm"
+                        class="min-h-11"
+                        aria-label="Filter role internal SIMPEG"
                     >
                         <option value="">Semua Role</option>
                         <option value="super_admin">Super Admin</option>
@@ -323,24 +328,25 @@
                         <option value="pimpinan">Pimpinan</option>
                         <option value="kepala_bagian">Kepala Bagian</option>
                         <option value="pegawai">Pegawai</option>
-                    </select>
+                    </x-form.select>
                 </div>
 
                 {{-- Filter Status Mapping --}}
                 <div class="col-span-1 lg:col-span-3">
                     <label for="user-mapping-status-filter" class="sr-only">Filter status mapping</label>
-                    <select
+                    <x-form.select
                         id="user-mapping-status-filter"
                         x-model="filters.status"
                         @change="applyFilter()"
-                        class="h-[44px] w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-ink focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans shadow-sm"
+                        class="min-h-11"
+                        aria-label="Filter status mapping"
                     >
                         <option value="">Semua Status Mapping</option>
                         <option value="terhubung">Terhubung</option>
                         <option value="belum_ada_user">Belum Ada User Lokal</option>
                         <option value="identifier_kosong">Identifier Keycloak Kosong</option>
                         <option value="role_kosong">Role Belum Ditetapkan</option>
-                    </select>
+                    </x-form.select>
                 </div>
 
                 {{-- Reset Filter --}}
@@ -400,19 +406,18 @@
 
                         {{-- STATUS SSO --}}
                         <x-ui.table-td class="whitespace-nowrap">
-                            <x-ui.badge variant="none" size="sm" pill x-bind:class="emp.mapping_status_class">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full" :class="emp.mapping_status_class.replace('text-', 'bg-').replace('/10', '')"></span>
+                            <x-ui.badge variant="none" size="sm" pill dot x-bind:class="emp.mapping_status_class">
                                 <span x-text="emp.mapping_status_label"></span>
                             </x-ui.badge>
                         </x-ui.table-td>
 
                         {{-- AKSI --}}
-                        <x-ui.table-td align="right" class="whitespace-nowrap">
-                            <div class="flex items-center justify-end">
+                        <x-ui.table-td class="whitespace-nowrap">
+                            <div class="flex items-center justify-start">
                                 <x-ui.button
                                     type="button"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     tooltip-position="top-end"
                                     ::title="'Edit pemetaan ' + emp.nama"
                                     ::aria-label="'Edit pemetaan ' + emp.nama"
@@ -449,7 +454,7 @@
                     <div class="px-6 py-5 border-b border-border flex items-center justify-between">
                         <div>
                             <h3 id="user-mapping-modal-title" class="text-sm font-bold text-ink font-sans">Edit Otorisasi & SSO</h3>
-                            <p class="text-[11px] text-muted font-sans mt-0.5" x-text="selectedEmployee.nama"></p>
+                            <p class="text-xs text-muted font-sans mt-0.5" x-text="selectedEmployee.nama"></p>
                         </div>
                         <x-ui.button type="button" variant="ghost" size="sm" @click="closeEdit()" aria-label="Tutup modal pemetaan user">Tutup</x-ui.button>
                     </div>
@@ -481,7 +486,7 @@
                                 class="h-[44px] w-full rounded-lg border border-border bg-soft px-4 py-2.5 text-xs text-muted font-sans select-none focus:outline-none"
                             >
                             @error('employee_id')
-                                <p id="user-mapping-employee-error" class="text-[11px] text-danger font-semibold font-sans" role="alert">{{ $message }}</p>
+                                <p id="user-mapping-employee-error" class="text-xs text-danger font-semibold font-sans" role="alert">{{ $message }}</p>
                             @enderror
                         </div>
 
@@ -499,11 +504,11 @@
                                 @if ($errors->has('keycloak_id')) aria-invalid="true" @endif
                                 class="h-[44px] w-full rounded-lg border {{ $errors->has('keycloak_id') ? 'border-danger focus:border-danger focus:ring-danger/20' : 'border-border focus:border-primary focus:ring-primary/20' }} bg-surface px-4 py-2.5 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 font-sans"
                             >
-                            <p id="user-mapping-keycloak-id-help" class="text-[10px] text-muted font-sans">Identifier Keycloak wajib diisi. Disconnect belum tersedia pada halaman ini.</p>
+                            <p id="user-mapping-keycloak-id-help" class="text-xs text-muted font-sans">Identifier Keycloak wajib diisi. Disconnect belum tersedia pada halaman ini.</p>
                             @error('keycloak_id')
-                                <p id="user-mapping-keycloak-id-error" class="text-[11px] text-danger font-semibold font-sans" role="alert">{{ $message }}</p>
+                                <p id="user-mapping-keycloak-id-error" class="text-xs text-danger font-semibold font-sans" role="alert">{{ $message }}</p>
                             @enderror
-                            <p class="text-[10px] text-danger font-semibold font-sans mt-1">⚠️ Aturan Unik: Satu Keycloak ID hanya boleh dipetakan ke satu pegawai saja.</p>
+                            <p class="text-xs text-danger font-semibold font-sans mt-1">⚠️ Aturan Unik: Satu Keycloak ID hanya boleh dipetakan ke satu pegawai saja.</p>
                         </div>
 
                         <div>
@@ -523,7 +528,7 @@
                                 <option value="kepala_bagian">Kepala Bagian</option>
                                 <option value="pegawai">Pegawai</option>
                             </x-form.select>
-                            <p class="text-[10px] text-warning font-semibold font-sans mt-1">⚠️ Catatan: Perubahan role baru akan aktif setelah user melakukan login berikutnya.</p>
+                            <p class="text-xs text-warning-dark font-semibold font-sans mt-1">⚠️ Catatan: Perubahan role baru akan aktif setelah user melakukan login berikutnya.</p>
                         </div>
 
                         {{-- WARNING SENSITIVE ROLE --}}

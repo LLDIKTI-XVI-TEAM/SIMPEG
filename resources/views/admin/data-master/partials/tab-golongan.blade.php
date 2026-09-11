@@ -5,8 +5,8 @@
     class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
     <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Golongan Pangkat</h2>
-            <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi golongan kepangkatan PNS.
+            <h2 class="text-xl font-semibold text-ink font-sans leading-tight">Golongan Pangkat</h2>
+            <p class="mt-0.5 max-w-2xl text-xs text-muted font-sans leading-normal">Data referensi golongan kepangkatan PNS.
                 Item yang sudah dipakai riwayat kepangkatan hanya dapat dinonaktifkan.</p>
         </div>
         <x-ui.button type="button" @click="showTambah = !showTambah" variant="secondary" class="shrink-0">
@@ -57,7 +57,7 @@
                                     type="button"
                                     @click="editId = editId === '{{ $item->id }}' ? null : '{{ $item->id }}'"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Edit"
                                     tooltip-position="top-end"
                                     aria-label="Edit"
@@ -72,7 +72,7 @@
                                     <x-ui.button
                                         type="submit"
                                         variant="{{ $item->is_active ? 'warning' : 'success' }}"
-                                        size="icon"
+                                        size="compact-icon"
                                         title="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
                                         tooltip-position="top-end"
                                         aria-label="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
@@ -96,7 +96,7 @@
                                         <x-ui.button
                                             type="submit"
                                             variant="danger"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="Hapus"
                                             tooltip-position="top-end"
                                             aria-label="Hapus"
@@ -117,17 +117,17 @@
                                 @csrf
                                 <input type="hidden" name="tab" value="golongan">
                                 <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Kode</label>
+                                    <label class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Kode</label>
                                     <input name="kode" value="{{ $item->kode }}" required
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Nama Pangkat</label>
+                                    <label class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Nama Pangkat</label>
                                     <input name="nama" value="{{ $item->nama }}" required
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Urutan</label>
+                                    <label class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Urutan</label>
                                     <input name="urutan" type="number" min="0" value="{{ $item->urutan }}"
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>

@@ -10,7 +10,7 @@
         {{-- ============================================================ --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Daftar Nominatif Pegawai</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Daftar Nominatif Pegawai</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Daftar Nominatif Pegawai']
@@ -112,23 +112,23 @@
                                 <ol class="mt-3 space-y-2" aria-label="Urutan kolom export">
                                     <template x-for="(column, index) in activeColumns" :key="'column-order-' + column.key">
                                         <li class="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-                                            <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary" x-text="index + 1"></span>
+                                            <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary" x-text="index + 1"></span>
                                             <span class="min-w-0 flex-1 truncate text-sm font-medium text-ink font-sans" x-text="column.label"></span>
                                             <div class="flex shrink-0 items-center gap-1">
-                                                <button type="button" @click="moveColumn(column.key, -1)" :disabled="index === 0"
-                                                    :aria-label="'Naikkan urutan ' + column.label"
-                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-40">
+                                                <x-ui.button type="button" variant="secondary" size="compact-icon"
+                                                    @click="moveColumn(column.key, -1)" ::disabled="index === 0"
+                                                    ::aria-label="'Naikkan urutan ' + column.label" title="Naikkan urutan">
                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="m18 15-6-6-6 6" />
                                                     </svg>
-                                                </button>
-                                                <button type="button" @click="moveColumn(column.key, 1)" :disabled="index === activeColumns.length - 1"
-                                                    :aria-label="'Turunkan urutan ' + column.label"
-                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-40">
+                                                </x-ui.button>
+                                                <x-ui.button type="button" variant="secondary" size="compact-icon"
+                                                    @click="moveColumn(column.key, 1)" ::disabled="index === activeColumns.length - 1"
+                                                    ::aria-label="'Turunkan urutan ' + column.label" title="Turunkan urutan">
                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" aria-hidden="true">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6" />
                                                     </svg>
-                                                </button>
+                                                </x-ui.button>
                                             </div>
                                         </li>
                                     </template>

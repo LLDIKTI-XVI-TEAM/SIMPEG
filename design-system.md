@@ -94,8 +94,10 @@ bawah adalah referensi kelas implementasi, bukan definisi kedua yang mandiri.
 |-------|-------------|---------------|------------|
 | Success | `--color-success` | `bg-success` / `text-success` | Aktif, berhasil, status oke |
 | Warning | `--color-warning` | `bg-warning` / `text-warning` | Peringatan, H-60, pending |
+| Warning text | `--color-warning-dark` | `text-warning-dark` | Teks peringatan pada surface terang |
 | Danger | `--color-danger` | `bg-danger` / `text-danger` | Error, H-30, aksi destruktif |
-| Info | `--color-info` | `bg-info` / `text-info` | Informasi, H-90 |
+| Info | `--color-info` | `bg-info` | Fill indikator, dot, atau background informasi |
+| Info text | `--color-info-dark` | `text-info-dark` | Teks informasi pada surface terang |
 
 ### Utility Colors
 
@@ -118,7 +120,8 @@ text-ink         text-muted
 bg-success       text-success
 bg-warning       text-warning
 bg-danger        text-danger
-bg-info          text-info
+bg-info          text-info-dark
+text-warning-dark text-info-dark
 border-border
 bg-soft
 ```
@@ -226,7 +229,7 @@ Dua layout tersedia di `resources/views/layouts/`:
 @section('title', 'Data Pegawai')
 
 @section('content')
-    <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
+    <h1 class="text-2xl font-semibold text-ink">Data Pegawai</h1>
     {{-- ... konten halaman ... --}}
 @endsection
 ```
@@ -235,7 +238,7 @@ Dua layout tersedia di `resources/views/layouts/`:
 
 ```blade
 <x-layouts.app title="Data Pegawai">
-    <h2 class="text-2xl font-semibold text-ink">Data Pegawai</h2>
+    <h1 class="text-2xl font-semibold text-ink">Data Pegawai</h1>
 </x-layouts.app>
 ```
 
@@ -440,8 +443,12 @@ mematuhi [`DESIGN.md`](DESIGN.md).
 
 Gunakan `x-ui.button` untuk action standar. Komponen saat ini menyediakan
 varian `primary`, `secondary`, `muted`, `danger`, `danger-solid`, `success`,
-`success-solid`, `warning`, `warning-solid`, `ghost`, dan `link`; ukuran `xs`,
-`sm`, `md`, `lg`, serta `icon`.
+`success-solid`, `warning`, `warning-solid`, `ghost`, dan `link`; ukuran
+`compact`, `compact-icon`, `xs`, `sm`, `md`, `lg`, serta `icon`. Gunakan `compact` untuk aksi
+padat dalam daftar atau baris card yang memerlukan geometri setara tombol
+"Ubah nama"; jangan gunakan untuk CTA utama atau submit form utama.
+`compact-icon` hanya digunakan untuk aksi ikon 32×32 px di dalam tabel padat
+yang sudah disetujui.
 Rujuk source komponen untuk API yang aktual saat menambah varian baru.
 
 ```blade
@@ -673,7 +680,7 @@ Layout: `grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6`
 
 | Notifikasi | Kondisi | Status | Kelas Badge |
 |-----------|---------|--------|-------------|
-| H-90 | 90 hari sebelum | Info | `bg-info/10 text-info` |
+| H-90 | 90 hari sebelum | Info | `bg-info/10 text-info-dark` |
 | H-60 | 60 hari sebelum | Warning | `bg-warning/10 text-warning` |
 | H-30 | 30 hari sebelum | Danger | `bg-danger/10 text-danger` |
 

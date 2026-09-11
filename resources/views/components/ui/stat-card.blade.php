@@ -56,8 +56,8 @@
             'surface' => 'border-orange/20 bg-orange/5',
         ],
         'info' => [
-            'text' => 'text-info',
-            'icon' => 'bg-info/10 text-info',
+            'text' => 'text-info-dark',
+            'icon' => 'bg-info/10 text-info-dark',
             'border' => 'border-b-info',
             'surface' => 'border-info/20 bg-info/5',
         ],
@@ -96,11 +96,11 @@
         'lg' => 'p-6',
     ];
     $surfaceClass = $surface === 'soft' ? $tone['surface'] : '';
-    $labelClasses = trim('text-[10px] font-bold text-muted uppercase tracking-wider font-sans ' . $labelClass);
+    $labelClasses = trim('text-xs font-bold text-muted uppercase tracking-wider font-sans leading-tight min-h-[2rem] block ' . $labelClass);
     $valueClasses = trim('mt-1 text-2xl font-extrabold leading-none ' . $dimension['value'] . ' ' . $tone['text'] . ' ' . $valueClass);
     $inlineValueClasses = trim(str_replace('mt-1', '', $valueClasses));
     $unitClasses = trim('text-sm text-muted font-sans ' . $unitClass);
-    $descriptionClasses = trim('text-[10px] text-muted font-sans ' . $descriptionClass);
+    $descriptionClasses = trim('text-xs text-muted font-sans ' . $descriptionClass);
     $cardAttributes = $attributes->merge($href ? ['href' => $href] : []);
 @endphp
 
@@ -144,7 +144,7 @@
         </div>
     @else
         <div class="flex items-start justify-between gap-4">
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
                 @isset($badge)
                     {{ $badge }}
                 @elseif ($label)

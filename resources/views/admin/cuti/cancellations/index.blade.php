@@ -21,7 +21,7 @@
         }"
     >
         <div>
-            <h2 class="text-2xl font-semibold text-ink font-sans">Antrean Pembatalan Cuti</h2>
+            <h1 class="text-2xl font-semibold text-ink font-sans">Antrean Pembatalan Cuti</h1>
             <x-ui.breadcrumb :items="[
                 ['label' => 'Dashboard', 'url' => route('dashboard')],
                 ['label' => 'Antrean Pembatalan Cuti'],

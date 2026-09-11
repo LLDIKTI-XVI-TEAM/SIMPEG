@@ -42,7 +42,7 @@ class SkRequirementMatrixTest extends TestCase
             ->assertSee('@keydown.escape.window="if (showSkRequirementModal) { closeSkRequirementModal() }"', false)
             ->assertDontSee('@keydown.escape.window="closeSkRequirementModal()"', false)
             ->assertDontSee("document.querySelectorAll('#sk-requirement-modal input[type=checkbox]')", false)
-            ->assertSee('Simpan Matriks');
+            ->assertSee('Simpan');
     }
 
     public function test_role_without_permission_cannot_see_or_update_matrix(): void

@@ -158,13 +158,13 @@ class EwsActivePageTest extends TestCase
             ->assertDontSee($other->employee->nama_lengkap);
     }
 
-    public function test_ews_active_page_search_uses_explicit_submit_instead_of_navigating_while_typing(): void
+    public function test_ews_active_page_filters_use_explicit_submit_instead_of_navigating_while_typing(): void
     {
         $response = $this->actingAs(User::factory()->adminKepegawaian()->create())
             ->get(route('ews'));
 
         $response->assertOk()
-            ->assertSee('aria-label="Terapkan pencarian EWS"', false)
+            ->assertSee('aria-label="Terapkan filter EWS"', false)
             ->assertDontSee('requestSubmit()', false);
     }
 
@@ -275,7 +275,7 @@ class EwsActivePageTest extends TestCase
             ->get(route('ews', ['status' => EwsAlert::FOLLOWUP_STATUS_NOT_NEEDED]))
             ->assertOk()
             ->assertSee('Daftar EWS Tidak Perlu')
-            ->assertSee('Tidak ada data EWS untuk filter yang dipilih.')
+            ->assertSee('Tidak ada EWS yang sesuai dengan filter.')
             ->assertDontSee('Tidak ada peringatan EWS aktif untuk kategori ini.');
     }
 

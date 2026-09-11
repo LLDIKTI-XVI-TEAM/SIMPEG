@@ -36,8 +36,8 @@
 >
     <div class="flex flex-col gap-4 border-b border-border pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-2xl font-bold leading-tight text-ink">Jabatan</h2>
-            <p class="mt-0.5 max-w-2xl text-[11px] leading-normal text-muted">
+            <h2 class="text-xl font-semibold leading-tight text-ink">Jabatan</h2>
+            <p class="mt-0.5 max-w-2xl text-xs leading-normal text-muted">
                 Referensi jabatan untuk riwayat kepegawaian, kategori jenis jabatan, eselon, dan batas usia pensiun.
                 Jabatan yang sudah dipakai hanya dapat dinonaktifkan.
             </p>
@@ -92,7 +92,7 @@
                 </select>
                 @if ($jabatanCreateFailed)
                     @error('jenis_jabatan_id')
-                        <p id="jabatan-jenis-jabatan-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                        <p id="jabatan-jenis-jabatan-error" class="text-xs font-semibold text-danger">{{ $message }}</p>
                     @enderror
                 @endif
             </div>
@@ -109,7 +109,7 @@
                 </select>
                 @if ($jabatanCreateFailed)
                     @error('eselon_id')
-                        <p id="jabatan-eselon-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                        <p id="jabatan-eselon-error" class="text-xs font-semibold text-danger">{{ $message }}</p>
                     @enderror
                 @endif
             </div>
@@ -126,7 +126,7 @@
                     class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 @if ($jabatanCreateKeteranganError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
                 @if ($jabatanCreateFailed)
                     @error('keterangan')
-                        <p id="jabatan-keterangan-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                        <p id="jabatan-keterangan-error" class="text-xs font-semibold text-danger">{{ $message }}</p>
                     @enderror
                 @endif
             </div>
@@ -184,7 +184,7 @@
                                         aria-label="Ubah {{ $item->nama }}"
                                         @click="editId = editId === '{{ $item->id }}' ? null : '{{ $item->id }}'"
                                         variant="secondary"
-                                        size="icon"
+                                        size="compact-icon"
                                     >
                                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
@@ -196,7 +196,7 @@
                                         <x-ui.button
                                             type="submit"
                                             variant="{{ $item->is_active ? 'warning' : 'success' }}"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
                                             tooltip-position="top-end"
                                             aria-label="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
@@ -219,7 +219,7 @@
                                             <x-ui.button
                                                 type="submit"
                                                 variant="danger"
-                                                size="icon"
+                                                size="compact-icon"
                                                 title="Hapus {{ $item->nama }}"
                                                 tooltip-position="top-end"
                                                 aria-label="Hapus {{ $item->nama }}"
@@ -267,7 +267,7 @@
                                         </select>
                                         @if ($jabatanEditFailed)
                                             @error('jenis_jabatan_id')
-                                                <p id="jabatan-jenis-{{ $item->id }}-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                                                <p id="jabatan-jenis-{{ $item->id }}-error" class="text-xs font-semibold text-danger">{{ $message }}</p>
                                             @enderror
                                         @endif
                                     </div>
@@ -284,7 +284,7 @@
                                         </select>
                                         @if ($jabatanEditFailed)
                                             @error('eselon_id')
-                                                <p id="jabatan-eselon-{{ $item->id }}-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                                                <p id="jabatan-eselon-{{ $item->id }}-error" class="text-xs font-semibold text-danger">{{ $message }}</p>
                                             @enderror
                                         @endif
                                     </div>
@@ -301,7 +301,7 @@
                                             class="w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 @if ($jabatanEditKeteranganError) border-danger focus:border-danger focus:ring-danger/20 @else border-border focus:border-primary focus:ring-primary/20 @endif">
                                         @if ($jabatanEditFailed)
                                             @error('keterangan')
-                                                <p id="jabatan-keterangan-{{ $item->id }}-error" class="text-[11px] font-semibold text-danger">{{ $message }}</p>
+                                                <p id="jabatan-keterangan-{{ $item->id }}-error" class="text-xs font-semibold text-danger">{{ $message }}</p>
                                             @enderror
                                         @endif
                                     </div>

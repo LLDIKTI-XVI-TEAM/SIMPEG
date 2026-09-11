@@ -45,7 +45,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Detail Pengajuan Cuti</h2>
+                <h1 class="text-2xl font-semibold text-ink">Detail Pengajuan Cuti</h1>
                 <x-ui.breadcrumb :items="[
         ['label' => 'Dashboard', 'url' => route('kepala-bagian.dashboard')],
         ['label' => 'Cuti Bawahan', 'url' => route('kepala-bagian.cuti.index')],
@@ -63,7 +63,7 @@
                         'success' => 'bg-success/10 border-success/20 text-success',
                         'danger' => 'bg-danger/10 border-danger/20 text-danger',
                         'warning' => 'bg-warning/10 border-warning/20 text-warning-dark',
-                        'info' => 'bg-info/10 border-info/20 text-info',
+                        'info' => 'bg-info/10 border-info/20 text-info-dark',
                         default => 'bg-muted/10 border-muted/20 text-muted',
                     };
                 @endphp
@@ -98,14 +98,14 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 flex-1">
                             <div>
-                                <p class="text-[10px] uppercase font-bold text-muted font-sans tracking-wider">Nama &
+                                <p class="text-xs uppercase font-bold text-muted font-sans tracking-wider">Nama &
                                     NIP</p>
                                 <p class="text-sm font-bold text-ink font-sans mt-0.5">
                                     {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}</p>
                                 <p class="text-xs text-muted font-sans mt-0.5">{{ $leave->employee?->nip ?? '-' }}</p>
                             </div>
                             <div>
-                                <p class="text-[10px] uppercase font-bold text-muted font-sans tracking-wider">Jabatan &
+                                <p class="text-xs uppercase font-bold text-muted font-sans tracking-wider">Jabatan &
                                     Golongan</p>
                                 <p class="text-sm font-medium text-ink font-sans mt-0.5">
                                     {{ $leave->employee?->jabatan_terakhir ?? '-' }}</p>
@@ -128,14 +128,14 @@
                     </h3>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
                         <div>
-                            <p class="text-[10px] uppercase font-bold text-muted font-sans tracking-wider">Jenis Cuti
+                            <p class="text-xs uppercase font-bold text-muted font-sans tracking-wider">Jenis Cuti
                             </p>
                             <p class="text-sm font-medium text-ink font-sans mt-1">
                                 <x-ui.badge variant="info" size="md">{{ $leave->jenisCuti?->nama ?? '-' }}</x-ui.badge>
                             </p>
                         </div>
                         <div>
-                            <p class="text-[10px] uppercase font-bold text-muted font-sans tracking-wider">Lama Cuti</p>
+                            <p class="text-xs uppercase font-bold text-muted font-sans tracking-wider">Lama Cuti</p>
                             <p class="text-sm font-bold text-ink font-sans mt-1">{{ $leave->jumlah_hari_kerja }} Hari
                                 Kerja</p>
                             <p class="text-xs text-muted font-sans mt-0.5">
@@ -143,7 +143,7 @@
                                 {{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</p>
                         </div>
                         <div class="sm:col-span-2">
-                            <p class="text-[10px] uppercase font-bold text-muted font-sans tracking-wider">Alasan Cuti
+                            <p class="text-xs uppercase font-bold text-muted font-sans tracking-wider">Alasan Cuti
                             </p>
                             <div class="mt-1 p-3 bg-surface rounded-lg border border-border">
                                 <p class="text-sm font-medium text-ink font-sans whitespace-pre-line">
@@ -151,7 +151,7 @@
                             </div>
                         </div>
                         <div class="sm:col-span-2">
-                            <p class="text-[10px] uppercase font-bold text-muted font-sans tracking-wider">Lampiran
+                            <p class="text-xs uppercase font-bold text-muted font-sans tracking-wider">Lampiran
                                 Pendukung</p>
                             @if ($attachmentAvailable)
                                 <a href="{{ route('kepala-bagian.cuti.attachment.download', $leave) }}" download
@@ -376,7 +376,7 @@
                                 :pulse="$step->status === 'active' && $leave->status !== 'menunggu_pembatalan'">
 
                                 <div class="mt-2 bg-soft/50 rounded-lg p-3 border border-border">
-                                    <p class="text-[11px] font-bold uppercase tracking-wider text-ink font-sans mb-1">
+                                    <p class="mb-1 text-xs font-bold uppercase tracking-wider text-ink font-sans">
                                         {{ $stepStatus['label'] }}</p>
                                     @if($step->decision_note)
                                         <p class="text-xs font-medium text-ink/80 font-sans whitespace-pre-line">
@@ -389,7 +389,7 @@
                                 </div>
 
                                 @if($step->acted_at)
-                                    <p class="text-[9px] font-medium text-muted mt-1">
+                                    <p class="mt-1 text-xs font-medium text-muted">
                                         {{ $step->acted_at->translatedFormat('d M Y H:i') }}</p>
                                 @endif
                             </x-ui.timeline-item>
