@@ -32,7 +32,7 @@
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-semibold text-ink font-sans">Daftar Permohonan Menunggu</h3>
-                    <p class="text-[10px] text-muted font-sans">Menampilkan dokumen permohonan yang perlu otorisasi Anda segera.</p>
+                    <p class="text-xs text-muted font-sans">Menampilkan dokumen permohonan yang perlu otorisasi Anda segera.</p>
                 </div>
             </div>
             
@@ -66,17 +66,17 @@
                             </x-ui.table-td>
                             <x-ui.table-td padding="comfortable" class="text-sm font-medium">
                                 {{ $r->jenisCuti->nama ?? '-' }}
-                                <div class="mt-1 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                                <div class="mt-1 text-xs font-semibold uppercase tracking-wide text-primary">
                                     {{ $activeStep === null ? 'Approver' : \App\Support\Cuti\ApprovalStepLabel::display($activeStep->step_type, $activeStep->role_label) }}
                                 </div>
                             </x-ui.table-td>
-                            <x-ui.table-td padding="comfortable" class="text-sm">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-[10px] text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
+                            <x-ui.table-td padding="comfortable" class="text-sm">{{ $r->jumlah_hari_kerja }} Hari Kerja<br><span class="text-xs text-muted font-sans">{{ $r->tanggal_mulai?->translatedFormat('d M') }} - {{ $r->tanggal_selesai?->translatedFormat('d M Y') }}</span></x-ui.table-td>
                             <x-ui.table-td padding="comfortable" class="max-w-xs break-words whitespace-normal text-muted">{{ $r->alasan }}</x-ui.table-td>
                             <x-ui.table-td align="right" padding="comfortable">
                                 <div class="flex items-center justify-end gap-2.5">
                                     {{-- Detail --}}
 
-                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="secondary" size="icon" class="min-h-11 min-w-11" title="Tinjau Detail" aria-label="Tinjau Detail">
+                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="secondary" size="compact-icon" class="h-11 w-11 sm:h-8 sm:w-8" title="Tinjau Detail" aria-label="Tinjau Detail">
 
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />

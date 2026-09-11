@@ -56,7 +56,7 @@
                             <dt class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted">Data Pegawai</dt>
                             <dd class="grid grid-cols-1 gap-4 rounded-lg bg-soft p-4 sm:grid-cols-2">
                                 <div>
-                                    <p class="text-[10px] font-bold uppercase tracking-wider text-muted">Nama</p>
+                                    <p class="text-xs font-bold uppercase tracking-wider text-muted">Nama</p>
                                     <p class="font-medium text-ink mt-1">{{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}</p>
                                 </div>
                                 <div>
@@ -71,24 +71,24 @@
                             <dd class="space-y-4 rounded-lg bg-soft p-4">
                                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
-                                        <p class="text-[10px] font-bold uppercase tracking-wider text-muted">Jenis Cuti</p>
+                                        <p class="text-xs font-bold uppercase tracking-wider text-muted">Jenis Cuti</p>
                                         <p class="font-medium text-ink mt-1">{{ $leave->jenisCuti?->nama ?? '-' }}</p>
                                     </div>
                                     <div>
-                                        <p class="text-[10px] font-bold uppercase tracking-wider text-muted">Lama Cuti</p>
+                                        <p class="text-xs font-bold uppercase tracking-wider text-muted">Lama Cuti</p>
                                         <p class="font-medium text-ink mt-1">{{ $leave->jumlah_hari_kerja }} hari kerja</p>
                                     </div>
                                     <div>
-                                        <p class="text-[10px] font-bold uppercase tracking-wider text-muted">Tanggal Mulai</p>
+                                        <p class="text-xs font-bold uppercase tracking-wider text-muted">Tanggal Mulai</p>
                                         <p class="font-medium text-ink mt-1">{{ $leave->tanggal_mulai?->translatedFormat('d M Y') ?? '-' }}</p>
                                     </div>
                                     <div>
-                                        <p class="text-[10px] font-bold uppercase tracking-wider text-muted">Tanggal Selesai</p>
+                                        <p class="text-xs font-bold uppercase tracking-wider text-muted">Tanggal Selesai</p>
                                         <p class="font-medium text-ink mt-1">{{ $leave->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}</p>
                                     </div>
                                 </div>
                                 <div>
-                                    <p class="text-[10px] font-bold uppercase tracking-wider text-muted">Alasan Cuti</p>
+                                    <p class="text-xs font-bold uppercase tracking-wider text-muted">Alasan Cuti</p>
                                     <div class="mt-1 p-3 bg-surface rounded-lg border border-border">
                                         <p class="text-ink">{{ $leave->alasan }}</p>
                                     </div>
@@ -315,7 +315,7 @@
                                 :pulse="$step->status === 'active' && $leave->status !== 'menunggu_pembatalan'">
 
                                 <div class="mt-2 bg-soft/50 rounded-lg p-3 border border-border">
-                                    <p class="text-[11px] font-bold uppercase tracking-wider text-ink font-sans mb-1">{{ $stepStatus['label'] }}</p>
+                                    <p class="text-xs font-bold uppercase tracking-wider text-ink font-sans mb-1">{{ $stepStatus['label'] }}</p>
                                     @if($step->decision_note)
                                         <p class="text-xs font-medium text-ink/80 font-sans whitespace-pre-line">{{ $step->decision_note }}</p>
                                     @endif
@@ -325,7 +325,7 @@
                                 </div>
 
                                 @if($step->acted_at)
-                                    <p class="text-[9px] font-medium text-muted mt-1">{{ $step->acted_at->translatedFormat('d M Y H:i') }}</p>
+                                    <p class="text-xs font-medium text-muted mt-1">{{ $step->acted_at->translatedFormat('d M Y H:i') }}</p>
                                 @endif
                             </x-ui.timeline-item>
                         @empty
@@ -362,7 +362,7 @@
                                 @endif
 
                                 @if($approval->acted_at)
-                                    <p class="text-[9px] font-medium text-muted mt-1">{{ $approval->acted_at->translatedFormat('d M Y H:i') }}</p>
+                                    <p class="text-xs font-medium text-muted mt-1">{{ $approval->acted_at->translatedFormat('d M Y H:i') }}</p>
                                 @endif
                             </x-ui.timeline-item>
                         @empty

@@ -168,7 +168,24 @@ class CutiListDisplayTest extends TestCase
         $this->actingAs($user)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertSee('Belum ada pengajuan cuti yang sesuai dengan filter.', false);
+            ->assertSee('Belum ada pengajuan cuti.', false);
+    }
+
+    public function test_empty_list_distinguishes_no_data_from_no_filter_result_for_pegawai(): void
+    {
+        [$user, $employee, , $jenis] = $this->makePegawaiContext();
+
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertSee('Belum ada pengajuan cuti Anda.', false);
+
+        $this->createLeave($employee, $jenis, 'Pengajuan yang tidak cocok filter', 'menunggu_approval');
+
+        $this->actingAs($user)
+            ->get(route('cuti', ['status' => 'disetujui']))
+            ->assertOk()
+            ->assertSee('Tidak ada pengajuan cuti Anda yang sesuai dengan filter.', false);
     }
 
     public function test_list_uses_official_perubahan_label(): void

@@ -22,7 +22,28 @@
 </head>
 <body class="h-full bg-page font-sans overflow-hidden">
 
-<div class="flex h-screen overflow-hidden" x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false">
+<div
+    class="flex h-screen overflow-hidden"
+    x-data="{
+        sidebarOpen: false,
+        isMobileNavigation: window.innerWidth < 1024,
+        openSidebar() {
+            this.sidebarOpen = true;
+            this.$nextTick(() => this.$refs.sidebarNav?.querySelector('a[href]')?.focus());
+        },
+        closeSidebar({ restoreFocus = true } = {}) {
+            if (!this.sidebarOpen) return;
+
+            this.sidebarOpen = false;
+
+            if (restoreFocus) {
+                this.$nextTick(() => this.$refs.sidebarToggle?.focus());
+            }
+        }
+    }"
+    @keydown.escape.window="closeSidebar()"
+    @resize.window="isMobileNavigation = window.innerWidth < 1024; if (!isMobileNavigation) sidebarOpen = false"
+>
 
     {{-- ================================================================== --}}
     {{-- MOBILE OVERLAY --}}
@@ -35,7 +56,7 @@
         x-transition:leave="transition-opacity ease-in duration-150"
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
-        @click="sidebarOpen = false"
+        @click="closeSidebar()"
         class="fixed inset-0 z-20 bg-ink/40 lg:hidden"
         style="display: none;"
     ></div>
@@ -45,6 +66,8 @@
     {{-- ================================================================== --}}
     <aside
         :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+        :inert="isMobileNavigation && !sidebarOpen"
+        :aria-hidden="(isMobileNavigation && !sidebarOpen).toString()"
         class="fixed inset-y-0 left-0 z-30 flex h-full w-64 shrink-0 flex-col border-r border-border bg-surface transition-transform duration-200 ease-in-out lg:static lg:z-auto"
     >
         {{-- Brand --}}
@@ -63,7 +86,7 @@
         </div>
 
         {{-- Navigation --}}
-        <nav id="sidebar-nav" class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <nav id="sidebar-nav" x-ref="sidebarNav" aria-label="Navigasi utama" class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
             @php
             $currentUser = auth()->user();
             $authUser = $currentUser;
@@ -139,11 +162,11 @@
                 [
                     'group' => 'Kepegawaian',
                     'items' => array_filter([
-                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users'],
+                        ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users', 'permissions' => ['employees.read']],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
-                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open'],
+                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open', 'permissions' => ['dokumen_sk.read']],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
-                        $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
+                        ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar', 'permissions' => ['employees.read']],
                     ])
                 ],
                 [
@@ -152,11 +175,9 @@
                         $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => in_array($activeRole, ['pegawai'], true) ? 'Pengajuan Cuti' : 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        $canAdministerLeaveBalance
-                            ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
-                            : null,
+                        ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal', 'permissions' => ['cuti.balance.read']],
                         $canManageLeaveCancellations
-                            ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
+                            ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge', 'permissions' => ['cuti.cancellation.manage']]
                             : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
                         $canConfigureLeave ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
@@ -180,7 +201,7 @@
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
                         $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
                         ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
-                        ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list'],
+                        ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list', 'permissions' => ['audit_logs.read']],
                     ])
                 ]
             ];
@@ -196,7 +217,7 @@
                     [
                         'group' => 'Kepegawaian',
                         'items' => [
-                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users'],
+                            ['label' => 'Data Pegawai', 'route' => 'pimpinan.pegawai.index', 'icon' => 'users', 'permissions' => ['employees.read']],
                         ]
                     ],
                     [
@@ -225,13 +246,13 @@
                     ],
                     [
                         'group' => 'Laporan',
-                        'items' => array_filter([
+                        'items' => [
                             ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'clipboard-document-list'],
-                            $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
+                            ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar', 'permissions' => ['employees.read']],
                             ['label' => 'Nominatif Pegawai', 'route' => 'pimpinan.laporan.nominatif', 'icon' => 'document-text'],
-                            ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
+                            ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'clipboard-document-list'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
-                        ])
+                        ]
                     ],
                     [
                         'group' => 'Administrasi Sistem',
@@ -282,9 +303,9 @@
                     ],
                     [
                         'group' => 'Laporan',
-                        'items' => array_filter([
-                            $canViewEmployeeStatistics ? ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar'] : null,
-                        ]),
+                        'items' => [
+                            ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar', 'permissions' => ['employees.read']],
+                        ],
                     ],
                     [
                         'group' => 'Administrasi Sistem',
@@ -348,7 +369,17 @@
                         ];
                         $isLocked = in_array($menu['route'], $myLockedMenus)
                             && ! ($delegatedCapabilityRoutes[$menu['route']] ?? false);
-                        if ($routeExists && !$isLocked) {
+                        $requiredPermissions = $menu['permissions'] ?? [];
+                        $hasRequiredPermission = $requiredPermissions === [];
+
+                        foreach ($requiredPermissions as $permission) {
+                            if ($layoutCapabilities[$permission] ?? false) {
+                                $hasRequiredPermission = true;
+                                break;
+                            }
+                        }
+
+                        if ($routeExists && !$isLocked && $hasRequiredPermission) {
                             $visibleItems[] = $menu;
                         }
                     }
@@ -356,7 +387,7 @@
                 
                 @if(count($visibleItems) > 0)
                     @if(!empty($group['group']))
-                        <div class="px-4 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted/60 font-sans">
+                        <div class="px-4 pt-4 pb-1.5 text-xs font-bold uppercase tracking-wider text-muted font-sans">
                             {{ $group['group'] }}
                         </div>
                     @endif
@@ -391,7 +422,9 @@
                         <a
                             href="{{ $href }}"
                             wire:navigate
-                            class="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors {{ $itemClass }}"
+                            @click="isMobileNavigation && closeSidebar({ restoreFocus: false })"
+                            data-sidebar-label-scroller
+                            class="flex min-w-0 items-center gap-3 rounded-lg px-4 py-2.5 text-sm transition-colors {{ $itemClass }}"
                         >
                             @if($menu['icon'] === 'squares-2x2')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>
@@ -438,7 +471,12 @@
                             @elseif($menu['icon'] === 'user-minus')
                                 <svg class="w-5 h-5 shrink-0 {{ $iconClass }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M22 10.5h-6m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235A10.19 10.19 0 0 1 12.75 15c2.015 0 3.907.585 5.5 1.59m-14.25 2.645A9.903 9.903 0 0 1 12.75 18a9.903 9.903 0 0 1 6.002 2.235" /></svg>
                             @endif
-                            <span class="truncate">{{ $menu['label'] }}</span>
+                            <span data-sidebar-label-viewport class="min-w-0 flex-1 overflow-hidden">
+                                <span
+                                    data-sidebar-label-text
+                                    class="inline-block whitespace-nowrap transition-transform ease-linear motion-reduce:transition-none"
+                                >{{ $menu['label'] }}</span>
+                            </span>
                         </a>
                     @endforeach
                 </div>
@@ -489,8 +527,9 @@
                 @endphp
             <div class="flex items-center gap-4 w-full max-w-sm" style="{{ $searchWidth }}">
                 <button
-                    @click="sidebarOpen = !sidebarOpen"
+                    @click="sidebarOpen ? closeSidebar() : openSidebar()"
                     id="sidebar-toggle"
+                    x-ref="sidebarToggle"
                     class="inline-flex items-center justify-center rounded-lg border border-border p-2 text-muted transition-colors hover:bg-soft hover:text-ink lg:hidden"
                     :aria-expanded="sidebarOpen.toString()"
                     :aria-label="sidebarOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi'"
@@ -508,6 +547,7 @@
                 >
                     <input
                         type="text"
+                        id="global-search"
                         x-model="searchQuery"
                         @input="handleInput"
                         @click.outside="showDropdown = false"
@@ -515,6 +555,7 @@
                         @keydown.enter="handleEnter"
                         class="w-full rounded-lg border border-border bg-surface pl-10 pr-10 py-2 text-sm text-ink focus:border-primary focus:bg-surface focus:outline-none focus:ring-1 focus:ring-primary font-sans transition-colors"
                         placeholder="{{ $searchPlaceholder }}"
+                        aria-label="Pencarian global"
                     >
                     <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
@@ -534,7 +575,7 @@
                         <div>
                             <template x-for="(group, title) in searchResults" :key="title">
                                 <div class="mb-2 last:mb-0">
-                                    <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-muted/60" x-text="title"></div>
+                                    <div class="px-3 py-1 text-xs font-bold uppercase tracking-wider text-muted" x-text="title"></div>
                                     <div class="space-y-1">
                                         <template x-for="item in group" :key="item.url">
                                             <a :href="item.url" class="block rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors">
@@ -567,7 +608,7 @@
                         <span class="hidden sm:inline">Simulasi: <strong>{{ ucwords(str_replace('_', ' ', auth()->user()->temporary_role)) }}</strong></span>
                         <form method="POST" action="{{ route('revert-role') }}" class="ml-0.5 sm:ml-1">
                             @csrf
-                            <button type="submit" class="rounded-md bg-warning/20 px-1.5 sm:px-2 py-0.5 text-[11px] sm:text-xs font-semibold text-warning hover:bg-warning/30 transition-colors">
+                            <button type="submit" class="rounded-md bg-warning/20 px-1.5 sm:px-2 py-0.5 text-xs sm:text-xs font-semibold text-warning hover:bg-warning/30 transition-colors">
                                 Revert
                             </button>
                         </form>
@@ -575,10 +616,47 @@
                 @endif
 
                 {{-- Profile Dropdown --}}
-                <div class="relative" x-data="{ open: false }">
+                <div
+                    class="relative"
+                    x-data="{
+                        open: false,
+                        close({ restoreFocus = false } = {}) {
+                            this.open = false;
+
+                            if (restoreFocus) {
+                                this.$nextTick(() => this.$refs.profileButton?.focus());
+                            }
+                        },
+                        focusMenuItem(direction = 'first') {
+                            const menuItems = [...(this.$refs.profileMenu?.querySelectorAll('[role=menuitem]') ?? [])]
+                                .filter((item) => item.offsetParent !== null);
+                            if (menuItems.length === 0) return;
+
+                            const currentIndex = menuItems.indexOf(document.activeElement);
+                            let nextIndex = 0;
+
+                            if (direction === 'last') {
+                                nextIndex = menuItems.length - 1;
+                            } else if (direction === 'next') {
+                                nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % menuItems.length;
+                            } else if (direction === 'previous') {
+                                nextIndex = currentIndex <= 0 ? menuItems.length - 1 : currentIndex - 1;
+                            }
+
+                            menuItems[nextIndex]?.focus();
+                        }
+                    }"
+                    @keydown.escape.stop="close({ restoreFocus: true })"
+                >
                     <button
                         @click="open = !open"
+                        @keydown.arrow-down.prevent="open = true; $nextTick(() => focusMenuItem())"
+                        @keydown.arrow-up.prevent="open = true; $nextTick(() => focusMenuItem('last'))"
                         id="profile-btn"
+                        x-ref="profileButton"
+                        :aria-expanded="open.toString()"
+                        aria-controls="profile-menu"
+                        aria-haspopup="menu"
                         class="flex items-center gap-2.5 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-soft"
                     >
                         <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -588,20 +666,29 @@
                             <p class="text-sm font-semibold leading-tight text-ink font-sans">
                                 {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name ?? 'Pengguna') }}
                             </p>
-                            <p class="text-[11px] leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
+                            <p class="text-xs leading-tight text-muted font-sans">{{ ucwords(str_replace('_', ' ', $activeRole)) }}</p>
                         </div>
                         
                     </button>
 
                     <div
                         x-show="open"
-                        @click.outside="open = false"
+                        @click.outside="close()"
+                        @keydown.arrow-down.prevent="focusMenuItem('next')"
+                        @keydown.arrow-up.prevent="focusMenuItem('previous')"
+                        @keydown.home.prevent="focusMenuItem()"
+                        @keydown.end.prevent="focusMenuItem('last')"
+                        @keydown.tab="close()"
                         x-transition:enter="transition ease-out duration-100"
                         x-transition:enter-start="opacity-0 scale-95"
                         x-transition:enter-end="opacity-100 scale-100"
                         x-transition:leave="transition ease-in duration-75"
                         x-transition:leave-start="opacity-100 scale-100"
                         x-transition:leave-end="opacity-0 scale-95"
+                        id="profile-menu"
+                        x-ref="profileMenu"
+                        role="menu"
+                        aria-label="Menu akun"
                         class="absolute right-0 top-full mt-2 w-64 origin-top-right overflow-hidden rounded-lg border border-border bg-surface shadow-lg z-50"
                         style="display: none;"
                     >
@@ -610,7 +697,7 @@
                             <p class="mt-0.5 text-xs text-muted font-sans truncate">{{ auth()->user()->email ?? '' }}</p>
                         </div>
                         <div class="p-1.5 space-y-0.5">
-                            <a href="{{ route('profil') }}" wire:navigate id="profile-link" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
+                            <a href="{{ route('profil') }}" wire:navigate id="profile-link" role="menuitem" class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium">
                                 {{-- heroicon: user-circle (outline) --}}
                                 <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -628,7 +715,11 @@
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"
+                                            role="menuitem"
                                             @click="switchRoleOpen = !switchRoleOpen"
+                                            :aria-expanded="switchRoleOpen.toString()"
+                                            aria-controls="role-switch-menu"
+                                            aria-haspopup="menu"
                                             class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-ink transition-colors hover:bg-soft font-sans font-medium"
                                             :class="{ 'bg-soft text-primary': switchRoleOpen }"
                                         >
@@ -659,6 +750,9 @@
                                             x-transition:leave="transition ease-in duration-100"
                                             x-transition:leave-start="opacity-100 translate-y-0"
                                             x-transition:leave-end="opacity-0 -translate-y-1"
+                                            id="role-switch-menu"
+                                            role="menu"
+                                            aria-label="Pilih role simulasi"
                                             class="mt-1 space-y-0.5 rounded-lg bg-soft/60 p-1 border border-border/50"
                                             style="display: none;"
                                         >
@@ -669,6 +763,7 @@
                                                         <input type="hidden" name="target_role" value="{{ $roleKey }}">
                                                         <button
                                                             type="submit"
+                                                            role="menuitem"
                                                             class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-surface hover:text-primary transition-colors font-sans text-left group"
                                                         >
                                                             <span class="h-1.5 w-1.5 rounded-full bg-muted/60 group-hover:bg-primary shrink-0 transition-colors"></span>
@@ -684,7 +779,7 @@
                                     <div class="border-t border-border/60 my-1 pt-1">
                                         <form method="POST" action="{{ route('revert-role') }}">
                                             @csrf
-                                            <button type="submit" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-warning hover:bg-warning/10 transition-colors font-sans text-left">
+                                            <button type="submit" role="menuitem" class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold text-warning hover:bg-warning/10 transition-colors font-sans text-left">
                                                 <svg class="w-4 h-4 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                                                 </svg>
@@ -701,6 +796,7 @@
                                 <button
                                     type="submit"
                                     id="logout-btn"
+                                    role="menuitem"
                                     class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 font-sans text-left"
                                 >
                                     {{-- heroicon: arrow-right-on-rectangle (outline) --}}
@@ -747,6 +843,9 @@
             x-transition:leave="transition ease-in duration-100"
             x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0"
+            :role="toast.type === 'error' ? 'alert' : 'status'"
+            :aria-live="toast.type === 'error' ? 'assertive' : 'polite'"
+            aria-atomic="true"
             :class="{
                 'border-success/20 bg-surface': toast.type === 'success',
                 'border-danger/20 bg-surface': toast.type === 'error',
@@ -760,7 +859,7 @@
                     'text-success': toast.type === 'success',
                     'text-danger': toast.type === 'error',
                     'text-warning': toast.type === 'warning',
-                    'text-info': toast.type === 'info',
+                    'text-info-dark': toast.type === 'info',
                 }"
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
             >
@@ -889,6 +988,56 @@
             }
         }));
     });
+
+    (() => {
+        const initialiseSidebarLabelScrollers = () => {
+            document.querySelectorAll('[data-sidebar-label-scroller]').forEach((menuItem) => {
+                if (menuItem.dataset.sidebarLabelScrollerReady === 'true') return;
+
+                const viewport = menuItem.querySelector('[data-sidebar-label-viewport]');
+                const text = menuItem.querySelector('[data-sidebar-label-text]');
+
+                if (!viewport || !text) return;
+
+                let animationVersion = 0;
+
+                const reset = () => {
+                    animationVersion += 1;
+                    text.style.transitionDuration = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? '0ms' : '180ms';
+                    text.style.transform = 'translateX(0)';
+                };
+
+                const start = () => {
+                    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+                    const overflow = Math.ceil(text.scrollWidth - viewport.clientWidth);
+                    if (overflow <= 0) return;
+
+                    const currentVersion = ++animationVersion;
+                    text.style.transitionDuration = '0ms';
+                    text.style.transform = 'translateX(0)';
+
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            if (currentVersion !== animationVersion) return;
+
+                            text.style.transitionDuration = `${Math.min(5000, Math.max(1200, overflow * 24))}ms`;
+                            text.style.transform = `translateX(-${overflow}px)`;
+                        });
+                    });
+                };
+
+                menuItem.addEventListener('pointerenter', start);
+                menuItem.addEventListener('pointerleave', reset);
+                menuItem.addEventListener('focus', start);
+                menuItem.addEventListener('blur', reset);
+                menuItem.dataset.sidebarLabelScrollerReady = 'true';
+            });
+        };
+
+        initialiseSidebarLabelScrollers();
+        document.addEventListener('livewire:navigated', initialiseSidebarLabelScrollers);
+    })();
 
     // Handle Laravel Session Flashes -> Convert to Toasts
     document.addEventListener('livewire:navigated', () => {

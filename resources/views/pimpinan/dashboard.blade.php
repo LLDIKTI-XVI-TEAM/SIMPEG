@@ -1,6 +1,31 @@
+@push('head')
+    @vite('resources/js/pages/dashboard-charts.js')
+@endpush
+
 <x-layouts.app title="Dashboard Pimpinan" subtitle="Ringkasan data kepegawaian terkini.">
     @php
         $employeeTotal = max($totalPegawai, 1);
+        $rankTooltipTotal = max(0, (int) $totalPegawai);
+        $standardRankOrder = [
+            'I/a', 'I/b', 'I/c', 'I/d',
+            'II/a', 'II/b', 'II/c', 'II/d',
+            'III/a', 'III/b', 'III/c', 'III/d',
+            'IV/a', 'IV/b', 'IV/c', 'IV/d', 'IV/e',
+        ];
+        $rankDistribution = collect($distribusiGolongan ?? []);
+        $rankChartRows = $rankDistribution
+            ->filter(fn ($count, $rank): bool => in_array((string) $rank, $standardRankOrder, true))
+            ->sortBy(fn ($count, $rank): int => array_search((string) $rank, $standardRankOrder, true))
+            ->map(fn ($count, $rank): array => ['golongan' => (string) $rank, 'jumlah' => max(0, (int) $count)])
+            ->values();
+        $rankUnclassifiedRows = $rankDistribution
+            ->reject(fn ($count, $rank): bool => in_array((string) $rank, $standardRankOrder, true))
+            ->filter(fn ($count): bool => (int) $count > 0);
+        $rankUnclassifiedTotal = $rankUnclassifiedRows->sum();
+        $rankUnclassifiedLabels = $rankUnclassifiedRows
+            ->keys()
+            ->map(fn ($rank): string => (string) $rank === 'Belum Diisi' ? 'belum diisi' : (string) $rank)
+            ->implode(', ');
     @endphp
 
     <div class="space-y-6">
@@ -25,12 +50,12 @@
 
             <!-- Content Left -->
             <div class="relative z-10 w-full lg:w-[70%] flex flex-col justify-center">
-                <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
-                <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
+                <p class="text-xs font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
+                <h1 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
                     {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
-                </h2>
+                </h1>
                 
-                <p class="mt-1 text-[12px] text-white/80 font-sans max-w-lg">
+                <p class="mt-1 text-xs text-white/80 font-sans max-w-lg">
                     Semangat menjalankan tugas hari ini. Tetap produktif dan berikan pelayanan terbaik.
                 </p>
 
@@ -42,8 +67,8 @@
                         </div>
                         <div class="w-px h-6 bg-white/20"></div>
                         <div class="flex flex-col mt-0.5">
-                            <span class="text-[12px] font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
-                            <span class="text-[10px] text-white/70 mt-0.5">Hari ini</span>
+                            <span class="text-xs font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
+                            <span class="text-xs text-white/70 mt-0.5">Hari ini</span>
                         </div>
                     </div>
 
@@ -54,8 +79,8 @@
                         </div>
                         <div class="w-px h-6 bg-white/20"></div>
                         <div class="flex flex-col mt-0.5">
-                            <span class="text-[12px] font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
-                            <span class="text-[10px] text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
+                            <span class="text-xs font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
+                            <span class="text-xs text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
                         </div>
                     </div>
                 </div>
@@ -149,7 +174,7 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                 </x-slot:icon>
                 <x-slot:meta>
-                    <span class="font-medium text-ink">{{ $cutiDisetujuiBulanIni }} disetujui bulan ini · {{ $cutiDitunda }} ditangguhkan (semua periode)</span>
+                    <span class="font-medium text-ink">{{ $cutiDisetujuiBulanIni }} disetujui · {{ $cutiDitunda }} ditangguhkan</span>
                     <span>Bulan berjalan</span>
                 </x-slot:meta>
             </x-ui.stat-card>
@@ -160,7 +185,7 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
                 </x-slot:icon>
                 <x-slot:meta>
-                    <span class="font-semibold text-danger">Peringatan</span>
+                    <span class="font-semibold text-ink">Peringatan</span>
                     <span>Tabel 5 teratas di bawah</span>
                 </x-slot:meta>
             </x-ui.stat-card>
@@ -194,7 +219,7 @@
                         </x-ui.table-head>
                         <x-ui.table-body>
                             @forelse($promotionRows as $row)
-                                <x-ui.table-row :interactive="true" class="cursor-pointer border-b border-border/50 group">
+                                <x-ui.table-row class="border-b border-border/50 group">
                                     <x-ui.table-td padding="xl">
                                         <div class="flex items-center gap-3">
                                             <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -202,7 +227,7 @@
                                             </div>
                                             <div class="min-w-0">
                                                 <p class="text-xs font-bold text-ink font-sans leading-tight">{{ $row['nama'] }}</p>
-                                                <p class="text-[10px] text-muted font-sans mt-0.5">NIP. {{ $row['nip'] }}</p>
+                                                <p class="text-xs text-muted font-sans mt-0.5">NIP. {{ $row['nip'] }}</p>
                                             </div>
                                         </div>
                                     </x-ui.table-td>
@@ -226,73 +251,64 @@
                 </div>
             </x-ui.card>
 
-            {{-- W1: Komposisi Pegawai PNS vs PPPK (SVG Pie/Donut Chart) --}}
+            {{-- W1: Komposisi seluruh pegawai aktif per jenis. --}}
             <x-ui.card padding="lg" class="flex flex-col justify-between">
                 <div>
                     <h3 class="text-sm font-bold text-ink font-sans">Komposisi Kepegawaian</h3>
-                    <p class="mt-0.5 text-xs text-muted font-sans mb-5">Rasio Pegawai PNS vs PPPK</p>
+                    <p class="mt-0.5 text-xs text-muted font-sans mb-5">Rasio pegawai aktif per jenis.</p>
                     
                     @php
                         $pnsCount = $komposisi['PNS'] ?? 0;
                         $pppkCount = $komposisi['PPPK'] ?? 0;
                         $cpnsCount = $komposisi['CPNS'] ?? 0;
-                        
-                        $pnsPercent = $employeeTotal > 0 ? round(($pnsCount / $employeeTotal) * 100, 1) : 0;
-                        $pppkPercent = $employeeTotal > 0 ? round(($pppkCount / $employeeTotal) * 100, 1) : 0;
-                        $cpnsPercent = $employeeTotal > 0 ? round(($cpnsCount / $employeeTotal) * 100, 1) : 0;
-                        
-                        $pnsDash = $employeeTotal > 0 ? ($pnsCount / $employeeTotal) * 100 : 0;
-                        $pppkDash = $employeeTotal > 0 ? ($pppkCount / $employeeTotal) * 100 : 0;
-                        $cpnsDash = $employeeTotal > 0 ? ($cpnsCount / $employeeTotal) * 100 : 0;
+                        $knownCount = $pnsCount + $pppkCount + $cpnsCount;
+                        $otherCount = max(0, $totalPegawai - $knownCount);
+                        $compositionRows = collect([
+                            ['label' => 'PNS', 'total' => $pnsCount, 'tone' => 'primary', 'dot' => 'bg-primary'],
+                            ['label' => 'PPPK', 'total' => $pppkCount, 'tone' => 'secondary', 'dot' => 'bg-secondary'],
+                            ['label' => 'CPNS', 'total' => $cpnsCount, 'tone' => 'info', 'dot' => 'bg-info'],
+                        ]);
+
+                        if ($otherCount > 0) {
+                            $compositionRows->push([
+                                'label' => 'Lainnya / Belum Diisi',
+                                'total' => $otherCount,
+                                'tone' => 'muted',
+                                'dot' => 'bg-muted',
+                            ]);
+                        }
+
+                        $compositionRows = $compositionRows->map(function (array $row) use ($employeeTotal): array {
+                            $row['percent'] = round(($row['total'] / $employeeTotal) * 100, 1);
+
+                            return $row;
+                        });
                     @endphp
 
-                    {{-- SVG Donut Chart --}}
                     <div class="flex items-center justify-center py-2">
-                        <div class="relative flex items-center justify-center h-32 w-32">
-                            <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                                {{-- Base background circle --}}
-                                <circle class="text-soft" stroke="currentColor" stroke-width="4.5" fill="none" cx="18" cy="18" r="15.915"></circle>
-                                {{-- PNS stroke --}}
-                                <circle class="text-primary" stroke="currentColor" stroke-width="4.5" stroke-dasharray="{{ $pnsDash }} {{ 100 - $pnsDash }}" stroke-dashoffset="0" fill="none" cx="18" cy="18" r="15.915" stroke-linecap="round"></circle>
-                                {{-- PPPK stroke --}}
-                                @if($pppkDash > 0)
-                                <circle class="text-secondary" stroke="currentColor" stroke-width="4.5" stroke-dasharray="{{ $pppkDash }} {{ 100 - $pppkDash }}" stroke-dashoffset="-{{ $pnsDash }}" fill="none" cx="18" cy="18" r="15.915" stroke-linecap="round"></circle>
-                                @endif
-                                {{-- CPNS stroke --}}
-                                @if($cpnsDash > 0)
-                                <circle class="text-warning" stroke="currentColor" stroke-width="4.5" stroke-dasharray="{{ $cpnsDash }} {{ 100 - $cpnsDash }}" stroke-dashoffset="-{{ $pnsDash + $pppkDash }}" fill="none" cx="18" cy="18" r="15.915" stroke-linecap="round"></circle>
-                                @endif
-                            </svg>
+                        <div
+                            x-data="dashboardChart({ type: 'doughnut', labels: @js($compositionRows->pluck('label')->all()), data: @js($compositionRows->pluck('total')->all()), tones: @js($compositionRows->pluck('tone')->all()) })"
+                            class="relative flex h-32 w-32 items-center justify-center"
+                        >
+                            <canvas x-ref="canvas" aria-hidden="true"></canvas>
                             <div class="absolute flex flex-col items-center justify-center">
                                 <span class="text-xl font-extrabold text-ink leading-none">{{ $totalPegawai }}</span>
-                                <span class="text-[9px] text-muted font-sans font-bold uppercase tracking-wider mt-1">Aktif</span>
+                                <span class="text-xs text-muted font-sans font-bold uppercase tracking-wider mt-1">Aktif</span>
                             </div>
                         </div>
                     </div>
 
                     {{-- Legend --}}
                     <div class="mt-6 space-y-2">
-                        <div class="flex items-center justify-between text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="h-2.5 w-2.5 rounded-full bg-primary shrink-0"></span>
-                                <span class="font-medium text-ink">PNS</span>
+                        @foreach ($compositionRows as $row)
+                            <div class="flex items-center justify-between text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="h-2.5 w-2.5 rounded-full {{ $row['dot'] }} shrink-0"></span>
+                                    <span class="font-medium text-ink">{{ $row['label'] }}</span>
+                                </div>
+                                <span class="font-bold text-ink">{{ $row['total'] }} ({{ $row['percent'] }}%)</span>
                             </div>
-                            <span class="font-bold text-primary">{{ $pnsCount }} ({{ $pnsPercent }}%)</span>
-                        </div>
-                        <div class="flex items-center justify-between text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="h-2.5 w-2.5 rounded-full bg-secondary shrink-0"></span>
-                                <span class="font-medium text-ink">PPPK</span>
-                            </div>
-                            <span class="font-bold text-secondary">{{ $pppkCount }} ({{ $pppkPercent }}%)</span>
-                        </div>
-                        <div class="flex items-center justify-between text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="h-2.5 w-2.5 rounded-full bg-warning shrink-0"></span>
-                                <span class="font-medium text-ink">CPNS</span>
-                            </div>
-                            <span class="font-bold text-warning">{{ $cpnsCount }} ({{ $cpnsPercent }}%)</span>
-                        </div>
+                        @endforeach
                     </div>
                 </div>
             </x-ui.card>
@@ -354,13 +370,13 @@
                                             </div>
                                             <div class="min-w-0">
                                                 <p class="text-xs font-bold text-ink font-sans leading-tight">{{ $alert['nama'] }}</p>
-                                                <p class="text-[9px] text-muted font-sans leading-none mt-0.5">NIP. {{ $alert['nip'] }}</p>
+                                                <p class="text-xs text-muted font-sans leading-none mt-0.5">NIP. {{ $alert['nip'] }}</p>
                                             </div>
                                         </div>
                                     </x-ui.table-td>
                                     <x-ui.table-td class="px-6 py-3.5">
                                         <div class="text-xs font-semibold text-ink">{{ $alert['jenis_event'] }}</div>
-                                        <div class="mt-1 text-[10px] text-muted">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</div>
+                                        <div class="mt-1 text-xs text-muted">{{ \Carbon\Carbon::parse($alert['tanggal_target'])->translatedFormat('d M Y') }}</div>
                                     </x-ui.table-td>
                                     <x-ui.table-td class="px-6 py-3.5 font-medium text-xs">{{ $alert['sisa_hari'] }} Hari Lagi</x-ui.table-td>
                                     <x-ui.table-td class="px-6 py-3.5">
@@ -401,10 +417,10 @@
                         <div class="flex items-center justify-between px-6 py-4 transition-colors hover:bg-soft/30">
                             <div class="min-w-0 flex-1 pr-4">
                                 <p class="text-xs font-bold text-ink font-sans">{{ $leave['nama'] }}</p>
-                                <p class="text-[10px] text-muted mt-0.5 font-sans leading-none">{{ $leave['jenis'] }} · {{ $leave['hari'] }} hari kerja · {{ \Carbon\Carbon::parse($leave['mulai'])->translatedFormat('d M') }}–{{ \Carbon\Carbon::parse($leave['selesai'])->translatedFormat('d M Y') }}</p>
+                                <p class="text-xs text-muted mt-0.5 font-sans leading-none">{{ $leave['jenis'] }} · {{ $leave['hari'] }} hari kerja · {{ \Carbon\Carbon::parse($leave['mulai'])->translatedFormat('d M') }}–{{ \Carbon\Carbon::parse($leave['selesai'])->translatedFormat('d M Y') }}</p>
                             </div>
                             <div class="ml-3 flex shrink-0 items-center gap-3">
-                                <a href="{{ route('pimpinan.cuti.show', $leave['id']) }}" class="text-xs font-semibold text-primary hover:underline transition-colors font-sans focus:outline-none">
+                                <a href="{{ route('pimpinan.cuti.show', $leave['id']) }}" class="rounded text-xs font-semibold text-primary transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 font-sans">
                                     Buka Detail
                                 </a>
                             </div>
@@ -417,7 +433,7 @@
                     </div>
                 </div>
                 <div class="border-t border-border px-6 py-4 bg-soft/20 text-center">
-                    <a href="{{ route('pimpinan.cuti.index', ['status' => 'menunggu']) }}" class="text-xs font-bold text-primary hover:underline transition-all font-sans">
+                    <a href="{{ route('pimpinan.cuti.index', ['status' => 'menunggu']) }}" class="text-xs font-bold text-primary transition-colors font-sans hover:underline">
                         Buka antrean persetujuan cuti
                     </a>
                 </div>
@@ -436,24 +452,26 @@
                     <h3 class="text-sm font-bold text-ink font-sans">Distribusi Golongan</h3>
                     <p class="mt-0.5 text-xs text-muted font-sans mb-5">Statistik jumlah pegawai per tingkat golongan</p>
                     
-                    <div class="space-y-4">
-                        @forelse($distribusiGolongan as $rank => $count)
-                            @php
-                                $percent = $employeeTotal > 0 ? round(($count / $employeeTotal) * 100, 1) : 0;
-                            @endphp
-                            <div>
-                                <div class="flex items-center justify-between text-xs mb-1">
-                                    <span class="font-medium text-ink">Golongan {{ $rank }}</span>
-                                    <span class="font-bold text-primary">{{ $count }} ({{ $percent }}%)</span>
-                                </div>
-                                <div class="h-2 w-full bg-soft rounded-full overflow-hidden">
-                                    <div class="h-2 rounded-full bg-primary" style="width: {{ $percent }}%"></div>
-                                </div>
-                            </div>
-                        @empty
-                            <p class="text-sm text-muted">Belum ada golongan yang tercatat.</p>
-                        @endforelse
-                    </div>
+                    @if ($rankChartRows->isEmpty())
+                        <p class="text-sm text-muted">Belum ada golongan yang tercatat.</p>
+                    @else
+                        <div
+                            x-data="dashboardChart({ type: 'horizontal-bar', labels: @js($rankChartRows->map(fn (array $row): string => 'Golongan '.$row['golongan'])->all()), data: @js($rankChartRows->pluck('jumlah')->all()), tooltipTotal: @js($rankTooltipTotal) })"
+                            class="h-64 w-full"
+                        >
+                            <canvas x-ref="canvas" aria-hidden="true"></canvas>
+                            <dl class="sr-only">
+                                @foreach ($rankChartRows as $row)
+                                    <div><dt>Golongan {{ $row['golongan'] }}</dt><dd>{{ $row['jumlah'] }} pegawai</dd></div>
+                                @endforeach
+                            </dl>
+                        </div>
+                    @endif
+                    @if ($rankUnclassifiedTotal > 0)
+                        <p class="mt-4 text-xs text-muted">
+                            {{ $rankUnclassifiedTotal }} pegawai tidak ditampilkan pada grafik karena golongannya belum diisi atau memakai nilai legacy ({{ $rankUnclassifiedLabels }}).
+                        </p>
+                    @endif
                 </div>
             </x-ui.card>
 
@@ -463,57 +481,21 @@
                     <h3 class="text-sm font-bold text-ink font-sans">Tren Pegawai Aktif</h3>
                     <p class="mt-0.5 text-xs text-muted font-sans mb-4">Grafik jumlah pegawai aktif bulanan dari data yang tersimpan</p>
                     
-                    @php
-                        // Menghitung poin-poin SVG secara dinamis berdasarkan data trend ($trenPegawai).
-                        $points = $trendPoints ?? [];
-                        $pathD = $trendPathD ?? '';
-                        $maxVal = $trendMaxVal ?? 10;
-                        $count = count($points);
-                    @endphp
-
-                    {{-- SVG Line Chart --}}
-                    <div class="w-full h-44 py-2 relative">
-                        @if($count > 1)
-                        <svg class="w-full h-full" viewBox="0 0 500 150" preserveAspectRatio="none">
-                            {{-- Grids --}}
-                            <line x1="40" y1="25" x2="480" y2="25" stroke="#F3F4F6" stroke-width="1"></line>
-                            <line x1="40" y1="58" x2="480" y2="58" stroke="#F3F4F6" stroke-width="1"></line>
-                            <line x1="40" y1="91" x2="480" y2="91" stroke="#F3F4F6" stroke-width="1"></line>
-                            <line x1="40" y1="125" x2="480" y2="125" stroke="#E5E7EB" stroke-width="1.5"></line>
-
-                            {{-- Chart Path with smooth curves --}}
-                            <path d="{{ $pathD }}" fill="none" stroke="#122E92" stroke-width="3.5" stroke-linecap="round"></path>
-                            
-                            {{-- Area under path with gradient --}}
-                            <path d="{{ $pathD }} L {{ end($points)['x'] }} 125 L {{ $points[0]['x'] }} 125 Z" fill="url(#chart-grad)" opacity="0.08"></path>
-
-                            {{-- Defs for linear gradient --}}
-                            <defs>
-                                <linearGradient id="chart-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-                                    <stop offset="0%" stop-color="#122E92"></stop>
-                                    <stop offset="100%" stop-color="#122E92" stop-opacity="0"></stop>
-                                </linearGradient>
-                            </defs>
-
-                            {{-- Dots on peaks and Labels --}}
-                            @foreach($points as $idx => $pt)
-                                @if($idx === count($points) - 1)
-                                    <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="4.5" fill="#122E92" stroke="#FFFFFF" stroke-width="1.5"></circle>
-                                @else
-                                    <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="4.5" fill="#FFFFFF" stroke="#122E92" stroke-width="2.5"></circle>
-                                @endif
-                                <text x="{{ $pt['x'] - 8 }}" y="142" fill="#9CA3AF" font-size="9" font-family="Poppins" font-weight="bold">{{ $pt['label'] }}</text>
-                            @endforeach
-
-                            {{-- Left Axis values --}}
-                            <text x="10" y="30" fill="#9CA3AF" font-size="9" font-family="mono" font-weight="bold">{{ round($maxVal) }}</text>
-                            <text x="10" y="78" fill="#9CA3AF" font-size="9" font-family="mono" font-weight="bold">{{ round($maxVal/2) }}</text>
-                            <text x="10" y="128" fill="#9CA3AF" font-size="9" font-family="mono" font-weight="bold">0</text>
-                        </svg>
-                        @else
-                            <div class="absolute inset-0 flex items-center justify-center text-sm text-muted">Data trend belum cukup untuk digambar.</div>
-                        @endif
-                    </div>
+                    @if (collect($trenPegawai)->isEmpty())
+                        <div class="flex h-44 items-center justify-center text-sm text-muted">Data tren belum tersedia.</div>
+                    @else
+                        <div
+                            x-data="dashboardChart({ type: 'line', labels: @js(collect($trenPegawai)->pluck('label')->all()), data: @js(collect($trenPegawai)->pluck('jumlah')->all()) })"
+                            class="h-56 w-full"
+                        >
+                            <canvas x-ref="canvas" aria-hidden="true"></canvas>
+                            <dl class="sr-only">
+                                @foreach ($trenPegawai as $row)
+                                    <div><dt>{{ data_get($row, 'label') }}</dt><dd>{{ data_get($row, 'jumlah') }} pegawai</dd></div>
+                                @endforeach
+                            </dl>
+                        </div>
+                    @endif
                 </div>
             </x-ui.card>
 
@@ -542,7 +524,7 @@
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="text-xs text-ink font-sans"><span class="font-bold">{{ $audit['user'] }}</span> &middot; {{ $audit['aksi'] }}</p>
-                            <div class="mt-1 flex items-center gap-2 text-[10px] text-muted font-sans">
+                            <div class="mt-1 flex items-center gap-2 text-xs text-muted font-sans">
                                 <span>{{ $audit['target'] }}</span>
                                 <span>&bull;</span>
                                 <span>{{ $audit['waktu'] }}</span>

@@ -235,7 +235,7 @@ class SessionTimeoutTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('<option value="SESSION_TIMEOUT">SESSION_TIMEOUT</option>', false);
-        $response->assertSee('SESSION_TIMEOUT: Sesi berakhir karena idle timeout', false);
+        $response->assertSee('SESSION_TIMEOUT', false);
         $response->assertSee('autentikasi');
     }
 

@@ -6,7 +6,7 @@
 <div {{ $attributes->class(['flex flex-col gap-3']) }}>
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
-            <h2 class="text-2xl md:text-3xl font-extrabold text-ink font-sans tracking-tight">{{ $title }}</h2>
+            <h1 class="text-2xl font-semibold text-ink font-sans">{{ $title }}</h1>
 
             @if ($description)
                 <p class="mt-1.5 text-sm md:text-base text-muted font-sans font-medium">{{ $description }}</p>

@@ -96,6 +96,8 @@
                 searchName="search" 
                 :searchValue="request('search')"
                 searchPlaceholder="Cari nama atau NIP"
+                searchLabel="Cari nama atau NIP"
+                searchLabelSrOnly
                 gridClass="grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
             >
                 <div class="relative">
@@ -179,7 +181,7 @@
                                     <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $leave->jumlah_hari_kerja }} Hari Kerja</p>
                                 </x-ui.table-td>
                                 <x-ui.table-td>
-                                    <div class="text-[11px] font-medium text-ink font-sans">
+                                    <div class="text-xs font-medium text-ink font-sans">
                                         @if($leave->status === 'menunggu_approval' && $leave->current_step_label)
                                             <span>Menunggu <strong>{{ $leave->current_step_label }}</strong></span>
                                         @elseif($leave->current_step_label)
@@ -196,7 +198,7 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td>
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <x-ui.button href="{{ route('pimpinan.cuti.show', $leave) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai' }}">
+                                        <x-ui.button href="{{ route('pimpinan.cuti.show', $leave) }}" variant="secondary" size="compact-icon" title="Detail" aria-label="Detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai' }}">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
@@ -215,25 +217,25 @@
             </div>
             
             {{-- TABLE FOOTER --}}
-            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row">
-                <div class="flex items-center gap-4">
+            <div class="flex flex-col items-start justify-between gap-4 border-t border-border bg-surface px-6 py-4 sm:flex-row sm:items-center">
+                <div class="flex flex-wrap items-center gap-4 text-sm text-muted">
                     <div class="flex items-center gap-2">
-                        <span class="text-sm text-muted">Tampilkan</span>
-                        <select onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="pimpinan-cuti-per-page" class="sr-only">Jumlah baris per halaman</label>
+                        <select id="pimpinan-cuti-per-page" onchange="updatePerPage(this.value)" class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-sm text-ink focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary font-sans cursor-pointer text-center">
                             <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10</option>
                             <option value="25" {{ request('per_page') == 25 ? 'selected' : '' }}>25</option>
                             <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50</option>
                         </select>
-                        <span class="text-sm text-muted">data per halaman</span>
+                        <span class="whitespace-nowrap">data</span>
                     </div>
-                    @if($leaves->total() > 0)
-                    <p class="text-sm text-muted hidden sm:block">
-                        Menampilkan <span class="font-semibold text-ink">{{ $leaves->firstItem() }}</span> hingga <span class="font-semibold text-ink">{{ $leaves->lastItem() }}</span> dari <span class="font-semibold text-ink">{{ $leaves->total() }}</span> hasil
+                    <span class="hidden h-6 w-px bg-border sm:block" aria-hidden="true"></span>
+                    <p class="whitespace-nowrap">
+                        Menampilkan {{ $leaves->firstItem() ?? 0 }} - {{ $leaves->lastItem() ?? 0 }} dari {{ $leaves->total() }}
                     </p>
-                    @endif
                 </div>
 
-                <div class="w-full sm:w-auto flex justify-end">
+                <div class="flex w-full justify-start sm:w-auto sm:justify-end">
                     {{ $leaves->appends(request()->query())->links('vendor.pagination.simpeg') }}
                 </div>
             </div>

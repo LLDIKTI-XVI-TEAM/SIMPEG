@@ -6,11 +6,11 @@ use App\Actions\Ews\ListActiveEwsAlertsAction;
 use App\Actions\Ews\UpdateEwsAlertFollowupAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Ews\AdminEwsFilterRequest;
+use App\Http\Requests\Ews\MyEwsFilterRequest;
 use App\Http\Requests\Ews\UpdateEwsAlertFollowupRequest;
 use App\Models\EwsAlert;
 use App\Models\RefGolongan;
 use App\Services\Employees\EmployeeDashboardScopeService;
-use Illuminate\Http\Request;
 
 class EwsController extends Controller
 {
@@ -51,13 +51,13 @@ class EwsController extends Controller
     /**
      * Menampilkan EWS pribadi milik pegawai yang sedang login.
      */
-    public function myAlerts(Request $request, ListActiveEwsAlertsAction $action)
+    public function myAlerts(MyEwsFilterRequest $request, ListActiveEwsAlertsAction $action)
     {
         $employeeId = $request->user()?->employee_id;
 
         abort_unless($employeeId, 404, 'Data pegawai untuk akun ini belum terhubung.');
 
-        $perPage = max(1, min((int) $request->query('per_page', 10), 100));
+        $perPage = (int) ($request->validated('per_page') ?? 10);
         $data = $action->paginate(null, null, null, $perPage, (string) $employeeId);
 
         return view('admin.ews.saya', [

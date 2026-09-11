@@ -12,7 +12,7 @@
 
         {{-- Breadcrumbs & Title --}}
         <div class="flex flex-col gap-1.5">
-            <h2 class="text-2xl font-bold text-ink font-sans">Edit Data Pegawai</h2>
+            <h1 class="text-2xl font-semibold text-ink font-sans">Edit Data Pegawai</h1>
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
@@ -381,9 +381,9 @@
                                 </div>
                             </div>
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
-                            <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans"
+                            <p x-show="nipError" class="text-xs text-danger font-semibold mt-1 font-sans"
                                 x-text="nipError"></p>
-                            <p x-show="nipSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans"
+                            <p x-show="nipSuccess" class="text-xs text-success font-semibold mt-1 font-sans"
                                 x-text="nipSuccess"></p>
                         </div>
 
@@ -409,9 +409,9 @@
                                 @else
                                     <span class="text-muted">-</span>
                                 @endif
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via SK Pengangkatan</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via SK Pengangkatan</span>
                             </div>
-                            <p class="text-[10px] text-muted font-sans mt-1">
+                            <p class="text-xs text-muted font-sans mt-1">
                                 Perubahan status kepegawaian harus disertai SK Pengangkatan. Buka tab
                                 <button type="button" @click="activeTab = 'pengangkatan'; subTab = 'pengangkatan'"
                                     class="text-primary font-semibold hover:underline cursor-pointer">Berkas &amp; SK →
@@ -465,7 +465,7 @@
                                     class="mt-1 rounded border-border text-primary focus:ring-primary/20">
                                 <span>
                                     Kepala Lembaga
-                                    <span class="block text-[10px] font-normal text-muted">Aktifkan hanya untuk pegawai
+                                    <span class="block text-xs font-normal text-muted">Aktifkan hanya untuk pegawai
                                         yang berwenang memberi keputusan Kepala Lembaga pada alur cuti.</span>
                                 </span>
                             </label>
@@ -484,7 +484,7 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span class="font-semibold">{{ $p->golongan_terakhir ?? '-' }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
@@ -500,7 +500,7 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span>{{ $p->pangkat_terakhir ?? '-' }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
@@ -517,7 +517,7 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span>{{ $p->jabatan_terakhir ?? '-' }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
@@ -541,7 +541,7 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span>{{ $currentJenisNama }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
@@ -558,7 +558,7 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span>{{ $currentUnitNama }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
@@ -575,7 +575,7 @@
                                         d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                                 </svg>
                                 <span>{{ $p->kelas_jabatan_terakhir ?? '-' }}</span>
-                                <span class="ml-auto text-[10px] text-muted font-sans">Ubah via Berkas &amp; SK</span>
+                                <span class="ml-auto text-xs text-muted font-sans">Ubah via Berkas &amp; SK</span>
                             </div>
                         </div>
 
@@ -637,9 +637,9 @@
                                 </div>
                             </div>
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
-                            <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans"
+                            <p x-show="nikError" class="text-xs text-danger font-semibold mt-1 font-sans"
                                 x-text="nikError"></p>
-                            <p x-show="nikSuccess" class="text-[11px] text-success font-semibold mt-1 font-sans"
+                            <p x-show="nikSuccess" class="text-xs text-success font-semibold mt-1 font-sans"
                                 x-text="nikSuccess"></p>
                         </div>
 
@@ -651,8 +651,8 @@
                             <input id="no_kk" name="no_kk" type="text" maxlength="16" x-model="kk"
                                 @input="validateKkLocal" placeholder="3273250102120045"
                                 class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <p class="text-[11px] text-muted font-sans mt-1">Harus 16 digit angka.</p>
-                            <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans"
+                            <p class="text-xs text-muted font-sans mt-1">Harus 16 digit angka.</p>
+                            <p x-show="kkError" class="text-xs text-danger font-semibold mt-1 font-sans"
                                 x-text="kkError"></p>
                         </div>
 
@@ -745,7 +745,7 @@
                                 <div class="space-y-1">
                                     <input type="file" id="foto" name="foto" accept="image/*" @change="handleFotoChange"
                                         class="text-xs text-muted focus:outline-none file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 file:transition file:cursor-pointer">
-                                    <p class="text-[10px] text-muted font-sans">Format file: JPG, PNG. Maksimal ukuran
+                                    <p class="text-xs text-muted font-sans">Format file: JPG, PNG. Maksimal ukuran
                                         10MB.</p>
                                 </div>
                             </div>

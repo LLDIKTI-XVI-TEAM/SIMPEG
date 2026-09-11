@@ -169,6 +169,20 @@ class ProfileTest extends TestCase
         $response->assertDontSee('Mockup EWS', false);
     }
 
+    public function test_profile_uses_consistent_subsection_heading_scale(): void
+    {
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+
+        $content = $this->actingAs($user)->get('/dashboard/profil')
+            ->assertOk()
+            ->getContent();
+
+        $headingClass = 'text-sm font-semibold text-ink uppercase tracking-wider font-sans border-b border-border pb-1.5';
+
+        $this->assertSame(4, substr_count($content, $headingClass));
+    }
+
     public function test_profile_uses_employee_tanggal_pensiun(): void
     {
         $employee = Employee::factory()->create([

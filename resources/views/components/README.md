@@ -52,7 +52,7 @@ Komponen tombol standar dan anchor link dengan dukungan variasi visual, ukuran, 
 
 **Props**:
 - `variant`: `'primary'` (default), `'secondary'`, `'muted'`, `'danger'`, `'danger-solid'`, `'success'`, `'warning'`, `'ghost'`, `'link'`.
-- `size`: `'xs'`, `'sm'`, `'md'` (default), `'lg'`, `'icon'`.
+- `size`: `'compact'`, `'compact-icon'`, `'xs'`, `'sm'`, `'md'` (default), `'lg'`, `'icon'`.
 - `type`: `'button'` (default), `'submit'`, `'reset'`.
 - `href`: (string|null) Jika diisi, otomatis dirender sebagai tag `<a>`.
 - `as`: (string|null) `'a'` atau `'button'`.
@@ -341,7 +341,7 @@ Bar pencarian dan filter data di atas tabel atau daftar.
 Tampilan ramah saat data kosong atau pencarian tidak menemukan hasil.
 
 **Props**:
-- `icon`: `'folder'` (default), `'document'`, `'search'`, atau `'none'`.
+- `icon`: `'folder'` (default), `'document'`, `'search'`, `'bell'`, atau `'none'`.
 - `title`: (string, default: `'Tidak ada data'`).
 - `message`: (string|null) Pesan penjelas.
 

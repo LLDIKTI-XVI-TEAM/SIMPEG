@@ -146,6 +146,8 @@ class ShowLeaveBalanceAdminAction
         $manualLeaveCaseOptions = $manualWorkspaceActive
             ? $this->manualLeaveCaseOptionQuery->forSelectedEmployee($selectedEmployee, $editableUsage?->leave_request_case_id)
             : collect();
+        $ledgerPerPage = $this->integerFilter($filters, 'per_page_ledger');
+        $ledgerPerPage = in_array($ledgerPerPage, [10, 25, 50], true) ? $ledgerPerPage : 10;
         $ledgerBase = LeaveBalanceLedger::query()
             ->select(['id', 'employee_id', 'tahun', 'event_type', 'amount', 'source_year', 'reason', 'metadata', 'created_by', 'occurred_at', 'created_at'])
             ->where('tahun', (int) $periode)
@@ -158,7 +160,7 @@ class ShowLeaveBalanceAdminAction
             ->orderByDesc('occurred_at')
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->paginate(10, ['*'], 'page_ledger')
+            ->paginate($ledgerPerPage, ['*'], 'page_ledger')
             ->withQueryString();
         $rolloverRows = (clone $ledgerBase)
             ->whereIn('event_type', [
@@ -197,6 +199,7 @@ class ShowLeaveBalanceAdminAction
             'manualWorkspaceActive',
             'currentApprovalChainPreview',
             'manualLeaveCaseOptions',
+            'ledgerPerPage',
             'ledgerRows',
             'rolloverRows',
         );

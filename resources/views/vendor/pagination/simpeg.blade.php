@@ -8,7 +8,7 @@
                 </li>
             @else
                 <li class="shrink-0">
-                    <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface hover:bg-soft hover:text-ink text-ink transition focus:outline-none shadow-sm" aria-label="{{ __('pagination.previous') }}">
+                    <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface hover:bg-soft hover:text-ink text-ink transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 shadow-sm" aria-label="{{ __('pagination.previous') }}">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
                     </a>
                 </li>
@@ -71,7 +71,7 @@
                             <li class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans focus:outline-none bg-primary text-white border-primary shadow-sm" aria-current="page">{{ $page }}</li>
                         @else
                             <li class="shrink-0">
-                                <a href="{{ $url }}" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans focus:outline-none bg-surface text-muted hover:bg-soft hover:text-ink border-border cursor-pointer shadow-sm" aria-label="{{ __('Go to page :page', ['page' => $page]) }}">
+                                <a href="{{ $url }}" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold transition font-sans focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 bg-surface text-muted hover:bg-soft hover:text-ink border-border cursor-pointer shadow-sm" aria-label="{{ __('Go to page :page', ['page' => $page]) }}">
                                     {{ $page }}
                                 </a>
                             </li>
@@ -83,7 +83,7 @@
             {{-- Next Page Link --}}
             @if ($paginator->hasMorePages())
                 <li class="shrink-0">
-                    <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface hover:bg-soft hover:text-ink text-ink transition focus:outline-none shadow-sm" aria-label="{{ __('pagination.next') }}">
+                    <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface hover:bg-soft hover:text-ink text-ink transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 shadow-sm" aria-label="{{ __('pagination.next') }}">
                         <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
                     </a>
                 </li>

@@ -86,7 +86,7 @@
             <p class="text-xs text-ink font-semibold mt-2 font-sans">{{ $title }}</p>
 
             @if ($hint)
-                <p class="text-[10px] text-muted mt-1 font-sans">{{ $hint }}</p>
+                <p class="text-xs text-muted mt-1 font-sans">{{ $hint }}</p>
             @endif
 
             {{ $slot }}
@@ -110,11 +110,11 @@
     @endif
 
     @if ($help)
-        <p @if ($helpId) id="{{ $helpId }}" @endif class="text-[10px] text-muted mt-1 font-sans">{{ $help }}</p>
+        <p @if ($helpId) id="{{ $helpId }}" @endif class="text-xs text-muted mt-1 font-sans">{{ $help }}</p>
     @endif
 
     @if ($hasError)
-        <p @if ($errorId) id="{{ $errorId }}" @endif class="text-[11px] text-danger font-semibold font-sans">
+        <p @if ($errorId) id="{{ $errorId }}" @endif class="text-xs text-danger font-semibold font-sans">
             {{ $errors->first($fieldErrorKey) }}
         </p>
     @endif

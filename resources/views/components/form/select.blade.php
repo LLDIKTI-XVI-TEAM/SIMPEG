@@ -13,6 +13,7 @@
     'errorBag' => null,
     'useOldInput' => true,
     'size' => 'md',
+    'radius' => 'xl',
     'labelSrOnly' => false,
     'wrapperClass' => '',
 ])
@@ -28,9 +29,14 @@
     $shouldUseOldInput = filter_var($useOldInput, FILTER_VALIDATE_BOOL);
 
     $sizes = [
-        'sm' => 'pl-3 pr-10 py-1.5 text-xs',
+        'sm' => 'pl-3 pr-10 py-2 text-xs',
         'md' => 'pl-4 pr-10 py-2 text-sm',
         'lg' => 'pl-4 pr-10 py-2.5 text-sm',
+    ];
+
+    $radii = [
+        'lg' => 'rounded-lg',
+        'xl' => 'rounded-xl',
     ];
 
     $hasOldValue = $shouldUseOldInput && $fieldErrorKey ? old($fieldErrorKey, null) !== null : false;
@@ -71,7 +77,8 @@
             @if ($hasError) aria-invalid="true" @endif
             @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
             {{ $attributes->class([
-                'w-full appearance-none rounded-xl border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer transition-all duration-200',
+                'w-full appearance-none border bg-surface text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans cursor-pointer',
+                $radii[$radius] ?? $radii['xl'],
                 $sizes[$size] ?? $sizes['md'],
                 'border-danger focus:border-danger focus:ring-danger/20' => $hasError,
                 'border-border' => ! $hasError,
@@ -101,12 +108,12 @@
     </div>
 
     @if ($help)
-        <p id="{{ $helpId }}" class="text-[11px] text-muted font-sans">{{ $help }}</p>
+        <p id="{{ $helpId }}" class="text-xs text-muted font-sans">{{ $help }}</p>
     @endif
 
     @if ($fieldErrorKey)
         @if ($hasError)
-            <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
+            <p id="{{ $errorId }}" class="text-xs text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
         @endif
     @endif
 </div>

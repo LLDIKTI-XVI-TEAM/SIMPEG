@@ -65,7 +65,7 @@
                  x-transition:leave="ease-in duration-200"
                  x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                  x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 class="relative transform overflow-hidden rounded-xl bg-surface p-6 text-left shadow-xl transition-all w-full sm:max-w-md border border-border"
+                 class="relative w-full transform overflow-hidden rounded-xl border border-border bg-surface p-6 text-left shadow-xl transition-[opacity,transform] sm:max-w-md"
                  style="max-width: 400px; margin-left: auto; margin-right: auto;"
                  @click.away="open = false">
 
@@ -128,7 +128,7 @@
                             @endif
                             <button type="submit"
                                     x-bind:disabled="submitting"
-                                    class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-all focus:outline-none disabled:opacity-75 disabled:cursor-wait {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
+                                    class="inline-flex w-full items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors focus:outline-none disabled:cursor-wait disabled:opacity-75 sm:w-auto {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
                                 <span x-show="!submitting" class="inline-flex items-center">
                                     @if ($showConfirmIcon)
                                         {!! $confirmIcons[(string) $variant] ?? $confirmIcons['primary'] !!}
@@ -150,7 +150,7 @@
                             <button type="button"
                                     @click="submitting = true; setTimeout(() => open = false, 300); $dispatch('confirm-{{ $id }}')"
                                     x-bind:disabled="submitting"
-                                    class="inline-flex w-full sm:w-auto items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-all focus:outline-none disabled:opacity-75 disabled:cursor-wait {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
+                                    class="inline-flex w-full items-center justify-center rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors focus:outline-none disabled:cursor-wait disabled:opacity-75 sm:w-auto {{ $buttonVariants[(string)$variant] ?? $buttonVariants['primary'] }}">
                                 <span x-show="!submitting" class="inline-flex items-center">
                                     @if ($showConfirmIcon)
                                         {!! $confirmIcons[(string) $variant] ?? $confirmIcons['primary'] !!}

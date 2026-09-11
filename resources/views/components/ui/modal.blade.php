@@ -102,7 +102,7 @@
 
         <div
             {{ $attributes->class([
-                'relative z-10 inline-block w-full transform overflow-hidden rounded-lg border border-border bg-surface text-left align-bottom shadow-xl transition-all sm:my-8 sm:align-middle',
+                'relative z-10 inline-block w-full transform overflow-hidden rounded-lg border border-border bg-surface text-left align-bottom shadow-xl transition-[opacity,transform] sm:my-8 sm:align-middle',
                 $widths[$maxWidth] ?? $widths['md'],
                 $panelClass,
             ]) }}

@@ -47,6 +47,20 @@ class PegawaiDashboardTest extends TestCase
             ->assertDontSee('Notifikasi Pegawai Lain', false);
     }
 
+    public function test_dashboard_pegawai_uses_a_single_primary_heading_and_readable_supporting_text(): void
+    {
+        [$user] = $this->pegawaiWithEmployee();
+
+        $response = $this->actingAs($user)->get(route('dashboard'));
+
+        $response->assertOk()
+            ->assertSee('Selamat datang kembali', false);
+
+        $primaryHeadingCount = preg_match_all('/<h1\b[^>]*>/', $response->getContent());
+
+        $this->assertSame(1, $primaryHeadingCount);
+    }
+
     public function test_dashboard_pegawai_membatasi_notifikasi_ke_lima_terbaru(): void
     {
         [$user, $employee] = $this->pegawaiWithEmployee();

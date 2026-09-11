@@ -61,23 +61,23 @@
             {{-- Metadata Grid --}}
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div class="space-y-0.5">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Operator</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Operator</span>
                     <p class="text-sm font-semibold text-ink font-sans">{{ $log['operator'] }}</p>
                 </div>
                 <div class="space-y-0.5">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">IP Address</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">IP Address</span>
                     <p class="text-sm font-semibold text-ink">{{ $log['ip_address'] }}</p>
                 </div>
                 <div class="space-y-0.5">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">ID Record</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">ID Record</span>
                     <p class="text-sm font-semibold text-ink truncate">{{ $log['record_id'] }}</p>
                 </div>
                 <div class="space-y-0.5">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Kategori</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Kategori</span>
                     <p class="text-sm font-semibold text-ink font-sans">{{ ucfirst(str_replace('_', ' ', $log['kategori'])) }}</p>
                 </div>
                 <div class="col-span-1 sm:col-span-2 space-y-0.5">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">User Agent / Browser Info</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">User Agent / Browser Info</span>
                     <p class="text-xs text-muted font-sans leading-normal bg-soft/50 rounded-lg p-3 border border-border">{{ $log['user_agent'] }}</p>
                 </div>
             </div>
@@ -89,13 +89,13 @@
                 <div class="overflow-hidden rounded-lg border border-border bg-soft">
                     <x-ui.table class="text-left border-collapse">
                         <x-ui.table-head>
-                            <x-ui.table-row class="bg-border/40 text-[10px] border-b border-border">
+                            <x-ui.table-row class="bg-border/40 text-xs border-b border-border">
                                 <x-ui.table-th padding="xs">Nama Field</x-ui.table-th>
                                 <x-ui.table-th padding="xs">Sebelum</x-ui.table-th>
                                 <x-ui.table-th padding="xs">Sesudah</x-ui.table-th>
                             </x-ui.table-row>
                         </x-ui.table-head>
-                        <x-ui.table-body class="text-[11px] font-sans">
+                        <x-ui.table-body class="text-xs font-sans">
                             @forelse($diffs as $diff)
                                 <x-ui.table-row>
                                     <x-ui.table-td padding="xs" class="font-semibold">{{ $diff['field'] }}</x-ui.table-td>

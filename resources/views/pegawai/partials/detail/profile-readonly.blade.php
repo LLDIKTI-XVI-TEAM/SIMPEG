@@ -86,7 +86,7 @@
                 ['label' => 'Estimasi Tanggal Pensiun', 'date' => $retirementDate, 'note' => $remainingRetirement ? 'Sisa: '.$remainingRetirement : null],
             ] as $schedule)
                 <div class="rounded-lg border border-border bg-surface p-3 text-center shadow-sm">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted font-sans">{{ $schedule['label'] }}</span>
+                    <span class="text-xs font-bold uppercase tracking-wider text-muted font-sans">{{ $schedule['label'] }}</span>
                     <p class="mt-1 text-sm font-bold text-ink font-sans">@include('pegawai.partials.detail.date', ['value' => $schedule['date']])</p>
                     @if($schedule['note'])
                         <p class="mt-0.5 text-[9px] {{ $schedule['label'] === 'Estimasi Tanggal Pensiun' ? 'font-semibold text-danger' : 'text-muted' }} font-sans">{{ $schedule['note'] }}</p>

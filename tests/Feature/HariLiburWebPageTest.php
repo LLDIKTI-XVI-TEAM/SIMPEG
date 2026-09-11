@@ -234,6 +234,7 @@ class HariLiburWebPageTest extends TestCase
         $this->assertNotContains('Libur Uji 11', $this->namaHariLiburDalamTabel($halamanPertama));
         $halamanPertama->assertSee('dari');
         $halamanPertama->assertSee('aria-label="Pagination Navigation"', false);
+        $halamanPertama->assertSee('focus-visible:ring-2 focus-visible:ring-primary/30', false);
 
         $halamanKedua = $this->actingAs($user)
             ->get(route('hari-libur', ['tahun' => 2026, 'per_page' => 10, 'page' => 2]));

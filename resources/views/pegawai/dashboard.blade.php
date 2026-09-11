@@ -1,4 +1,4 @@
-<x-layouts.app title="Dashboard" subtitle="Ringkasan eksekutif dan pemantauan aktivitas kepegawaian hari ini.">
+<x-layouts.app title="Dashboard" subtitle="Ringkasan informasi kepegawaian Anda hari ini.">
     @php
         $dashboardEwsAlerts = $dashboardEwsAlerts ?? [];
         $dashboardEwsTotal = $dashboardEwsTotal ?? 0;
@@ -49,12 +49,12 @@
                 
                 <!-- Profil Info -->
                 <div>
-                    <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
-                    <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm mb-2">
+                    <p class="text-xs font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
+                    <h1 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm mb-2">
                         {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
-                    </h2>
+                    </h1>
                     
-                    <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-white/90 font-sans">
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-white/90 font-sans">
                         <div class="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/20 shadow-sm hover:bg-white/20 transition-colors">
                             <svg class="w-3.5 h-3.5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm1.294 6.336a6.721 6.721 0 0 1-3.17.789 6.721 6.721 0 0 1-3.168-.789 3.376 3.376 0 0 1 6.338 0Z" /></svg>
                             <span class="font-medium tracking-wide">NIP. {{ $employee?->nip ?? '-' }}</span>
@@ -83,8 +83,8 @@
                     </div>
                     <div class="w-px h-6 bg-white/20"></div>
                     <div class="flex flex-col mt-0.5">
-                        <span class="text-[12px] font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
-                        <span class="text-[10px] text-white/70 mt-0.5">Hari ini</span>
+                        <span class="text-xs font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
+                        <span class="text-xs text-white/70 mt-0.5">Hari ini</span>
                     </div>
                 </div>
 
@@ -95,8 +95,8 @@
                     </div>
                     <div class="w-px h-6 bg-white/20"></div>
                     <div class="flex flex-col mt-0.5">
-                        <span class="text-[12px] font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
-                        <span class="text-[10px] text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
+                        <span class="text-xs font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
+                        <span class="text-xs text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
                     </div>
                 </div>
             </div>
@@ -162,7 +162,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     </x-slot:icon>
                 </x-ui.stat-card>
-                <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }}" description="{{ !empty($saldoCuti) ? 'Total sisa saldo cuti aktif.' : 'Saldo belum diinput.' }}" unit="Hari" variant="success" size="md" accent role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }} Hari">
+                <x-ui.stat-card label="Hak Efektif Tahun Ini" value="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }}" description="{{ !empty($saldoCuti) ? 'Total sisa saldo cuti aktif.' : 'Saldo belum diinput.' }}" variant="success" size="md" accent role="group" aria-label="{{ $saldoCuti['saldo_dapat_diajukan'] ?? '-' }}">
                     <x-slot:icon>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     </x-slot:icon>
@@ -214,11 +214,11 @@
                                 <x-ui.table-row>
                                     <x-ui.table-td class="px-6 py-3.5">
                                         <p class="text-xs font-semibold text-ink font-sans">{{ $cuti->jenisCuti?->nama ?? 'Cuti Tahunan' }}</p>
-                                        <p class="text-[10px] text-muted line-clamp-1">{{ $cuti->alasan }}</p>
+                                        <p class="text-xs text-muted line-clamp-1">{{ $cuti->alasan }}</p>
                                     </x-ui.table-td>
                                     <x-ui.table-td class="px-6 py-3.5 font-medium text-xs text-ink">
                                         {{ $cuti->tanggal_mulai?->translatedFormat('d M') }} - {{ $cuti->tanggal_selesai?->translatedFormat('d M Y') }}
-                                        <div class="text-[10px] text-muted">{{ $cuti->lama_hari }} Hari Kerja</div>
+                                        <div class="text-xs text-muted">{{ $cuti->lama_hari }} Hari Kerja</div>
                                     </x-ui.table-td>
                                     <x-ui.table-td class="px-6 py-3.5">
                                         <x-ui.badge :variant="$statusVariant" size="sm" dot>
@@ -240,24 +240,23 @@
         </div>
         
         {{-- Kanan: Notifikasi --}}
-        <div class="space-y-6">
+        <div class="space-y-6 h-full flex flex-col">
             <x-ui.card padding="none" class="overflow-hidden h-full flex flex-col">
                 <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface shrink-0">
                     <div>
                         <h3 class="text-sm font-bold text-ink font-sans">Notifikasi Terbaru</h3>
                     </div>
-                    <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Semua</a>
+                    <a href="{{ route('notifications.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans">Lihat Semua</a>
                 </div>
-                <div class="flex-1 overflow-y-auto">
+                <div class="flex-1 overflow-y-auto flex flex-col">
                     @forelse($notifikasi as $notif)
                         <div class="px-6 py-4 border-b border-border/50 hover:bg-soft transition-colors {{ $notif->read_at ? 'opacity-70' : '' }}">
                             <p class="text-xs font-semibold text-ink mb-1">{{ $notif->title ?? 'Pemberitahuan' }}</p>
-                            <p class="text-[11px] text-muted line-clamp-2">{{ $notif->body ?? '' }}</p>
-                            <p class="text-[9px] text-muted/70 mt-2">{{ $notif->created_at->diffForHumans() }}</p>
+                            <p class="text-xs text-muted line-clamp-2">{{ $notif->body ?? '' }}</p>
+                            <p class="text-xs text-muted/70 mt-2">{{ $notif->created_at->diffForHumans() }}</p>
                         </div>
                     @empty
-                        <div class="px-6 py-10 text-center text-sm text-muted flex flex-col items-center justify-center">
-                            <svg class="w-8 h-8 text-muted/40 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" /></svg>
+                        <div class="flex-1 flex items-center justify-center p-6 text-center text-sm text-muted">
                             Belum ada notifikasi
                         </div>
                     @endforelse
@@ -307,7 +306,7 @@
                             <x-ui.table-row :interactive="false">
                                 <x-ui.table-td class="px-6 py-3.5">
                                     <div class="text-xs font-bold text-ink">{{ $alert['jenis_event'] }}</div>
-                                    <div class="mt-1 text-[10px] text-muted">{{ $alert['threshold_label'] }}</div>
+                                    <div class="mt-1 text-xs text-muted">{{ $alert['threshold_label'] }}</div>
                                 </x-ui.table-td>
                                 <x-ui.table-td class="px-6 py-3.5 font-medium text-xs text-ink">{{ date('d M Y', strtotime($alert['tanggal_target'])) }}</x-ui.table-td>
                                 <x-ui.table-td class="px-6 py-3.5 font-medium text-xs text-ink">{{ $alert['sisa_hari'] }} Hari Lagi</x-ui.table-td>

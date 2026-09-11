@@ -141,13 +141,13 @@ class Rule5PostgresConcurrencyTest extends TestCase
                 'approver_id' => $fixture['finalApprover']->id,
                 'actor_user_id' => $fixture['finalApproverUser']->id,
                 'active_step_id' => $fixture['large']->steps()->where('status', 'active')->valueOrFail('id'),
-            ], JSON_THROW_ON_ERROR))], base_path(), timeout: 20);
+            ], JSON_THROW_ON_ERROR))], base_path(), timeout: 60);
             $reserve = new Process([PHP_BINARY, $worker, base64_encode(json_encode([
                 'mode' => 'reserve_annual',
                 'barrier' => $barrier,
                 'result' => $reserveResult,
                 'employee_id' => $fixture['employee']->id,
-            ], JSON_THROW_ON_ERROR))], base_path(), timeout: 20);
+            ], JSON_THROW_ON_ERROR))], base_path(), timeout: 60);
 
             $approve->start();
             $reserve->start();

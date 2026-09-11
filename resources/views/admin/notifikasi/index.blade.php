@@ -4,7 +4,7 @@
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-            <h2 class="text-2xl font-semibold text-ink">Pusat Notifikasi</h2>
+            <h1 class="text-2xl font-semibold text-ink">Pusat Notifikasi</h1>
             <x-ui.breadcrumb :items="[
                 ['label' => 'Dashboard', 'url' => route('dashboard')],
                 ['label' => 'Notifikasi']
@@ -64,7 +64,9 @@
                 </template>
                 <span x-text="isSubmitting ? 'Memproses...' : 'Tandai semua dibaca'"></span>
             </x-ui.button>
-            <p x-cloak x-show="error" x-text="error" role="alert" class="mt-2 text-sm text-danger"></p>
+            <x-ui.alert x-cloak x-show="error" variant="danger" size="sm" class="mt-2">
+                <span x-text="error"></span>
+            </x-ui.alert>
         </div>
     </div>
 
@@ -110,7 +112,7 @@
                 <button
                     type="button"
                     @click="openNotification(@js($notif->id), @js($targetUrl))"
-                    class="flex w-full items-start gap-4 rounded-lg p-5 text-left shadow-sm transition-colors hover:bg-soft/50 {{ $isUnread ? 'border border-border border-l-4 border-l-primary bg-primary/[0.03]' : 'border border-border bg-surface opacity-80' }}"
+                    class="flex w-full items-start gap-4 rounded-lg border p-5 text-left shadow-sm transition-colors hover:bg-soft/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 {{ $isUnread ? 'border-primary/30 bg-primary/[0.03]' : 'border-border bg-surface opacity-80' }}"
                 >
                     <div class="rounded-lg p-2.5 shrink-0 mt-0.5 {{ $isUnread ? 'bg-danger/10 text-danger' : 'bg-soft text-muted' }}">
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -120,12 +122,12 @@
                     <div class="min-w-0 flex-1 space-y-1">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-bold uppercase tracking-wider font-sans {{ $isUnread ? 'text-primary' : 'text-muted' }}">{{ $subText }}</span>
+                                <span class="text-xs font-bold uppercase tracking-wider font-sans {{ $isUnread ? 'text-primary' : 'text-muted' }}">{{ $subText }}</span>
                                 @if($isUnread)
                                     <x-ui.badge variant="primary" size="sm" pill>Belum Dibaca</x-ui.badge>
                                 @endif
                             </div>
-                            <span class="text-[10px] text-muted font-sans shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>
+                            <span class="text-xs text-muted font-sans shrink-0">{{ $notif->created_at->format('d F Y, H:i') }}</span>
                         </div>
                         <h3 class="text-sm font-sans leading-snug {{ $isUnread ? 'font-bold text-ink' : 'font-medium text-muted' }}">{{ $notif->title }}</h3>
                         <p class="text-xs font-sans leading-relaxed {{ $isUnread ? 'text-ink/80' : 'text-muted' }}">{{ $notif->body }}</p>
@@ -135,8 +137,8 @@
                 <x-ui.card class="py-8">
                     <x-ui.empty-state
                         icon="bell"
-                        title="Belum Ada Notifikasi"
-                        message="Anda belum memiliki notifikasi atau seluruh notifikasi telah ditandai dibaca."
+                        title="Belum ada notifikasi"
+                        message="Notifikasi untuk akun Anda akan muncul di halaman ini."
                     />
                 </x-ui.card>
             @endforelse

@@ -30,7 +30,7 @@
 
             $pemohon = $cuti->employee?->nama_lengkap ?? 'Pegawai';
 
-            $buttonBase = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold font-sans transition-all duration-200 active:scale-95 focus:outline-none focus:ring-2';
+            $buttonBase = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold font-sans transition-[background-color,border-color,color,transform] duration-200 active:scale-95 focus:outline-none focus:ring-2';
             $buttonStyles = [
                 'secondary' => $buttonBase.' border border-border bg-surface text-primary shadow-sm hover:bg-soft hover:border-primary/30 focus:ring-primary/30',
                 'muted' => $buttonBase.' border border-border bg-surface text-ink shadow-sm hover:bg-soft focus:ring-primary/20',
@@ -129,28 +129,28 @@
             @endif
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div class="space-y-1">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Jenis Cuti</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Jenis Cuti</span>
                     <p class="text-sm font-semibold text-ink font-sans">{{ $cuti->jenisCuti?->nama ?? '-' }}</p>
                 </div>
                 <div class="space-y-1">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Durasi Cuti</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Durasi Cuti</span>
                     <p class="text-sm font-bold text-ink">{{ $cuti->jumlah_hari_kerja }} Hari Kerja</p>
                 </div>
                 <div class="space-y-1">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Tanggal Mulai</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Tanggal Mulai</span>
                     <p class="text-sm font-semibold text-ink">{{ $cuti->tanggal_mulai?->translatedFormat('d F Y') }}</p>
                 </div>
                 <div class="space-y-1">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Tanggal Selesai</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Tanggal Selesai</span>
                     <p class="text-sm font-semibold text-ink">{{ $cuti->tanggal_selesai?->translatedFormat('d F Y') }}</p>
                 </div>
                 <div class="space-y-1 sm:col-span-2">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Alasan / Keterangan</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Alasan / Keterangan</span>
                     <p class="text-sm text-ink font-sans leading-relaxed bg-soft/50 rounded-lg p-3 border border-border">{{ $cuti->alasan }}</p>
                 </div>
                 @if ($attachmentAvailable)
                     <div class="space-y-1 sm:col-span-2">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Lampiran</span>
+                        <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Lampiran</span>
                         <a href="{{ route('cuti.attachment.download', $cuti) }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
@@ -161,7 +161,7 @@
                 @endif
                 @if ($cuti->proof !== null)
                     <div class="space-y-1 sm:col-span-2">
-                        <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Bukti Persetujuan Cuti</span>
+                        <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Bukti Persetujuan Cuti</span>
                         <p class="text-sm text-muted font-sans">Buka bukti persetujuan untuk memeriksa status pengajuan.</p>
                         <a href="{{ route('cuti.verify', ['token' => $cuti->proof->token]) }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
                             Lihat bukti persetujuan
@@ -386,27 +386,27 @@
 
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
-                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Saldo Dapat Diajukan (N={{ $saldoPemohon['tahun'] }})</span>
+                                <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Saldo Dapat Diajukan (N={{ $saldoPemohon['tahun'] }})</span>
                                 <p class="text-lg font-bold text-primary font-sans">{{ $saldoPemohon['saldo_dapat_diajukan'] }} Hari</p>
-                                <p class="text-[10px] text-muted">Saldo aktual {{ $saldoPemohon['saldo_aktual'] }} · {{ $saldoPemohon['dialokasikan_aktif'] }} dialokasikan · {{ $saldoPemohon['terpakai_final'] }} terpakai</p>
+                                <p class="text-xs text-muted">Saldo aktual {{ $saldoPemohon['saldo_aktual'] }} · {{ $saldoPemohon['dialokasikan_aktif'] }} dialokasikan · {{ $saldoPemohon['terpakai_final'] }} terpakai</p>
                             </div>
 
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
-                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sisa Hak N-1 ({{ $saldoPemohon['tahun'] - 1 }})</span>
+                                <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Sisa Hak N-1 ({{ $saldoPemohon['tahun'] - 1 }})</span>
                                 <p class="text-lg font-bold text-warning font-sans">{{ $saldoPemohon['bucket']['n1'] }} Hari</p>
-                                <p class="text-[10px] text-muted">Terpakai pada N-1: {{ $saldoPemohon['used_n1'] }} hari</p>
+                                <p class="text-xs text-muted">Terpakai pada N-1: {{ $saldoPemohon['used_n1'] }} hari</p>
                             </div>
 
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1">
-                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Sisa Hak N-2 ({{ $saldoPemohon['tahun'] - 2 }})</span>
+                                <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Sisa Hak N-2 ({{ $saldoPemohon['tahun'] - 2 }})</span>
                                 <p class="text-lg font-bold text-ink font-sans">{{ $saldoPemohon['bucket']['n2'] }} Hari</p>
-                                <p class="text-[10px] text-muted">Terpakai pada N-2: {{ $saldoPemohon['used_n2'] }} hari</p>
+                                <p class="text-xs text-muted">Terpakai pada N-2: {{ $saldoPemohon['used_n2'] }} hari</p>
                             </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1.5">
-                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Cuti Bersama {{ $saldoPemohon['tahun'] }}</span>
+                                <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Cuti Bersama {{ $saldoPemohon['tahun'] }}</span>
                                 @if ($verifierContext['cutiBersama']->isEmpty())
                                     <p class="text-xs text-muted font-sans">Tidak ada cuti bersama terdaftar pada tahun ini.</p>
                                 @else
@@ -419,7 +419,7 @@
                             </div>
 
                             <div class="p-3 bg-surface rounded-lg border border-border space-y-1.5">
-                                <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Riwayat Cuti Tahunan Disetujui</span>
+                                <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Riwayat Cuti Tahunan Disetujui</span>
                                 @if ($verifierContext['riwayatTahunan']->isEmpty())
                                     <p class="text-xs text-muted font-sans">Belum ada riwayat cuti tahunan yang disetujui.</p>
                                 @else

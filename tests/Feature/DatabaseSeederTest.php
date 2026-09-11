@@ -44,6 +44,19 @@ class DatabaseSeederTest extends TestCase
         $this->assertFileDoesNotExist(database_path('seeders/LeaveBalance2026Seeder.php'));
     }
 
+    public function test_database_seeder_does_not_seed_demo_leave_balances(): void
+    {
+        Carbon::setTestNow('2027-01-15 12:00:00');
+
+        try {
+            $this->seed(DatabaseSeeder::class);
+
+            $this->assertSame(0, LeaveBalance::query()->count());
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
     public function test_phase_seven_browser_fixture_mencatat_pengajuan_disetujui_sebagai_fakta_tunggal(): void
     {
         $this->seed(DatabaseSeeder::class);

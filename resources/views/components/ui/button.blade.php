@@ -30,11 +30,13 @@
     ];
 
     $sizes = [
+        'compact' => 'gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium',
+        'compact-icon' => 'h-8 w-8 rounded-lg p-0',
         'xs' => 'gap-2 rounded-lg px-3 py-2 text-xs',
         'sm' => 'gap-2 rounded-xl px-3.5 py-1.5 text-xs',
         'md' => 'gap-2 rounded-xl px-4 py-2.5 text-sm',
         'lg' => 'gap-2 rounded-xl px-5 py-3 text-sm',
-        'icon' => 'h-8 w-8 rounded-xl p-0',
+        'icon' => 'h-10 w-10 rounded-xl p-0',
     ];
 
     $isDisabled = filter_var($disabled, FILTER_VALIDATE_BOOL);

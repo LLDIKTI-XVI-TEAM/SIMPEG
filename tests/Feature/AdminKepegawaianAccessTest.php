@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class AdminKepegawaianAccessTest extends TestCase
@@ -115,7 +118,31 @@ class AdminKepegawaianAccessTest extends TestCase
         }
     }
 
-    public function test_super_admin_melihat_konfigurasi_approval_cuti_di_sidebar_dan_bukan_pengaturan(): void
+    public function test_sidebar_pembatalan_cuti_mengikuti_grant_dan_revoke_permission_super_admin(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $superAdminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $cancellationPermission = Permission::query()
+            ->where('name', 'cuti.cancellation.manage')
+            ->firstOrFail();
+
+        $superAdminRole->permissions()->syncWithoutDetaching([$cancellationPermission->id]);
+
+        $dashboard = $this->actingAs($superAdmin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->get(route('dashboard'));
+
+        $dashboard->assertOk();
+        $dashboard->assertSee('href="'.route('cuti.cancellations.index').'"', false);
+        $this->get(route('cuti.cancellations.index'))->assertOk();
+
+        $superAdminRole->permissions()->detach($cancellationPermission->id);
+        $this->get(route('dashboard'))
+            ->assertDontSee('href="'.route('cuti.cancellations.index').'"', false);
+        $this->get(route('cuti.cancellations.index'))->assertForbidden();
+    }
+
+    public function test_super_admin_dapat_membuka_konfigurasi_approval_cuti_tanpa_menu_pengaturan_legacy(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();
 
@@ -124,9 +151,125 @@ class AdminKepegawaianAccessTest extends TestCase
             ->get(route('dashboard'));
 
         $dashboardResponse->assertOk();
-        $dashboardResponse->assertSee('href="'.route('cuti.config').'"', false);
-        $dashboardResponse->assertSee('Konfigurasi Approval Cuti');
+        $dashboardResponse->assertDontSee('Pengaturan Sistem');
 
+        $this->get(route('cuti.config'))->assertOk();
+
+    }
+
+    public function test_sidebar_menampilkan_semua_menu_yang_capability_permissionnya_tersedia(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('dashboard'));
+
+        $response->assertOk();
+
+        foreach ([
+            'notifications.index',
+            'hari-libur',
+            'cuti.config',
+        ] as $routeName) {
+            $response->assertSee('href="'.route($routeName).'"', false);
+        }
+    }
+
+    public function test_app_shell_menyediakan_semantik_aksesibilitas_untuk_navigasi_pencarian_menu_dan_toast(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this->actingAs($superAdmin)
+            ->withSession(['active_role' => 'super_admin'])
+            ->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('x-ref="sidebarNav"', false);
+        $response->assertSee(':inert="isMobileNavigation && !sidebarOpen"', false);
+        $response->assertSee('@keydown.escape.window="closeSidebar()"', false);
+        $response->assertSee('aria-label="Pencarian global"', false);
+        $response->assertSee(':aria-expanded="open.toString()"', false);
+        $response->assertSee('aria-controls="profile-menu"', false);
+        $response->assertSee('role="menu"', false);
+        $response->assertSee('aria-controls="role-switch-menu"', false);
+        $response->assertSee(':role="toast.type === \'error\' ? \'alert\' : \'status\'"', false);
+    }
+
+    public function test_sidebar_menyembunyikan_rbac_yang_dicabut_tetapi_mempertahankan_paten(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $role = Role::query()->where('name', 'super_admin')->firstOrFail();
+        $permissionIds = Permission::query()
+            ->whereIn('name', [
+                'employees.read',
+                'dokumen_sk.read',
+                'notifications.read',
+                'audit_logs.read',
+                'hari_libur.read',
+                'cuti.configure',
+            ])
+            ->pluck('id')
+            ->all();
+
+        $role->permissions()->detach($permissionIds);
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('dashboard'));
+
+        $response->assertOk();
+        $sidebar = Str::between($response->getContent(), '<nav id="sidebar-nav"', '</nav>');
+
+        foreach ([
+            'data-pegawai',
+            'dokumen',
+            'reporting.employee-statistics',
+            'audit-log',
+            'cuti.config',
+        ] as $routeName) {
+            $this->assertStringNotContainsString('href="'.route($routeName).'"', $sidebar);
+        }
+
+        $this->get(route('data-pegawai'))->assertForbidden();
+        foreach (['notifications.index', 'hari-libur'] as $routeName) {
+            $this->assertStringContainsString('href="'.route($routeName).'"', $sidebar);
+            $this->get(route($routeName))->assertOk();
+        }
+    }
+
+    public function test_sidebar_arsip_mengikuti_permission_dokumen_tanpa_memerlukan_baca_pegawai(): void
+    {
+        $actor = User::factory()->adminKepegawaian()->create();
+        $role = Role::query()->where('name', 'admin_kepegawaian')->firstOrFail();
+        $role->permissions()->detach(Permission::query()->where('name', 'employees.read')->value('id'));
+        $documentPermission = Permission::query()->where('name', 'dokumen_sk.read')->firstOrFail();
+        $role->permissions()->syncWithoutDetaching([$documentPermission->id]);
+
+        $response = $this->actingAs($actor)->get(route('dashboard'));
+        $response->assertOk()->assertSee('href="'.route('dokumen').'"', false);
+        $this->get(route('dokumen'))->assertOk();
+
+        $role->permissions()->detach($documentPermission->id);
+        $this->get(route('dashboard'))->assertDontSee('href="'.route('dokumen').'"', false);
+        $this->get(route('dokumen'))->assertForbidden();
+    }
+
+    public function test_sidebar_menampilkan_statistik_saat_permission_diberikan_secara_dinamis(): void
+    {
+        $pegawai = User::factory()->pegawai()->create();
+        $role = Role::query()->where('name', 'pegawai')->firstOrFail();
+        $employeesReadId = Permission::query()
+            ->where('name', 'employees.read')
+            ->firstOrFail()
+            ->id;
+
+        $role->permissions()->syncWithoutDetaching([$employeesReadId]);
+
+        $response = $this->actingAs($pegawai)
+            ->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('href="'.route('reporting.employee-statistics').'"', false);
+        $this->get(route('reporting.employee-statistics'))->assertOk();
     }
 
     public function test_admin_kepegawaian_dapat_membuka_halaman_operasional_sesuai_dokumen(): void

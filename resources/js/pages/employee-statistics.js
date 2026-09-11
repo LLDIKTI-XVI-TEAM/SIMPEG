@@ -1,26 +1,4 @@
-import Chart from 'chart.js/auto';
-
-const TONE_KEYS = ['primary', 'secondary', 'info', 'success', 'warning', 'orange', 'danger', 'muted'];
-
-const token = (name) => window
-    .getComputedStyle(document.documentElement)
-    .getPropertyValue(`--color-${name}`)
-    .trim();
-
-const chartTheme = () => {
-    const tones = Object.fromEntries(TONE_KEYS.map((tone) => [tone, token(tone)]));
-
-    return {
-        tones,
-        palette: TONE_KEYS.map((tone) => tones[tone]),
-        surface: token('surface'),
-        ink: token('ink'),
-        border: token('border'),
-        muted: token('muted'),
-    };
-};
-
-const colorFor = (row, index, theme) => theme.tones[row.tone] || theme.palette[index % theme.palette.length];
+import { Chart, chartTheme, colorFor } from '../charts/simpeg-chart.js';
 
 const registerEmployeeStatistics = () => {
     window.Alpine.data('employeeStatisticsPage', (initialData = {}) => ({

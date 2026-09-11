@@ -1,7 +1,8 @@
 @props([
-    'icon' => 'folder', // Supported: folder, document, search
+    'icon' => 'folder', // Supported: folder, document, search, bell
     'title' => 'Tidak ada data',
     'message' => null,
+    'messageExpression' => null,
 ])
 
 <div {{ $attributes->merge(['class' => 'flex flex-col items-center justify-center p-8 text-center']) }}>
@@ -19,12 +20,18 @@
                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                 </svg>
+            @elseif ($icon === 'bell')
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75v-.7V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+                </svg>
             @endif
         </div>
     @endif
     
     <h3 class="text-sm font-medium text-muted font-sans">{{ $title }}</h3>
-    @if ($message)
+    @if ($messageExpression)
+        <p class="mt-1 max-w-sm text-xs text-muted font-sans" x-text="{{ $messageExpression }}">{{ $message }}</p>
+    @elseif ($message)
         <p class="mt-1 text-xs text-muted font-sans max-w-sm">{{ $message }}</p>
     @endif
     

@@ -1,3 +1,7 @@
+@push('head')
+    @vite('resources/js/pages/dashboard-charts.js')
+@endpush
+
 <x-layouts.app title="Dashboard" subtitle="Ringkasan operasional kepegawaian dan pemantauan tindak lanjut.">
     @php
         $dashboardEwsAlerts = collect($dashboardEwsAlerts ?? [])->take(5);
@@ -33,21 +37,23 @@
         $compositionDisplayTotal = $totalPegawaiAktif ?? $compositionTotal;
         $compositionOffset = 0;
         $compositionTones = [
-            ['stroke' => 'text-primary', 'dot' => 'bg-primary', 'text' => 'text-ink'],
-            ['stroke' => 'text-secondary', 'dot' => 'bg-secondary', 'text' => 'text-ink'],
-            ['stroke' => 'text-info', 'dot' => 'bg-info', 'text' => 'text-ink'],
-            ['stroke' => 'text-muted', 'dot' => 'bg-muted', 'text' => 'text-ink'],
+            ['chart' => 'primary', 'stroke' => 'text-primary', 'dot' => 'bg-primary', 'text' => 'text-ink'],
+            ['chart' => 'secondary', 'stroke' => 'text-secondary', 'dot' => 'bg-secondary', 'text' => 'text-ink'],
+            ['chart' => 'info', 'stroke' => 'text-info-dark', 'dot' => 'bg-info', 'text' => 'text-ink'],
+            ['chart' => 'muted', 'stroke' => 'text-muted', 'dot' => 'bg-muted', 'text' => 'text-ink'],
         ];
         $compositionRows = $compositionOrder
             ->map(function (string $jenis, int $index) use ($compositionCounts, $compositionTotal, &$compositionOffset, $compositionTones): array {
                 $jumlah = $compositionCounts->get($jenis, 0);
                 $persen = $compositionTotal > 0 ? ($jumlah / $compositionTotal) * 100 : 0;
+                $tone = $compositionTones[$index % count($compositionTones)];
                 $row = [
                     'jenis' => $jenis,
                     'jumlah' => $jumlah,
                     'persen' => $persen,
                     'offset' => $compositionOffset,
-                    'tone' => $compositionTones[$index % count($compositionTones)],
+                    'tone' => $tone,
+                    'chartTone' => $tone['chart'],
                 ];
                 $compositionOffset += $persen;
 
@@ -57,13 +63,13 @@
             ->values();
 
         $promotionRows = collect($daftarKenaikanPangkat ?? []);
-        $rankOrder = [
+        $standardRankOrder = [
             'I/a', 'I/b', 'I/c', 'I/d',
             'II/a', 'II/b', 'II/c', 'II/d',
             'III/a', 'III/b', 'III/c', 'III/d',
             'IV/a', 'IV/b', 'IV/c', 'IV/d', 'IV/e',
-            'Belum Diisi',
         ];
+        $rankOrder = [...$standardRankOrder, 'Belum Diisi'];
         $rankCounts = collect($distribusiGolongan ?? [])
             ->mapWithKeys(fn ($jumlah, $golongan): array => [(string) $golongan => max(0, (int) $jumlah)]);
         $rankRows = collect($rankOrder)
@@ -75,8 +81,20 @@
             ])
             ->values();
         $rankTotal = $rankRows->sum('jumlah');
-        $rankMax = max(1, (int) $rankRows->max('jumlah'));
-
+        $rankChartRows = $rankRows
+            ->filter(fn (array $row): bool => in_array($row['golongan'], $standardRankOrder, true))
+            ->values();
+        $rankChartTotal = $rankChartRows->sum('jumlah');
+        $rankTooltipTotal = max(0, (int) ($totalPegawaiAktif ?? $rankTotal));
+        $rankUnclassifiedRows = $rankRows
+            ->reject(fn (array $row): bool => in_array($row['golongan'], $standardRankOrder, true))
+            ->filter(fn (array $row): bool => $row['jumlah'] > 0)
+            ->values();
+        $rankUnclassifiedTotal = $rankUnclassifiedRows->sum('jumlah');
+        $rankUnclassifiedLabels = $rankUnclassifiedRows
+            ->pluck('golongan')
+            ->map(fn (string $golongan): string => $golongan === 'Belum Diisi' ? 'belum diisi' : $golongan)
+            ->implode(', ');
         $auditRows = collect($auditTerbaru ?? []);
         $trendRows = collect($trenPegawai ?? [])
             ->map(fn ($point): array => [
@@ -84,35 +102,6 @@
                 'jumlah' => max(0, (int) data_get($point, 'jumlah', 0)),
             ])
             ->values();
-        $trendMax = (int) ($trendRows->max('jumlah') ?? 0);
-        $trendMin = (int) ($trendRows->min('jumlah') ?? 0);
-        $trendRange = max(1, $trendMax - $trendMin);
-        $trendChart = ['width' => 720, 'height' => 256, 'left' => 42, 'right' => 18, 'top' => 24, 'bottom' => 42];
-        $trendPlotWidth = $trendChart['width'] - $trendChart['left'] - $trendChart['right'];
-        $trendPlotHeight = $trendChart['height'] - $trendChart['top'] - $trendChart['bottom'];
-        $trendPoints = $trendRows
-            ->map(function (array $point, int $index) use ($trendRows, $trendChart, $trendPlotWidth, $trendPlotHeight, $trendMax, $trendRange): array {
-                $count = max(1, $trendRows->count());
-                $x = $count === 1
-                    ? $trendChart['left'] + ($trendPlotWidth / 2)
-                    : $trendChart['left'] + (($trendPlotWidth / ($count - 1)) * $index);
-                $y = $trendChart['top'] + (($trendMax - $point['jumlah']) / $trendRange) * $trendPlotHeight;
-
-                return [
-                    ...$point,
-                    'x' => round($x, 2),
-                    'y' => round($y, 2),
-                ];
-            })
-            ->values();
-        $trendPolyline = $trendPoints->map(fn (array $point): string => "{$point['x']},{$point['y']}")->implode(' ');
-        $trendBaselineY = $trendChart['height'] - $trendChart['bottom'];
-        $trendAreaPath = $trendPoints->isNotEmpty()
-            ? 'M '.$trendPoints->first()['x'].' '.$trendBaselineY
-                .' L '.$trendPolyline
-                .' L '.$trendPoints->last()['x'].' '.$trendBaselineY.' Z'
-            : '';
-        $trendMid = (int) round(($trendMax + $trendMin) / 2);
     @endphp
 
     <div class="relative w-full rounded-2xl bg-gradient-to-r from-[#173292] to-[#2143c2] p-6 sm:p-8 overflow-hidden shadow-lg border border-primary/20 flex flex-col lg:flex-row items-center justify-between mb-6" style="background: linear-gradient(90deg, #173292 0%, #2143c2 100%);">
@@ -135,7 +124,7 @@
 
         <!-- Content Left -->
         <div class="relative z-10 w-full lg:w-[70%] flex flex-col justify-center">
-            <p class="text-[10px] font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
+            <p class="text-xs font-bold uppercase tracking-widest text-white/70 mb-0.5">Selamat datang kembali</p>
             <h2 class="text-xl sm:text-2xl font-extrabold text-white leading-tight">
                 {{ preg_replace('/\s*\(.*?\)/', '', auth()->user()->name) }}
             </h2>
@@ -153,7 +142,7 @@
                     <div class="w-px h-6 bg-white/20"></div>
                     <div class="flex flex-col mt-0.5">
                         <span class="text-[12px] font-medium text-white/90 leading-none">{{ now()->translatedFormat('l, d F Y') }}</span>
-                        <span class="text-[10px] text-white/70 mt-0.5">Hari ini</span>
+                        <span class="text-xs text-white/70 mt-0.5">Hari ini</span>
                     </div>
                 </div>
 
@@ -165,7 +154,7 @@
                     <div class="w-px h-6 bg-white/20"></div>
                     <div class="flex flex-col mt-0.5">
                         <span class="text-[12px] font-medium text-white/90 leading-none">Sistem Informasi Kepegawaian</span>
-                        <span class="text-[10px] text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
+                        <span class="text-xs text-white/70 mt-0.5">LLDIKTI Wilayah XVI</span>
                     </div>
                 </div>
             </div>
@@ -367,29 +356,11 @@
                 <x-ui.empty-state icon="none" title="Belum ada pegawai aktif untuk ditampilkan." />
             @else
                 <div class="mt-5 flex justify-center">
-                    <div class="relative h-40 w-40">
-                        <svg class="h-full w-full -rotate-90" viewBox="0 0 36 36" role="img" aria-labelledby="composition-chart-title composition-chart-description">
-                            <title id="composition-chart-title">Komposisi pegawai aktif</title>
-                            <desc id="composition-chart-description">
-                                @foreach ($compositionRows as $row)
-                                    {{ $row['jenis'] }} {{ $formatNumber($row['jumlah']) }} pegawai{{ $loop->last ? '.' : ',' }}
-                                @endforeach
-                            </desc>
-                            <circle class="text-soft" stroke="currentColor" stroke-width="4.5" fill="none" cx="18" cy="18" r="15.915"></circle>
-                            @foreach ($compositionRows as $row)
-                                <circle
-                                    class="{{ $row['tone']['stroke'] }}"
-                                    stroke="currentColor"
-                                    stroke-width="4.5"
-                                    stroke-dasharray="{{ number_format($row['persen'], 3, '.', '') }} 100"
-                                    stroke-dashoffset="{{ number_format(-$row['offset'], 3, '.', '') }}"
-                                    fill="none"
-                                    cx="18"
-                                    cy="18"
-                                    r="15.915"
-                                ></circle>
-                            @endforeach
-                        </svg>
+                    <div
+                        x-data="dashboardChart({ type: 'doughnut', labels: @js($compositionRows->pluck('jenis')->all()), data: @js($compositionRows->pluck('jumlah')->all()), tones: @js($compositionRows->pluck('chartTone')->all()) })"
+                        class="relative h-40 w-40"
+                    >
+                        <canvas x-ref="canvas" aria-hidden="true"></canvas>
                         <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
                             <span class="text-2xl font-semibold text-ink">{{ $formatNumber($compositionDisplayTotal) }}</span>
                             <span class="mt-1 text-xs text-muted">pegawai aktif</span>
@@ -422,9 +393,6 @@
                     <h3 class="text-sm font-bold text-ink">Status Cuti</h3>
                     <p class="mt-0.5 text-xs text-muted">Ringkasan pengajuan yang perlu dipantau.</p>
                 </div>
-                <svg class="h-6 w-6 shrink-0 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.25 3v2.25m7.5-2.25v2.25M3.75 9.75h16.5M5.25 4.5h13.5A1.5 1.5 0 0 1 20.25 6v13.5A1.5 1.5 0 0 1 18.75 21h-13.5a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5Z" />
-                </svg>
             </div>
 
             @if ($cutiMenunggu === null)
@@ -457,37 +425,31 @@
                     <p class="mt-0.5 text-xs text-muted">Jumlah pegawai per golongan I/a sampai IV/e.</p>
                 </div>
                 @if ($rankTotal > 0)
-                    <span class="text-sm font-semibold text-ink">{{ $formatNumber($rankTotal) }} pegawai</span>
+                    <span class="text-sm font-semibold text-ink">{{ $formatNumber($rankChartTotal) }} pegawai bergolongan</span>
                 @endif
             </div>
 
             @if ($distribusiGolongan === null)
                 <x-ui.empty-state icon="none" title="Distribusi golongan belum tersedia." />
-            @elseif ($rankTotal === 0)
+            @elseif ($rankChartTotal === 0)
                 <x-ui.empty-state icon="none" title="Belum ada distribusi golongan untuk ditampilkan." />
             @else
-                <div class="mt-6 overflow-x-auto pb-1">
-                    <div class="flex h-56 min-w-[760px] items-end gap-2" role="img" aria-label="Grafik distribusi golongan pegawai aktif">
-                        @foreach ($rankRows as $row)
-                            @php
-                                $barHeight = (int) round(($row['jumlah'] / $rankMax) * 100);
-                                $isUnfilledRank = $row['golongan'] === 'Belum Diisi';
-                            @endphp
-                            <div class="flex h-full min-w-9 flex-1 flex-col justify-end">
-                                <span class="mb-2 text-center text-xs font-semibold text-ink">{{ $row['jumlah'] > 0 ? $formatNumber($row['jumlah']) : '' }}</span>
-                                <div class="flex h-40 items-end rounded-t-md bg-soft" aria-hidden="true">
-                                    <div
-                                        class="w-full rounded-t-md {{ $isUnfilledRank ? 'bg-muted' : 'bg-primary' }}"
-                                        style="height: {{ $barHeight }}%"
-                                        title="{{ $row['golongan'] }}: {{ $formatNumber($row['jumlah']) }} pegawai"
-                                    ></div>
-                                </div>
-                                <span class="mt-2 text-center text-xs font-medium text-muted">{{ $isUnfilledRank ? 'Belum' : $row['golongan'] }}</span>
-                            </div>
+                <div
+                    x-data="dashboardChart({ type: 'bar', labels: @js($rankChartRows->pluck('golongan')->all()), data: @js($rankChartRows->pluck('jumlah')->all()), tooltipTotal: @js($rankTooltipTotal) })"
+                    class="mt-6 h-64 w-full"
+                >
+                    <canvas x-ref="canvas" aria-hidden="true"></canvas>
+                    <dl class="sr-only">
+                        @foreach ($rankChartRows as $row)
+                            <div><dt>{{ $row['golongan'] }}</dt><dd>{{ $formatNumber($row['jumlah']) }} pegawai</dd></div>
                         @endforeach
-                    </div>
+                    </dl>
                 </div>
-                <p class="mt-4 text-[10px] text-muted">Geser ke samping pada layar kecil untuk melihat seluruh golongan.</p>
+            @endif
+            @if ($rankUnclassifiedTotal > 0)
+                <p class="mt-4 text-xs text-muted">
+                    {{ $formatNumber($rankUnclassifiedTotal) }} pegawai tidak ditampilkan pada grafik karena golongannya belum diisi atau memakai nilai legacy ({{ $rankUnclassifiedLabels }}).
+                </p>
             @endif
         </x-ui.card>
     </section>
@@ -604,36 +566,16 @@
             @elseif ($trendRows->isEmpty())
                 <x-ui.empty-state icon="none" title="Belum ada data tren pegawai aktif." />
             @else
-                <div class="mt-6 h-64 w-full">
-                    <svg class="h-full w-full overflow-visible" viewBox="0 0 {{ $trendChart['width'] }} {{ $trendChart['height'] }}" role="img" aria-labelledby="trend-chart-title trend-chart-description">
-                        <title id="trend-chart-title">Tren pegawai aktif dua belas bulan terakhir</title>
-                        <desc id="trend-chart-description">
-                            @foreach ($trendRows as $row)
-                                {{ $row['label'] }} {{ $formatNumber($row['jumlah']) }} pegawai{{ $loop->last ? '.' : ',' }}
-                            @endforeach
-                        </desc>
-                        @foreach ([0, 0.5, 1] as $position)
-                            @php $y = $trendChart['top'] + ($trendPlotHeight * $position); @endphp
-                            <line x1="{{ $trendChart['left'] }}" y1="{{ $y }}" x2="{{ $trendChart['width'] - $trendChart['right'] }}" y2="{{ $y }}" stroke="var(--color-border)" stroke-width="1"></line>
+                <div
+                    x-data="dashboardChart({ type: 'line', labels: @js($trendRows->pluck('label')->all()), data: @js($trendRows->pluck('jumlah')->all()) })"
+                    class="mt-6 h-64 w-full"
+                >
+                    <canvas x-ref="canvas" aria-hidden="true"></canvas>
+                    <dl class="sr-only">
+                        @foreach ($trendRows as $row)
+                            <div><dt>{{ $row['label'] }}</dt><dd>{{ $formatNumber($row['jumlah']) }} pegawai</dd></div>
                         @endforeach
-                        <text x="0" y="{{ $trendChart['top'] + 4 }}" fill="var(--color-muted)" font-size="10">{{ $formatNumber($trendMax) }}</text>
-                        <text x="0" y="{{ $trendChart['top'] + ($trendPlotHeight / 2) + 4 }}" fill="var(--color-muted)" font-size="10">{{ $formatNumber($trendMid) }}</text>
-                        <text x="0" y="{{ $trendChart['height'] - $trendChart['bottom'] + 4 }}" fill="var(--color-muted)" font-size="10">{{ $formatNumber($trendMin) }}</text>
-
-                        @if ($trendPoints->count() > 1)
-                            <path d="{{ $trendAreaPath }}" fill="var(--color-primary)" opacity="0.08"></path>
-                            <polyline points="{{ $trendPolyline }}" fill="none" stroke="var(--color-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
-                        @endif
-
-                        @foreach ($trendPoints as $point)
-                            <circle cx="{{ $point['x'] }}" cy="{{ $point['y'] }}" r="4" fill="var(--color-surface)" stroke="var(--color-primary)" stroke-width="2">
-                                <title>{{ $point['label'] }}: {{ $formatNumber($point['jumlah']) }} pegawai</title>
-                            </circle>
-                            <text x="{{ $point['x'] }}" y="{{ $trendChart['height'] - 14 }}" text-anchor="middle" fill="var(--color-muted)" font-size="10">
-                                {{ \Illuminate\Support\Str::before($point['label'], ' ') }}
-                            </text>
-                        @endforeach
-                    </svg>
+                    </dl>
                 </div>
             @endif
         </x-ui.card>
@@ -661,7 +603,7 @@
                             $eventTone = match ($event) {
                                 'created', 'create' => 'bg-success/10 text-success',
                                 'deleted', 'delete' => 'bg-danger/10 text-danger',
-                                'updated', 'update', 'config_update' => 'bg-info/10 text-info',
+                                'updated', 'update', 'config_update' => 'bg-info/10 text-info-dark',
                                 default => 'bg-soft text-muted',
                             };
                             $eventLabel = $event !== ''

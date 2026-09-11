@@ -26,6 +26,24 @@ class RolePermissionMatrixAuditTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
+    public function test_checkbox_matriks_memiliki_id_unik_dan_nama_aksesibel(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $role = Role::query()->where('name', 'pegawai')->firstOrFail();
+        $permission = Permission::query()->firstOrFail();
+
+        $html = $this->actingAs($superAdmin)
+            ->get(route('rbac'))
+            ->assertOk()
+            ->getContent();
+
+        $checkboxId = sprintf('rbac-%s-%s', $role->id, $permission->id);
+
+        $this->assertSame(1, substr_count($html, sprintf('id="%s"', $checkboxId)));
+        $this->assertStringContainsString('aria-label="Izinkan ', $html);
+        $this->assertStringContainsString('untuk pegawai"', $html);
+    }
+
     public function test_perubahan_hak_akses_peran_tercatat_pada_audit_basis_data(): void
     {
         $superAdmin = User::factory()->superAdmin()->create();

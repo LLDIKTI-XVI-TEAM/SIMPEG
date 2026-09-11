@@ -97,8 +97,8 @@
                             x-on:input="validateNip"
 
                         >
-                            <p x-show="nipError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
-                            <p x-show="!nipError" class="text-[11px] text-muted mt-1 font-sans">Format: 18 digit angka.</p>
+                            <p x-show="nipError" class="text-xs text-danger font-semibold mt-1 font-sans" x-text="nipError"></p>
+                            <p x-show="!nipError" class="text-xs text-muted mt-1 font-sans">Format: 18 digit angka.</p>
                         </x-form.input>
 
                         {{-- Jenis Pegawai --}}
@@ -167,7 +167,7 @@
                                 <input id="is_kepala_lembaga" name="is_kepala_lembaga" type="checkbox" value="1" @checked(old('is_kepala_lembaga')) class="mt-1 rounded border-border text-primary focus:ring-primary/20">
                                 <span>
                                     Kepala Lembaga
-                                    <span class="block text-[10px] font-normal text-muted">Aktifkan hanya untuk pegawai yang berwenang memberi keputusan Kepala Lembaga pada alur cuti.</span>
+                                    <span class="block text-xs font-normal text-muted">Aktifkan hanya untuk pegawai yang berwenang memberi keputusan Kepala Lembaga pada alur cuti.</span>
                                 </span>
                             </label>
                         </div>
@@ -189,8 +189,8 @@
                             x-on:input="validateNik"
 
                         >
-                            <p x-show="nikError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
-                            <p x-show="!nikError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
+                            <p x-show="nikError" class="text-xs text-danger font-semibold mt-1 font-sans" x-text="nikError"></p>
+                            <p x-show="!nikError" class="text-xs text-muted mt-1 font-sans">Format: 16 digit angka.</p>
                         </x-form.input>
 
                         {{-- KK --}}
@@ -204,8 +204,8 @@
                             x-model="kk"
                             x-on:input="validateKk"
                         >
-                            <p x-show="kkError" class="text-[11px] text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
-                            <p x-show="!kkError" class="text-[11px] text-muted mt-1 font-sans">Format: 16 digit angka.</p>
+                            <p x-show="kkError" class="text-xs text-danger font-semibold mt-1 font-sans" x-text="kkError"></p>
+                            <p x-show="!kkError" class="text-xs text-muted mt-1 font-sans">Format: 16 digit angka.</p>
                         </x-form.input>
 
                         {{-- Tempat Lahir --}}
@@ -281,7 +281,7 @@
                                 </div>
                                 <div class="space-y-1">
                                     <input type="file" id="foto" name="foto" accept="image/*" @change="handleFotoChange" class="text-xs text-muted focus:outline-none file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 file:transition file:cursor-pointer">
-                                    <p class="text-[10px] text-muted font-sans">Format file: JPG, PNG. Maksimal ukuran 10MB.</p>
+                                    <p class="text-xs text-muted font-sans">Format file: JPG, PNG. Maksimal ukuran 10MB.</p>
                                 </div>
                             </div>
                         </div>
@@ -660,7 +660,7 @@
                     {{-- SUB-TAB E: BERKAS LAINNYA --}}
                     <div x-show="subTab === 'lainnya'" class="space-y-6" x-transition style="display: none;">
                         <div class="rounded-lg bg-soft/40 border border-border px-4 py-3">
-                            <p class="text-[11px] text-muted font-sans">Berkas ini akan tersimpan ke arsip dokumen pegawai saat Anda menekan tombol "Simpan Pegawai". Kosongkan bila tidak ingin menambah berkas.</p>
+                            <p class="text-xs text-muted font-sans">Berkas ini akan tersimpan ke arsip dokumen pegawai saat Anda menekan tombol "Simpan Pegawai". Kosongkan bila tidak ingin menambah berkas.</p>
                         </div>
 
                         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -697,7 +697,7 @@
                             <div class="space-y-1">
                                 <label for="berkas_lainnya_tanggal" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berkas</label>
                                 <input id="berkas_lainnya_tanggal" name="berkas_lainnya_tanggal" type="date" class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer" x-model="berkasLainnyaForm.tanggal">
-                                <p class="text-[10px] text-muted font-sans mt-0.5">Boleh dikosongkan jika tidak relevan.</p>
+                                <p class="text-xs text-muted font-sans mt-0.5">Boleh dikosongkan jika tidak relevan.</p>
                             </div>
 
                             {{-- Upload Berkas Lainnya --}}

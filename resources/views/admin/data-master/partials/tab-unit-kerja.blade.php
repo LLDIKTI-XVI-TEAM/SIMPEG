@@ -16,8 +16,8 @@
     class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
     <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Unit Kerja</h2>
-            <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Struktur organisasi berjenjang. Unit yang
+            <h2 class="text-xl font-semibold text-ink font-sans leading-tight">Unit Kerja</h2>
+            <p class="mt-0.5 max-w-2xl text-xs text-muted font-sans leading-normal">Struktur organisasi berjenjang. Unit yang
                 sudah dipakai riwayat jabatan atau masih memiliki sub-unit hanya dapat dinonaktifkan.</p>
         </div>
         <x-ui.button type="button" @click="showTambah = !showTambah"
@@ -34,7 +34,7 @@
         <input type="hidden" name="form_context" value="create">
         <x-form.input name="nama" label="Nama Unit Kerja" required placeholder="cth: Urusan Keuangan" />
         <div class="space-y-1">
-            <label for="unit-kerja-jenis-baru" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Jenis Unit</label>
+            <label for="unit-kerja-jenis-baru" class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Jenis Unit</label>
             <select id="unit-kerja-jenis-baru" name="jenis_unit" required
                 class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                 @foreach ($unitKerjaJenisOptions as $nilai => $label)
@@ -43,7 +43,7 @@
             </select>
         </div>
         <div class="space-y-1">
-            <label for="unit-kerja-induk-baru" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Unit Induk</label>
+            <label for="unit-kerja-induk-baru" class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Unit Induk</label>
             <select id="unit-kerja-induk-baru" name="parent_id"
                 class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                 <option value="">Tanpa induk (unit tertinggi)</option>
@@ -109,7 +109,7 @@
                                     x-bind:aria-expanded="editId === '{{ $item->id }}' ? 'true' : 'false'"
                                     aria-controls="unit-kerja-edit-{{ $item->id }}"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Edit"
                                     tooltip-position="top-end"
                                     aria-label="Edit"
@@ -124,7 +124,7 @@
                                     <x-ui.button
                                         type="submit"
                                         variant="{{ $item->is_active ? 'warning' : 'success' }}"
-                                        size="icon"
+                                        size="compact-icon"
                                         title="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
                                         tooltip-position="top-end"
                                         aria-label="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
@@ -148,7 +148,7 @@
                                         <x-ui.button
                                             type="submit"
                                             variant="danger"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="Hapus"
                                             tooltip-position="top-end"
                                             aria-label="Hapus"
@@ -170,12 +170,12 @@
                                 <input type="hidden" name="tab" value="unit_kerja">
                                 <input type="hidden" name="form_context" value="{{ $item->id }}">
                                 <div class="space-y-1">
-                                    <label for="unit-kerja-nama-{{ $item->id }}" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Nama Unit Kerja</label>
+                                    <label for="unit-kerja-nama-{{ $item->id }}" class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Nama Unit Kerja</label>
                                     <input id="unit-kerja-nama-{{ $item->id }}" name="nama" value="{{ $item->nama }}" required
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
-                                    <label for="unit-kerja-jenis-{{ $item->id }}" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Jenis Unit</label>
+                                    <label for="unit-kerja-jenis-{{ $item->id }}" class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Jenis Unit</label>
                                     <select id="unit-kerja-jenis-{{ $item->id }}" name="jenis_unit" required
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         @foreach ($unitKerjaJenisOptions as $nilai => $label)
@@ -184,7 +184,7 @@
                                     </select>
                                 </div>
                                 <div class="space-y-1">
-                                    <label for="unit-kerja-induk-{{ $item->id }}" class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Unit Induk</label>
+                                    <label for="unit-kerja-induk-{{ $item->id }}" class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Unit Induk</label>
                                     <select id="unit-kerja-induk-{{ $item->id }}" name="parent_id"
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                         <option value="">Tanpa induk (unit tertinggi)</option>

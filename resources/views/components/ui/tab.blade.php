@@ -9,7 +9,7 @@
 @php
     $styles = [
         'underline' => [
-            'base' => 'shrink-0 pb-2 text-xs md:text-sm transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 font-sans',
+            'base' => 'inline-flex min-h-10 shrink-0 items-center pb-2 text-xs md:text-sm transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 font-sans',
             'active' => 'border-b-2 border-primary text-primary font-bold',
             'inactive' => 'text-muted hover:text-ink font-semibold',
         ],
@@ -19,7 +19,7 @@
             'inactive' => 'text-muted hover:bg-soft hover:text-ink font-medium',
         ],
         'sidebar-soft' => [
-            'base' => 'w-full py-2.5 text-left text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 font-sans flex items-center justify-between gap-3',
+            'base' => 'w-full py-2.5 text-left text-sm transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 font-sans flex items-center justify-between gap-3',
             'active' => 'bg-soft text-primary font-semibold border-l-4 border-primary pl-2 rounded-r-lg',
             'inactive' => 'text-muted hover:bg-soft/50 hover:text-ink font-medium pl-3 rounded-lg',
         ],

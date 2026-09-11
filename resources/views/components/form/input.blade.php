@@ -57,7 +57,7 @@
             @if ($hasError) aria-invalid="true" @endif
             @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
             {{ $attributes->class([
-                'w-full rounded-xl border bg-surface text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans transition-all duration-200',
+                'w-full rounded-xl border bg-surface text-ink shadow-sm transition-[border-color,box-shadow] duration-200 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 font-sans',
                 $sizes[$size] ?? $sizes['md'],
                 'border-danger focus:border-danger focus:ring-danger/20' => $hasError,
                 'border-border' => ! $hasError,
@@ -76,10 +76,10 @@
     {{ $slot }}
 
     @if ($help)
-        <p id="{{ $helpId }}" class="text-[11px] text-muted font-sans">{{ $help }}</p>
+        <p id="{{ $helpId }}" class="text-xs text-muted font-sans">{{ $help }}</p>
     @endif
 
     @if ($hasError)
-        <p id="{{ $errorId }}" class="text-[11px] text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
+        <p id="{{ $errorId }}" class="text-xs text-danger font-semibold font-sans">{{ $fieldErrors->first($fieldErrorKey) }}</p>
     @endif
 </div>

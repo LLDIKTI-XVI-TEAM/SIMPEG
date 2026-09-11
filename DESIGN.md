@@ -50,13 +50,16 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 | Soft | `soft` | `#F3F4F6` | Surface pasif |
 | Success | `success` | `#16A34A` | Status berhasil |
 | Warning | `warning` | `#F59E0B` | Perhatian dan pending |
+| Warning text | `warning-dark` | `#92400E` | Teks peringatan pada surface terang |
 | Danger | `danger` | `#DC2626` | Risiko dan keputusan negatif |
 | Info | `info` | `#0284C7` | Informasi |
+| Info text | `info-dark` | `#075985` | Teks informasi pada surface terang |
 
 ### Rules
 
 - Gunakan token Tailwind yang berasal dari `resources/css/app.css`; jangan menambah warna ad hoc di view, kecuali pada pengecualian yang disetujui di bawah.
 - Warna status selalu ditemani teks status atau severity.
+- Gunakan `warning-dark` dan `info-dark` untuk teks peringatan/informasi pada surface terang agar kontras minimum 4,5:1 tetap terpenuhi.
 - Primary hanya untuk aksi yang benar-benar tersedia dan fokus keyboard.
 
 ## 3. Typography
@@ -111,6 +114,12 @@ SIMPEG adalah command center kepegawaian LLDIKTI Wilayah XVI: tenang, formal, da
 - **Structure:** button atau anchor dengan variant dan size.
 - **Variants:** `primary`, `secondary`, `muted`, `danger`, `danger-solid`,
   `success`, `success-solid`, `warning`, `warning-solid`, `ghost`, `link`.
+- **Sizes:** `compact` untuk aksi padat di dalam daftar atau baris card, `xs`,
+  `sm`, `md`, `lg`, `icon`, dan `compact-icon`. `compact` memakai radius `rounded-lg`,
+  `px-2.5 py-1.5`, serta teks `text-xs`; gunakan hanya ketika konteks dan label
+  aksi tetap mudah dipindai. `compact-icon` memakai target `32×32 px` khusus
+  aksi ikon dalam tabel padat yang telah disetujui; jangan gunakan untuk CTA
+  atau aksi utama di luar tabel.
 - **States:** default, hover, focus ring, active scale, disabled.
 - **Accessibility:** disabled action selalu memiliki teks penjelasan dekat kontrol dan `aria-describedby`; tooltip tidak menjadi satu-satunya penjelasan.
 

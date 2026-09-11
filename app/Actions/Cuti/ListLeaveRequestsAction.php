@@ -30,7 +30,7 @@ class ListLeaveRequestsAction
      *   optPeriodes: Collection<int, non-falsy-string>,
      *   optTahuns: Collection<int, string>,
      *   search: string, status: string, jenis: string, unit: string, periode: string,
-     *   isPegawai: bool
+     *   isPegawai: bool, hasActiveFilters: bool
      * }
      */
     public function execute(User $user, Request $request): array
@@ -45,6 +45,11 @@ class ListLeaveRequestsAction
         $periode = (string) $request->query('periode', '');
         $tahun = (string) $request->query('tahun', '');
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
+        $hasActiveFilters = $status !== ''
+            || $jenis !== ''
+            || $periode !== ''
+            || $tahun !== ''
+            || (! $isPegawai && ($search !== '' || $unit !== ''));
 
         $query = LeaveRequest::query()
             ->with([
@@ -138,6 +143,7 @@ class ListLeaveRequestsAction
             'periode' => $periode,
             'tahun' => $tahun,
             'isPegawai' => $isPegawai,
+            'hasActiveFilters' => $hasActiveFilters,
         ];
     }
 

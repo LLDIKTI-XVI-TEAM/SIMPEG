@@ -177,7 +177,7 @@ class EmployeeProfileDocumentMatrixTest extends TestCase
             ->assertSee('data-document-status="tidak_dinilai"', false)
             ->assertSee('data-document-is-dinilai="false"', false)
             ->assertSee('data-document-total-wajib="0"', false)
-            ->assertSee('Tidak Dinilai')
+            ->assertDontSee('Tidak Dinilai')
             ->assertSee('Matriks SK wajib belum dikonfigurasi')
             ->assertDontSee('data-required-sk=', false);
     }

@@ -730,6 +730,24 @@ class CutiRekapExportTest extends TestCase
             $this->assertCount(1, $submitButtons);
             $this->assertCount(1, $resetLinks);
             $this->assertStringContainsString('Terapkan Filter', $submitButtons->item(0)?->textContent ?? '');
+            $this->assertStringContainsString('bg-primary', (string) $submitButtons->item(0)?->attributes?->getNamedItem('class')?->nodeValue);
+            $this->assertStringContainsString('bg-transparent', (string) $resetLinks->item(0)?->attributes?->getNamedItem('class')?->nodeValue);
+
+            foreach ([
+                $expectation['prefix'].'-unit' => 'Unit Kerja',
+                $expectation['prefix'].'-jenis' => 'Jenis Cuti',
+                $expectation['prefix'].'-pegawai' => 'Pegawai',
+            ] as $fieldId => $labelText) {
+                $labels = $xpath->query('.//label[@for="'.$fieldId.'"]', $form);
+
+                $this->assertNotFalse($labels);
+                $this->assertCount(1, $labels, "Filter {$fieldId} harus memiliki label visual.");
+                $label = $labels->item(0);
+                $this->assertNotNull($label);
+                $this->assertSame($labelText, trim($label->textContent ?? ''));
+                $this->assertStringNotContainsString('sr-only', (string) $label->attributes?->getNamedItem('class')?->nodeValue);
+            }
+
             $visibleFilterText = preg_replace('/\s+/', ' ', $form->textContent ?? '');
             $this->assertIsString($visibleFilterText);
             $this->assertStringContainsString('Aktif: Agustus 2026', $visibleFilterText);

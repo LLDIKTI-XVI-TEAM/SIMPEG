@@ -2,8 +2,8 @@
     x-data="{ showTambah: {{ $errors->any() && old('tab') === 'program_studi' ? 'true' : 'false' }}, editId: null }">
     <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Program Studi</h2>
-            <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Kelola pilihan program studi yang digunakan pada pendidikan pegawai.</p>
+            <h2 class="text-xl font-semibold text-ink font-sans leading-tight">Program Studi</h2>
+            <p class="mt-0.5 max-w-2xl text-xs text-muted font-sans leading-normal">Kelola pilihan program studi yang digunakan pada pendidikan pegawai.</p>
         </div>
         <x-ui.button type="button" @click="showTambah = !showTambah" variant="secondary" class="shrink-0">
             Tambah
@@ -45,7 +45,7 @@
                                     type="button"
                                     @click="editId = editId === '{{ $item->id }}' ? null : '{{ $item->id }}'"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Edit"
                                     tooltip-position="top-end"
                                     aria-label="Edit"
@@ -60,7 +60,7 @@
                                     <x-ui.button
                                         type="submit"
                                         variant="{{ $item->is_active ? 'warning' : 'success' }}"
-                                        size="icon"
+                                        size="compact-icon"
                                         title="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
                                         tooltip-position="top-end"
                                         aria-label="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
@@ -83,7 +83,7 @@
                                         <x-ui.button
                                             type="submit"
                                             variant="danger"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="Hapus"
                                             tooltip-position="top-end"
                                             aria-label="Hapus"

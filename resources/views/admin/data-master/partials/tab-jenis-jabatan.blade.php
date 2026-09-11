@@ -5,8 +5,8 @@
     class="rounded-lg bg-surface p-6 shadow-sm space-y-6" style="display: none;">
     <div class="border-b border-border pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h2 class="text-2xl font-bold text-ink font-sans leading-tight">Jenis Jabatan</h2>
-            <p class="mt-0.5 max-w-2xl text-[11px] text-muted font-sans leading-normal">Data referensi jenis jabatan dan maksimal
+            <h2 class="text-xl font-semibold text-ink font-sans leading-tight">Jenis Jabatan</h2>
+            <p class="mt-0.5 max-w-2xl text-xs text-muted font-sans leading-normal">Data referensi jenis jabatan dan maksimal
                 usia pensiun. Dipakai riwayat jabatan dan referensi jabatan.</p>
         </div>
         <x-ui.button type="button" @click="showTambah = !showTambah" variant="secondary" class="shrink-0">
@@ -43,7 +43,7 @@
                     @php $dipakai = $jenisJabatanUsage[$item->id] ?? 0; @endphp
                     <x-ui.table-row>
                         <x-ui.table-td padding="sm" class="text-sm font-medium">{{ $item->nama }}</x-ui.table-td>
-                        <x-ui.table-td align="center" padding="sm" class="text-sm font-medium text-warning">{{ $item->maks_usia_pensiun }}</x-ui.table-td>
+                        <x-ui.table-td align="center" padding="sm" class="text-sm font-medium text-warning-dark">{{ $item->maks_usia_pensiun }}</x-ui.table-td>
                         <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $item->catatan ?? '—' }}</x-ui.table-td>
                         <x-ui.table-td align="center" padding="sm">
                             <x-ui.badge :variant="$item->is_active ? 'success' : 'danger'" size="sm" pill>
@@ -57,7 +57,7 @@
                                     type="button"
                                     @click="editId = editId === '{{ $item->id }}' ? null : '{{ $item->id }}'"
                                     variant="secondary"
-                                    size="icon"
+                                    size="compact-icon"
                                     title="Edit"
                                     tooltip-position="top-end"
                                     aria-label="Edit"
@@ -72,7 +72,7 @@
                                     <x-ui.button
                                         type="submit"
                                         variant="{{ $item->is_active ? 'warning' : 'success' }}"
-                                        size="icon"
+                                        size="compact-icon"
                                         title="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
                                         tooltip-position="top-end"
                                         aria-label="{{ $item->is_active ? 'Nonaktifkan' : 'Aktifkan' }}"
@@ -96,7 +96,7 @@
                                         <x-ui.button
                                             type="submit"
                                             variant="danger"
-                                            size="icon"
+                                            size="compact-icon"
                                             title="Hapus"
                                             tooltip-position="top-end"
                                             aria-label="Hapus"
@@ -117,17 +117,17 @@
                                 @csrf
                                 <input type="hidden" name="tab" value="jenis_jabatan">
                                 <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Nama Jenis Jabatan</label>
+                                    <label class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Nama Jenis Jabatan</label>
                                     <input name="nama" value="{{ $item->nama }}" required
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Maks Usia Pensiun</label>
+                                    <label class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Maks Usia Pensiun</label>
                                     <input name="maks_usia_pensiun" type="number" min="1" max="100" value="{{ $item->maks_usia_pensiun }}" required
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
                                 <div class="space-y-1">
-                                    <label class="text-[10px] font-bold text-muted uppercase tracking-wide font-sans">Catatan</label>
+                                    <label class="text-xs font-bold text-muted uppercase tracking-wide font-sans">Catatan</label>
                                     <input name="catatan" value="{{ $item->catatan }}"
                                         class="w-full rounded-xl border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 </div>
@@ -135,7 +135,7 @@
                                     Perbarui
                                 </x-ui.button>
                             </form>
-                            <p class="mt-2 text-[11px] text-muted font-sans">Perubahan maks usia pensiun hanya berlaku
+                            <p class="mt-2 text-xs text-muted font-sans">Perubahan maks usia pensiun hanya berlaku
                                 untuk perhitungan berikutnya; tanggal pensiun pegawai yang sudah terisi tidak dihitung
                                 ulang otomatis.</p>
                         </td>

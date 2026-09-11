@@ -26,41 +26,6 @@ class BuildPimpinanDashboardAction
         $ews = $this->ewsAlerts->preview(5);
         $trenPegawai = collect($this->trenPegawai->monthlyActiveCounts($now));
 
-        $chartWidth = 440;
-        $chartHeight = 100;
-        $paddingX = 40;
-        $paddingYBottom = 125;
-        $count = $trenPegawai->count();
-        $points = [];
-        $pathD = '';
-        $maxVal = 10;
-
-        if ($count > 1) {
-            $trenArray = $trenPegawai->toArray();
-            $maxVal = max(array_column($trenArray, 'jumlah'));
-            $maxVal = $maxVal > 0 ? $maxVal * 1.2 : 10;
-            $stepX = $chartWidth / ($count - 1);
-
-            foreach (array_values($trenArray) as $index => $data) {
-                $x = $paddingX + ($index * $stepX);
-                $y = $paddingYBottom - (($data['jumlah'] / $maxVal) * $chartHeight);
-                $points[] = [
-                    'x' => $x,
-                    'y' => $y,
-                    'val' => $data['jumlah'],
-                    'label' => substr((string) $data['label'], 0, 3),
-                ];
-            }
-
-            $pathD = 'M '.$points[0]['x'].' '.$points[0]['y'];
-            for ($i = 0; $i < count($points) - 1; $i++) {
-                $curr = $points[$i];
-                $next = $points[$i + 1];
-                $midX = ($curr['x'] + $next['x']) / 2;
-                $pathD .= " C {$midX} {$curr['y']}, {$midX} {$next['y']}, {$next['x']} {$next['y']}";
-            }
-        }
-
         return [
             'totalPegawai' => $employees['total'],
             'komposisi' => $employees['composition'],
@@ -121,9 +86,6 @@ class BuildPimpinanDashboardAction
                 ]),
             'distribusiGolongan' => $employees['rank_distribution'],
             'trenPegawai' => $trenPegawai,
-            'trendPoints' => $points,
-            'trendPathD' => $pathD,
-            'trendMaxVal' => $maxVal,
         ];
     }
 

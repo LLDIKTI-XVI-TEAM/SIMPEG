@@ -9,7 +9,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink">Import Data Pegawai</h2>
+                <h1 class="text-2xl font-semibold text-ink">Import Data Pegawai</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Data Pegawai', 'url' => route('data-pegawai')],
@@ -152,7 +152,7 @@
                         <span class="text-muted ml-2" x-text="'(' + totalRows + ' baris data)'"></span>
                     </div>
                 </div>
-                <div x-show="hasEdits" class="flex items-center gap-1.5 text-[10px] font-bold text-warning uppercase tracking-wider">
+                <div x-show="hasEdits" class="flex items-center gap-1.5 text-xs font-bold text-warning uppercase tracking-wider">
                     <span>●</span> Ada perubahan belum divalidasi
                 </div>
             </div>
@@ -266,7 +266,7 @@
                         <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Preview & Edit Data</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Klik langsung pada sel untuk mengedit data. Perubahan akan disimpan secara otomatis sebelum validasi.</p>
                     </div>
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans bg-soft px-2 py-1 rounded">
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans bg-soft px-2 py-1 rounded">
                         Hal. <span x-text="previewPage"></span> / <span x-text="previewTotalPages"></span>
                     </span>
                 </div>
@@ -279,7 +279,7 @@
                                 <template x-for="header in mainHeaders" :key="header">
                                     <x-ui.table-th padding="xs" class="border-r min-w-[200px]">
                                         <span class="block" x-text="header"></span>
-                                        <span class="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-muted"
+                                        <span class="mt-0.5 block text-xs font-medium normal-case tracking-normal text-muted"
                                             x-text="columnMapping[header] === 'tidak_dipakai' ? 'Tidak dipakai' : '→ ' + mappingTargetLabel(columnMapping[header])"></span>
                                     </x-ui.table-th>
                                 </template>
@@ -345,7 +345,7 @@
             {{-- Ringkasan Validasi Cards --}}
             <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <x-ui.card padding="sm" class="text-center">
-                    <span class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Total Baris</span>
+                    <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Total Baris</span>
                     <p class="text-2xl font-bold text-ink font-sans mt-1" x-text="totalRows"></p>
                 </x-ui.card>
                 <x-ui.button type="button" variant="ghost"
@@ -387,7 +387,7 @@
                         <h3 class="text-sm font-bold text-ink uppercase tracking-wider font-sans">Hasil Validasi</h3>
                         <p class="text-xs text-muted font-sans mt-0.5">Baris error bisa diedit langsung. Klik <strong>"Validasi Ulang"</strong> setelah memperbaiki data.</p>
                     </div>
-                    <div x-show="hasEdits" class="flex items-center gap-1.5 text-[10px] font-bold text-warning uppercase tracking-wider">
+                    <div x-show="hasEdits" class="flex items-center gap-1.5 text-xs font-bold text-warning uppercase tracking-wider">
                         <span>●</span> Ada perubahan
                     </div>
                 </div>
@@ -401,7 +401,7 @@
                                 <template x-for="header in mainHeaders" :key="'val-' + header">
                                     <x-ui.table-th padding="xs" class="border-r min-w-[200px]">
                                         <span class="block" x-text="header"></span>
-                                        <span class="mt-0.5 block text-[10px] font-medium normal-case tracking-normal text-muted"
+                                        <span class="mt-0.5 block text-xs font-medium normal-case tracking-normal text-muted"
                                             x-text="columnMapping[header] === 'tidak_dipakai' ? 'Tidak dipakai' : '→ ' + mappingTargetLabel(columnMapping[header])"></span>
                                     </x-ui.table-th>
                                 </template>
@@ -528,9 +528,9 @@
                 </div>
                 <div class="space-y-1">
                     <div class="w-full bg-soft rounded-full h-2.5 overflow-hidden border border-border">
-                        <div class="bg-primary h-2.5 rounded-full transition-all duration-300" :style="'width: ' + progress + '%'"></div>
+                        <div class="h-2.5 rounded-full bg-primary transition-[width] duration-300" :style="'width: ' + progress + '%'"></div>
                     </div>
-                    <span class="text-[10px] font-bold text-muted" x-text="progress + '%'"></span>
+                    <span class="text-xs font-bold text-muted" x-text="progress + '%'"></span>
                 </div>
                 <div class="border-t border-border pt-4 flex justify-center">
                     <a href="{{ route('data-pegawai') }}"
@@ -538,7 +538,7 @@
                         Lanjutkan di Background →
                     </a>
                 </div>
-                <p class="text-[10px] text-muted/70 font-sans -mt-2">Anda akan mendapat notifikasi sistem saat import selesai.</p>
+                <p class="text-xs text-muted/70 font-sans -mt-2">Anda akan mendapat notifikasi sistem saat import selesai.</p>
             </x-ui.card>
         </div>
 
@@ -578,14 +578,14 @@
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                         <div>
                             <span class="font-bold">Laporan Hasil Import</span>
-                            <p class="text-[11px] text-muted mt-0.5">Laporan tersimpan permanen di server: ringkasan hasil beserta baris gagal/dilewati dan alasannya.</p>
+                            <p class="text-xs text-muted mt-0.5">Laporan tersimpan permanen di server: ringkasan hasil beserta baris gagal/dilewati dan alasannya.</p>
                         </div>
                         <a :href="'/pegawai/import/' + batchId + '/laporan'" x-show="batchId"
                             class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 font-bold text-primary transition hover:bg-primary/5 shadow-xs cursor-pointer">
                             📥 Unduh Laporan (.csv)
                         </a>
                     </div>
-                    <div class="border-t border-border/80 pt-3 space-y-1 text-muted text-[11px]">
+                    <div class="border-t border-border/80 pt-3 space-y-1 text-muted text-xs">
                         <span class="font-bold text-ink uppercase tracking-wider block text-[9px] mb-1">📝 Audit Log</span>
                         {{-- Label operator memakai role efektif agar konsisten dengan otorisasi saat simulasi role aktif. --}}
                         <p>• Operator: <span class="font-semibold text-ink">{{ auth()->user()?->getEffectiveRole() ?? 'admin_kepegawaian' }}</span></p>

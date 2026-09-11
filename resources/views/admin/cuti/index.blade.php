@@ -37,7 +37,7 @@
         {{-- PAGE HEADER --}}
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">{{ $isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti' }}</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">{{ $isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti' }}</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => $isPegawai ? 'Pengajuan Cuti' : 'Monitoring Cuti']
@@ -56,7 +56,7 @@
                     Refresh
                 </x-ui.button>
                 @if(auth()->user()?->hasPermission('cuti.create') && ! auth()->user()?->employee?->is_kepala_lembaga)
-                <x-ui.button href="{{ route('cuti.create') }}" variant="primary" size="md">
+                <x-ui.button href="{{ route('cuti.create') }}" variant="secondary" size="md">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
@@ -185,51 +185,51 @@
 
             <div class="overflow-x-auto">
 
-                <x-ui.table id="cuti-table">
+                <x-ui.table id="cuti-table" :class="$isPegawai ? 'min-w-[56rem]' : 'min-w-[78rem]'">
                     <x-ui.table-head class="border-b border-border">
                         <x-ui.table-row>
                             @unless($isPegawai)
-                                <x-ui.table-th class="select-none">Pegawai</x-ui.table-th>
-                                <x-ui.table-th class="select-none">Unit Kerja</x-ui.table-th>
+                                <x-ui.table-th class="min-w-64 select-none">Pegawai</x-ui.table-th>
+                                <x-ui.table-th class="min-w-44 select-none">Unit Kerja</x-ui.table-th>
                             @endunless
-                            <x-ui.table-th class="select-none">Detail Cuti</x-ui.table-th>
-                            <x-ui.table-th class="select-none">Tanggal & Durasi</x-ui.table-th>
-                            <x-ui.table-th class="select-none">Langkah Aktif</x-ui.table-th>
-                            <x-ui.table-th class="select-none">Status Akhir</x-ui.table-th>
-                            <x-ui.table-th align="right" class="select-none">Aksi</x-ui.table-th>
+                            <x-ui.table-th class="min-w-80 select-none">Detail Cuti</x-ui.table-th>
+                            <x-ui.table-th class="min-w-48 select-none">Tanggal & Durasi</x-ui.table-th>
+                            <x-ui.table-th class="min-w-52 select-none">Langkah Aktif</x-ui.table-th>
+                            <x-ui.table-th class="min-w-44 select-none">Status Akhir</x-ui.table-th>
+                            <x-ui.table-th align="right" class="w-20 select-none">Aksi</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
                         @forelse($riwayatCuti as $r)
                         <x-ui.table-row data-nama="{{ $r['nama'] }}" data-nip="{{ $r['nip'] }}" data-unit="{{ $r['unit'] }}" data-jenis="{{ $r['jenis'] }}" data-status="{{ $r['status'] }}" data-periode="{{ $r['periode'] }}" :interactive="true">
                             @unless($isPegawai)
-                            <x-ui.table-td>
+                            <x-ui.table-td class="min-w-64">
 
                                 <div class="flex items-center gap-3">
                                     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                                         {{ strtoupper(substr($r['nama'], 0, 1)) }}
                                     </div>
                                     <div class="min-w-0">
-                                        <p class="text-sm font-semibold text-ink">{{ $r['nama'] }}</p>
+                                        <p class="whitespace-nowrap text-sm font-semibold text-ink">{{ $r['nama'] }}</p>
                                         <p class="text-xs text-muted">{{ $r['nip'] }}</p>
                                     </div>
                                 </div>
                             </x-ui.table-td>
-                            <x-ui.table-td>
-                                <span class="text-sm text-ink font-sans">{{ $r['unit'] }}</span>
+                            <x-ui.table-td class="min-w-44">
+                                <span class="whitespace-nowrap text-sm text-ink font-sans">{{ $r['unit'] }}</span>
                             </x-ui.table-td>
                             @endunless
-                            <x-ui.table-td>
-                                <p class="text-sm font-semibold text-ink font-sans">{{ $r['jenis'] }}</p>
+                            <x-ui.table-td class="min-w-80">
+                                <p class="whitespace-nowrap text-sm font-semibold text-ink font-sans">{{ $r['jenis'] }}</p>
                                 <p class="text-xs text-muted font-sans mt-0.5 max-w-xs truncate" title="{{ $r['alasan'] }}">{{ $r['alasan'] }}</p>
                             </x-ui.table-td>
-                            <x-ui.table-td>
-                                <p class="text-sm text-ink">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
+                            <x-ui.table-td class="min-w-48">
+                                <p class="whitespace-nowrap text-sm text-ink">{{ \Carbon\Carbon::parse($r['mulai'])->translatedFormat('d M') }} - {{ \Carbon\Carbon::parse($r['selesai'])->translatedFormat('d M Y') }}</p>
 
-                                <p class="text-xs text-primary font-semibold mt-0.5 leading-none">{{ $r['hari'] }} Hari Kerja</p>
+                                <p class="mt-0.5 whitespace-nowrap text-xs font-semibold leading-none text-primary">{{ $r['hari'] }} Hari Kerja</p>
                             </x-ui.table-td>
-                            <x-ui.table-td>
-                                <div class="text-[11px] font-medium text-ink font-sans">
+                            <x-ui.table-td class="min-w-52">
+                                <div class="whitespace-nowrap text-xs font-medium text-ink font-sans">
                                     @if($r['status'] === 'menunggu_approval' && $r['current_step_label'])
                                         <span>Menunggu <strong>{{ $r['current_step_label'] }}</strong></span>
                                     @elseif($r['current_step_label'])
@@ -239,15 +239,15 @@
                                     @endif
                                 </div>
                             </x-ui.table-td>
-                            <x-ui.table-td>
+                            <x-ui.table-td class="min-w-44">
                                 <x-ui.badge :variant="$statusVariant[$r['status']] ?? 'muted'" size="md" dot>
                                     {{ $statusLabel[$r['status']] }}
                                 </x-ui.badge>
                             </x-ui.table-td>
-                            <x-ui.table-td>
+                            <x-ui.table-td class="w-20">
                                 <div class="flex items-center justify-end gap-1.5">
 
-                                    <x-ui.button href="{{ route('cuti.show', $r['id']) }}" variant="secondary" size="icon" title="Detail" aria-label="Detail">
+                                    <x-ui.button href="{{ route('cuti.show', $r['id']) }}" variant="secondary" size="compact-icon" title="Detail" aria-label="Detail">
 
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -260,7 +260,11 @@
                         @empty
                         <x-ui.table-row>
                             <x-ui.table-td colspan="{{ $isPegawai ? 5 : 7 }}" align="center" class="px-6 py-8 text-muted">
-                                {{ $isPegawai ? 'Belum ada pengajuan cuti Anda yang sesuai dengan filter.' : 'Belum ada pengajuan cuti yang sesuai dengan filter.' }}
+                                @if($hasActiveFilters)
+                                    {{ $isPegawai ? 'Tidak ada pengajuan cuti Anda yang sesuai dengan filter.' : 'Tidak ada pengajuan cuti yang sesuai dengan filter.' }}
+                                @else
+                                    {{ $isPegawai ? 'Belum ada pengajuan cuti Anda.' : 'Belum ada pengajuan cuti.' }}
+                                @endif
                             </x-ui.table-td>
                         </x-ui.table-row>
                         @endforelse

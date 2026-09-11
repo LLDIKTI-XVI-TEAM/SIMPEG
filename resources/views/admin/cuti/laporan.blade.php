@@ -5,13 +5,17 @@
         'pegawai' => $pegawaiId,
         'jenis' => $jenisId,
     ]);
+    $hasActiveReportFilters = request()->filled('periode')
+        || request()->filled('unit')
+        || request()->filled('pegawai')
+        || request()->filled('jenis');
 @endphp
 
 <x-layouts.app title="Laporan Cuti">
     <div class="space-y-6">
         <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h2 class="text-2xl font-semibold text-ink font-sans">Laporan Cuti Pegawai</h2>
+                <h1 class="text-2xl font-semibold text-ink font-sans">Laporan Cuti Pegawai</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Laporan Cuti Pegawai'],
@@ -47,14 +51,16 @@
             </div>
         </div>
 
-        <section class="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm" aria-label="Filter laporan cuti">
+        <section class="rounded-xl border border-border bg-surface px-5 py-5 shadow-sm" aria-label="Filter laporan cuti">
             <form id="laporan-filter" method="GET" action="{{ route('cuti.laporan') }}" class="space-y-5">
                 <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
-                <x-cuti.period-filter :period="$periode" id-prefix="laporan" />
+                <div class="border-b border-border pb-5">
+                    <x-cuti.period-filter :period="$periode" id-prefix="laporan" layout="inline" />
+                </div>
 
-                <div class="grid gap-4 md:grid-cols-3">
+                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)_auto] xl:items-start">
                     <div class="space-y-1">
-                        <label for="laporan-unit" class="text-xs font-bold uppercase tracking-wider text-ink">Unit Kerja</label>
+                        <label for="laporan-unit" class="text-xs font-semibold text-ink">Unit Kerja</label>
                         <select id="laporan-unit" name="unit" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <option value="">Semua unit kerja</option>
                             @foreach($unitOptions as $option)
@@ -63,7 +69,7 @@
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label for="laporan-jenis" class="text-xs font-bold uppercase tracking-wider text-ink">Jenis Cuti</label>
+                        <label for="laporan-jenis" class="text-xs font-semibold text-ink">Jenis Cuti</label>
                         <select id="laporan-jenis" name="jenis" class="min-h-11 w-full rounded-xl border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
                             <option value="">Semua jenis cuti</option>
                             @foreach($jenisOptions as $option)
@@ -82,48 +88,55 @@
                         :embedded="true"
                         :auto-submit="false"
                     />
-                </div>
-
-                <div class="flex flex-wrap gap-2 border-t border-border pt-4">
-                    <x-ui.button type="submit">Terapkan Filter</x-ui.button>
-                    <x-ui.button href="{{ route('cuti.laporan') }}" variant="secondary" data-filter-reset>Reset</x-ui.button>
+                    <div class="flex flex-wrap gap-2 xl:justify-end xl:pt-5">
+                        <x-ui.button type="submit" variant="primary">Terapkan Filter</x-ui.button>
+                        <x-ui.button href="{{ route('cuti.laporan') }}" variant="ghost" data-filter-reset>Reset</x-ui.button>
+                    </div>
                 </div>
             </form>
         </section>
 
         <x-ui.card padding="none" class="overflow-hidden">
+            <div class="border-b border-border px-6 py-4">
+                <h2 class="text-base font-semibold text-ink">Data Laporan Cuti</h2>
+                <p class="mt-1 text-xs text-muted">Daftar pengajuan cuti pegawai sesuai periode dan filter yang dipilih.</p>
+            </div>
             <div class="overflow-x-auto">
-                <x-ui.table>
+                <x-ui.table class="min-w-[80rem]">
                     <x-ui.table-head>
                         <x-ui.table-row>
-                            <x-ui.table-th class="w-12">No</x-ui.table-th>
-                            <x-ui.table-th>NIP</x-ui.table-th>
-                            <x-ui.table-th>Nama</x-ui.table-th>
-                            <x-ui.table-th>Jenis Cuti</x-ui.table-th>
-                            <x-ui.table-th>Tanggal Mulai</x-ui.table-th>
-                            <x-ui.table-th>Tanggal Selesai</x-ui.table-th>
-                            <x-ui.table-th align="right">Hari Kerja</x-ui.table-th>
-                            <x-ui.table-th>Sumber</x-ui.table-th>
-                            <x-ui.table-th>Status</x-ui.table-th>
+                            <x-ui.table-th class="w-14">No</x-ui.table-th>
+                            <x-ui.table-th class="min-w-52">NIP</x-ui.table-th>
+                            <x-ui.table-th class="min-w-64">Nama</x-ui.table-th>
+                            <x-ui.table-th class="min-w-56">Jenis Cuti</x-ui.table-th>
+                            <x-ui.table-th class="min-w-36">Tanggal Mulai</x-ui.table-th>
+                            <x-ui.table-th class="min-w-36">Tanggal Selesai</x-ui.table-th>
+                            <x-ui.table-th align="right" class="min-w-24">Hari Kerja</x-ui.table-th>
+                            <x-ui.table-th class="min-w-36">Sumber</x-ui.table-th>
+                            <x-ui.table-th class="min-w-56">Status</x-ui.table-th>
                         </x-ui.table-row>
                     </x-ui.table-head>
                     <x-ui.table-body>
                         @forelse($rows as $row)
                             <x-ui.table-row :interactive="true">
-                                <x-ui.table-td padding="sm" class="text-sm text-muted">{{ $rows->firstItem() + $loop->index }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="font-mono text-sm text-ink whitespace-nowrap">{{ $row->nip }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-sm font-semibold text-ink">{{ $row->nama }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-sm text-ink">{{ $row->jenis }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-sm text-muted whitespace-nowrap">{{ $row->tanggalMulai->format('d-m-Y') }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-sm text-muted whitespace-nowrap">{{ $row->tanggalSelesai->format('d-m-Y') }}</x-ui.table-td>
-                                <x-ui.table-td align="right" padding="sm" class="font-mono text-sm text-ink">{{ $row->hari }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-sm text-ink">{{ $row->sourceLabel }}</x-ui.table-td>
-                                <x-ui.table-td padding="sm" class="text-sm text-ink whitespace-nowrap">{{ $row->statusLabel }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="w-14 text-sm text-muted">{{ $rows->firstItem() + $loop->index }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-52 whitespace-nowrap font-mono text-sm text-ink">{{ $row->nip }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-64 whitespace-nowrap text-sm font-semibold text-ink">{{ $row->nama }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-56 whitespace-nowrap text-sm text-ink">{{ $row->jenis }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-36 whitespace-nowrap text-sm text-muted">{{ $row->tanggalMulai->format('d-m-Y') }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-36 whitespace-nowrap text-sm text-muted">{{ $row->tanggalSelesai->format('d-m-Y') }}</x-ui.table-td>
+                                <x-ui.table-td align="right" padding="sm" class="min-w-24 font-mono text-sm text-ink">{{ $row->hari }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-36 whitespace-nowrap text-sm text-ink">{{ $row->sourceLabel }}</x-ui.table-td>
+                                <x-ui.table-td padding="sm" class="min-w-56 whitespace-nowrap text-sm text-ink">{{ $row->statusLabel }}</x-ui.table-td>
                             </x-ui.table-row>
                         @empty
                             <x-ui.table-row>
-                                <x-ui.table-td colspan="9" align="center" class="px-5 py-10 text-muted">
-                                    Tidak ada data cuti sesuai filter.
+                                <x-ui.table-td colspan="9" padding="none">
+                                    <x-ui.empty-state
+                                        :icon="$hasActiveReportFilters ? 'search' : 'document'"
+                                        :title="$hasActiveReportFilters ? 'Tidak ada data cuti yang sesuai dengan filter.' : 'Belum ada data cuti untuk dilaporkan.'"
+                                        :message="$hasActiveReportFilters ? 'Ubah atau reset filter untuk melihat data cuti lainnya.' : 'Data akan tersedia setelah ada pengajuan cuti yang tercatat.'"
+                                    />
                                 </x-ui.table-td>
                             </x-ui.table-row>
                         @endforelse
