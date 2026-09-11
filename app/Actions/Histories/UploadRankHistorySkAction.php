@@ -4,11 +4,13 @@ namespace App\Actions\Histories;
 
 use App\Models\Employee;
 use App\Models\RankHistory;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class UploadRankHistorySkAction
 {
@@ -23,6 +25,16 @@ class UploadRankHistorySkAction
             $history = DB::transaction(function () use ($employee, $history, $file, $request, &$storedPath, &$replacedPath): RankHistory {
                 $history = RankHistory::query()->whereKey($history->id)->lockForUpdate()->firstOrFail();
                 abort_unless($history->employee_id === $employee->id, 404);
+
+                // Re-check permission setelah row terkunci: FormRequest sudah cek create vs update
+                // di gate awal, tetapi state file_sk dapat berubah di antara request dan lock.
+                $actor = $request?->user();
+                $permission = filled($history->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
+                if ($actor instanceof User && ! $actor->hasPermission($permission)) {
+                    throw ValidationException::withMessages([
+                        'file_sk' => 'Anda tidak memiliki permission '.$permission.'.',
+                    ]);
+                }
 
                 $oldValues = $history->toArray();
                 $replacedPath = $history->file_sk;

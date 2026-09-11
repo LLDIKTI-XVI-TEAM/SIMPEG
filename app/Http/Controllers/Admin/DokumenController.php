@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Document;
 use App\Services\Employees\KepalaBagianScopeService;
 use App\Support\Documents\DocumentAuthorization;
+use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -105,7 +106,14 @@ class DokumenController extends Controller
             );
         }
 
-        $download = $action->execute($id);
+        // Pimpinan tidak boleh mengunduh KTP/KK, juga tolak path yang ambigu (shared file_path dengan KTP/KK)
+        $isPimpinan = $user !== null && $user->getEffectiveRole() === 'pimpinan';
+        $download = $action->execute(
+            $id,
+            null,
+            $isPimpinan ? DocumentCategory::visibleToPimpinanKeys() : null,
+            $isPimpinan,
+        );
 
         return Storage::disk(Document::STORAGE_DISK)->download($download['path'], $download['filename'], [
             'Cache-Control' => 'private, no-store, max-age=0',

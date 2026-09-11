@@ -23,7 +23,8 @@ class BuildPimpinanDashboardAction
         $employees = $this->employeeSummary->execute($user);
         $now = now();
         $pendingLeaves = $this->pendingLeaves($user->employee_id);
-        $ews = $this->ewsAlerts->preview(5);
+        $canReadEws = $user->hasPermission('ews.read');
+        $ews = $canReadEws ? $this->ewsAlerts->preview(5) : ['alerts' => collect(), 'total' => 0, 'urgent' => 0, 'warning' => 0, 'info' => 0];
         $trenPegawai = collect($this->trenPegawai->monthlyActiveCounts($now));
 
         return [

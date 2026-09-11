@@ -491,7 +491,7 @@
             :employees-url="route('pimpinan.pegawai.index')"
         >
                 @if($canUpdateEmployee)
-                <x-ui.button href="{{ route('pimpinan.pegawai.edit', $p->id) }}" wire:navigate aria-label="Edit Pegawai">
+                <x-ui.button href="{{ route('rbac.pegawai.edit', $p->id) }}" wire:navigate aria-label="Edit Pegawai">
                     <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
                     </svg>
@@ -663,7 +663,7 @@
                             </div>
                     </div>
                     @if ($canAssignSupervisor)
-                        <form id="assign-kepala-bagian-form" action="{{ route('pimpinan.pegawai.assign-atasan', $p->id) }}" method="POST" @submit="validateSupervisorSelection($event)" class="border-t border-border pt-4">
+                        <form id="assign-kepala-bagian-form" action="{{ route('rbac.pegawai.assign-atasan', $p->id) }}" method="POST" @submit="validateSupervisorSelection($event)" class="border-t border-border pt-4">
                             @csrf
                             <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_13rem_auto] md:items-start">
                                 <div class="space-y-1">
@@ -1846,7 +1846,7 @@
 
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
-        <form method="POST" action="{{ route('pimpinan.pegawai.destroy', $p->id) }}" class="space-y-4">
+        <form method="POST" action="{{ route('rbac.pegawai.destroy', $p->id) }}" class="space-y-4">
             @csrf
             <p class="text-sm text-muted font-sans">
                 Pegawai <strong class="text-ink">{{ $p->nama_lengkap }}</strong> akan dinonaktifkan: akses akun

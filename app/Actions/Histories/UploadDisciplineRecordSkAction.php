@@ -4,11 +4,13 @@ namespace App\Actions\Histories;
 
 use App\Models\DisciplineRecord;
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\EmployeeFileStorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class UploadDisciplineRecordSkAction
 {
@@ -23,6 +25,14 @@ class UploadDisciplineRecordSkAction
             $record = DB::transaction(function () use ($employee, $record, $file, $request, &$storedPath, &$replacedPath): DisciplineRecord {
                 $record = DisciplineRecord::query()->whereKey($record->id)->lockForUpdate()->firstOrFail();
                 abort_unless($record->employee_id === $employee->id, 404);
+
+                $actor = $request?->user();
+                $permission = filled($record->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
+                if ($actor instanceof User && ! $actor->hasPermission($permission)) {
+                    throw ValidationException::withMessages([
+                        'file_sk' => 'Anda tidak memiliki permission '.$permission.'.',
+                    ]);
+                }
 
                 $oldValues = $record->toArray();
                 $replacedPath = $record->file_sk;

@@ -37,7 +37,8 @@ class BuildAdminDashboardAction
     public function execute(?User $viewer = null): array
     {
         $now = now();
-        $ews = $this->ewsAlerts->preview(5);
+        $canReadEws = $viewer === null || $viewer->hasPermission('ews.read');
+        $ews = $canReadEws ? $this->ewsAlerts->preview(5) : ['alerts' => collect(), 'total' => 0, 'urgent' => 0, 'warning' => 0, 'info' => 0];
         $employees = $this->employeeSummary->execute($viewer);
 
         $daftarKenaikanPangkat = RankHistory::query()
