@@ -758,22 +758,22 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('employee')
                 ->name('pegawai.show');
             Route::get('/pegawai/{employee}/dokumen/{document}/unduh', [PimpinanEmployeeController::class, 'downloadDocument'])
-                ->middleware('permission:employees.read')
+                ->middleware(['permission:employees.read', 'permission:dokumen_sk.read'])
                 ->whereUuid('employee')
                 ->whereUuid('document')
                 ->name('pegawai.documents.download');
             Route::get('/pegawai/{employee}/hukuman-disiplin/{history}/unduh', [PimpinanEmployeeController::class, 'downloadDisciplineAttachment'])
-                ->middleware(['permission:employees.read', 'permission:discipline_records.read'])
+                ->middleware(['permission:employees.read', 'permission:discipline_records.read', 'permission:dokumen_sk.read'])
                 ->whereUuid('employee')
                 ->whereUuid('history')
                 ->name('pegawai.discipline-attachments.download');
             Route::get('/pegawai/{employee}/status/{history}/unduh', [PimpinanEmployeeController::class, 'downloadStatusAttachment'])
-                ->middleware('permission:employees.read')
+                ->middleware(['permission:employees.read', 'permission:employee_histories.read', 'permission:dokumen_sk.read'])
                 ->whereUuid('employee')
                 ->whereUuid('history')
                 ->name('pegawai.status-attachments.download');
             Route::get('/pegawai/{employee}/attachment-riwayat/{type}/{history}/unduh', [PimpinanEmployeeController::class, 'downloadHistoryAttachment'])
-                ->middleware('permission:employees.read')
+                ->middleware(['permission:employees.read', 'permission:employee_histories.read', 'permission:dokumen_sk.read'])
                 ->whereUuid('employee')
                 ->whereUuid('history')
                 ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'education'])

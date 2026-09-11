@@ -45,6 +45,8 @@ class PreparePimpinanEmployeeDetailAction
         $canCreateDiscipline = $viewer->hasPermission('discipline_records.create');
         $canCreateEmployeeHistory = $viewer->hasPermission('employee_histories.create');
         $canUpdateEmployeeHistory = $viewer->hasPermission('employee_histories.update') || $viewer->hasPermission('employee_histories.create');
+        $canDeleteEmployeeHistory = $viewer->hasPermission('employee_histories.delete');
+        $hasEducationHistoryMutation = $canCreateEmployeeHistory || $canUpdateEmployeeHistory || $canDeleteEmployeeHistory;
         $canCreateDocument = $viewer->hasPermission('dokumen_sk.create');
         $canUpdateDocument = $viewer->hasPermission('dokumen_sk.update');
         $canDeleteDocument = $viewer->hasPermission('dokumen_sk.delete');
@@ -227,6 +229,8 @@ class PreparePimpinanEmployeeDetailAction
             'canCreateDiscipline' => $canCreateDiscipline,
             'canCreateEmployeeHistory' => $canCreateEmployeeHistory,
             'canUpdateEmployeeHistory' => $canUpdateEmployeeHistory,
+            'canDeleteEmployeeHistory' => $canDeleteEmployeeHistory,
+            'hasEducationHistoryMutation' => $hasEducationHistoryMutation,
             'canCreateDocument' => $canCreateDocument,
             'canUpdateDocument' => $canUpdateDocument,
             'canDeleteDocument' => $canDeleteDocument,

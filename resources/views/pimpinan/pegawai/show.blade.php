@@ -25,6 +25,8 @@
             && auth()->user()->hasPermission('employee_histories.create');
         $canUpdateEmployeeHistory = auth()->check()
             && (auth()->user()->hasPermission('employee_histories.update') || auth()->user()->hasPermission('employee_histories.create') || auth()->user()->getEffectiveRole() === 'super_admin');
+        $canDeleteEmployeeHistory = auth()->check() && auth()->user()->hasPermission('employee_histories.delete');
+        $hasEducationHistoryMutation = $canCreateEmployeeHistory || $canUpdateEmployeeHistory || $canDeleteEmployeeHistory;
 
         // Tabs granular: hanya tampil jika permission read tersedia (sesuai dashboard)
         $canReadFamiliesForTabs = $canReadFamilies ?? (auth()->check() && auth()->user()->hasPermission('employee_families.read'));
@@ -1108,7 +1110,7 @@
                 <x-pegawai.detail.table
                     name="pendidikan"
                     :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah', 'Berkas']"
-                    :show-actions="$canCreateEmployeeHistory"
+                    :show-actions="$hasEducationHistoryMutation"
                     x-show="!pendidikanLoading"
                 >
                             <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
@@ -1122,9 +1124,9 @@
                                         <a x-show="edu.download_url" :href="edu.download_url" class="font-semibold text-primary hover:underline">Unduh Ijazah</a>
                                         <span x-show="!edu.download_url" class="text-muted">-</span>
                                     </td>
-                                    @if($canCreateEmployeeHistory)
                                             <td class="px-4 py-3 text-right">
                                         <div class="inline-flex items-center gap-3">
+                                            @if($canUpdateEmployeeHistory)
                                             <button
                                                 type="button"
                                                 @click="openEditPendidikan(edu)"
@@ -1132,6 +1134,8 @@
                                                 class="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
                                                 title="Edit riwayat pendidikan"
                                             >Edit</button>
+                                            @endif
+                                            @if($canDeleteEmployeeHistory)
                                             <button
                                                 type="button"
                                                 @click="deletePendidikan(edu.id, index)"
@@ -1144,13 +1148,13 @@
                                                 </svg>
                                                 Hapus
                                             </button>
+                                            @endif
                                         </div>
                                     </td>
-                                            @endif
                                 </tr>
                             </template>
                             <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
-                                <td colspan="{{ $canCreateEmployeeHistory ? 7 : 6 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="{{ $hasEducationHistoryMutation ? 7 : 6 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki riwayat pendidikan formal.
                                 </td>
                             </tr>

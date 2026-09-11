@@ -645,8 +645,8 @@ class EmployeeShowTest extends TestCase
 
         $this->assertStringContainsString('colspan="5"', $familyTable);
         $this->assertStringNotContainsString('colspan="6"', $familyTable);
-        $this->assertStringContainsString('colspan="6"', $educationTable);
-        $this->assertStringNotContainsString('colspan="7"', $educationTable);
+        $this->assertStringContainsString('colspan="7"', $educationTable);
+        $this->assertStringNotContainsString('colspan="6"', $educationTable);
     }
 
     public function test_detail_page_uses_created_history_payload_for_rank_and_position_rows(): void

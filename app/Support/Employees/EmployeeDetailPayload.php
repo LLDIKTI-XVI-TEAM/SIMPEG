@@ -24,7 +24,7 @@ class EmployeeDetailPayload
      * - Disiplin, Pendidikan, Dokumen (tanggal desc / latest)
      * - Atasan, Saldo Cuti, Pengajuan Cuti, Alert EWS (tanggal desc / order)
      */
-    public function loadRelations(Employee $employee, bool $canReadFamilies = true, bool $canReadHistories = true, bool $canReadDiscipline = true, bool $canReadDocuments = true): Employee
+    public function loadRelations(Employee $employee, bool $canReadFamilies = true, bool $canReadHistories = true, bool $canReadDiscipline = true, bool $canReadDocuments = true, bool $canReadLeaveRequests = false, bool $canReadLeaveBalances = false, bool $canReadEwsAlerts = false): Employee
     {
         return $employee->load([
             'agama:id,nama',
@@ -52,9 +52,9 @@ class EmployeeDetailPayload
                 ->with('supervisor:id,nama_lengkap,nip,jabatan_terakhir')
                 ->orderByRaw('tanggal_berakhir is null desc')
                 ->orderByDesc('tanggal_mulai'),
-            'leaveBalances' => fn ($query) => $query->orderByDesc('tahun'),
-            'leaveRequests' => fn ($query) => $query->with('jenisCuti:id,nama')->latest(),
-            'ewsAlerts' => fn ($query) => $query->orderBy('target_date'),
+            'leaveBalances' => fn ($query) => $query->when(! $canReadLeaveBalances, fn ($q) => $q->whereRaw('1 = 0'))->orderByDesc('tahun'),
+            'leaveRequests' => fn ($query) => $query->when(! $canReadLeaveRequests, fn ($q) => $q->whereRaw('1 = 0'))->with('jenisCuti:id,nama')->latest(),
+            'ewsAlerts' => fn ($query) => $query->when(! $canReadEwsAlerts, fn ($q) => $q->whereRaw('1 = 0'))->orderBy('target_date'),
         ]);
     }
 
@@ -65,7 +65,7 @@ class EmployeeDetailPayload
      * Field yang diizinkan: identitas dasar, pangkat, jabatan, riwayat, saldo cuti, alert.
      * Relasi yang disertakan: agama, status kawin, jenis pegawai, keluarga, pengangkatan, dll.
      */
-    public function response(Employee $employee): array
+    public function response(Employee $employee, bool $canReadLeaveRequests = false, bool $canReadLeaveBalances = false, bool $canReadEwsAlerts = false): array
     {
         return [
             ...Arr::only($employee->toArray(), [
@@ -118,9 +118,9 @@ class EmployeeDetailPayload
             'documents' => $employee->documents,
             'kepala_bagian' => $employee->kepalaBagian,
             'supervisor_assignments' => $employee->supervisorAssignments,
-            'leave_balances' => $employee->leaveBalances,
-            'leave_requests' => $employee->leaveRequests,
-            'ews_alerts' => $employee->ewsAlerts,
+            'leave_balances' => $canReadLeaveBalances ? $employee->leaveBalances : collect(),
+            'leave_requests' => $canReadLeaveRequests ? $employee->leaveRequests : collect(),
+            'ews_alerts' => $canReadEwsAlerts ? $employee->ewsAlerts : collect(),
         ];
     }
 }

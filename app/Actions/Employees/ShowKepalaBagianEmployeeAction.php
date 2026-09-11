@@ -35,10 +35,12 @@ class ShowKepalaBagianEmployeeAction
                     ->orderByDesc('tmt_jabatan')
                     ->limit(1),
                 'leaveRequests' => fn ($query) => $query
+                    ->when(! $user->hasPermission('cuti.read_all'), fn ($q) => $q->whereRaw('1 = 0'))
                     ->with('jenisCuti:id,nama')
                     ->latest()
                     ->limit(5),
                 'ewsAlerts' => fn ($query) => $query
+                    ->when(! $user->hasPermission('ews.read'), fn ($q) => $q->whereRaw('1 = 0'))
                     ->where('followup_status', 'aktif')
                     ->orderBy('target_date')
                     ->limit(5),

@@ -5,12 +5,14 @@ namespace App\Actions\Employees;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\EmployeeDocumentStatusService;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListEmployeesAction
 {
     public function __construct(
         private readonly EmployeeDocumentStatusService $documentStatus,
+        private readonly EmployeeDashboardScopeService $employeeScope,
     ) {}
 
     /**
@@ -30,9 +32,8 @@ class ListEmployeesAction
         $direction = $validated['direction'] ?? 'asc';
         $perPage = (int) ($validated['per_page'] ?? 10);
 
-        // Soft delete sudah dihapus (keputusan produk): parameter show_nonaktif/onlyTrashed
-        // tidak lagi relevan — nonaktif kini status kepegawaian biasa.
-        $employees = Employee::query();
+        // Dataset selalu dimulai dari scope kanonis aktor (global / bawahan / self).
+        $employees = $this->employeeScope->for($viewer);
 
         if ($viewer !== null
             && $viewer->getEffectiveRole() !== 'super_admin'

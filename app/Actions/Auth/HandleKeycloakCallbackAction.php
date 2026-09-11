@@ -287,7 +287,11 @@ class HandleKeycloakCallbackAction
                     if ($driver === 'pgsql') {
                         DB::statement('select pg_advisory_xact_lock(?)', [self::BOOTSTRAP_LOCK_KEY]);
                     } elseif (in_array($driver, ['mysql', 'mariadb'], true)) {
-                        DB::statement("SELECT GET_LOCK('simpeg.bootstrap.super_admin', 10)");
+                        $row = DB::selectOne("SELECT GET_LOCK('simpeg.bootstrap.super_admin', 10) AS got_lock");
+                        $got = $row ? (int) $row->got_lock : null;
+                        if ($got !== 1) {
+                            abort(503, 'Bootstrap lock unavailable — please retry.');
+                        }
                         $mysqlBootstrapLockAcquired = true;
                     }
 
