@@ -533,6 +533,11 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
             ->name('history-attachments.download');
     });
 
+    // SK Wajib via RBAC permission-only (untuk Pimpinan granular) — view pimpinan pakai route ini bila isPimpinan
+    Route::post('/rbac/sk-requirements', [SkRequirementController::class, 'update'])
+        ->middleware('permission:sk_requirements.manage')
+        ->name('rbac.sk-requirements.update');
+
     Route::get('/dashboard/cuti/saldo', [LeaveBalanceController::class, 'showMyBalanceWeb'])
         ->name('cuti.saldo');
 

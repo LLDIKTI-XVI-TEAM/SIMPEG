@@ -64,9 +64,9 @@ class PimpinanEmployeeController extends Controller
                 'url' => route('pimpinan.pegawai.show', $employee['id']),
             ])
             ->all();
-        // Permission-driven (kontrak RBAC): capability halaman mengikuti permission
-        // pada role efektif — bukan role asli. Halaman read-only default; blok aksi
-        // (SK wajib, tambah/import pegawai) tampil sesuai permission yang diberikan.
+        // Permission-driven (kontrak RBAC) granular per-aksi: setiap kontrol
+        // dirender hanya bila permission spesifik dimiliki pada role efektif.
+        // isReadOnly dipertahankan untuk fallback legacy, tapi bukan gate utama.
         $user = $request->user();
         $canManageSkRequirements = $user?->hasPermission('sk_requirements.manage') ?? false;
         $skRequirementMatrix = $canManageSkRequirements
@@ -74,12 +74,18 @@ class PimpinanEmployeeController extends Controller
             : ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $canCreateEmployee = $user?->hasPermission('employees.create') ?? false;
         $canImportEmployees = $user?->hasPermission('employees.import') ?? false;
+        $canUpdateEmployee = $user?->hasPermission('employees.update') ?? false;
+        $canDeactivateEmployee = $user?->hasPermission('employees.deactivate') ?? false;
+        $canRestoreEmployee = $user?->hasPermission('employees.restore') ?? false;
+        $canExportEmployees = $user?->hasPermission('employees.export') ?? false;
+        // Ubah Status adalah aksi administratif kepegawaian, bukan pimpinan — tetap false untuk pimpinan
+        $canChangeStatus = false;
         $hasEmployeeMutationCapability = $canManageSkRequirements
             || $canCreateEmployee
             || $canImportEmployees
-            || ($user?->hasPermission('employees.update') ?? false)
-            || ($user?->hasPermission('employees.deactivate') ?? false)
-            || ($user?->hasPermission('employees.restore') ?? false);
+            || $canUpdateEmployee
+            || $canDeactivateEmployee
+            || $canRestoreEmployee;
         $isReadOnly = ! $hasEmployeeMutationCapability;
         $skRequirementVersion = $matrixVersion->current();
 
@@ -117,6 +123,11 @@ class PimpinanEmployeeController extends Controller
             'skRequirementMatrix',
             'canCreateEmployee',
             'canImportEmployees',
+            'canUpdateEmployee',
+            'canDeactivateEmployee',
+            'canRestoreEmployee',
+            'canExportEmployees',
+            'canChangeStatus',
         ));
     }
 

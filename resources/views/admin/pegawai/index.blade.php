@@ -6,12 +6,13 @@
         $isReadOnly = $isReadOnly ?? false;
         $openStatusModal = $openStatusModal ?? false;
         $statusFormEmployee = $statusFormEmployee ?? null;
-        $canChangeStatus = $canChangeStatus ?? false;
-        // Pemulihan pegawai (K-STATUS-04): boleh Super Admin atau Admin Kepegawaian selama
-        // role EFEKTIF memegang employees.restore; saat simulasi, tombol mengikuti role
-        // efektif (K-MTG-03).
-        $canRestoreEmployee = ! $isReadOnly
-            && auth()->user()?->hasPermission('employees.restore');
+        $isPimpinan = $isPimpinan ?? (auth()->user()?->getEffectiveRole() === 'pimpinan');
+        // Granular per-aksi: setiap kontrol dirender hanya bila permission spesifik dimiliki
+        // pada role efektif. isReadOnly dipertahankan untuk fallback legacy, bukan gate utama.
+        $canUpdateEmployee = $canUpdateEmployee ?? (bool) auth()->user()?->hasPermission('employees.update');
+        $canDeactivateEmployee = $canDeactivateEmployee ?? (bool) auth()->user()?->hasPermission('employees.deactivate');
+        $canRestoreEmployee = $canRestoreEmployee ?? (bool) auth()->user()?->hasPermission('employees.restore');
+        $canChangeStatus = $canChangeStatus ?? $canUpdateEmployee;
         $canManageSkRequirements = $canManageSkRequirements ?? false;
         // Capability aksi pegawai permission-driven: dihitung dari permission role efektif
         // (controller bisa mengoverride), bukan blanket role super_admin/admin_kepegawaian.
@@ -20,10 +21,11 @@
         $canExportEmployees = $canExportEmployees ?? (bool) auth()->user()?->hasPermission('employees.export');
         $skRequirementMatrix = $skRequirementMatrix ?? ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $skRequirementVersion = $skRequirementVersion ?? 'unversioned';
+        $hasAnyMutation = $canUpdateEmployee || $canDeactivateEmployee || $canRestoreEmployee || $canCreateEmployee || $canImportEmployees || $canManageSkRequirements;
     @endphp
 
     <div x-data="{
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     // ===== State Modal Riwayat =====
     showRiwayatModal: false,
     riwayatType: '',
@@ -103,7 +105,8 @@
         const matrix = this.cloneSkMatrix(this.skMatrixDraft);
 
         try {
-            const response = await fetch(@js(route('sk-requirements.update')), {
+            const skRoute = @js($isPimpinan ? route('rbac.sk-requirements.update') : route('sk-requirements.update'));
+            const response = await fetch(skRoute, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -154,7 +157,7 @@
     meta: @js($initialMeta),
     isLoading: false,
     perPage: {{ $perPage }},
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
     editedEmployeeData: @js(session('edited_employee_data', null)),
@@ -292,7 +295,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         this.clearCacheByPrefixes(['pegawai_']);
     },
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     clearEmployeeLifecycleCache() {
         // Perubahan status aktif/nonaktif memengaruhi daftar pegawai aktif.
         this.clearCacheByPrefixes(['pegawai_']);
@@ -307,7 +310,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
-                @if (! $isReadOnly)
+                @if ($hasAnyMutation)
                 // Pilihan baris tidak boleh terbawa antar halaman atau antar mode filter.
                 this.$nextTick(() => {
                     document.querySelectorAll('.row-check').forEach(c => c.checked = false);
@@ -347,7 +350,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
             sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
             this.pegawaiRows = rows;
             this.meta = meta;
-            @if (! $isReadOnly)
+            @if ($hasAnyMutation)
             // Reset semua checkbox saat data baru dimuat
             this.$nextTick(() => {
                 document.querySelectorAll('.row-check').forEach(c => c.checked = false);
@@ -365,7 +368,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         this.fetchPage(1);
     },
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     /**
      * Nonaktifkan dan pulihkan memindahkan pegawai antar daftar sehingga jumlah data di server
      * berubah. Halaman dimuat ulang agar jumlah baris, penomoran, dan rentang data tidak
@@ -397,7 +400,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         this.fetchPage(1);
     },
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     // Tanggal hari ini dalam zona waktu lokal (toISOString memakai UTC dan dapat
     // menghasilkan tanggal kemarin pada jam-jam awal); dipakai default modal.
     todayLocal() {
@@ -665,7 +668,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
     init() {
         this.registerSkRequirementCacheListener();
 
-        @if (! $isReadOnly)
+        @if ($hasAnyMutation)
         if (this.dataChanged) {
             if (this.editedEmployeeId && this.editedEmployeeData) {
                 // Perbarui cache secara sinkron tanpa loading delay untuk pengalaman instant save
@@ -753,7 +756,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </svg>
                     <span x-text="isLoading ? 'Refreshing…' : 'Refresh'">Refresh</span>
                 </x-ui.button>
-                @if(!$isReadOnly && ($canExportEmployees ?? false))
+                @if($canExportEmployees)
                 <x-ui.button type="button" variant="primary" onclick="exportFilteredData()" id="export-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
@@ -762,7 +765,6 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </svg>
                     Export Excel
                 </x-ui.button>
-                @if($canExportEmployees ?? false)
                 <x-ui.button type="button" variant="primary" onclick="exportFilteredDataPdf()" id="export-pdf-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.476-1.12-1.09l-.23-2.523M19.5 10.5v.375c0 .621-.504 1.125-1.125 1.125H5.625A1.125 1.125 0 0 1 4.5 11.25v-.375m15 0V9a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 9v1.5m15 0A1.5 1.5 0 0 0 18 9h-3V6a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3H6a1.5 1.5 0 0 0-1.5 1.5" />
@@ -793,7 +795,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     <div id="add-pegawai-menu" x-show="open" style="display: none;" x-transition
                         class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
                         @if ($canCreateEmployee ?? false)
-                        <a href="{{ route('pegawai.create') }}" wire:navigate
+                        <a href="{{ $isPimpinan ? route('rbac.pegawai.create') : route('pegawai.create') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24" stroke-width="1.5">
@@ -817,17 +819,6 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                     </div>
                 </div>
                 @endif
-                @else
-                @if($canExportEmployees ?? false)
-                <a href="{{ route('laporan.pegawai') }}"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
-                    <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                    </svg>
-                    Laporan Pegawai
-                </a>
-                @endif
-                @endif
             </div>
         </div>
 
@@ -845,7 +836,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                 ['key' => 'is_lengkap', 'label' => 'Dokumen'],
                 ['key' => 'aksi', 'label' => 'Aksi'],
             ];
-            if (! ($isReadOnly ?? false)) {
+            if ($hasAnyMutation) {
                 array_unshift($tableColumns, ['key' => 'check', 'label' => '', 'width' => 'w-10']);
             }
         @endphp
@@ -853,7 +844,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" emptyTitle="Tidak ada data pegawai yang sesuai."
-            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null"
+            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="$hasAnyMutation ? 'check-all' : null"
             filterClass="lg:grid-cols-6" searchCols="col-span-1 sm:col-span-2 lg:col-span-2">
             {{-- ---- Filter Slots ---- --}}
             <x-slot:filters>
@@ -910,7 +901,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                         x-bind:data-nip="p.nip">
 
                         {{-- Checkbox --}}
-                        @if (! ($isReadOnly ?? false))
+                        @if ($hasAnyMutation)
                             <td class="px-4 py-3">
                                 <x-form.checkbox x-bind:disabled="!p.is_aktif" size="sm" class="row-check" />
                             </td>
@@ -1029,10 +1020,10 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                                         </svg>
                                     </a>
                                 </x-ui.tooltip>
-                                @if (!$isReadOnly)
+                                @if ($canUpdateEmployee)
                                 {{-- Edit --}}
                                 <x-ui.tooltip text="Edit" position="top">
-                                    <a :href="`/pegawai/${p.id}/edit`" wire:navigate
+                                    <a :href="$isPimpinan ? `/rbac/pegawai/${p.id}/edit` : `/pegawai/${p.id}/edit`" wire:navigate
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">
@@ -1058,7 +1049,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                                     </x-ui.tooltip>
                                 @endif
 
-                                @if (! $isReadOnly && auth()->user()->hasPermission('employees.deactivate'))
+                                @if ($canDeactivateEmployee)
                                     {{-- Nonaktifkan dengan mengubah status pegawai (bukan delete); hanya untuk baris aktif. --}}
                                     <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
                                         <button x-show="p.is_aktif" type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
@@ -1099,7 +1090,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         </x-ui.data-table>
 
 
-        @if (! ($isReadOnly ?? false))
+        @if ($hasAnyMutation)
         {{-- ============================================================ --}}
         {{-- BULK ACTION FLOATING BAR --}}
         {{-- ============================================================ --}}
@@ -1122,7 +1113,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         </div>
         @endif
 
-        @if (! $isReadOnly)
+        @if ($hasAnyMutation)
         {{-- ============================================================ --}}
         {{-- MODAL RINCIAN STATUS DOKUMEN --}}
         {{-- ============================================================ --}}
@@ -1800,7 +1791,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
 
     </div>{{-- end x-data --}}
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     <script>
         function updateBulkBar() {
             // Baris yang dinonaktifkan (mode daftar nonaktif) tidak boleh ikut dihitung sebagai
