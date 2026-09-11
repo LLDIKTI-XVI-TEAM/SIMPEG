@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Employees\ShowEmployeeAction;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\Permission;
@@ -34,7 +35,7 @@ class CodexGateReviewTest extends TestCase
         $this->actingAs($admin);
         $payload = app(EmployeeDetailPayload::class)->loadRelations($employee, true, true, true, true, false, true, true);
         $this->assertCount(0, $payload->leaveRequests);
-        $response = app(\App\Actions\Employees\ShowEmployeeAction::class)->execute($employee);
+        $response = app(ShowEmployeeAction::class)->execute($employee);
         $this->assertEmpty($response['leave_requests']);
     }
 

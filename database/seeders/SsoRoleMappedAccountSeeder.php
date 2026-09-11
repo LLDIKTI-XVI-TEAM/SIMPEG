@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Employee;
+use App\Models\RefJenisPegawai;
+use App\Models\RefStatusPegawai;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -191,12 +193,49 @@ class SsoRoleMappedAccountSeeder extends Seeder
 
             if (! $employee) {
                 // Placeholder baru: hanya di sini status aktif + role ditetapkan.
-                $employee = Employee::factory()->create([
+                // Untuk persona PhaseSeven (kepala-bagian & pegawai) set jabatan/kepala_bagian
+                // agar harness browser QA tidak false-negative karena jabatan random.
+                // Jenis/status juga di-force ke PNS/Aktif agar konsisten dengan ekspektasi PhaseSeven.
+                $statusAktifIdForNew = RefStatusPegawai::query()->where('nama', 'Aktif')->value('id');
+                $jenisPnsIdForNew = RefJenisPegawai::query()->where('nama', 'PNS')->value('id');
+                $extra = [];
+                if ($statusAktifIdForNew) {
+                    $extra['status_pegawai_id'] = $statusAktifIdForNew;
+                    $extra['status_aktif'] = 'Aktif';
+                }
+                if ($jenisPnsIdForNew) {
+                    $extra['jenis_pegawai_id'] = $jenisPnsIdForNew;
+                }
+                if ($email === 'kepala-bagian@example.test') {
+                    $extra = array_merge($extra, [
+                        'jabatan_terakhir' => 'Kepala Bagian',
+                        'kelas_jabatan' => '9',
+                        'kelas_jabatan_terakhir' => '9',
+                    ]);
+                } elseif ($email === 'pegawai@example.test') {
+                    $kabag = Employee::query()
+                        ->whereRaw('lower(email) = ?', [strtolower('kepala-bagian@example.test')])
+                        ->orWhereRaw('lower(email_pribadi) = ?', [strtolower('kepala-bagian@example.test')])
+                        ->first();
+                    $extra = array_merge($extra, [
+                        'jabatan_terakhir' => 'Analis Kepegawaian',
+                        'kelas_jabatan' => '7',
+                        'kelas_jabatan_terakhir' => '7',
+                        'kepala_bagian_id' => $kabag?->id,
+                    ]);
+                }
+                $employee = Employee::factory()->create(array_merge([
                     'nama_lengkap' => $this->displayName($email),
                     'email' => $email,
-                    'status_aktif' => 'Aktif',
                     'role' => $role,
-                ]);
+                ], $extra));
+
+                // Pegawai placeholder butuh supervisor assignment implisit via kepala_bagian_id
+                // sudah diset di atas; PhaseSeven akan validasi via currentSupervisor().
+                if ($email === 'pegawai@example.test' && $employee->kepala_bagian_id) {
+                    // Pastikan kepala_bagian_id tetap konsisten walau factory random;
+                    // sudah di-set, tidak perlu tambahan.
+                }
             }
             // Pegawai existing: status/role domain tidak disentuh agar seeder ulang
             // tidak menghidupkan kembali pegawai Non-Aktif/Pensiun/Mutasi, dan tidak

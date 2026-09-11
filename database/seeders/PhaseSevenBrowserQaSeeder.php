@@ -173,47 +173,40 @@ class PhaseSevenBrowserQaSeeder extends Seeder
 
     private function upsertAdminSession(?string $jenisPegawaiId, ?string $statusAktifId): User
     {
-        $email = 'demo-klabat-kepeg@example.test';
-        // Validate-only for SSO persona existing: do not repair silently.
-        $userCandidates = User::query()
-            ->whereRaw('lower(keycloak_username) = ?', [strtolower('demo-klabat-kepeg')])
-            ->orWhereRaw('lower(email) = ?', [strtolower($email)])
-            ->limit(2)
-            ->get();
-        if ($userCandidates->count() > 1) {
-            throw new \RuntimeException('QA fixture contract violated: ambiguous admin user for demo-klabat-kepeg');
-        }
-        $user = $userCandidates->first();
+        // Single source of truth untuk fixture Admin Kepegawaian - sama seperti approver/pegawai.
+        // Jangan duplikasi literal; ambil dari SsoRoleMappedAccountSeeder::UAT_ACCOUNTS agar
+        // perubahan fixture tidak membuat admin dan approver divergen.
+        $uat = collect(SsoRoleMappedAccountSeeder::UAT_ACCOUNTS)->firstWhere('username', 'demo-klabat-kepeg');
+        $email = $uat['email'] ?? 'admin-kepegawaian@example.test';
+        $expectedUsername = $uat['username'] ?? 'demo-klabat-kepeg';
+        $expectedRole = $uat['role'] ?? 'admin_kepegawaian';
 
+        // Kanonis Issue #6: Employee dicari via email terverifikasi (email/email_pribadi, case-insensitive, bounded).
         $employeeCandidates = Employee::query()
             ->whereRaw('lower(email) = ? OR lower(email_pribadi) = ?', [strtolower($email), strtolower($email)])
             ->limit(2)
             ->get();
-        if ($employeeCandidates->count() > 1) {
-            throw new \RuntimeException('QA fixture contract violated: ambiguous admin employee for demo-klabat-kepeg');
-        }
-        $employee = null;
-        if ($user !== null && $user->employee_id !== null) {
-            $employee = Employee::query()->find($user->employee_id);
-        }
-        if ($employee === null) {
-            $employee = $employeeCandidates->first();
+
+        if ($employeeCandidates->count() !== 1) {
+            throw new \RuntimeException('QA fixture contract violated: ambiguous or missing active Employee for demo admin email '.$email);
         }
 
-        if ($user === null && $employee === null) {
-            throw new \RuntimeException('QA fixture contract violated: admin persona SSO prerequisite missing - run SsoRoleMappedAccountSeeder, refusing to create demo-klabat-kepeg');
-        }
-
-        if ($user === null || $employee === null) {
-            throw new \RuntimeException('QA fixture contract violated: admin user/employee incomplete - run SsoRoleMappedAccountSeeder');
-        }
+        $employee = $employeeCandidates->first();
 
         if (! $employee->isActive() || $employee->status_pegawai_id !== $statusAktifId || $employee->jenis_pegawai_id !== $jenisPegawaiId) {
             throw new \RuntimeException('QA fixture contract violated: admin employee not Aktif or mismatched jenis/status - refusing to force Aktif');
         }
 
-        if ($user->role !== 'admin_kepegawaian' || $user->keycloak_username !== 'demo-klabat-kepeg' || $user->employee_id !== $employee->id) {
-            throw new \RuntimeException('QA fixture contract violated: admin user role/employee_id mismatch - refusing to overwrite');
+        // User hanya via employee_id (kontrak Issue #6), bukan username-first agar harness
+        // tidak PASS palsu bila mapping email kanonis rusak.
+        $user = User::query()->where('employee_id', $employee->id)->first();
+
+        if ($user === null) {
+            throw new \RuntimeException('QA fixture contract violated: admin User not found via employee_id for '.$email);
+        }
+
+        if ($user->role !== $expectedRole || $user->keycloak_username !== $expectedUsername || $user->employee_id !== $employee->id) {
+            throw new \RuntimeException('QA fixture contract violated: admin user role/keycloak_username/employee_id mismatch - refusing to overwrite');
         }
 
         return $user;
