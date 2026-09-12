@@ -94,8 +94,25 @@ class EmployeeHistoryPayload
     {
         $payload['download_url'] = $employee === null
             ? null
-            : $this->attachments->downloadUrl($employee, $type, $history, 'pegawai.history-attachments.download');
+            : $this->attachments->downloadUrl($employee, $type, $history, $this->historyRouteName());
 
         return $payload;
+    }
+
+    private function historyRouteName(): string
+    {
+        // Pertahankan surface RBAC: Kepala Bagian/Pegawai yang menyimpan via /rbac/pegawai/...
+        // harus mendapat URL rbac.pegawai.history-attachments.download, bukan pegawai.* (admin-only 403).
+        $routeName = request()?->route()?->getName();
+        if (is_string($routeName) && str_starts_with($routeName, 'rbac.')) {
+            return 'rbac.pegawai.history-attachments.download';
+        }
+
+        $user = request()?->user() ?? auth()->user();
+        if ($user !== null && in_array($user->getEffectiveRole(), ['kepala_bagian', 'pegawai'], true)) {
+            return 'rbac.pegawai.history-attachments.download';
+        }
+
+        return 'pegawai.history-attachments.download';
     }
 }

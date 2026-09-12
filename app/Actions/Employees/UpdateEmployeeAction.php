@@ -410,16 +410,28 @@ class UpdateEmployeeAction
                         }
 
                         if ($storedPengangkatanPath !== null) {
-                            Document::create([
+                            $existingDoc = Document::where('employee_id', $employee->id)
+                                ->where('jenis_dokumen', 'sk_pengangkatan')
+                                ->where('history_id', $appointment->id)
+                                ->first();
+                            $oldDocPath = $existingDoc?->file_path;
+                            Document::updateOrCreate([
                                 'employee_id' => $employee->id,
                                 'history_id' => $appointment->id,
                                 'jenis_dokumen' => 'sk_pengangkatan',
+                            ], [
                                 'nama_dokumen' => 'SK Pengangkatan '.($appointmentData['jenis_pengangkatan'] ?? ''),
                                 'nomor_dokumen' => $appointmentData['no_sk'] ?? null,
                                 'tanggal_dokumen' => $appointmentData['tanggal_sk'] ?? null,
                                 'file_path' => $appointmentData['file_sk'],
                                 'keterangan' => 'Diunggah otomatis saat edit pegawai',
                             ]);
+                            if ($oldDocPath !== null && $oldDocPath !== $appointmentData['file_sk']) {
+                                // Hapus byte lama hanya bila tidak ada dokumen lain yang mereferensikannya
+                                if (! Document::where('file_path', $oldDocPath)->exists()) {
+                                    $this->files->deleteReplacedEmployeeDocumentFile($oldDocPath);
+                                }
+                            }
                         }
 
                         $jenisNama = $appointmentData['jenis_pengangkatan'] ?? $validated['pengangkatan_jenis_pengangkatan'] ?? null;

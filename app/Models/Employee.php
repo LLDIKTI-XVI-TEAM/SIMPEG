@@ -327,7 +327,7 @@ class Employee extends Model
     /** @return HasOne<Appointment, $this> */
     public function appointment(): HasOne
     {
-        return $this->hasOne(Appointment::class);
+        return $this->hasOne(Appointment::class)->orderBy('tmt_pengangkatan')->orderBy('id');
     }
 
     // --- Supervisor Relations ---

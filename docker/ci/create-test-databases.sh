@@ -27,8 +27,14 @@ create_if_missing() {
 
 create_if_missing "$BASE_DB"
 
-i=0
+# Laravel ParallelTesting menambahkan suffix _test_{token} pada DB_DATABASE.
+# Dengan DB_DATABASE=simpeg_test, worker 1 mencari simpeg_test_test_1, bukan
+# simpeg_test1. Bentuk yang salah membuat helper sukses tetapi worker gagal
+# sebelum suite berjalan pada runner tanpa hak CREATEDB.
+i=1
 while [ "$i" -le "$MAX_SUFFIX" ]; do
-    create_if_missing "${BASE_DB}${i}"
+    create_if_missing "${BASE_DB}_test_${i}"
     i=$((i + 1))
 done
+# Kompatibilitas token 0-based pada versi paratest tertentu
+create_if_missing "${BASE_DB}_test_0"

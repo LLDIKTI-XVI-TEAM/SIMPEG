@@ -90,7 +90,9 @@ return [
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             // Laravel ParallelTesting mengisolasi worker dengan suffix _test_{token}.
-            'database' => env('DB_DATABASE', 'laravel'),
+            // Bentuk ini harus sama dengan docker/ci/create-test-databases.sh
+            // agar helper yang sukses benar-benar menyiapkan DB yang dicari worker.
+            'database' => env('DB_DATABASE', 'laravel').(getenv('TEST_TOKEN') !== false && getenv('TEST_TOKEN') !== '' ? '_test_'.getenv('TEST_TOKEN') : ''),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
             'charset' => env('DB_CHARSET', 'utf8'),
