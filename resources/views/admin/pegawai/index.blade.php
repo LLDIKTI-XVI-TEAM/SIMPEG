@@ -22,10 +22,14 @@
         $skRequirementMatrix = $skRequirementMatrix ?? ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $skRequirementVersion = $skRequirementVersion ?? 'unversioned';
         $hasAnyMutation = $canUpdateEmployee || $canDeactivateEmployee || $canRestoreEmployee || $canCreateEmployee || $canImportEmployees || $canManageSkRequirements;
+        // Bulk export hanya relevan bila actor memang memiliki employees.export; jangan membuka checkbox
+        // hanya karena mutation lain. Rincian dokumen memakai endpoint strict/admin raw sehingga
+        // Pimpinan tetap badge read-only.
+        $canViewDocumentStatus = !$isPimpinan && (bool) auth()->user()?->hasPermission('dokumen_sk.read');
     @endphp
 
     <div x-data="{
-    @if ($hasAnyMutation)
+    @if ($hasAnyMutation || $canViewDocumentStatus)
     // ===== State Modal Riwayat =====
     showRiwayatModal: false,
     riwayatType: '',
@@ -836,7 +840,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                 ['key' => 'is_lengkap', 'label' => 'Dokumen'],
                 ['key' => 'aksi', 'label' => 'Aksi'],
             ];
-            if ($hasAnyMutation) {
+            if ($canExportEmployees) {
                 array_unshift($tableColumns, ['key' => 'check', 'label' => '', 'width' => 'w-10']);
             }
         @endphp
@@ -844,7 +848,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" hasActiveFilters="filters.search || filters.golongan || filters.unit_kerja_id || filters.jenis_pegawai_id || (filters.status_pegawai_id && filters.status_pegawai_id !== 'all')" emptyTitle="Belum ada data pegawai."
-            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="$hasAnyMutation ? 'check-all' : null"
+            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="$canExportEmployees ? 'check-all' : null"
             filterClass="lg:grid-cols-6 xl:grid-cols-[minmax(12rem,1.05fr)_minmax(11rem,1fr)_minmax(9rem,.8fr)_minmax(9rem,.8fr)_minmax(13.5rem,1.2fr)]"
             searchCols="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-1">
             {{-- ---- Filter Slots ---- --}}
@@ -902,7 +906,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                         x-bind:data-nip="p.nip">
 
                         {{-- Checkbox --}}
-                        @if ($hasAnyMutation)
+                        @if ($canExportEmployees)
                             <td class="px-4 py-3">
                                 <x-form.checkbox x-bind:disabled="!p.is_aktif" size="sm" class="row-check" />
                             </td>
@@ -975,7 +979,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
 
                         {{-- Dokumen --}}
                         <td class="px-4 py-3">
-                            @if ($isReadOnly)
+                            @if (! $canViewDocumentStatus)
                             <x-ui.badge variant="none" size="md" dot x-bind:class="docBadgeClass(p.is_lengkap)"
                                 title="Status kelengkapan dokumen">
                                 <span x-text="docStatusWithCount(p)"></span>
@@ -1085,7 +1089,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         </x-ui.data-table>
 
 
-        @if ($hasAnyMutation)
+        @if ($canExportEmployees)
         {{-- ============================================================ --}}
         {{-- BULK ACTION FLOATING BAR --}}
         {{-- ============================================================ --}}
@@ -1108,7 +1112,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         </div>
         @endif
 
-        @if ($hasAnyMutation)
+        @if ($canViewDocumentStatus)
         {{-- ============================================================ --}}
         {{-- MODAL RINCIAN STATUS DOKUMEN --}}
         {{-- ============================================================ --}}
