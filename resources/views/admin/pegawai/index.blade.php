@@ -426,7 +426,8 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
         this.deletePegawaiAlasan = '';
         this.showDeleteModal = true;
     },
-
+    @endif
+    @if ($canViewDocumentStatus)
     async openDocumentStatus(employee) {
         this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
         this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_dinilai: employee.dokumen_is_dinilai, is_lengkap: employee.is_lengkap === 'lengkap', total_wajib: employee.dokumen_total_wajib, tersedia_count: employee.dokumen_tersedia_count, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
@@ -451,7 +452,8 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
             this.isLoadingDocumentStatus = false;
         }
     },
-
+    @endif
+    @if ($hasAnyMutation)
     async confirmDeletePegawai() {
         if (!this.deletePegawaiId) return;
         // Kontrak perubahan status resmi: tanggal efektif + alasan wajib (US-2.9).
