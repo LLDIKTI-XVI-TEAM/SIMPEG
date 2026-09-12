@@ -1268,9 +1268,10 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertSame([], Storage::disk('public')->allFiles('cuti'));
     }
 
-    public function test_pemohon_bisa_merevisi_pengajuan_menunggu_approval_sebelum_ada_tindakan_dengan_snapshot_yang_sama(): void
+    #[DataProvider('revisionNavigationContexts')]
+    public function test_pemohon_bisa_merevisi_pengajuan_menunggu_approval_sebelum_ada_tindakan_dengan_snapshot_yang_sama(array $context): void
     {
-        $aktor = $this->makePemohon();
+        $aktor = $this->makePemohon(role: $context === [] ? 'pegawai' : 'pimpinan');
         $jenis = $this->jenisCuti('Cuti Sakit');
 
         $this->actingAs($aktor['user']);
@@ -1278,8 +1279,14 @@ class SubmitLeaveRequestTest extends TestCase
 
         $leave = LeaveRequest::with('steps')->firstOrFail();
         $stepIdsBefore = $leave->steps()->orderBy('step_order')->pluck('id')->all();
+        $detail = route('cuti.show', ['id' => $leave->id, ...$context]);
+        $endpoint = route('cuti.resubmit', ['leaveRequest' => $leave->id, ...$context]);
+        $formEndpoint = route('cuti.resubmit', ['leaveRequest' => $leave->id, ...($context ?: ['from' => 'own'])]);
+        $this->get($detail)->assertOk()->assertSee('action="'.e($formEndpoint).'"', false);
+        $this->from($detail)->patch($endpoint, [])->assertRedirect($detail)->assertSessionHasErrors('tanggal_mulai');
+        $this->assertSame(1, $leave->fresh()->revision_version);
 
-        $response = $this->patch(route('cuti.resubmit', $leave), [
+        $response = $this->patch($endpoint, [
             'revision_version' => $leave->fresh()->revision_version,
             'tanggal_mulai' => '2026-07-13',
             'tanggal_selesai' => '2026-07-15',
@@ -1288,7 +1295,10 @@ class SubmitLeaveRequestTest extends TestCase
             'nomor_telepon' => '+62 (431) 123-457',
         ]);
 
-        $response->assertRedirect(route('cuti.show', $leave));
+        $response->assertSessionHasNoErrors()->assertRedirect($detail);
+        $listRoute = ($context['from'] ?? null) === 'pimpinan' ? 'pimpinan.cuti.index' : 'cuti';
+        $filters = $context['return'] ?? ['scope' => 'own'];
+        $this->get($detail)->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route($listRoute, $filters));
         $leave->refresh();
 
         $this->assertSame('menunggu_approval', $leave->status);
@@ -1303,6 +1313,15 @@ class SubmitLeaveRequestTest extends TestCase
             'step_order' => 1,
             'status' => 'active',
         ]);
+    }
+
+    public static function revisionNavigationContexts(): array
+    {
+        return [
+            'tanpa asal' => [[]],
+            'monitoring' => [['from' => 'monitoring', 'return' => ['status' => 'menunggu', 'periode' => '2026-07', 'page' => '2']]],
+            'pimpinan' => [['from' => 'pimpinan', 'return' => ['status' => 'all', 'periode' => '2026-07', 'page' => '3', 'per_page' => '25']]],
+        ];
     }
 
     public function test_dua_revisi_dalam_detik_yang_sama_membentuk_siklus_notifikasi_berbeda(): void

@@ -126,7 +126,9 @@ class CutiController extends Controller
     {
         $action->execute($leaveRequest, $request->validated(), $request);
 
-        return redirect()->route('cuti.show', $leaveRequest)
+        return redirect()->route('cuti.show', $this->navigation->detailParameters(
+            $request->user(), $leaveRequest->id, $request->input('from'), $request->input('return', []),
+        ))
             ->with('success', 'Perubahan pengajuan cuti berhasil dikirim ulang.');
     }
 

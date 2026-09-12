@@ -65,6 +65,85 @@ class CutiNavigationScopeTest extends TestCase
         $response->assertViewHas('totalPengajuan', 1)->assertDontSee('Unit Tidak Berhak');
     }
 
+    #[DataProvider('scopedUnitRoles')]
+    public function test_opsi_unit_pimpinan_mengikuti_scope_identitas_dan_jabatan_terkini(string $role): void
+    {
+        $actor = $this->actor($role);
+        $this->monitoringPermission($role, true);
+        $visible = $role === 'pegawai' ? $actor->employee : Employee::factory()->create(['kepala_bagian_id' => $actor->employee_id]);
+        $oldUnit = $this->assignUnit($visible, 'Unit Lama');
+        $visible->positionHistories()->update(['is_latest' => false]);
+        $insideUnit = $this->assignUnit($visible, 'Unit Dalam Scope');
+        $outsideUnit = $this->assignUnit(Employee::factory()->create(), 'Unit Luar Scope');
+        $future = Employee::factory()->create(['kepala_bagian_id' => $actor->employee_id]);
+        SupervisorAssignment::create([
+            'employee_id' => $future->id, 'kepala_bagian_id' => $actor->employee_id,
+            'tanggal_mulai' => today()->addMonth()->toDateString(),
+        ]);
+        $futureUnit = $this->assignUnit($future, 'Unit Assignment Mendatang');
+        $leave = $this->leave($visible);
+
+        $response = $this->actingAs($actor)->get(route('pimpinan.cuti.index'))->assertOk();
+        $this->assertSame([$insideUnit->id], $response->viewData('unitKerjaOptions')->pluck('id')->all());
+        $this->assertSame([$leave->id], $response->viewData('leaves')->pluck('id')->all());
+        foreach ([$oldUnit, $outsideUnit, $futureUnit] as $excluded) {
+            $filtered = $this->get(route('pimpinan.cuti.index', ['unit_kerja_id' => $excluded->id]))->assertOk();
+            $this->assertSame([$insideUnit->id], $filtered->viewData('unitKerjaOptions')->pluck('id')->all());
+            $this->assertSame(0, $filtered->viewData('leaves')->total());
+        }
+    }
+
+    public static function scopedUnitRoles(): array
+    {
+        return [['pegawai'], ['kepala_bagian']];
+    }
+
+    public function test_opsi_unit_pimpinan_mempertahankan_scope_global_saat_switch_role(): void
+    {
+        $actor = $this->actor('super_admin');
+        $actor->update(['temporary_role' => 'pegawai', 'temporary_role_started_at' => now()]);
+        $this->monitoringPermission('pegawai', true);
+        $ownUnit = $this->assignUnit($actor->employee, 'Unit Pribadi');
+        $otherUnit = $this->assignUnit(Employee::factory()->create(), 'Unit Pegawai Lain');
+
+        $response = $this->actingAs($actor)->get(route('pimpinan.cuti.index'))->assertOk();
+        $this->assertEqualsCanonicalizing([$ownUnit->id, $otherUnit->id], $response->viewData('unitKerjaOptions')->pluck('id')->all());
+    }
+
+    public function test_pembatalan_pemilik_mempertahankan_konteks_monitoring_setelah_error_dan_sukses(): void
+    {
+        Queue::fake();
+        $actor = $this->actor('pimpinan');
+        $leave = $this->leave($actor->employee, Employee::factory()->create());
+        $filters = ['status' => 'menunggu', 'periode' => '2026-09', 'page' => '3', 'per_page' => '25'];
+        $context = ['from' => 'monitoring', 'return' => $filters];
+        $detail = route('cuti.show', ['id' => $leave->id, ...$context]);
+        $endpoint = route('cuti.cancellations.store', ['leaveRequest' => $leave->id, ...$context]);
+        $this->actingAs($actor)->get($detail)->assertOk()
+            ->assertSee('action="'.e($endpoint).'"', false);
+        $this->from($detail)->post($endpoint, ['reason' => ''])->assertRedirect($detail)->assertSessionHasErrors('reason');
+        $this->assertSame('menunggu_approval', $leave->fresh()->status);
+        $this->get($detail)->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('cuti', $filters));
+
+        $this->post($endpoint, ['reason' => 'Jadwal keluarga berubah.'])->assertSessionHasNoErrors()->assertRedirect($detail);
+        $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $leave->fresh()->status);
+        $this->get($detail)->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('cuti', $filters));
+    }
+
+    #[DataProvider('invalidDecisionContexts')]
+    public function test_konteks_pembatalan_tidak_menjadi_url_bebas_atau_izin_monitoring(mixed $from, mixed $filters, array $expectedContext): void
+    {
+        Queue::fake();
+        $actor = $this->actor('pegawai');
+        $this->monitoringPermission('pegawai', false);
+        $leave = $this->leave($actor->employee, Employee::factory()->create());
+
+        $this->actingAs($actor)->post(route('cuti.cancellations.store', $leave), [
+            'reason' => 'Jadwal pengujian berubah.', 'from' => $from, 'return' => $filters,
+        ])->assertSessionHasNoErrors()->assertRedirect(route('cuti.show', ['id' => $leave->id, ...$expectedContext]));
+        $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $leave->fresh()->status);
+    }
+
     public function test_switch_role_tidak_mengganti_scope_identitas_monitoring(): void
     {
         $actor = $this->actor('super_admin');

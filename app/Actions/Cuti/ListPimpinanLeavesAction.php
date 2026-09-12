@@ -3,6 +3,7 @@
 namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
+use App\Models\PositionHistory;
 use App\Models\RefJenisCuti;
 use App\Models\RefUnitKerja;
 use App\Models\User;
@@ -105,6 +106,10 @@ class ListPimpinanLeavesAction
                     ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$filters['jenis_cuti_id']]))
                 ->orderBy('nama')->orderBy('id')->limit(self::MAX_FILTER_OPTIONS)->get(['id', 'nama']),
             'unitKerjaOptions' => RefUnitKerja::query()
+                // Opsi mengikuti unit jabatan terkini dalam scope yang sama dengan baris pengajuan.
+                ->whereIn('id', PositionHistory::query()->select('unit_kerja_id')
+                    ->where('is_latest', true)
+                    ->whereIn('employee_id', $this->employeeScope->forIdentity($user)->select('employees.id')))
                 ->when(filled($filters['unit_kerja_id'] ?? null), fn ($units) => $units
                     ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$filters['unit_kerja_id']]))
                 ->orderBy('nama')->orderBy('id')->limit(self::MAX_FILTER_OPTIONS)->get(['id', 'nama']),

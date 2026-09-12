@@ -329,7 +329,7 @@ class LeaveCancellationWorkflowTest extends TestCase
             ->assertDontSee('window.confirm', false)
             ->assertSee('x-bind:disabled="submitting"', false)
             ->assertSee('grid grid-cols-1 gap-3 sm:grid-cols-2', false)
-            ->assertSee('href="'.route('cuti.show', $fixture['leave']).'"', false)
+            ->assertSee('href="'.e(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'cancellations'])).'"', false)
             ->assertViewHas('cancellations', function ($items) use ($oldestCancellation): bool {
                 return $items->total() === 11
                     && $items->first()?->id === $oldestCancellation->id

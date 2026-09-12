@@ -86,6 +86,24 @@ class AdministrativeLeavePostponementWorkflowTest extends TestCase
         $this->assertSame($counts, [AuditLog::count(), LeaveBalanceLedger::count()]);
     }
 
+    public function test_penangguhan_administratif_mempertahankan_konteks_monitoring_setelah_error_dan_sukses(): void
+    {
+        [$leave, $admin] = $this->fixture();
+        $filters = ['status' => 'disetujui', 'page' => '2', 'per_page' => '25'];
+        $context = ['from' => 'monitoring', 'return' => $filters];
+        $detail = route('cuti.show', ['id' => $leave->id, ...$context]);
+        $endpoint = route('cuti.penangguhan-administratif', ['leaveRequest' => $leave->id, ...$context]);
+        $this->actingAs($admin)->get($detail)->assertOk()->assertSee('action="'.e($endpoint).'"', false);
+        $this->from($detail)->post($endpoint, ['alasan' => ''])->assertRedirect($detail)
+            ->assertSessionHasErrors('alasan', null, 'administrativePostponement');
+        $this->assertSame('disetujui', $leave->fresh()->status);
+        $this->get($detail)->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('cuti', $filters));
+
+        $this->post($endpoint, ['alasan' => 'Jadwal instansi berubah.'])->assertSessionHasNoErrors()->assertRedirect($detail);
+        $this->assertSame(LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED, $leave->fresh()->status);
+        $this->get($detail)->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('cuti', $filters));
+    }
+
     #[DataProvider('auditReaders')]
     public function test_alasan_privat_audit_tidak_dibuka_oleh_izin_audit_umum_dan_pencabutan_langsung_berlaku(string $role): void
     {

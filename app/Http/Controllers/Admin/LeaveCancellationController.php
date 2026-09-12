@@ -12,12 +12,15 @@ use App\Http\Requests\Cuti\RequestLeaveCancellationRequest;
 use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\Cuti\LeaveDetailNavigation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 
 /** Adapter tipis untuk permintaan pembatalan oleh pemilik pengajuan cuti. */
 class LeaveCancellationController extends Controller
 {
+    public function __construct(private readonly LeaveDetailNavigation $navigation) {}
+
     /** Menampilkan antrean pembatalan dalam scope pengelola yang berwenang. */
     public function index(
         ListLeaveCancellationRequest $request,
@@ -43,7 +46,9 @@ class LeaveCancellationController extends Controller
 
         $action->execute($leaveRequest, $actor, $payload['reason'], $request);
 
-        return redirect()->route('cuti.show', $leaveRequest)
+        return redirect()->route('cuti.show', $this->navigation->detailParameters(
+            $actor, $leaveRequest->id, $request->input('from'), $request->input('return', []),
+        ))
             ->with('success', 'Permohonan pembatalan cuti telah dikirim dan menunggu keputusan pengelola yang berwenang.');
     }
 

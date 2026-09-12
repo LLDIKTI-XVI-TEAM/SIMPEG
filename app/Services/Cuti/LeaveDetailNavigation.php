@@ -16,6 +16,19 @@ use Illuminate\Validation\Rule;
 final class LeaveDetailNavigation
 {
     /**
+     * Mutasi pemilik/pengelola memakai konteks aman yang sama; caller tanpa asal tetap menuju detail biasa.
+     *
+     * @return array<string, mixed>
+     */
+    public function detailParameters(User $actor, string $id, mixed $from = null, mixed $returnFilters = []): array
+    {
+        return [
+            'id' => $id,
+            ...($from === null && $returnFilters === [] ? [] : $this->resolve($actor, $from, $returnFilters)['parameters']),
+        ];
+    }
+
+    /**
      * Asal pendek hanya memilih route lokal; izin terkini diperiksa kembali sebelum membawa filter.
      *
      * @return array{parameters: array<string, mixed>, backLink: array{url: string, label: string}}

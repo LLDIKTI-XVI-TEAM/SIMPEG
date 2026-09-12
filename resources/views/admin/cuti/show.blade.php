@@ -333,7 +333,7 @@
                     <section class="rounded-lg border border-warning/25 bg-warning/5 p-4" aria-labelledby="leave-cancellation-title">
                         <h4 id="leave-cancellation-title" class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Minta Pembatalan</h4>
                         <p class="mt-1 text-xs text-muted font-sans">Pembatalan akan menahan approval dan mempertahankan reservasi saldo sampai pengelola pembatalan memutuskan.</p>
-                        <form action="{{ route('cuti.cancellations.store', $cuti) }}" method="POST" class="mt-4 space-y-3" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
+                        <form action="{{ route('cuti.cancellations.store', ['leaveRequest' => $cuti->id, ...$decisionReturnParameters]) }}" method="POST" class="mt-4 space-y-3" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
                             @csrf
                             <div>
                                 <label for="cancellation-reason" class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Alasan pembatalan <span class="text-danger">*</span></label>
@@ -353,7 +353,7 @@
                     <div class="rounded-lg border border-warning/25 bg-warning/5 p-4">
                         <h4 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">{{ $isRolloverReturn ? 'Perbaiki dan Ajukan Kembali' : 'Edit Pengajuan Sebelum Diproses' }}</h4>
                         <p id="rollover-target-year-hint" class="mt-1 text-xs text-muted font-sans">{{ $isRolloverReturn ? "Pilih tanggal dalam tahun target {$cuti->rollover_target_year}." : 'Anda masih dapat memperbarui data karena belum ada tindakan persetujuan.' }} Jenis cuti dan rangkaian persetujuan tetap.</p>
-                        <form action="{{ route('cuti.resubmit', $cuti->id) }}" method="POST" enctype="multipart/form-data" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <form action="{{ route('cuti.resubmit', ['leaveRequest' => $cuti->id, ...$decisionReturnParameters]) }}" method="POST" enctype="multipart/form-data" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                             @csrf
                             @method('PATCH')
                             <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
