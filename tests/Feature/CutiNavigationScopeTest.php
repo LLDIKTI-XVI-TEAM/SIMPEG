@@ -119,6 +119,9 @@ class CutiNavigationScopeTest extends TestCase
         $assigned = $this->get(route('pimpinan.cuti.index', ['status' => 'menunggu_saya']))->assertOk();
         $this->assertSame([$mine->id], $assigned->viewData('leaves')->pluck('id')->all());
         $all->assertSee('Monitoring Cuti');
+        foreach (['status' => 'Status pengajuan cuti', 'unit_kerja_id' => 'Unit kerja', 'jenis_cuti_id' => 'Jenis cuti', 'periode' => 'Periode cuti'] as $id => $label) {
+            $all->assertSee('<label for="'.$id.'" class="sr-only">'.$label.'</label>', false);
+        }
     }
 
     public function test_monitoring_pimpinan_memakai_scope_sebelum_counter_dan_membatasi_pagination(): void
@@ -346,8 +349,11 @@ class CutiNavigationScopeTest extends TestCase
         $leave = $this->leave($employee, $actor->employee);
         $expected = route('cuti.show', ['id' => $leave->id, 'from' => $from, 'return' => $filters]);
 
-        $this->actingAs($actor)->get(route($route, $from === null ? ['scope' => 'own', ...$filters] : $filters))
+        $response = $this->actingAs($actor)->get(route($route, $from === null ? ['scope' => 'own', ...$filters] : $filters))
             ->assertOk()->assertSee('href="'.e($expected).'"', false);
+        if ($from === 'approval') {
+            $response->assertSee('action="'.e(route('cuti.approve', ['id' => $leave->id, 'from' => 'approval', 'return' => $filters])).'"', false);
+        }
     }
 
     public static function listReturnContexts(): array
@@ -435,6 +441,7 @@ class CutiNavigationScopeTest extends TestCase
         return [
             'asal URL asing' => ['https://example.invalid', ['page' => '3'], ['from' => 'own']],
             'monitoring tanpa permission' => ['pimpinan', ['page' => '3'], ['from' => 'own']],
+            'pembatalan tanpa permission' => ['cancellations', ['status' => 'pending', 'page' => '3'], ['from' => 'own']],
             'parameter cacat' => [['approval'], 'https://example.invalid', ['from' => 'own']],
             'filter asing dan tidak sah' => ['approval', ['url' => 'https://example.invalid', 'status' => 'all', 'per_page' => '100000', 'page' => '2'], ['from' => 'approval', 'return' => ['page' => '2']]],
             'daftar pribadi eksplisit' => ['own', ['status' => 'menunggu', 'page' => '2'], ['from' => 'own', 'return' => ['status' => 'menunggu', 'page' => '2']]],

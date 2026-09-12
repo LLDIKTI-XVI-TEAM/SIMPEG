@@ -200,7 +200,7 @@ class NotificationInboxTest extends TestCase
     public static function approvalNotificationUrlProvider(): array
     {
         $id = '00000000-0000-4000-8000-000000000001';
-        $detail = '/dashboard/cuti/'.$id;
+        $detail = '/dashboard/cuti/'.$id.'?from=approval';
 
         return [
             'pengajuan dengan URL antrean lama' => ['cuti.pengajuan_baru', ['leave_request_id' => $id, 'url' => '/cuti/approval'], $detail],

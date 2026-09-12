@@ -321,6 +321,7 @@
                 $from = request()->query('from');
                 $currentNavigationRoute = match ($from) {
                     'approval' => $canUseLeaveQueue ? 'cuti.approval' : 'cuti',
+                    'cancellations' => $canManageLeaveCancellations ? 'cuti.cancellations.index' : 'cuti',
                     'pimpinan' => $canMonitorLeaves && $activeRole === 'pimpinan' ? 'pimpinan.cuti.index' : 'cuti',
                     'bawahan' => $canMonitorLeaves && $activeRole === 'kepala_bagian' ? 'kepala-bagian.cuti.index' : 'cuti',
                     default => 'cuti',

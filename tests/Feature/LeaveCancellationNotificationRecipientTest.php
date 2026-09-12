@@ -109,10 +109,12 @@ class LeaveCancellationNotificationRecipientTest extends TestCase
         $this->assign($owner->employee, $actor, today()->subDay()->toDateString());
         $cancellation = $this->cancellation($owner);
         $leave = $cancellation->leaveRequest;
-        $url = route('cuti.show', $leave);
+        $filters = ['status' => 'all', 'per_page' => '25', 'page' => '1'];
+        $url = route('cuti.show', ['id' => $leave->id, 'from' => 'cancellations', 'return' => $filters]);
 
-        $this->actingAs($actor)->get(route('cuti.cancellations.index'))->assertOk()->assertSee('href="'.$url.'"', false);
+        $this->actingAs($actor)->get(route('cuti.cancellations.index', $filters))->assertOk()->assertSee('href="'.e($url).'"', false);
         $this->get($url)->assertOk()->assertViewHas('canAct', false)
+            ->assertViewHas('backLink', ['url' => route('cuti.cancellations.index', $filters), 'label' => 'Kembali ke Antrean Pembatalan Cuti'])
             ->assertViewHas('canDownloadFormulir', false)->assertViewHas('attachmentAvailable', false)
             ->assertViewHas('verifierContext', null)->assertViewHas('latestCancellation', null)
             ->assertDontSee($cancellation->reason);
@@ -128,6 +130,15 @@ class LeaveCancellationNotificationRecipientTest extends TestCase
 
         $this->patch(route('cuti.cancellations.decide', $cancellation), ['decision' => 'DITOLAK'])->assertRedirect();
         $this->get($url)->assertOk()->assertViewHas('canAct', false);
+
+        $this->get(route('cuti.show', ['id' => $leave->id, 'from' => 'cancellations', 'return' => [
+            'status' => 'rejected', 'per_page' => '25', 'page' => '2', 'url' => 'https://example.invalid',
+        ]]))->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('cuti.cancellations.index', [
+            'status' => 'rejected', 'per_page' => '25', 'page' => '2',
+        ]));
+        $this->get(route('cuti.show', ['id' => $leave->id, 'from' => 'cancellations', 'return' => [
+            'status' => ['pending'], 'per_page' => '100000', 'page' => '-1',
+        ]]))->assertOk()->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('cuti.cancellations.index'));
 
         $leave->update(['jenis_cuti_id' => RefJenisCuti::where('code', 'sakit')->sole()->id, 'status' => 'disetujui']);
         $leave->proof()->create(['token' => (string) Str::uuid()]);

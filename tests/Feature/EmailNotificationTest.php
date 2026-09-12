@@ -764,7 +764,7 @@ class EmailNotificationTest extends TestCase
         // Referensi tahap dan versi tetap utuh ketika tujuan dibatasi ke detail pengajuan terkait.
         $this->assertSame($leave->id, $notification->data['leave_request_id']);
         $this->assertSame((string) $leave->fresh()->revision_version, $notification->data['leave_request_version']);
-        $this->assertSame('/dashboard/cuti/'.$leave->id, $notification->data['url']);
+        $this->assertSame('/dashboard/cuti/'.$leave->id.'?from=approval', $notification->data['url']);
 
         $job = $queue->pushed(SendSimpegNotificationEmailJob::class)->sole();
         app()->call([$job, 'handle']);
@@ -800,12 +800,12 @@ class EmailNotificationTest extends TestCase
         $this->assertSame($stepId, $notification->data['leave_request_step_id']);
         $this->assertSame('2', $notification->data['leave_request_version']);
         $this->assertSame('revision-resubmit:'.$leave->id.':2', $notification->data['notification_cycle_id']);
-        $this->assertSame('/dashboard/cuti/'.$leave->id, $notification->data['url']);
+        $this->assertSame('/dashboard/cuti/'.$leave->id.'?from=approval', $notification->data['url']);
 
         $job = $queue->pushed(SendSimpegNotificationEmailJob::class)->sole();
         app()->call([$job, 'handle']);
         Mail::assertSent(SimpegNotificationMail::class, fn (SimpegNotificationMail $mail): bool => $mail->hasTo('approver@example.test')
-            && str_contains($mail->render(), url('/dashboard/cuti/'.$leave->id)));
+            && str_contains($mail->render(), url('/dashboard/cuti/'.$leave->id.'?from=approval')));
     }
 
     public function test_email_approval_yang_sudah_antre_dilewati_saat_pengajuan_ditahan_pembatalan(): void

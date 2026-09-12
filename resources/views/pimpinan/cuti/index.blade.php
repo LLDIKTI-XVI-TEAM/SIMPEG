@@ -103,6 +103,7 @@
                 gridClass="grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
             >
                 <div class="relative">
+                    <label for="status" class="sr-only">Status pengajuan cuti</label>
                     <x-form.select id="status" name="status" class="w-full" onchange="this.form.submit()">
                         <option value="all" @selected(($filters['status'] ?? 'all') === 'all')>Semua Status</option>
                         <option value="menunggu_saya" @selected(($filters['status'] ?? '') === 'menunggu_saya')>Menunggu Tindakan Saya</option>
@@ -119,6 +120,7 @@
                     </x-form.select>
                 </div>
                 <div class="relative">
+                    <label for="unit_kerja_id" class="sr-only">Unit kerja</label>
                     <x-form.select id="unit_kerja_id" name="unit_kerja_id" class="w-full" onchange="this.form.submit()">
                         <option value="">Semua unit</option>
                         @foreach ($unitKerjaOptions as $unit)
@@ -127,6 +129,7 @@
                     </x-form.select>
                 </div>
                 <div class="relative">
+                    <label for="jenis_cuti_id" class="sr-only">Jenis cuti</label>
                     <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" class="w-full" onchange="this.form.submit()">
                         <option value="">Semua jenis cuti</option>
                         @foreach ($jenisCutiOptions as $jenisCuti)
@@ -135,6 +138,7 @@
                     </x-form.select>
                 </div>
                 <div class="relative">
+                    <label for="periode" class="sr-only">Periode cuti</label>
                     <x-form.select id="periode" name="periode" class="w-full" onchange="this.form.submit()">
                         <option value="">Semua Periode</option>
                         @foreach ($optPeriodes as $periodeOption)

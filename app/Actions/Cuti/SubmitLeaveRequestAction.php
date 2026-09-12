@@ -276,7 +276,7 @@ class SubmitLeaveRequestAction
                 'leave_request_id' => $leaveRequest->id,
                 'leave_request_step_id' => $activeStep->id,
                 'leave_request_version' => (string) $leaveRequest->revision_version,
-                'url' => route('cuti.show', $leaveRequest->id, false),
+                'url' => route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'approval'], false),
             ],
         );
     }

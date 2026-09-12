@@ -230,7 +230,7 @@ class ResubmitLeaveRequestAction
                     $leaveRequest->id,
                     $leaveRequest->revision_version,
                 ),
-                'url' => route('cuti.show', $leaveRequest->id, false),
+                'url' => route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'approval'], false),
             ],
         );
     }

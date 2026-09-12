@@ -93,7 +93,7 @@
                                         close() { this.confirming = false; this.$nextTick(() => this.lastTrigger?.focus()); } }" class="inline-flex items-center gap-2"
                                         x-effect="if (confirming) $nextTick(() => $refs.confirmApprove?.focus())">
                                         <x-ui.button type="button" variant="success-solid" size="sm" class="min-h-11" x-show="!confirming" @click="open($event)">Setuju</x-ui.button>
-                                        <form action="{{ route('cuti.approve', ['id' => $r->id, 'from' => 'approval']) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
+                                        <form action="{{ route('cuti.approve', ['id' => $r->id, 'from' => 'approval', 'return' => $returnFilters]) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
                                             @csrf
                                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                                             <input type="hidden" name="revision_version" value="{{ $r->revision_version }}">

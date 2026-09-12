@@ -481,7 +481,7 @@ class CutiEndToEndApprovalTest extends TestCase
             ->where('type', 'cuti.pengajuan_baru')
             ->sole();
         $this->assertSame($firstEffective->id, $initialNotification->data['leave_request_step_id'] ?? null);
-        $this->assertSame('/dashboard/cuti/'.$leave->id, $initialNotification->data['url']);
+        $this->assertSame('/dashboard/cuti/'.$leave->id.'?from=approval', $initialNotification->data['url']);
 
         foreach ($steps as $step) {
             $user = $approverUsers->get($step->approver_employee_id);

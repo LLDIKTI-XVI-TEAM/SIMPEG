@@ -21,7 +21,7 @@ class LeaveNotificationUrl
         $id = $data['leave_request_id'] ?? null;
 
         return is_string($id) && Str::isUuid($id)
-            ? route('cuti.show', $id, false)
+            ? route('cuti.show', ['id' => $id, 'from' => 'approval'], false)
             : route('cuti.approval', [], false);
     }
 }

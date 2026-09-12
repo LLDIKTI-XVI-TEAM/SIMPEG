@@ -3,6 +3,7 @@
 namespace App\Services\Cuti;
 
 use App\Http\Requests\Cuti\KepalaBagianLeaveFilterRequest;
+use App\Http\Requests\Cuti\ListLeaveCancellationRequest;
 use App\Http\Requests\Cuti\PimpinanLeaveFilterRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
@@ -33,6 +34,9 @@ final class LeaveDetailNavigation
                 'bawahan' => ['kepala-bagian.cuti.index', 'Kembali ke Cuti Bawahan'],
                 'monitoring' => ['cuti', 'Kembali ke Monitoring Cuti'],
             ];
+        }
+        if ($actor->hasPermission('cuti.cancellation.manage')) {
+            $targets['cancellations'] = ['cuti.cancellations.index', 'Kembali ke Antrean Pembatalan Cuti'];
         }
 
         $target = $targets[$from ?? ''] ?? null;
@@ -65,6 +69,7 @@ final class LeaveDetailNavigation
         ];
         $rules = match ($from) {
             'approval' => [],
+            'cancellations' => (new ListLeaveCancellationRequest)->rules(),
             'pimpinan' => (new PimpinanLeaveFilterRequest)->rules(),
             'bawahan' => (new KepalaBagianLeaveFilterRequest)->rules(),
             default => [
