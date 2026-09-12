@@ -8,7 +8,7 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefHariLibur;
 use App\Models\User;
-use App\Services\Cuti\AdministrativeLeavePostponementAccess;
+use App\Services\Cuti\LeaveRequestReadAccess;
 use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
 use Illuminate\Support\Carbon;
@@ -25,7 +25,7 @@ class BuildCutiDetailAction
         private readonly EmployeeFileStorageService $files,
         private readonly DownloadLeaveAttachmentAction $attachmentDownloads,
         private readonly BuildAdministrativeLeavePostponementContextAction $administrativeContext,
-        private readonly AdministrativeLeavePostponementAccess $administrativeAccess,
+        private readonly LeaveRequestReadAccess $readAccess,
     ) {}
 
     /**
@@ -51,8 +51,10 @@ class BuildCutiDetailAction
      *     activeStep: LeaveRequestStep|null
      * }
      */
-    public function execute(LeaveRequest $cuti, User $user): array
+    public function execute(LeaveRequest $cuti, User $user, ?string $from = null): array
     {
+        abort_unless($this->readAccess->canReadDetail($cuti, $user), 403);
+
         $isOwner = $cuti->employee_id === $user->employee_id;
         $relations = [
             'employee',
@@ -83,38 +85,20 @@ class BuildCutiDetailAction
         $isCurrentApprover = $employeeId !== null
             && $stage !== null
             && $this->approvals->approverEmployeeIdForStage($cuti, $stage) === $employeeId;
-        // Snapshot menyimpan seluruh pihak yang berwenang menelusuri pengajuan,
-        // termasuk approver yang sudah selesai atau masih menunggu tahapnya.
-        $isAnySnapshotApprover = $employeeId !== null
-            && $cuti->steps->contains(
-                fn (LeaveRequestStep $step): bool => $step->approver_employee_id === $employeeId,
-            );
         $canAct = $isCurrentApprover
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
-        $canReadAll = $user->hasPermission('cuti.read_all');
-
-        // Snapshot approver lama tetap boleh membaca pengajuan untuk kebutuhan audit,
-        // tetapi tidak memperoleh izin bertindak setelah tahapnya selesai.
-        // Pengelola administratif dalam scope perlu membuka keputusan sebelum dan setelah mutasi;
-        // akses ini tidak menambah hak unduh dokumen atau monitoring global.
-        abort_if(
-            ! $canReadAll
-            && $cuti->employee_id !== $user->employee_id
-            && ! $isAnySnapshotApprover
-            && ! $canDownloadFormulir
-            && ! $this->administrativeAccess->canManage($cuti, $user),
-            403,
-        );
+        $canReadBalance = $this->readAccess->canReadBalance($cuti, $user);
 
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
         $latestCancellation = $isOwner ? $cuti->cancellationRequests->first() : null;
         $canRequestCancellation = $isOwner
-            && $user->hasPermission('cuti.create')
             && in_array($cuti->status, ['menunggu_approval', 'ditangguhkan'], true)
             && $latestCancellation?->status !== 'pending';
-        $isVerifierContext = $canAct || $canReadAll;
-        $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
+        // Assignment aktif membawa konteks keputusan; monitoring saja tidak memberikan saldo lintas pegawai.
+        $isVerifierContext = $canAct || $canReadBalance;
+        $targetBalance = ($isOwner || $isVerifierContext)
+            && $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $this->balancePreview->execute(
                 $cuti->employee,
                 Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay(),
@@ -126,6 +110,7 @@ class BuildCutiDetailAction
 
         return [
             ...$this->administrativeContext->execute($cuti, $user),
+            'backLink' => $this->backLink($user, $from),
             'cuti' => $cuti,
             'canAct' => $canAct,
             'isVerifierContext' => $isVerifierContext,
@@ -142,5 +127,24 @@ class BuildCutiDetailAction
             'verifierContext' => $verifierContext,
             'activeStep' => $stage === null ? null : $cuti->steps->firstWhere('step_order', $stage),
         ];
+    }
+
+    /** Asal pendek dipetakan ke route lokal; query pengguna tidak boleh menjadi URL kembali bebas. */
+    private function backLink(User $actor, ?string $from): array
+    {
+        if ($from === 'approval') {
+            return ['url' => route('cuti.approval'), 'label' => 'Kembali ke Menunggu Tindakan Saya'];
+        }
+
+        if ($actor->hasPermission('cuti.read_all')) {
+            return match ($from) {
+                'pimpinan' => ['url' => route('pimpinan.cuti.index'), 'label' => 'Kembali ke Monitoring Cuti'],
+                'bawahan' => ['url' => route('kepala-bagian.cuti.index'), 'label' => 'Kembali ke Cuti Bawahan'],
+                'monitoring' => ['url' => route('cuti'), 'label' => 'Kembali ke Monitoring Cuti'],
+                default => ['url' => route('cuti', ['scope' => 'own']), 'label' => 'Kembali ke Pengajuan Cuti Saya'],
+            };
+        }
+
+        return ['url' => route('cuti', ['scope' => 'own']), 'label' => 'Kembali ke Pengajuan Cuti Saya'];
     }
 }

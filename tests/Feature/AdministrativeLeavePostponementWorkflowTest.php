@@ -419,8 +419,12 @@ class AdministrativeLeavePostponementWorkflowTest extends TestCase
             ]);
         }
 
-        $this->actingAs($actor)->get(route('cuti.show', $leave))->assertOk()
-            ->assertViewHas('canAdministrativelyPostpone', false);
+        $detail = $this->actingAs($actor)->get(route('cuti.show', $leave));
+        if ($snapshot) {
+            $detail->assertOk()->assertViewHas('canAdministrativelyPostpone', false);
+        } else {
+            $detail->assertForbidden();
+        }
         $this->post($this->endpoint($leave), ['alasan' => 'Mutasi di luar scope.'])->assertForbidden();
         try {
             app(RecordAdministrativeLeavePostponementAction::class)->execute($leave, $actor, 'Jalur Action juga wajib scoped.');
@@ -432,7 +436,7 @@ class AdministrativeLeavePostponementWorkflowTest extends TestCase
 
         $this->actingAs($admin)->post($this->endpoint($leave), ['alasan' => 'Alasan administratif privat.'])
             ->assertSessionHasNoErrors();
-        $this->actingAs($actor)->get(route('cuti.show', $leave))->assertOk()
+        $this->actingAs($actor)->get(route('cuti.show', $leave))->assertStatus($snapshot ? 200 : 403)
             ->assertDontSee('Alasan administratif privat.');
     }
 

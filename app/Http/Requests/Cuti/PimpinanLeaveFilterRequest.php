@@ -8,20 +8,23 @@ use Illuminate\Validation\Rule;
 
 class PimpinanLeaveFilterRequest extends FormRequest
 {
+    /** Permission monitoring tetap diperlukan meskipun aktor memakai halaman berlabel peran. */
     public function authorize(): bool
     {
-        return $this->user()?->getEffectiveRole() === 'pimpinan';
+        return $this->user()?->hasPermission('cuti.read_all') === true;
     }
 
+    /** Monitoring tanpa filter tidak otomatis menjadi antrean assignment aktor. */
     protected function prepareForValidation(): void
     {
         if (! $this->has('status')) {
             $this->merge([
-                'status' => $this->filled('search') ? 'all' : 'menunggu_saya',
+                'status' => 'all',
             ]);
         }
     }
 
+    /** Membatasi filter serta ukuran halaman sebelum query monitoring dijalankan. */
     public function rules(): array
     {
         return [
@@ -29,6 +32,7 @@ class PimpinanLeaveFilterRequest extends FormRequest
             'unit_kerja_id' => ['nullable', 'uuid'],
             'periode' => ['nullable', 'string', 'regex:/^\d{4}-\d{2}$/'],
             'jenis_cuti_id' => ['nullable', 'uuid'],
+            'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50])],
             'status' => ['nullable', Rule::in([
                 'all',
                 'menunggu_saya',

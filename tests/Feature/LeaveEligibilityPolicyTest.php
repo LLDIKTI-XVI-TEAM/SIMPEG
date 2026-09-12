@@ -574,8 +574,6 @@ class LeaveEligibilityPolicyTest extends TestCase
             'resources/views/admin/cuti/form-pengajuan.blade.php',
             'resources/views/admin/cuti/show.blade.php',
             'resources/views/components/ui/modal.blade.php',
-            'resources/views/kabag/cuti/show.blade.php',
-            'resources/views/pimpinan/cuti/show.blade.php',
         ] as $path) {
             $source = file_get_contents(base_path($path));
             $this->assertIsString($source, $path);

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\Cuti\ApproveLeaveAction;
 use App\Actions\Cuti\DeclineLeaveAction;
+use App\Actions\Cuti\ResubmitLeaveRequestAction;
 use App\Jobs\SendSimpegNotificationEmailJob;
 use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
@@ -385,6 +386,7 @@ class EmailNotificationTest extends TestCase
 
     public function test_cuti_cancellation_request_queues_email_to_primary_recipient(): void
     {
+        $this->seedRbac();
         $queue = Queue::fake();
         Mail::fake();
         $this->enableEventChannels('cuti.pembatalan_diajukan');
@@ -734,7 +736,7 @@ class EmailNotificationTest extends TestCase
         $this->assertSame("/dashboard/cuti/{$leave->id}", $notification->data['url']);
     }
 
-    public function test_intermediate_approval_notifies_next_approver_with_internal_approval_url(): void
+    public function test_intermediate_approval_notifies_next_approver_with_internal_detail_url(): void
     {
         $queue = Queue::fake();
         Mail::fake();
@@ -759,14 +761,51 @@ class EmailNotificationTest extends TestCase
             ->where('type', 'cuti.menunggu_persetujuan')
             ->firstOrFail();
 
-        // Approver tahap berikutnya diarahkan ke antrean approval lewat path internal relatif tanpa parameter.
+        // Referensi tahap dan versi tetap utuh ketika tujuan dibatasi ke detail pengajuan terkait.
         $this->assertSame($leave->id, $notification->data['leave_request_id']);
         $this->assertSame((string) $leave->fresh()->revision_version, $notification->data['leave_request_version']);
-        $this->assertSame('/cuti/approval', $notification->data['url']);
+        $this->assertSame('/dashboard/cuti/'.$leave->id, $notification->data['url']);
 
         $job = $queue->pushed(SendSimpegNotificationEmailJob::class)->sole();
         app()->call([$job, 'handle']);
         Mail::assertSent(SimpegNotificationMail::class, fn (SimpegNotificationMail $mail): bool => $mail->hasTo('pybmc@example.test'));
+    }
+
+    public function test_resubmission_notifies_active_approver_with_current_version_and_internal_detail_url(): void
+    {
+        $queue = Queue::fake();
+        Mail::fake();
+        $this->enableEventChannels('cuti.pengajuan_baru');
+        $employee = Employee::factory()->create();
+        $owner = User::factory()->pegawai()->create(['employee_id' => $employee->id]);
+        $approver = Employee::factory()->create(['email' => 'approver@example.test']);
+        $leave = $this->makeLeaveRequestWithSteps($employee, [$approver]);
+        $stepId = $leave->steps()->sole()->id;
+
+        app(ResubmitLeaveRequestAction::class)->execute($leave, [
+            'tanggal_mulai' => '2026-07-06',
+            'tanggal_selesai' => '2026-07-08',
+            'alasan' => 'Keterangan pengajuan diperbarui.',
+            'alamat_selama_cuti' => 'Alamat selama cuti fixture',
+            'nomor_telepon' => '08123456789',
+            'revision_version' => $leave->revision_version,
+        ], $this->actorRequest($owner));
+
+        $notification = SimpegNotification::query()
+            ->where('user_id', $approver->id)
+            ->where('type', 'cuti.pengajuan_baru')
+            ->sole();
+
+        $this->assertSame($leave->id, $notification->data['leave_request_id']);
+        $this->assertSame($stepId, $notification->data['leave_request_step_id']);
+        $this->assertSame('2', $notification->data['leave_request_version']);
+        $this->assertSame('revision-resubmit:'.$leave->id.':2', $notification->data['notification_cycle_id']);
+        $this->assertSame('/dashboard/cuti/'.$leave->id, $notification->data['url']);
+
+        $job = $queue->pushed(SendSimpegNotificationEmailJob::class)->sole();
+        app()->call([$job, 'handle']);
+        Mail::assertSent(SimpegNotificationMail::class, fn (SimpegNotificationMail $mail): bool => $mail->hasTo('approver@example.test')
+            && str_contains($mail->render(), url('/dashboard/cuti/'.$leave->id)));
     }
 
     public function test_email_approval_yang_sudah_antre_dilewati_saat_pengajuan_ditahan_pembatalan(): void

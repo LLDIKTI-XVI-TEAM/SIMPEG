@@ -4,8 +4,8 @@ namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\Cuti\LeaveRequestReadAccess;
 use App\Services\EmployeeFileStorageService;
-use App\Services\Employees\KepalaBagianScopeService;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -14,7 +14,7 @@ final class DownloadLeaveAttachmentAction
 {
     public function __construct(
         private readonly EmployeeFileStorageService $files,
-        private readonly KepalaBagianScopeService $kepalaBagianScope,
+        private readonly LeaveRequestReadAccess $readAccess,
     ) {}
 
     /** Unduhan pemohon/read-all selalu memeriksa kepemilikan di backend. */
@@ -28,29 +28,19 @@ final class DownloadLeaveAttachmentAction
     /** Satu aturan baca dipakai detail dan unduhan: owner, read-all, atau approver snapshot. */
     public function canReadAsGeneralActor(LeaveRequest $leave, User $actor): bool
     {
-        if ($actor->hasPermission('cuti.read_all') || $actor->employee_id === $leave->employee_id) {
-            return true;
-        }
-
-        return $actor->employee_id !== null
-            && $leave->steps()->where('approver_employee_id', $actor->employee_id)->exists();
+        return $this->readAccess->canRead($leave, $actor);
     }
 
-    /** Pimpinan dibatasi role backend meski endpoint telah dipagari route. */
+    /** URL role lama tidak menjadi jalan pintas melewati otorisasi record kanonis. */
     public function forPimpinan(LeaveRequest $leave, User $actor): StreamedResponse
     {
-        abort_unless($actor->getEffectiveRole() === 'pimpinan', 403);
-
-        return $this->download($leave);
+        return $this->forOwnerOrReadAll($leave, $actor);
     }
 
-    /** Kepala Bagian hanya dapat membaca lampiran laporan langsungnya. */
+    /** Assignment lintas unit tetap sah; monitoring bawahan tetap membutuhkan permission dan scope. */
     public function forKepalaBagian(LeaveRequest $leave, User $actor): StreamedResponse
     {
-        abort_if($actor->employee_id === null, 403, 'Akun Atasan Langsung belum tertaut ke data pegawai.');
-        abort_unless($this->kepalaBagianScope->hasDirectReport($actor, $leave->employee_id), 403);
-
-        return $this->download($leave);
+        return $this->forOwnerOrReadAll($leave, $actor);
     }
 
     /** Validasi path sebelum setiap akses disk mencegah path DB yang ditamper menjadi traversal. */

@@ -6,6 +6,7 @@ use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\User;
 use App\Services\Cuti\LeaveProofService;
+use App\Services\Cuti\LeaveRequestReadAccess;
 use App\Support\Cuti\ApprovalStepLabel;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonInterface;
@@ -17,6 +18,7 @@ class DownloadOfficialLeavePdfAction
     public function __construct(
         private readonly LeaveProofService $proofs,
         private readonly DownloadStoredLeaveProofAction $storedProofs,
+        private readonly LeaveRequestReadAccess $readAccess,
     ) {}
 
     /**
@@ -43,15 +45,7 @@ class DownloadOfficialLeavePdfAction
             return false;
         }
 
-        if ($user->employee_id === $leaveRequest->employee_id) {
-            return true;
-        }
-
-        if ($user->employee_id !== null && $leaveRequest->steps->contains('approver_employee_id', $user->employee_id)) {
-            return true;
-        }
-
-        return $user->hasPermission('cuti.read_all');
+        return $this->readAccess->canRead($leaveRequest, $user);
     }
 
     /**

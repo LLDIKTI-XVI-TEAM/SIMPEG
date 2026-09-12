@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Actions\Cuti\DownloadLeaveAttachmentAction;
-use App\Actions\Cuti\ShowKepalaBagianLeaveDetailAction;
+use App\Actions\Cuti\RedirectToLeaveDetailAction;
 use App\Actions\Cuti\ShowKepalaBagianLeaveIndexAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Cuti\KepalaBagianLeaveFilterRequest;
@@ -26,12 +26,16 @@ class KepalaBagianLeaveController extends Controller
     public function show(
         Request $request,
         LeaveRequest $leave,
-        ShowKepalaBagianLeaveDetailAction $action,
+        RedirectToLeaveDetailAction $action,
     ) {
         /** @var User|null $actor */
         $actor = $request->user();
 
-        return view('kabag.cuti.show', $action->execute($actor, $leave));
+        $url = $action->execute($leave, $actor, 'bawahan');
+        // Redirect tambahan tidak boleh menghabiskan error dan draft dari POST sebelumnya.
+        $request->session()->reflash();
+
+        return redirect($url);
     }
 
     public function downloadAttachment(Request $request, LeaveRequest $leave, DownloadLeaveAttachmentAction $action)

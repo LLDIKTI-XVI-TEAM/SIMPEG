@@ -29,6 +29,15 @@
             };
 
             $pemohon = $cuti->employee?->nama_lengkap ?? 'Pegawai';
+            $decisionCommentKey = $errors->has('catatan') ? 'catatan' : 'komentar';
+            $oldDecisionForm = old('decision_form') ?? match (old('keputusan')) {
+                'DISETUJUI' => 'approve', 'DITANGGUHKAN' => 'postpone', 'TIDAK_DISETUJUI' => 'decline',
+                default => null,
+            };
+            $initialDecisionForm = $canAct && $errors->dutyPostponement->any()
+                ? 'dutyPostponement'
+                : ($canAct && $errors->has($decisionCommentKey) && in_array($oldDecisionForm, ['approve', 'postpone', 'decline'], true)
+                    ? $oldDecisionForm : null);
 
             $buttonBase = 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold font-sans transition-[background-color,border-color,color,transform] duration-200 active:scale-95 focus:outline-none focus:ring-2';
             $buttonStyles = [
@@ -50,9 +59,17 @@
             </x-slot:breadcrumb>
         </x-admin.page-header>
 
-        @error('status')
-            <x-ui.alert variant="danger" title="Tindakan belum dapat diproses">{{ $message }}</x-ui.alert>
-        @enderror
+        @if ($errors->any() || $errors->dutyPostponement->any())
+            <div id="leave-errors" tabindex="-1" x-data x-init="$el.focus()" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger">
+                <x-ui.alert variant="danger" title="Tindakan belum dapat disimpan">
+                    <ul class="list-inside list-disc space-y-1">
+                        @foreach (array_unique(array_merge($errors->all(), $errors->dutyPostponement->all())) as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </x-ui.alert>
+            </div>
+        @endif
 
         @if ($errors->administrativePostponement->any())
             <x-ui.alert variant="danger" title="Penangguhan belum dapat disimpan">
@@ -75,7 +92,9 @@
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-ink font-sans leading-tight">{{ $pemohon }}</h3>
+                        <p class="mt-1 text-sm text-muted">NIP {{ $cuti->employee?->nip ?? '-' }}</p>
                         <p class="text-xs text-muted font-sans mt-0.5">Pengajuan: {{ $cuti->created_at?->translatedFormat('d F Y') }}</p>
+                        <p class="mt-1 text-xs text-muted">Nomor tiket: #CT-{{ strtoupper(substr($cuti->id, 0, 8)) }}</p>
                     </div>
                 </div>
                 <div>
@@ -100,7 +119,7 @@
             @if ($isOwner && $latestCancellation !== null)
                 @php
                     $cancellationStatusLabel = match ($latestCancellation->status) {
-                        'pending' => 'Menunggu keputusan Admin Kepegawaian',
+                        'pending' => 'Menunggu keputusan pengelola pembatalan',
                         'approved' => 'Pembatalan disetujui',
                         default => 'Pembatalan ditolak',
                     };
@@ -116,7 +135,7 @@
                         <x-ui.badge :variant="$cancellationStatusVariant">{{ $cancellationStatusLabel }}</x-ui.badge>
                     </div>
                     @if ($latestCancellation->status === 'pending')
-                        <p class="mt-2 text-sm text-muted font-sans">Proses persetujuan pengajuan ditahan sampai keputusan Admin Kepegawaian.</p>
+                        <p class="mt-2 text-sm text-muted font-sans">Proses persetujuan pengajuan ditahan sampai keputusan pengelola pembatalan.</p>
                     @endif
                     <p class="mt-3 text-xs font-bold uppercase tracking-wider text-muted">Alasan pembatalan</p>
                     <p class="mt-1 break-words rounded-lg border border-border bg-surface p-3 text-sm text-ink">{{ $latestCancellation->reason }}</p>
@@ -124,10 +143,18 @@
             @elseif ($cuti->status === 'menunggu_pembatalan')
                 <section class="rounded-lg border border-warning/25 bg-warning/5 p-4" aria-labelledby="cancellation-pending-title">
                     <h4 id="cancellation-pending-title" class="text-sm font-bold text-ink font-sans">Menunggu keputusan pembatalan</h4>
-                    <p class="mt-1 text-sm text-muted font-sans">Proses persetujuan pengajuan ini ditahan sampai Admin Kepegawaian mengambil keputusan.</p>
+                    <p class="mt-1 text-sm text-muted font-sans">Proses persetujuan pengajuan ini ditahan sampai pengelola pembatalan mengambil keputusan.</p>
                 </section>
             @endif
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div class="space-y-1">
+                    <span class="text-xs font-bold uppercase tracking-wider text-muted">Jabatan</span>
+                    <p class="text-sm text-ink">{{ $cuti->employee?->jabatan_terakhir ?? '-' }}</p>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-xs font-bold uppercase tracking-wider text-muted">Golongan</span>
+                    <p class="text-sm text-ink">{{ $cuti->employee?->golongan_terakhir ?? '-' }}</p>
+                </div>
                 <div class="space-y-1">
                     <span class="text-xs font-bold text-muted uppercase tracking-wider font-sans">Jenis Cuti</span>
                     <p class="text-sm font-semibold text-ink font-sans">{{ $cuti->jenisCuti?->nama ?? '-' }}</p>
@@ -158,6 +185,8 @@
                             Lihat lampiran
                         </a>
                     </div>
+                @else
+                    <p class="text-sm text-muted sm:col-span-2">Lampiran pendukung tidak tersedia.</p>
                 @endif
                 @if ($cuti->proof !== null)
                     <div class="space-y-1 sm:col-span-2">
@@ -214,12 +243,13 @@
                                 $step->approver?->nama_lengkap ?? 'Approver',
                                 $step->acted_at?->translatedFormat('d M Y, H:i'),
                                 $skippedReason,
+                                $step->decision_note,
                             ])));
                         @endphp
                         <x-ui.timeline-item
                             :variant="$stepVariant"
-                            :title="$stepTitle"
-                            :description="$stepDescription"
+                            :title="'Tahap '.$step->step_order.' · '.$stepRoleLabel"
+                            :description="$stepTitle.($stepDescription !== '' ? ' — '.$stepDescription : '')"
                             :pulse="$step->status === 'active' && ! in_array($status, ['ditangguhkan', 'menunggu_pembatalan'], true)"
                         />
                     @endforeach
@@ -281,7 +311,7 @@
             @endif
             @include('admin.cuti.partials.administrative-postponement-form')
             <div class="border-t border-border pt-6 space-y-4"
-                   x-data="{ decisionForm: {{ $errors->dutyPostponement->hasAny(['alasan', 'active_step_id', 'revision_version']) ? "'dutyPostponement'" : 'null' }}, lastTrigger: null,
+                   x-data="{ decisionForm: @js($initialDecisionForm), lastTrigger: null,
                      open(key, ev) { this.lastTrigger = ev?.currentTarget ?? null; this.decisionForm = key; this.$nextTick(() => document.getElementById(key === 'dutyPostponement' ? 'alasan-duty-postponement' : `komentar-${key}`)?.focus()); },
                      close() { this.decisionForm = null; this.$nextTick(() => this.lastTrigger?.focus()); } }"
                  @if ($errors->dutyPostponement->has('alasan')) x-init="$nextTick(() => document.getElementById('alasan-duty-postponement')?.focus())" @endif
@@ -302,13 +332,13 @@
                 @if ($canRequestCancellation)
                     <section class="rounded-lg border border-warning/25 bg-warning/5 p-4" aria-labelledby="leave-cancellation-title">
                         <h4 id="leave-cancellation-title" class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Minta Pembatalan</h4>
-                        <p class="mt-1 text-xs text-muted font-sans">Pembatalan akan menahan approval dan mempertahankan reservasi saldo sampai Admin Kepegawaian memutuskan.</p>
+                        <p class="mt-1 text-xs text-muted font-sans">Pembatalan akan menahan approval dan mempertahankan reservasi saldo sampai pengelola pembatalan memutuskan.</p>
                         <form action="{{ route('cuti.cancellations.store', $cuti) }}" method="POST" class="mt-4 space-y-3" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
                             @csrf
                             <div>
                                 <label for="cancellation-reason" class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Alasan pembatalan <span class="text-danger">*</span></label>
                                 <textarea id="cancellation-reason" name="reason" rows="3" maxlength="500" required @if($errors->has('reason')) autofocus @endif aria-invalid="{{ $errors->has('reason') ? 'true' : 'false' }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" aria-describedby="cancellation-reason-help{{ $errors->has('reason') ? ' cancellation-reason-error' : '' }}">{{ old('reason') }}</textarea>
-                                <p id="cancellation-reason-help" class="mt-1 text-xs text-muted font-sans">Alasan hanya dapat dilihat oleh Anda dan Admin Kepegawaian yang berwenang.</p>
+                                <p id="cancellation-reason-help" class="mt-1 text-xs text-muted font-sans">Alasan hanya dapat dilihat oleh Anda dan pengelola pembatalan yang berwenang.</p>
                                 @error('reason')<p id="cancellation-reason-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
                             </div>
                             <x-ui.button type="submit" variant="warning" class="min-h-11 w-full sm:w-auto" x-bind:disabled="submitting" x-bind:aria-busy="submitting.toString()">
@@ -441,17 +471,16 @@
                         'postpone' => ['route' => 'cuti.postpone', 'label' => 'Alasan Penundaan', 'title' => 'Ditangguhkan', 'variant' => 'warning-solid'],
                         'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger-solid'],
                     ] as $formKey => $form)
-                    <div x-show="decisionForm === '{{ $formKey }}'" x-cloak
-                        role="region" aria-labelledby="decision-title-{{ $formKey }}"
-                        x-effect="if (decisionForm === '{{ $formKey }}') $nextTick(() => document.getElementById('komentar-{{ $formKey }}')?.focus())"
-                        class="rounded-lg border border-warning/25 bg-warning/5 p-4">
-                        <h4 id="decision-title-{{ $formKey }}" class="mb-2 text-sm font-semibold text-ink">{{ $form['title'] }}</h4>
+                    <x-ui.modal show="decisionForm === '{{ $formKey }}'" close-action="close()" :title="$form['title']">
                         <form action="{{ route($form['route'], $cuti->id) }}" method="POST" class="space-y-3">
                             @csrf
+                            <input type="hidden" name="decision_form" value="{{ $formKey }}">
                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                             <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
                             <x-form.textarea
                                 name="komentar"
+                                :error-key="$decisionCommentKey"
+                                data-error-autofocus="{{ $errors->has($decisionCommentKey) ? 'true' : 'false' }}"
                                 label="{{ $form['label'] }}"
                                 id="komentar-{{ $formKey }}"
                                 rows="3"
@@ -465,8 +494,23 @@
                                 <x-ui.button type="submit" variant="{{ $form['variant'] }}">{{ $form['title'] }}</x-ui.button>
                             </div>
                         </form>
-                    </div>
+                    </x-ui.modal>
                     @endforeach
+
+                    <x-ui.modal show="decisionForm === 'approve'" close-action="close()" title="Konfirmasi Persetujuan" description-id="approve-confirmation-description">
+                        <p id="approve-confirmation-description" class="text-sm text-ink">Setujui tahap ini? Pengajuan akan diteruskan ke tahap berikutnya, atau diselesaikan jika ini tahap terakhir.</p>
+                        <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="mt-4 space-y-4" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
+                            @csrf
+                            <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
+                            <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
+                            <input type="hidden" name="decision_form" value="approve">
+                            <x-form.textarea name="komentar" :error-key="$decisionCommentKey" id="komentar-approve" label="Catatan persetujuan (opsional)" rows="2" maxlength="500" data-error-autofocus="{{ $errors->has($decisionCommentKey) ? 'true' : 'false' }}" />
+                            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <x-ui.button type="button" variant="secondary" @click="close()" data-modal-initial-focus="true">Batal</x-ui.button>
+                                <x-ui.button type="submit" variant="success-solid" x-bind:disabled="submitting" x-bind:aria-busy="submitting.toString()">Ya, Setujui</x-ui.button>
+                            </div>
+                        </form>
+                    </x-ui.modal>
 
                     @if ($cuti->jenisCuti?->code === 'tahunan')
                         <x-ui.modal show="decisionForm === 'dutyPostponement'" close-action="close()" title="Tangguhkan karena Tugas Dinas" description-id="decision-description-duty-postponement">
@@ -493,13 +537,26 @@
                     @endif
                 @endif
 
+                @if (! $canAct && $cuti->status !== 'menunggu_pembatalan')
+                    <p class="text-sm text-muted">
+                        @if ($activeStep !== null && in_array($cuti->status, ['menunggu_approval', 'ditangguhkan'], true))
+                            Tahap aktif ditujukan kepada {{ $activeStep->approver?->nama_lengkap ?? 'approver yang dipetakan' }}. Anda dapat membaca riwayat pengajuan ini.
+                        @else
+                            Tidak ada tindakan persetujuan yang tersedia pada status pengajuan ini.
+                        @endif
+                    </p>
+                @endif
+
                 <div class="flex flex-wrap items-end justify-end gap-3">
 
-                    <a href="{{ route('cuti') }}" class="{{ $buttonStyles['secondary'] }}">
-                        Kembali ke Daftar
+                    <a href="{{ $backLink['url'] }}" class="{{ $buttonStyles['secondary'] }}">
+                        {{ $backLink['label'] }}
                     </a>
 
                     @if ($canDownloadFormulir)
+                        @if ($cuti->proof?->document_path !== null)
+                            <a href="{{ route('pimpinan.cuti.document.show', $cuti) }}" target="_blank" rel="noopener noreferrer" class="{{ $buttonStyles['secondary'] }}">Lihat Formulir Cuti</a>
+                        @endif
                         <a href="{{ route('cuti.formulir-pdf', $cuti) }}" aria-label="Unduh Formulir Cuti (PDF)" class="{{ $buttonStyles['secondary'] }}">
                             Unduh Formulir Cuti (PDF)
                         </a>
@@ -518,12 +575,7 @@
                             </div>
                         @endif
                         <x-ui.button type="button" variant="danger-solid" @click="open('decline', $event)">Tidak Setujui</x-ui.button>
-                        <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="inline">
-                            @csrf
-                            <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
-                            <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
-                            <x-ui.button type="submit" variant="success-solid">Setujui</x-ui.button>
-                        </form>
+                        <x-ui.button type="button" variant="success-solid" @click="open('approve', $event)">Setujui</x-ui.button>
                     @endif
                 </div>
             </div>

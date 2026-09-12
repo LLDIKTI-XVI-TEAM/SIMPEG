@@ -1,9 +1,9 @@
-<x-layouts.app title="Persetujuan Cuti">
+<x-layouts.app title="Menunggu Tindakan Saya">
     <div class="space-y-6">
         
         <x-ui.card padding="lg">
             <x-admin.page-header
-                title="Persetujuan Cuti Pegawai"
+                title="Menunggu Tindakan Saya"
                 description="Tinjau dan lakukan keputusan setujui atau tunda atas permohonan cuti dari staf."
             >
                 <x-slot:breadcrumb>
@@ -76,7 +76,7 @@
                                 <div class="flex items-center justify-end gap-2.5">
                                     {{-- Detail --}}
 
-                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="secondary" size="compact-icon" class="h-11 w-11 sm:h-8 sm:w-8" title="Tinjau Detail" aria-label="Tinjau Detail">
+                                    <x-ui.button href="{{ route('cuti.show', ['id' => $r->id, 'from' => 'approval']) }}" variant="secondary" size="compact-icon" class="h-11 w-11 sm:h-8 sm:w-8" title="Tinjau Detail" aria-label="Tinjau Detail">
 
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -90,7 +90,7 @@
                                         close() { this.confirming = false; this.$nextTick(() => this.lastTrigger?.focus()); } }" class="inline-flex items-center gap-2"
                                         x-effect="if (confirming) $nextTick(() => $refs.confirmApprove?.focus())">
                                         <x-ui.button type="button" variant="success-solid" size="sm" class="min-h-11" x-show="!confirming" @click="open($event)">Setuju</x-ui.button>
-                                        <form action="{{ route('cuti.approve', $r->id) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
+                                        <form action="{{ route('cuti.approve', ['id' => $r->id, 'from' => 'approval']) }}" method="POST" class="inline-flex items-center gap-2" x-show="confirming" x-cloak @keydown.escape="close()">
                                             @csrf
                                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                                             <input type="hidden" name="revision_version" value="{{ $r->revision_version }}">
@@ -101,7 +101,7 @@
                                     </div>
 
                                     {{-- Tunda: butuh alasan, arahkan ke detail tempat form penundaan tersedia --}}
-                                    <x-ui.button href="{{ route('cuti.show', $r->id) }}" variant="warning-solid" size="sm" class="min-h-11">Tunda</x-ui.button>
+                                    <x-ui.button href="{{ route('cuti.show', ['id' => $r->id, 'from' => 'approval']) }}" variant="warning-solid" size="sm" class="min-h-11">Tunda</x-ui.button>
                                 </div>
                             </x-ui.table-td>
                         </x-ui.table-row>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -97,9 +98,9 @@ class AdminKepegawaianAccessTest extends TestCase
         }
     }
 
-    public function test_sidebar_tetap_menyembunyikan_pembatalan_cuti_saat_permission_diberikan_ke_super_admin(): void
+    public function test_sidebar_dan_antrean_pembatalan_terbuka_saat_permission_diberikan_ke_super_admin_aktif(): void
     {
-        $superAdmin = User::factory()->superAdmin()->create();
+        $superAdmin = User::factory()->superAdmin()->create(['employee_id' => Employee::factory()->create()->id]);
         $superAdminRole = Role::query()->where('name', 'super_admin')->firstOrFail();
         $cancellationPermission = Permission::query()
             ->where('name', 'cuti.cancellation.manage')
@@ -112,7 +113,12 @@ class AdminKepegawaianAccessTest extends TestCase
             ->get(route('dashboard'));
 
         $dashboard->assertOk();
-        $dashboard->assertDontSee('href="'.route('cuti.cancellations.index').'"', false);
+        $dashboard->assertSee('href="'.route('cuti.cancellations.index').'"', false);
+        $this->get(route('cuti.cancellations.index'))->assertOk();
+
+        $superAdminRole->permissions()->detach($cancellationPermission->id);
+        $this->actingAs($superAdmin->fresh())->get(route('dashboard'))
+            ->assertDontSee('href="'.route('cuti.cancellations.index').'"', false);
         $this->get(route('cuti.cancellations.index'))->assertForbidden();
     }
 

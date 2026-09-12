@@ -96,6 +96,7 @@ class PimpinanLeaveDetailTest extends TestCase
         ]);
 
         $this->actingAs($this->pimpinan())
+            ->followingRedirects()
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
             ->assertSeeInOrder(['Tahap 1 · Atasan Langsung', 'Menunggu Atasan Langsung'])
@@ -117,9 +118,10 @@ class PimpinanLeaveDetailTest extends TestCase
         ]);
 
         $this->actingAs($this->pimpinan())
+            ->followingRedirects()
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
-            ->assertSeeInOrder(['Timeline Persetujuan', 'Tahap 1 · PYBMC', 'Menunggu Keputusan Pembatalan'])
+            ->assertSeeInOrder(['Alur Persetujuan Cuti', 'Tahap 1 · PYBMC', 'Menunggu Keputusan Pembatalan'])
             ->assertDontSee('animate-pulse', false);
     }
 
@@ -162,19 +164,20 @@ class PimpinanLeaveDetailTest extends TestCase
             'acted_at' => '2026-07-03 09:15:00',
         ]);
         $response = $this->actingAs($this->pimpinan())
+            ->followingRedirects()
             ->get(route('pimpinan.cuti.show', $leave));
 
         $response
             ->assertOk()
-            ->assertSee('Riwayat Tindakan Resmi')
+            ->assertSee('Riwayat Tindakan Approval')
             ->assertSee('Perubahan')
             ->assertSee('Ditangguhkan')
             ->assertDontSee('Ditolak')
             ->assertSee('Lengkapi surat pendukung.')
             ->assertSee('Menunggu konfirmasi jadwal.')
             ->assertSee('Dokumen baru tidak memenuhi persyaratan.')
-            ->assertSee('01 Jul 2026 10:30')
-            ->assertSee('02 Jul 2026 11:45')
+            ->assertSee('01 Jul 2026, 10:30')
+            ->assertSee('02 Jul 2026, 11:45')
             ->assertSee('Pejabat Cuti');
 
         $response->assertSee('Tidak Disetujui');
@@ -189,10 +192,11 @@ class PimpinanLeaveDetailTest extends TestCase
         $pimpinan = $this->pimpinan();
 
         $this->actingAs($pimpinan)
+            ->followingRedirects()
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
-            ->assertSee('Lampiran Pendukung')
-            ->assertSee(route('pimpinan.cuti.attachment.download', $leave), false);
+            ->assertSee('Lihat lampiran')
+            ->assertSee(route('cuti.attachment.download', $leave), false);
         $download = $this->actingAs($pimpinan)
             ->get(route('pimpinan.cuti.attachment.download', $leave));
         $download
@@ -210,10 +214,11 @@ class PimpinanLeaveDetailTest extends TestCase
         $leave = $this->leave(Employee::factory()->create(), $this->leaveType(), '2026-07-06', 'menunggu_approval');
 
         $this->actingAs($this->pimpinan())
+            ->followingRedirects()
             ->get(route('pimpinan.cuti.show', $leave))
             ->assertOk()
-            ->assertSee('Tidak ada lampiran pendukung.')
-            ->assertDontSee(route('pimpinan.cuti.attachment.download', $leave), false);
+            ->assertSee('Lampiran pendukung tidak tersedia.')
+            ->assertDontSee(route('cuti.attachment.download', $leave), false);
     }
 
     private function employeeInUnit(string $name, RefUnitKerja $unit): Employee

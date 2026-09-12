@@ -104,7 +104,8 @@
                 @php
                     $isUnread = is_null($notif->read_at);
                     $subText = $notif->data['label'] ?? 'Notifikasi Sistem';
-                    $targetUrl = $notif->data['url']
+                    $targetUrl = $leaveNotificationUrls[$notif->id]
+                        ?? $notif->data['url']
                         ?? $notif->data['link']
                         ?? $notif->data['redirect_url']
                         ?? (isset($notif->data['leave_request_id']) ? route('cuti.show', $notif->data['leave_request_id']) : route('notifications.index'));

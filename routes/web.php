@@ -309,7 +309,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
     Route::get('/cuti/administrasi-saldo', [LeaveBalanceController::class, 'administrasi'])
         ->middleware(['permission:cuti.balance.reconcile,cuti.manual.manage'])
         ->name('cuti.saldo.administrasi');
-    Route::middleware(['role:admin_kepegawaian', 'permission:cuti.cancellation.manage'])
+    Route::middleware(['permission:cuti.cancellation.manage'])
         ->prefix('cuti/pembatalan')
         ->name('cuti.cancellations.')
         ->group(function (): void {
@@ -498,7 +498,6 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
         ->middleware('permission:cuti.create')
         ->name('cuti.store');
     Route::post('/dashboard/cuti/{leaveRequest}/pembatalan', [LeaveCancellationController::class, 'store'])
-        ->middleware('permission:cuti.create')
         ->name('cuti.cancellations.store')
         ->whereUuid('leaveRequest');
     Route::post('/cuti/{leaveRequest}/penangguhan-administratif', [AdministrativeLeavePostponementController::class, 'store'])
@@ -704,8 +703,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereIn('type', ['rank', 'position', 'salary', 'appointment', 'education'])
                 ->name('pegawai.history-attachments.download');
 
-            Route::get('/cuti', [PimpinanLeaveController::class, 'index'])->name('cuti.index');
+            Route::get('/cuti', [PimpinanLeaveController::class, 'index'])
+                ->withoutMiddleware('role:pimpinan')->middleware('permission:cuti.read_all')->name('cuti.index');
             Route::get('/cuti/{leave}', [PimpinanLeaveController::class, 'show'])
+                ->withoutMiddleware('role:pimpinan')
                 ->whereUuid('leave')
                 ->name('cuti.show');
             Route::post('/cuti/{leave}/decision', [PimpinanLeaveDecisionController::class, 'store'])
@@ -715,12 +716,15 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('leave')
                 ->name('cuti.penangguhan-tugas-dinas');
             Route::get('/cuti/{leave}/dokumen', [PimpinanLeaveDocumentController::class, 'show'])
+                ->withoutMiddleware('role:pimpinan')
                 ->whereUuid('leave')
                 ->name('cuti.document.show');
             Route::get('/cuti/{leave}/dokumen/download', [PimpinanLeaveDocumentController::class, 'download'])
+                ->withoutMiddleware('role:pimpinan')
                 ->whereUuid('leave')
                 ->name('cuti.document.download');
             Route::get('/cuti/{leave}/lampiran', [PimpinanLeaveDocumentController::class, 'downloadAttachment'])
+                ->withoutMiddleware('role:pimpinan')
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');
 
@@ -751,8 +755,10 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('employee')
                 ->name('bawahan.show');
 
-            Route::get('/cuti', [KepalaBagianLeaveController::class, 'index'])->name('cuti.index');
+            Route::get('/cuti', [KepalaBagianLeaveController::class, 'index'])
+                ->withoutMiddleware('role:kepala_bagian')->middleware('permission:cuti.read_all')->name('cuti.index');
             Route::get('/cuti/{leave}', [KepalaBagianLeaveController::class, 'show'])
+                ->withoutMiddleware('role:kepala_bagian')
                 ->whereUuid('leave')
                 ->name('cuti.show');
             Route::post('/cuti/{leave}/keputusan', [KepalaBagianLeaveDecisionController::class, 'store'])
@@ -762,6 +768,7 @@ Route::middleware(['keycloak.auth', 'session.timeout', 'role:super_admin,admin_k
                 ->whereUuid('leave')
                 ->name('cuti.penangguhan-tugas-dinas');
             Route::get('/cuti/{leave}/lampiran', [KepalaBagianLeaveController::class, 'downloadAttachment'])
+                ->withoutMiddleware('role:kepala_bagian')
                 ->whereUuid('leave')
                 ->name('cuti.attachment.download');
 

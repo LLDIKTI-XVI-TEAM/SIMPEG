@@ -63,7 +63,7 @@ class DutyPostponementWorkflowTest extends TestCase
                 'jumlah_hari' => 99,
                 'actor_id' => Employee::factory()->create()->id,
             ])
-            ->assertRedirect(route('cuti.approval'))
+            ->assertRedirect(route('cuti.show', ['id' => $fixture['request']->id, 'from' => 'approval']))
             ->assertSessionHas('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
 
         $this->assertDatabaseHas('leave_requests', [
@@ -282,7 +282,7 @@ class DutyPostponementWorkflowTest extends TestCase
                 'alasan' => 'abcd',
             ])
             ->assertOk()
-            ->assertSee('decisionForm: &#039;dutyPostponement&#039;', false)
+            ->assertSee("decisionForm: 'dutyPostponement'", false)
             ->assertSee('Alasan tugas dinas minimal berisi 5 karakter.')
             ->assertSee('aria-invalid="true"', false)
             ->assertSee('data-error-autofocus="true"', false)
@@ -308,7 +308,7 @@ class DutyPostponementWorkflowTest extends TestCase
 
         $this->get(route('cuti.show', $fixture['request']))
             ->assertOk()
-            ->assertSee('decisionForm: &#039;dutyPostponement&#039;', false)
+            ->assertSee("decisionForm: 'dutyPostponement'", false)
             ->assertSee($message);
     }
 
@@ -325,7 +325,7 @@ class DutyPostponementWorkflowTest extends TestCase
             ->assertOk()
             ->assertSee('decisionForm: null', false)
             ->assertSee('data-error-autofocus="false"', false)
-            ->assertDontSee('decisionForm: &#039;dutyPostponement&#039;', false);
+            ->assertDontSee("decisionForm: 'dutyPostponement'", false);
     }
 
     public function test_duty_postponement_admin_detail_uses_neutral_fallbacks_for_unknown_step_and_action(): void

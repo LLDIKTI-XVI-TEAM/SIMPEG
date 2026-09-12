@@ -3,8 +3,10 @@
 namespace App\Services\Notifications;
 
 use App\Models\Employee;
+use App\Models\LeaveRequest;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Cuti\LeaveCancellationAccess;
 use Illuminate\Support\Collection;
 
 class NotificationRecipientResolver
@@ -15,6 +17,7 @@ class NotificationRecipientResolver
     public function __construct(
         private readonly NotificationChannelResolver $channels,
         private readonly NotificationEventCatalog $catalog,
+        private readonly LeaveCancellationAccess $cancellations,
     ) {}
 
     /**
@@ -51,41 +54,50 @@ class NotificationRecipientResolver
     }
 
     /**
-     * Mengambil penerima keputusan pembatalan dari role efektif dan matrix permission saat ini.
-     * Query dibatasi pada kandidat Admin Kepegawaian serta pegawai aktif, lalu role sementara
-     * divalidasi lagi supaya simulasi yang tidak sah tidak ikut menerima data workflow.
+     * Mengambil pengelola dalam scope pemohon dengan matrix yang dibaca sekali per resolusi.
+     * Kandidat dibaca bertahap; role sementara tetap dievaluasi oleh model pengguna.
      *
-     * @return Collection<int, Employee>
+     * @return iterable<Employee>
      */
-    public function cancellationDecisionRecipients(): Collection
+    public function cancellationDecisionRecipients(LeaveRequest $leave): iterable
     {
-        $hasPermission = Role::query()
-            ->where('name', 'admin_kepegawaian')
+        $grantedRoles = Role::query()
             ->whereHas('permissions', fn ($query) => $query->where('name', 'cuti.cancellation.manage'))
-            ->exists();
+            ->pluck('name')
+            ->all();
 
-        if (! $hasPermission) {
-            return collect();
+        if ($grantedRoles === []) {
+            return;
         }
 
-        return User::query()
-            ->where(function ($query): void {
-                $query->where('role', 'admin_kepegawaian')
-                    ->orWhere(function ($temporaryRole): void {
-                        $temporaryRole->where('role', 'super_admin')
-                            ->where('temporary_role', 'admin_kepegawaian');
-                    });
+        $candidates = User::query()
+            ->select(['id', 'employee_id', 'role', 'temporary_role'])
+            ->where(function ($query) use ($grantedRoles): void {
+                $query->whereIn('role', $grantedRoles)->orWhereIn('temporary_role', $grantedRoles);
             })
             ->whereNotNull('employee_id')
             ->whereIn('employee_id', Employee::query()->whereActiveStatus()->select('id'))
             ->with(['employee.statusPegawai'])
-            ->get()
-            ->filter(fn (User $user): bool => $user->getEffectiveRole() === 'admin_kepegawaian'
+            ->lazyById(100);
+
+        foreach ($candidates as $user) {
+            // Set role ini memakai relasi permission yang sama dengan hasPermission(), tanpa query ulang per kandidat.
+            if (in_array($user->getEffectiveRole(), $grantedRoles, true)
                 && $user->employee instanceof Employee
-                && $user->employee->isActive())
-            ->pluck('employee')
-            ->unique('id')
-            ->values();
+                && $user->employee->isActive()
+                && $this->cancellations->contains($user, $leave->employee_id)) {
+                // Constraint unik users.employee_id mencegah duplikasi identitas inbox pada schema aktif.
+                yield $user->employee;
+            }
+        }
+    }
+
+    /** Memeriksa ulang model dan matrix terkini ketika email tertunda akan dikirim. */
+    public function canReceiveCancellationDecision(User $user, LeaveRequest $leave): bool
+    {
+        $freshUser = User::query()->find($user->id);
+
+        return $freshUser !== null && $this->cancellations->canManage($freshUser, $leave);
     }
 
     /**

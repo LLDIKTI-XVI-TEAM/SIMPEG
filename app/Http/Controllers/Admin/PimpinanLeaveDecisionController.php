@@ -35,7 +35,7 @@ class PimpinanLeaveDecisionController extends Controller
             'TIDAK_DISETUJUI' => 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.',
         };
 
-        return redirect()->route('pimpinan.cuti.show', $leave)
+        return redirect()->route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan'])
             ->with('success', $message);
     }
 
@@ -52,7 +52,7 @@ class PimpinanLeaveDecisionController extends Controller
         $payload = $request->validated();
         $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['revision_version'], $payload['alasan']);
 
-        return redirect()->route('pimpinan.cuti.show', $leave)
+        return redirect()->route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan'])
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }

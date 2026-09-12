@@ -193,7 +193,7 @@ class CutiRbacTest extends TestCase
             'revision_version' => $cuti->fresh()->revision_version,
         ]);
 
-        $response->assertRedirect(route('cuti.approval'));
+        $response->assertRedirect(route('cuti.show', ['id' => $cuti->id, 'from' => 'approval']));
         $this->assertSame('disetujui', $cuti->fresh()->status);
 
         $audit = AuditLog::query()

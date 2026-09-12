@@ -18,13 +18,16 @@ use Illuminate\Http\RedirectResponse;
 /** Adapter tipis untuk permintaan pembatalan oleh pemilik pengajuan cuti. */
 class LeaveCancellationController extends Controller
 {
-    /** Menampilkan antrean pembatalan terbatas untuk Admin Kepegawaian yang berwenang. */
+    /** Menampilkan antrean pembatalan dalam scope pengelola yang berwenang. */
     public function index(
         ListLeaveCancellationRequest $request,
         ListLeaveCancellationRequestsAction $action,
     ): View {
+        /** @var User $actor */
+        $actor = $request->user();
+
         return view('admin.cuti.cancellations.index', [
-            'cancellations' => $action->execute($request->validated()),
+            'cancellations' => $action->execute($actor, $request->validated()),
             'filters' => $request->validated(),
         ]);
     }
@@ -41,10 +44,10 @@ class LeaveCancellationController extends Controller
         $action->execute($leaveRequest, $actor, $payload['reason'], $request);
 
         return redirect()->route('cuti.show', $leaveRequest)
-            ->with('success', 'Permohonan pembatalan cuti telah dikirim dan menunggu keputusan Admin Kepegawaian.');
+            ->with('success', 'Permohonan pembatalan cuti telah dikirim dan menunggu keputusan pengelola yang berwenang.');
     }
 
-    /** Meneruskan keputusan Admin ke Action agar mutasi, audit, dan notifikasi tetap satu use case. */
+    /** Meneruskan keputusan pengelola ke Action agar mutasi, audit, dan notifikasi tetap satu use case. */
     public function decide(
         DecideLeaveCancellationRequest $request,
         LeaveCancellationRequest $cancellation,

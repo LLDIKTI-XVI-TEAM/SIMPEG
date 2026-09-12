@@ -52,7 +52,7 @@ class LeaveDecisionAuditTest extends TestCase
             'komentar' => $komentar,
         ]);
 
-        $response->assertRedirect(route('cuti.approval'));
+        $response->assertRedirect(route('cuti.show', ['id' => $cuti->id, 'from' => 'approval']));
         $this->assertSame('tidak_disetujui', $cuti->fresh()->status);
 
         $audit = AuditLog::query()
@@ -104,7 +104,7 @@ class LeaveDecisionAuditTest extends TestCase
             'komentar' => 'Diteruskan ke tahap berikutnya.',
         ]);
 
-        $response->assertRedirect(route('cuti.approval'));
+        $response->assertRedirect(route('cuti.show', ['id' => $cuti->id, 'from' => 'approval']));
         // Tahap pertama bukan tahap akhir sehingga pengajuan masih menunggu keputusan berikutnya.
         $this->assertSame('menunggu_approval', $cuti->fresh()->status);
 
@@ -124,7 +124,7 @@ class LeaveDecisionAuditTest extends TestCase
             'komentar' => 'Disetujui.',
         ]);
 
-        $response->assertRedirect(route('cuti.approval'));
+        $response->assertRedirect(route('cuti.show', ['id' => $cuti->id, 'from' => 'approval']));
         $this->assertSame('disetujui', $cuti->fresh()->status);
 
         $audit = $this->auditKeputusan($cuti->id, 'DECIDE');
@@ -142,7 +142,7 @@ class LeaveDecisionAuditTest extends TestCase
             'komentar' => 'Ditangguhkan karena kebutuhan unit kerja.',
         ]);
 
-        $response->assertRedirect(route('cuti.approval'));
+        $response->assertRedirect(route('cuti.show', ['id' => $cuti->id, 'from' => 'approval']));
         $this->assertSame('ditangguhkan', $cuti->fresh()->status);
 
         $audit = $this->auditKeputusan($cuti->id, 'DEFER');

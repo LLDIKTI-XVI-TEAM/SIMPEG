@@ -182,12 +182,12 @@ class ApproveLeaveAction
             'cuti.menunggu_persetujuan',
             'Pengajuan Cuti Menunggu Persetujuan',
             'Terdapat pengajuan cuti yang menunggu persetujuan Anda.',
-            // Approver tahap berikutnya diarahkan ke antrean approval; path relatif internal agar link aman lintas host.
+            // Approver tahap berikutnya membuka pengajuan terkait lewat path relatif internal.
             [
                 'leave_request_id' => $leaveRequest->id,
                 'leave_request_step_id' => $nextStep->id,
                 'leave_request_version' => (string) $leaveRequest->revision_version,
-                'url' => route('cuti.approval', [], false),
+                'url' => route('cuti.show', $leaveRequest->id, false),
             ],
         );
     }
