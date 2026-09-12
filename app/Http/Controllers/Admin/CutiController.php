@@ -25,12 +25,15 @@ use App\Http\Requests\Cuti\ReviewLeaveDecisionRequest;
 use App\Http\Requests\Cuti\StoreLeaveRequestRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\Cuti\LeaveDetailNavigation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class CutiController extends Controller
 {
+    public function __construct(private readonly LeaveDetailNavigation $navigation) {}
+
     /** Menyajikan formulir resmi setelah otorisasi rekam ditegakkan Action. */
     public function formulirPdf(LeaveRequest $leaveRequest, DownloadOfficialLeavePdfAction $action): Response
     {
@@ -157,7 +160,9 @@ class CutiController extends Controller
         $payload = $request->validated();
         $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['komentar'] ?? null, $request);
 
-        return redirect()->route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'approval'])
+        $navigation = $this->navigation->resolve($request->user(), $request->input('from', 'approval'), $request->input('return', []));
+
+        return redirect()->route('cuti.show', ['id' => $leaveRequest->id, ...$navigation['parameters']])
             ->with('success', 'Pengajuan cuti berhasil disetujui.');
     }
 
@@ -175,7 +180,9 @@ class CutiController extends Controller
         $payload = $request->validated();
         $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['komentar'], $request);
 
-        return redirect()->route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'approval'])
+        $navigation = $this->navigation->resolve($request->user(), $request->input('from', 'approval'), $request->input('return', []));
+
+        return redirect()->route('cuti.show', ['id' => $leaveRequest->id, ...$navigation['parameters']])
             ->with('success', 'Pengajuan cuti ditunda dan pemohon telah diberi tahu.');
     }
 
@@ -190,7 +197,9 @@ class CutiController extends Controller
         $payload = $request->validated();
         $action->execute($leaveRequest, $actor, $payload['active_step_id'], $payload['revision_version'], $payload['komentar'], $request);
 
-        return redirect()->route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'approval'])
+        $navigation = $this->navigation->resolve($request->user(), $request->input('from', 'approval'), $request->input('return', []));
+
+        return redirect()->route('cuti.show', ['id' => $leaveRequest->id, ...$navigation['parameters']])
             ->with('success', 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.');
     }
 
@@ -207,7 +216,9 @@ class CutiController extends Controller
         $payload = $request->validated();
         $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['revision_version'], $payload['alasan']);
 
-        return redirect()->route('cuti.show', ['id' => $leave->id, 'from' => 'approval'])
+        $navigation = $this->navigation->resolve($user, $request->input('from', 'approval'), $request->input('return', []));
+
+        return redirect()->route('cuti.show', ['id' => $leave->id, ...$navigation['parameters']])
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }

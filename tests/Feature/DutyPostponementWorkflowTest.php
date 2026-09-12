@@ -14,8 +14,10 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
 use App\Models\RefNotificationChannel;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\Cuti\LeaveBalanceReservationService;
@@ -82,6 +84,29 @@ class DutyPostponementWorkflowTest extends TestCase
             'approver_id' => $fixture['actor']->id,
             'action' => LeaveApproval::ACTION_DUTY_POSTPONEMENT,
         ]);
+    }
+
+    public function test_form_keputusan_dan_penangguhan_dinas_mempertahankan_konteks_daftar(): void
+    {
+        $fixture = $this->makeWorkflowFixture();
+        Role::where('name', 'kepala_bagian')->sole()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'cuti.read_all')->sole()->id,
+        ]);
+        $filters = ['status' => 'all', 'tahun' => '2026', 'page' => '2'];
+        $parameters = [$fixture['request']->id, 'from' => 'bawahan', 'return' => $filters];
+        $detail = $this->actingAs($fixture['actingUser'])->get(route('cuti.show', $parameters))->assertOk();
+        foreach (['cuti.approve', 'cuti.postpone', 'cuti.decline', 'cuti.penangguhan-tugas-dinas'] as $route) {
+            $detail->assertSee('action="'.e(route($route, $parameters)).'"', false);
+        }
+
+        $response = $this->post(route('cuti.penangguhan-tugas-dinas', $parameters), [
+            'active_step_id' => $fixture['activeStep']->id,
+            'revision_version' => $this->revisionVersion($fixture['request']),
+            'alasan' => self::REASON,
+        ])->assertSessionHasNoErrors()->assertRedirect(route('cuti.show', $parameters));
+        $this->get($response->headers->get('Location'))->assertOk()
+            ->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route('kepala-bagian.cuti.index', $filters));
+        $this->assertSame(LeaveRequest::STATUS_DUTY_POSTPONED, $fixture['request']->fresh()->status);
     }
 
     public function test_duty_postponement_generic_route_validates_reason_without_mutation(): void

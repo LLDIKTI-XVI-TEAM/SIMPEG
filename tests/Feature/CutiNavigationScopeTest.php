@@ -15,6 +15,7 @@ use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -376,6 +377,68 @@ class CutiNavigationScopeTest extends TestCase
         $this->assertSame(route('kepala-bagian.cuti.index', ['status' => 'all']), $detail->viewData('backLink')['url']);
         $returned = $this->get($detail->viewData('backLink')['url'])->assertOk();
         $this->assertSame([$leave->id], $returned->viewData('leaves')->pluck('id')->all());
+    }
+
+    #[DataProvider('decisionReturnContexts')]
+    public function test_keputusan_mempertahankan_asal_dan_filter_daftar(string $decision, string $from, string $listRoute, array $filters): void
+    {
+        Queue::fake();
+        $actor = $this->actor('pimpinan');
+        $leave = $this->leave(Employee::factory()->create(), $actor->employee);
+        $step = $leave->steps()->sole();
+        $step->update(['is_final' => false]);
+        $leave->steps()->create([
+            'step_order' => 2, 'step_type' => 'pybmc', 'role_label' => 'PYBMC',
+            'approver_employee_id' => Employee::factory()->create()->id, 'status' => 'pending', 'is_final' => true,
+        ]);
+        $context = ['from' => $from, 'return' => $filters];
+        $url = route('cuti.show', ['id' => $leave->id, ...$context]);
+
+        $response = $this->actingAs($actor)->post(route('cuti.'.$decision, ['id' => $leave->id, ...$context]), [
+            'active_step_id' => $step->id, 'revision_version' => $leave->fresh()->revision_version,
+            'komentar' => 'Catatan keputusan untuk pengujian navigasi.',
+        ])->assertSessionHasNoErrors()->assertSessionHas('success');
+        $this->assertSame(1, $leave->approvals()->count());
+        $response->assertRedirect($url);
+        $this->get($response->headers->get('Location'))->assertOk()
+            ->assertViewHas('backLink', fn (array $back): bool => $back['url'] === route($listRoute, $filters));
+    }
+
+    public static function decisionReturnContexts(): array
+    {
+        return [
+            'setuju dari pimpinan' => ['approve', 'pimpinan', 'pimpinan.cuti.index', ['status' => 'all', 'search' => 'Pegawai', 'page' => '3', 'per_page' => '25']],
+            'tunda dari bawahan' => ['postpone', 'bawahan', 'kepala-bagian.cuti.index', ['status' => 'all', 'tahun' => '2026', 'page' => '2']],
+            'tidak setuju dari monitoring' => ['decline', 'monitoring', 'cuti', ['status' => 'menunggu', 'periode' => '2026-09', 'page' => '4']],
+            'setuju dari antrean' => ['approve', 'approval', 'cuti.approval', ['page' => '2', 'per_page' => '25']],
+        ];
+    }
+
+    #[DataProvider('invalidDecisionContexts')]
+    public function test_konteks_post_tidak_mengikuti_url_asing_atau_mempertahankan_izin_yang_dicabut(mixed $from, mixed $filters, array $expectedContext): void
+    {
+        Queue::fake();
+        $actor = $this->actor('pegawai');
+        $this->monitoringPermission('pegawai', false);
+        $leave = $this->leave(Employee::factory()->create(), $actor->employee);
+        $response = $this->actingAs($actor)->post(route('cuti.postpone', $leave->id), [
+            'active_step_id' => $leave->steps()->sole()->id,
+            'revision_version' => $leave->fresh()->revision_version,
+            'komentar' => 'Catatan penundaan pengujian.', 'from' => $from, 'return' => $filters,
+        ])->assertSessionHasNoErrors()->assertRedirect(route('cuti.show', ['id' => $leave->id, ...$expectedContext]));
+        $this->get($response->headers->get('Location'))->assertOk()->assertViewHas('canAct', true);
+        $this->assertSame('ditangguhkan', $leave->fresh()->status);
+    }
+
+    public static function invalidDecisionContexts(): array
+    {
+        return [
+            'asal URL asing' => ['https://example.invalid', ['page' => '3'], ['from' => 'own']],
+            'monitoring tanpa permission' => ['pimpinan', ['page' => '3'], ['from' => 'own']],
+            'parameter cacat' => [['approval'], 'https://example.invalid', ['from' => 'own']],
+            'filter asing dan tidak sah' => ['approval', ['url' => 'https://example.invalid', 'status' => 'all', 'per_page' => '100000', 'page' => '2'], ['from' => 'approval', 'return' => ['page' => '2']]],
+            'daftar pribadi eksplisit' => ['own', ['status' => 'menunggu', 'page' => '2'], ['from' => 'own', 'return' => ['status' => 'menunggu', 'page' => '2']]],
+        ];
     }
 
     public function test_konteks_kembali_membuang_filter_tidak_sah_dan_tidak_memperluas_scope(): void

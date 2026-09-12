@@ -15,6 +15,7 @@ use App\Models\RefJenisCuti;
 use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
+use App\Services\Cuti\LeaveRequestReadAccess;
 use App\Services\Notifications\NotificationRecipientResolver;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -25,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Illuminate\Support\Testing\Fakes\QueueFake;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -94,6 +96,50 @@ class LeaveCancellationNotificationRecipientTest extends TestCase
         $this->actingAs($actor)->patch(route('cuti.cancellations.decide', $current), ['decision' => 'DITOLAK'])
             ->assertRedirect();
         $this->assertSame('menunggu_approval', $current->leaveRequest->fresh()->status);
+    }
+
+    public function test_pengelola_pembatalan_membaca_detail_terkait_tanpa_memperoleh_akses_lain(): void
+    {
+        $actor = $this->actor('kepala_bagian');
+        $this->grant('kepala_bagian');
+        Role::where('name', 'kepala_bagian')->sole()->permissions()->detach(
+            Permission::whereIn('name', ['cuti.read_all', 'cuti.balance.read', 'cuti.administrative_postponement.manage'])->pluck('id'),
+        );
+        $owner = $this->actor('pegawai');
+        $this->assign($owner->employee, $actor, today()->subDay()->toDateString());
+        $cancellation = $this->cancellation($owner);
+        $leave = $cancellation->leaveRequest;
+        $url = route('cuti.show', $leave);
+
+        $this->actingAs($actor)->get(route('cuti.cancellations.index'))->assertOk()->assertSee('href="'.$url.'"', false);
+        $this->get($url)->assertOk()->assertViewHas('canAct', false)
+            ->assertViewHas('canDownloadFormulir', false)->assertViewHas('attachmentAvailable', false)
+            ->assertViewHas('verifierContext', null)->assertViewHas('latestCancellation', null)
+            ->assertDontSee($cancellation->reason);
+        $this->get(route('cuti.attachment.download', $leave))->assertForbidden();
+        $this->get(route('cuti.formulir-pdf', $leave))->assertNotFound();
+        $this->get(route('cuti.show', $this->leave($owner)))->assertForbidden();
+
+        $outside = $this->cancellation($this->actor('pegawai'));
+        $this->get(route('cuti.show', $outside->leaveRequest))->assertForbidden();
+        $futureOwner = $this->actor('pegawai');
+        $this->assign($futureOwner->employee, $actor, today()->addDay()->toDateString());
+        $this->get(route('cuti.show', $this->cancellation($futureOwner)->leaveRequest))->assertForbidden();
+
+        $this->patch(route('cuti.cancellations.decide', $cancellation), ['decision' => 'DITOLAK'])->assertRedirect();
+        $this->get($url)->assertOk()->assertViewHas('canAct', false);
+
+        $leave->update(['jenis_cuti_id' => RefJenisCuti::where('code', 'sakit')->sole()->id, 'status' => 'disetujui']);
+        $leave->proof()->create(['token' => (string) Str::uuid()]);
+        $this->get($url)->assertOk()->assertViewHas('canDownloadFormulir', false);
+        $this->get(route('cuti.formulir-pdf', $leave))->assertForbidden();
+        $this->grant('kepala_bagian', false);
+        $this->get($url)->assertForbidden();
+        $this->grant('kepala_bagian');
+        $actor->employee->update(['status_aktif' => 'Nonaktif']);
+        $actor = $actor->fresh();
+        $this->assertFalse(app(LeaveRequestReadAccess::class)->canReadDetail($leave->fresh(), $actor));
+        $this->actingAs($actor)->get($url)->assertRedirect(route('status-akun'));
     }
 
     public function test_keputusan_menolak_actor_lama_setelah_role_asli_berubah_menjadi_pegawai(): void

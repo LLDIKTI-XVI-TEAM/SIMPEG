@@ -12,13 +12,16 @@ final class LeaveRequestReadAccess
     public function __construct(
         private readonly EmployeeDashboardScopeService $employeeScope,
         private readonly AdministrativeLeavePostponementAccess $administrativeAccess,
+        private readonly LeaveCancellationAccess $cancellations,
     ) {}
 
-    /** Pengelola penangguhan boleh membuka detail dalam scope, tetapi belum tentu dokumen privatnya. */
+    /** Pengelola hanya mendapat konteks pembatalan yang tercatat, bukan monitoring atau unduhan privat. */
     public function canReadDetail(LeaveRequest $leave, ?User $actor): bool
     {
         return $actor !== null && $this->hasActiveIdentity($actor)
-            && ($this->canRead($leave, $actor) || $this->administrativeAccess->canManage($leave, $actor));
+            && ($this->canRead($leave, $actor)
+                || $this->administrativeAccess->canManage($leave, $actor)
+                || ($this->cancellations->canManage($actor, $leave) && $leave->cancellationRequests()->exists()));
     }
 
     /** Snapshot memberi akses record terkait saja, termasuk sebelum dan sesudah giliran persetujuan. */

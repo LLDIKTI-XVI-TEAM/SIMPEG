@@ -472,7 +472,7 @@
                         'decline' => ['route' => 'cuti.decline', 'label' => 'Alasan Tidak Disetujui', 'title' => 'Tidak Disetujui', 'variant' => 'danger-solid'],
                     ] as $formKey => $form)
                     <x-ui.modal show="decisionForm === '{{ $formKey }}'" close-action="close()" :title="$form['title']">
-                        <form action="{{ route($form['route'], $cuti->id) }}" method="POST" class="space-y-3">
+                        <form action="{{ route($form['route'], ['id' => $cuti->id, ...$decisionReturnParameters]) }}" method="POST" class="space-y-3">
                             @csrf
                             <input type="hidden" name="decision_form" value="{{ $formKey }}">
                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
@@ -499,7 +499,7 @@
 
                     <x-ui.modal show="decisionForm === 'approve'" close-action="close()" title="Konfirmasi Persetujuan" description-id="approve-confirmation-description">
                         <p id="approve-confirmation-description" class="text-sm text-ink">Setujui tahap ini? Pengajuan akan diteruskan ke tahap berikutnya, atau diselesaikan jika ini tahap terakhir.</p>
-                        <form action="{{ route('cuti.approve', $cuti->id) }}" method="POST" class="mt-4 space-y-4" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
+                        <form action="{{ route('cuti.approve', ['id' => $cuti->id, ...$decisionReturnParameters]) }}" method="POST" class="mt-4 space-y-4" x-data="{ submitting: false }" @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
                             @csrf
                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                             <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
@@ -515,7 +515,7 @@
                     @if ($cuti->jenisCuti?->code === 'tahunan')
                         <x-ui.modal show="decisionForm === 'dutyPostponement'" close-action="close()" title="Tangguhkan karena Tugas Dinas" description-id="decision-description-duty-postponement">
                             <p id="decision-description-duty-postponement" class="text-sm text-ink">Tindakan ini bersifat terminal: pengajuan lama ditutup, reservasi dilepas, hak dilindungi paling lama satu tahun, dan pegawai membuat pengajuan baru pada tahun berikutnya.</p>
-                            <form action="{{ route('cuti.penangguhan-tugas-dinas', $cuti->id) }}" method="POST" class="mt-4 space-y-4">
+                            <form action="{{ route('cuti.penangguhan-tugas-dinas', ['leave' => $cuti->id, ...$decisionReturnParameters]) }}" method="POST" class="mt-4 space-y-4">
                                 @csrf
                                 <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                                 <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
