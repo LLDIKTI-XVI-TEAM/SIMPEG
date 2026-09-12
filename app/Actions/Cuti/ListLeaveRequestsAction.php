@@ -4,6 +4,7 @@ namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Support\Cuti\ApprovalStepLabel;
@@ -11,8 +12,11 @@ use App\Support\Cuti\CutiPeriodFilter;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Membangun daftar pengajuan cuti dengan pagination/filtering di level database.
@@ -49,7 +53,10 @@ class ListLeaveRequestsAction
         $search = $isPegawai ? '' : trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
         $jenis = (string) $request->query('jenis', '');
-        $unit = $isPegawai ? '' : (string) $request->query('unit', '');
+        $requestedUnit = $isPegawai ? '' : ($request->query('unit') ?? '');
+        // Filter unit memakai UUID referensi; input cacat ditolak sebelum menyentuh kolom UUID PostgreSQL.
+        abort_unless(is_string($requestedUnit) && ($requestedUnit === '' || Str::isUuid($requestedUnit)), 404);
+        $unit = $requestedUnit;
         $periode = (string) $request->query('periode', '');
         $tahun = (string) $request->query('tahun', '');
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
@@ -60,6 +67,10 @@ class ListLeaveRequestsAction
             || (! $isPegawai && ($search !== '' || $unit !== ''));
 
         $query = LeaveRequest::query()
+            ->select(['leave_requests.*', 'monitoring_units.nama as monitoring_unit_name'])
+            ->leftJoinSub($this->currentPositions(), 'monitoring_positions', fn ($join) => $join
+                ->on('monitoring_positions.employee_id', '=', 'leave_requests.employee_id'))
+            ->leftJoin('ref_unit_kerja as monitoring_units', 'monitoring_units.id', '=', 'monitoring_positions.unit_kerja_id')
             ->with([
                 'employee',
                 'jenisCuti',
@@ -68,14 +79,14 @@ class ListLeaveRequestsAction
                     ->where('status', 'active')
                     ->orderBy('step_order'),
             ])
-            ->latest()
-            ->orderByDesc('id');
+            ->latest('leave_requests.created_at')
+            ->orderByDesc('leave_requests.id');
 
         if ($isPegawai) {
-            $query->where('employee_id', $user->employee_id);
+            $query->where('leave_requests.employee_id', $user->employee_id);
         } else {
             // Permission efektif membuka monitoring, tetapi Switch Role tidak mengganti scope identitas.
-            $query->whereIn('employee_id', $this->employeeScope->forIdentity($user)->select('employees.id'));
+            $query->whereIn('leave_requests.employee_id', $this->employeeScope->forIdentity($user)->select('employees.id'));
         }
 
         // Base query (setelah scope, sebelum filter status) menjadi sumber counter ringkasan.
@@ -103,7 +114,7 @@ class ListLeaveRequestsAction
             $query->whereHas('jenisCuti', fn ($jenisQuery) => $jenisQuery->where('nama', $jenis));
         }
         if ($unit !== '') {
-            $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('jabatan_terakhir', $unit));
+            $query->where('monitoring_positions.unit_kerja_id', $unit);
         }
         if ($periode !== '') {
             CutiPeriodFilter::parse($periode)?->applyToDateColumn($query, 'tanggal_mulai');
@@ -138,14 +149,15 @@ class ListLeaveRequestsAction
                 ->orderBy('nama')->limit(self::MAX_FILTER_OPTIONS)->pluck('nama'),
             'optUnits' => $isPegawai
                 ? collect()
-                : $this->employeeScope->forIdentity($user)
-                    ->whereNotNull('jabatan_terakhir')
-                    ->groupBy('jabatan_terakhir')
-                    ->when($unit !== '', fn ($employees) => $employees
-                        ->orderByRaw('CASE WHEN jabatan_terakhir = ? THEN 0 ELSE 1 END', [$unit]))
-                    ->orderBy('jabatan_terakhir')
+                : RefUnitKerja::query()
+                    ->whereIn('id', DB::query()->fromSub($this->currentPositions(), 'scoped_positions')
+                        ->select('scoped_positions.unit_kerja_id')
+                        ->whereIn('scoped_positions.employee_id', $this->employeeScope->forIdentity($user)->select('employees.id')))
+                    ->when($unit !== '', fn ($units) => $units
+                        ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$unit]))
+                    ->orderBy('nama')->orderBy('id')
                     ->limit(self::MAX_FILTER_OPTIONS)
-                    ->pluck('jabatan_terakhir'),
+                    ->pluck('nama', 'id'),
             // Portable periode options (verified current producer): 12 bulan terakhir, tanpa SQL PostgreSQL-only.
             'optPeriodes' => collect(range(0, 11))
                 ->map(fn (int $offset): string => $bulanBerjalan->copy()->subMonths($offset)->format('Y-m')),
@@ -162,6 +174,20 @@ class ListLeaveRequestsAction
                 && $user->hasPermission('cuti.create') && ! $user->employee?->is_kepala_lembaga,
             'hasActiveFilters' => $hasActiveFilters,
         ];
+    }
+
+    /**
+     * Unit berasal dari riwayat terkini, bukan snapshot nama jabatan. Pemilihan deterministik menjaga
+     * filter, opsi, dan baris tetap konsisten tanpa menggandakan pengajuan bila penanda terkini inkonsisten.
+     */
+    private function currentPositions(): QueryBuilder
+    {
+        return DB::table('position_histories as position_rows')
+            ->selectRaw('DISTINCT ON (position_rows.employee_id) position_rows.employee_id, position_rows.unit_kerja_id')
+            ->where('position_rows.is_latest', true)
+            ->orderBy('position_rows.employee_id')
+            ->orderByDesc('position_rows.tmt_jabatan')
+            ->orderBy('position_rows.id');
     }
 
     /**
@@ -210,7 +236,7 @@ class ListLeaveRequestsAction
             'id' => $r->id,
             'nama' => $r->employee?->nama_lengkap ?? '-',
             'nip' => $r->employee?->nip ?? '-',
-            'unit' => $r->employee?->jabatan_terakhir ?? '-',
+            'unit' => $r->getAttribute('monitoring_unit_name') ?? '-',
             'jenis' => $r->jenisCuti?->nama ?? '-',
             'mulai' => optional($r->tanggal_mulai)->toDateString(),
             'selesai' => optional($r->tanggal_selesai)->toDateString(),

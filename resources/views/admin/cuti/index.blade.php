@@ -1,6 +1,10 @@
 <x-layouts.app :title="$isPegawai ? 'Riwayat Pengajuan Cuti Saya' : 'Monitoring Cuti'">
 
     @php
+        $returnFilters = \Illuminate\Support\Arr::only(request()->query(), $isPegawai
+            ? ['status', 'jenis', 'periode', 'tahun', 'per_page', 'page']
+            : ['search', 'status', 'jenis', 'unit', 'periode', 'tahun', 'per_page', 'page']);
+
         // Warna badge mengikuti ketetapan resmi: kuning menunggu, hijau disetujui, biru perubahan,
         // oranye ditangguhkan, merah tidak disetujui. Kunci memakai token runtime mentah dari Action.
         $statusVariant = [
@@ -156,8 +160,8 @@
             <div class="relative">
                 <x-form.select id="filter-unit" name="unit" onchange="this.form.submit()">
                     <option value="">Semua Unit Kerja</option>
-                    @foreach($optUnits as $namaUnit)
-                        <option value="{{ $namaUnit }}" @selected($unit === $namaUnit)>{{ $namaUnit }}</option>
+                    @foreach($optUnits as $unitId => $namaUnit)
+                        <option value="{{ $unitId }}" @selected($unit === $unitId)>{{ $namaUnit }}</option>
                     @endforeach
                 </x-form.select>
             </div>
@@ -250,7 +254,7 @@
                             <x-ui.table-td class="w-20">
                                 <div class="flex items-center justify-end gap-1.5">
 
-                                    <x-ui.button href="{{ route('cuti.show', ['id' => $r['id'], 'from' => $isPegawai ? null : 'monitoring']) }}" variant="secondary" size="compact-icon" title="Detail" aria-label="Detail">
+                                    <x-ui.button :href="route('cuti.show', ['id' => $r['id'], 'from' => $isPegawai ? null : 'monitoring', 'return' => $returnFilters])" variant="secondary" size="compact-icon" title="Detail" aria-label="Detail">
 
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />

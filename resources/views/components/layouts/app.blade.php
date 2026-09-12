@@ -173,8 +173,8 @@
                 [
                     'group' => 'Cuti',
                     'items' => array_filter([
-                        $activeRole === 'kepala_bagian' && $canMonitorLeaves ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
-                        $canMonitorLeaves ? ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'] : null,
+                        $activeRole === 'kepala_bagian' && $canMonitorLeaves ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'users'] : null,
+                        $canMonitorLeaves ? ['label' => 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'eye'] : null,
                         ['label' => 'Pengajuan Cuti Saya', 'route' => 'cuti', 'parameters' => ['scope' => 'own'], 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
                         ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal', 'permissions' => ['cuti.balance.reconcile', 'cuti.manual.manage']],
@@ -224,7 +224,7 @@
                     [
                         'group' => 'Cuti',
                         'items' => array_filter([
-                            $canMonitorLeaves ? ['label' => 'Monitoring Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'check-badge'] : null,
+                            $canMonitorLeaves ? ['label' => 'Monitoring Cuti', 'route' => 'pimpinan.cuti.index', 'icon' => 'eye'] : null,
                             ['label' => 'Pengajuan Cuti Saya', 'route' => 'cuti', 'parameters' => ['scope' => 'own'], 'icon' => 'calendar'],
                             $canAdministerLeaveBalance
                                 ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
@@ -268,7 +268,7 @@
                     [
                         'group' => 'Cuti',
                         'items' => array_filter([
-                            $canMonitorLeaves ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
+                            $canMonitorLeaves ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'users'] : null,
                             ['label' => 'Pengajuan Cuti Saya', 'route' => 'cuti', 'parameters' => ['scope' => 'own'], 'icon' => 'calendar'],
                             $canAdministerLeaveBalance
                                 ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
@@ -297,14 +297,14 @@
                     if ($menuGroup['group'] === 'Cuti') {
                         if ($canUseLeaveQueue) {
                             array_unshift($menuGroup['items'], [
-                                'label' => 'Menunggu Tindakan Saya', 'route' => 'cuti.approval', 'icon' => 'check-badge',
+                                'label' => 'Menunggu Tindakan Saya', 'route' => 'cuti.approval', 'icon' => 'clipboard-document-check',
                             ]);
                         }
                         if ($canManageLeaveCancellations) {
                             $menuGroup['items'][] = [
                                 'label' => 'Permohonan Pembatalan Cuti',
                                 'route' => 'cuti.cancellations.index',
-                                'icon' => 'check-badge',
+                                'icon' => 'arrow-uturn-left',
                                 'permissions' => ['cuti.cancellation.manage'],
                             ];
                         }

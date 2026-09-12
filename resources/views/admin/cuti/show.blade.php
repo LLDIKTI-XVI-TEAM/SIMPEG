@@ -60,7 +60,7 @@
         </x-admin.page-header>
 
         @if ($errors->any() || $errors->dutyPostponement->any())
-            <div id="leave-errors" tabindex="-1" x-data x-init="$el.focus()" class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger">
+            <div id="leave-errors" tabindex="-1" x-data @if (! ($canRequestCancellation && $errors->has('reason')) && $initialDecisionForm === null) x-init="$el.focus()" @endif class="rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-danger">
                 <x-ui.alert variant="danger" title="Tindakan belum dapat disimpan">
                     <ul class="list-inside list-disc space-y-1">
                         @foreach (array_unique(array_merge($errors->all(), $errors->dutyPostponement->all())) as $error)
@@ -337,7 +337,7 @@
                             @csrf
                             <div>
                                 <label for="cancellation-reason" class="text-xs font-bold uppercase tracking-wider text-ink font-sans">Alasan pembatalan <span class="text-danger">*</span></label>
-                                <textarea id="cancellation-reason" name="reason" rows="3" maxlength="500" required @if($errors->has('reason')) autofocus @endif aria-invalid="{{ $errors->has('reason') ? 'true' : 'false' }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" aria-describedby="cancellation-reason-help{{ $errors->has('reason') ? ' cancellation-reason-error' : '' }}">{{ old('reason') }}</textarea>
+                                <textarea id="cancellation-reason" name="reason" rows="3" maxlength="500" required @if($errors->has('reason')) x-init="$nextTick(() => $el.focus())" @endif aria-invalid="{{ $errors->has('reason') ? 'true' : 'false' }}" class="mt-1 w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink" aria-describedby="cancellation-reason-help{{ $errors->has('reason') ? ' cancellation-reason-error' : '' }}">{{ old('reason') }}</textarea>
                                 <p id="cancellation-reason-help" class="mt-1 text-xs text-muted font-sans">Alasan hanya dapat dilihat oleh Anda dan pengelola pembatalan yang berwenang.</p>
                                 @error('reason')<p id="cancellation-reason-error" class="mt-1 text-xs text-danger" role="alert">{{ $message }}</p>@enderror
                             </div>
@@ -479,8 +479,8 @@
                             <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
                             <x-form.textarea
                                 name="komentar"
-                                :error-key="$decisionCommentKey"
-                                data-error-autofocus="{{ $errors->has($decisionCommentKey) ? 'true' : 'false' }}"
+                                :error-key="$oldDecisionForm === $formKey ? $decisionCommentKey : ''"
+                                data-error-autofocus="{{ $oldDecisionForm === $formKey && $errors->has($decisionCommentKey) ? 'true' : 'false' }}"
                                 label="{{ $form['label'] }}"
                                 id="komentar-{{ $formKey }}"
                                 rows="3"
@@ -504,7 +504,7 @@
                             <input type="hidden" name="active_step_id" value="{{ $activeStep?->id }}">
                             <input type="hidden" name="revision_version" value="{{ $cuti->revision_version }}">
                             <input type="hidden" name="decision_form" value="approve">
-                            <x-form.textarea name="komentar" :error-key="$decisionCommentKey" id="komentar-approve" label="Catatan persetujuan (opsional)" rows="2" maxlength="500" data-error-autofocus="{{ $errors->has($decisionCommentKey) ? 'true' : 'false' }}" />
+                            <x-form.textarea name="komentar" :error-key="$oldDecisionForm === 'approve' ? $decisionCommentKey : ''" id="komentar-approve" label="Catatan persetujuan (opsional)" rows="2" maxlength="500" data-error-autofocus="{{ $oldDecisionForm === 'approve' && $errors->has($decisionCommentKey) ? 'true' : 'false' }}" />
                             <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                                 <x-ui.button type="button" variant="secondary" @click="close()" data-modal-initial-focus="true">Batal</x-ui.button>
                                 <x-ui.button type="submit" variant="success-solid" x-bind:disabled="submitting" x-bind:aria-busy="submitting.toString()">Ya, Setujui</x-ui.button>

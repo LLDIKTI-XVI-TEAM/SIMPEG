@@ -1,10 +1,13 @@
 <x-layouts.app title="Menunggu Tindakan Saya">
+    @php
+        $returnFilters = \Illuminate\Support\Arr::only(request()->query(), ['per_page', 'page']);
+    @endphp
     <div class="space-y-6">
         
         <x-ui.card padding="lg">
             <x-admin.page-header
                 title="Menunggu Tindakan Saya"
-                description="Tinjau dan lakukan keputusan setujui atau tunda atas permohonan cuti dari staf."
+                description="Tinjau pengajuan cuti yang menunggu tindakan Anda sesuai tahap penugasan."
             >
                 <x-slot:breadcrumb>
                     <a href="{{ route('dashboard') }}" class="transition-colors hover:text-ink">Dashboard</a>
@@ -32,7 +35,7 @@
             <div class="flex items-center justify-between border-b border-border px-6 py-4 bg-surface">
                 <div>
                     <h3 class="text-sm font-semibold text-ink font-sans">Daftar Permohonan Menunggu</h3>
-                    <p class="text-xs text-muted font-sans">Menampilkan dokumen permohonan yang perlu otorisasi Anda segera.</p>
+                    <p class="text-xs text-muted font-sans">Pengajuan berikut sedang menunggu tindakan Anda pada rantai persetujuan.</p>
                 </div>
             </div>
             
@@ -76,7 +79,7 @@
                                 <div class="flex items-center justify-end gap-2.5">
                                     {{-- Detail --}}
 
-                                    <x-ui.button href="{{ route('cuti.show', ['id' => $r->id, 'from' => 'approval']) }}" variant="secondary" size="compact-icon" class="h-11 w-11 sm:h-8 sm:w-8" title="Tinjau Detail" aria-label="Tinjau Detail">
+                                    <x-ui.button :href="route('cuti.show', ['id' => $r->id, 'from' => 'approval', 'return' => $returnFilters])" variant="secondary" size="compact-icon" class="h-11 w-11 sm:h-8 sm:w-8" title="Tinjau Detail" aria-label="Tinjau Detail">
 
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
@@ -101,7 +104,7 @@
                                     </div>
 
                                     {{-- Tunda: butuh alasan, arahkan ke detail tempat form penundaan tersedia --}}
-                                    <x-ui.button href="{{ route('cuti.show', ['id' => $r->id, 'from' => 'approval']) }}" variant="warning-solid" size="sm" class="min-h-11">Tunda</x-ui.button>
+                                    <x-ui.button :href="route('cuti.show', ['id' => $r->id, 'from' => 'approval', 'return' => $returnFilters])" variant="warning-solid" size="sm" class="min-h-11">Tunda</x-ui.button>
                                 </div>
                             </x-ui.table-td>
                         </x-ui.table-row>

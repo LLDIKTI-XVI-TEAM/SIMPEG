@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Permission;
+use App\Models\PositionHistory;
 use App\Models\RefJenisCuti;
+use App\Models\RefUnitKerja;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -421,6 +423,70 @@ class CutiListDisplayTest extends TestCase
             ->assertSee('name="unit"', false);
         $this->assertMatchesRegularExpression('/<th\b[^>]*>\s*Pegawai\s*<\/th>/s', $content);
         $this->assertMatchesRegularExpression('/<th\b[^>]*>\s*Unit Kerja\s*<\/th>/s', $content);
+    }
+
+    public function test_monitoring_memfilter_unit_riwayat_terkini_bukan_snapshot_jabatan(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Uji Unit Monitoring']);
+        $target = RefUnitKerja::create(['nama' => 'Unit Monitoring Target']);
+        $other = RefUnitKerja::create(['nama' => 'Unit Monitoring Lain']);
+        $historical = RefUnitKerja::create(['nama' => 'Unit Monitoring Historis']);
+        $samePositionTarget = Employee::factory()->create(['jabatan_terakhir' => 'Analis Sama']);
+        $samePositionOther = Employee::factory()->create(['jabatan_terakhir' => 'Analis Sama']);
+        $differentPositionTarget = Employee::factory()->create(['jabatan_terakhir' => 'Analis Berbeda']);
+        $withoutUnit = Employee::factory()->create(['jabatan_terakhir' => 'Jabatan Bukan Unit']);
+
+        foreach ([[$samePositionTarget, $target], [$samePositionOther, $other], [$differentPositionTarget, $target]] as [$employee, $unit]) {
+            PositionHistory::create([
+                'employee_id' => $employee->id,
+                'nama_jabatan' => $employee->jabatan_terakhir,
+                'unit_kerja_id' => $unit->id,
+                'tmt_jabatan' => '2026-01-01',
+                'is_latest' => true,
+            ]);
+        }
+        // TMT lebih baru tanpa penanda terkini tidak boleh menjadi sumber unit monitoring.
+        PositionHistory::create([
+            'employee_id' => $samePositionTarget->id,
+            'nama_jabatan' => 'Jabatan Historis',
+            'unit_kerja_id' => $historical->id,
+            'tmt_jabatan' => '2030-01-01',
+            'is_latest' => false,
+        ]);
+        $first = $this->createLeave($samePositionTarget, $jenis, 'Unit target satu', 'menunggu_approval');
+        $this->createLeave($samePositionOther, $jenis, 'Unit lain', 'disetujui');
+        $second = $this->createLeave($differentPositionTarget, $jenis, 'Unit target dua', 'menunggu_approval');
+        $missing = $this->createLeave($withoutUnit, $jenis, 'Belum memiliki unit', 'disetujui');
+
+        $response = $this->actingAs($user)->get(route('cuti', ['unit' => $target->id]))->assertOk();
+        $this->assertEqualsCanonicalizing(
+            [$first->id, $second->id],
+            $response->viewData('riwayatCuti')->pluck('id')->all(),
+        );
+        $this->assertSame(['Unit Monitoring Target'], $response->viewData('riwayatCuti')->pluck('unit')->unique()->values()->all());
+        $this->assertSame(
+            [$target->id => 'Unit Monitoring Target', $other->id => 'Unit Monitoring Lain'],
+            $response->viewData('optUnits')->all(),
+        );
+        $response->assertViewHas('totalPengajuan', 4)
+            ->assertViewHas('jumlahMenunggu', 2)
+            ->assertViewHas('jumlahDisetujui', 2)
+            ->assertSee('value="'.$target->id.'" selected', false)
+            ->assertDontSee('Unit Monitoring Historis');
+
+        $all = $this->get(route('cuti'))->assertOk();
+        $this->assertSame('-', $all->viewData('riwayatCuti')->firstWhere('id', $missing->id)['unit']);
+        $this->get(route('cuti', ['unit' => $historical->id]))->assertOk()
+            ->assertViewHas('riwayatCuti', fn ($rows): bool => $rows->isEmpty());
+    }
+
+    public function test_monitoring_menolak_filter_unit_malformed_sebelum_query_uuid(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)->get(route('cuti', ['unit' => 'bukan-uuid']))->assertNotFound();
+        $this->get(route('cuti', ['unit' => ['bukan-uuid']]))->assertNotFound();
     }
 
     public function test_super_admin_tidak_melihat_cta_pengajuan_cuti(): void

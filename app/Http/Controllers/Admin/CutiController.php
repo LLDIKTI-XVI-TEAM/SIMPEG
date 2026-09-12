@@ -84,8 +84,14 @@ class CutiController extends Controller
         $user = $request->user();
 
         $from = $request->query('from');
+        $returnFilters = $request->query('return', []);
 
-        return view('admin.cuti.show', $action->execute($id, $user, is_string($from) ? $from : null));
+        return view('admin.cuti.show', $action->execute(
+            $id,
+            $user,
+            is_string($from) ? $from : null,
+            is_array($returnFilters) ? $returnFilters : [],
+        ));
     }
 
     /** Unduhan lampiran pemohon/read-all didelegasikan ke Action dengan guard kepemilikan. */

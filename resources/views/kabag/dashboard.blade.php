@@ -141,7 +141,7 @@
         </x-ui.stat-card>
 
         {{-- Stat: Cuti Pending --}}
-        <x-ui.stat-card href="{{ route('kepala-bagian.cuti.index') }}" label="Cuti Menunggu Tindakan" value="{{ $cutiPending }}" variant="warning" size="lg" accent>
+        <x-ui.stat-card href="{{ route('cuti.approval') }}" label="Cuti Menunggu Tindakan" value="{{ $cutiPending }}" variant="warning" size="lg" accent>
             <x-slot:icon>
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
             </x-slot:icon>
@@ -196,7 +196,7 @@
                         <p class="text-xs text-muted">Menunggu keputusan Anda</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <a href="{{ route('kepala-bagian.cuti.index') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
+                        <a href="{{ route('cuti.approval') }}" class="text-xs font-semibold text-primary hover:underline font-sans">
                             Lihat Antrean
                         </a>
                     </div>

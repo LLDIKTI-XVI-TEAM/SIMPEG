@@ -143,6 +143,37 @@ class CutiDetailTimelineTest extends TestCase
             ->assertOk()->assertSee('Pengajuan sedang menunggu keputusan pembatalan.');
     }
 
+    public function test_error_dan_draft_catatan_hanya_dipulihkan_pada_modal_keputusan_yang_gagal(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $leave->forceFill(['status' => 'menunggu_approval'])->save();
+        $approver = User::factory()->pegawai()->create(['employee_id' => Employee::factory()->create()->id]);
+        $leave->steps()->create([
+            'step_order' => 1, 'step_type' => 'verifikator', 'role_label' => 'Verifikator',
+            'approver_employee_id' => $approver->employee_id, 'status' => 'active', 'is_final' => false,
+        ]);
+
+        foreach (['decline', 'postpone', 'approve'] as $failedForm) {
+            $response = $this->actingAs($approver)->withSession([
+                'errors' => (new ViewErrorBag)->put('default', new MessageBag(['komentar' => 'Catatan tidak valid.'])),
+                '_old_input' => ['decision_form' => $failedForm, 'komentar' => 'Draft keputusan gagal'],
+            ])->get(route('cuti.show', $leave))->assertOk();
+
+            foreach (['decline', 'postpone', 'approve'] as $form) {
+                $this->assertSame(1, preg_match('/<textarea\b([^>]*\bid="komentar-'.$form.'"[^>]*)>(.*?)<\/textarea>/s', $response->getContent(), $field));
+                if ($form === $failedForm) {
+                    $this->assertStringContainsString('aria-invalid="true"', $field[1]);
+                    $this->assertSame('Draft keputusan gagal', trim($field[2]));
+                    $response->assertSee('id="komentar-'.$form.'_error"', false);
+                } else {
+                    $this->assertStringNotContainsString('aria-invalid="true"', $field[1]);
+                    $this->assertSame('', trim($field[2]));
+                    $response->assertDontSee('id="komentar-'.$form.'_error"', false);
+                }
+            }
+        }
+    }
+
     public function test_konteks_kembali_hanya_memilih_route_lokal_tanpa_memperluas_akses(): void
     {
         $leave = $this->administrativePostponementFixture();
