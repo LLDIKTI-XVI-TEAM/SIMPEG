@@ -62,8 +62,9 @@ class UpdateEmployeeAction
         }
 
         $storedEmployeeDocumentPaths = [];
+        $replacedEmployeeDocumentPaths = [];
 
-        $transaction = function () use ($employee, $validated, $request, &$storedEmployeeDocumentPaths) {
+        $transaction = function () use ($employee, $validated, $request, &$storedEmployeeDocumentPaths, &$replacedEmployeeDocumentPaths) {
             $employee = Employee::whereKey($employee->id)->lockForUpdate()->firstOrFail();
             $oldValues = $employee->toArray();
             $validated = $this->normalizeEmployeeContract($validated, $employee);
@@ -108,7 +109,7 @@ class UpdateEmployeeAction
                 && $request->filled('pangkat_tanggal_sk') && $request->filled('pangkat_tmt_pangkat');
             $wantsPangkatFile = $request->hasFile('file_sk_pangkat') || $request->filled('existing_document_id_pangkat');
             if ($wantsPangkat || $wantsPangkatFile) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                 if (! $canHistory) {
                     $this->warnings[] = 'Riwayat kepangkatan tidak dibuat: butuh permission employee_histories.create.';
                 } else {
@@ -127,7 +128,7 @@ class UpdateEmployeeAction
                             $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: data riwayat kepangkatan tidak lengkap.';
                         }
                     } else {
-                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                        $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.update'));
                         $storedPangkatPath = null;
                         if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                             if (! $canDoc) {
@@ -190,7 +191,7 @@ class UpdateEmployeeAction
                 && $request->filled('jabatan_tanggal_sk') && $request->filled('jabatan_tmt_jabatan');
             $wantsJabatanFile = $request->hasFile('file_sk_jabatan') || $request->filled('existing_document_id_jabatan');
             if ($wantsJabatan || $wantsJabatanFile) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                 if (! $canHistory) {
                     $this->warnings[] = 'Riwayat jabatan tidak dibuat: butuh permission employee_histories.create.';
                 } elseif (! $wantsJabatan) {
@@ -214,7 +215,7 @@ class UpdateEmployeeAction
                         'tmt_jabatan' => $validated['jabatan_tmt_jabatan'],
                     ];
 
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                    $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.update'));
                     $storedJabatanPath = null;
                     if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                         if (! $canDoc) {
@@ -270,7 +271,7 @@ class UpdateEmployeeAction
                 && $request->filled('kgb_tanggal_sk') && $request->filled('kgb_tmt_kgb');
             $wantsKgbFile = $request->hasFile('file_sk_kgb') || $request->filled('existing_document_id_kgb');
             if ($wantsKgb || $wantsKgbFile) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                 if (! $canHistory) {
                     $this->warnings[] = 'Riwayat KGB tidak dibuat: butuh permission employee_histories.create.';
                 } elseif (! $wantsKgb) {
@@ -285,7 +286,7 @@ class UpdateEmployeeAction
                         'tmt_kgb' => $validated['kgb_tmt_kgb'] ?? null,
                     ];
 
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                    $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.update'));
                     $storedKgbPath = null;
                     if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                         if (! $canDoc) {
@@ -350,9 +351,9 @@ class UpdateEmployeeAction
             // 4. Pengangkatan (Appointment)
             $wantsPengangkatan = $request->filled('pengangkatan_jenis_pengangkatan') || $request->hasFile('file_sk_pengangkatan') || $request->filled('existing_document_id_pengangkatan');
             if ($wantsPengangkatan) {
-                $canHistory = $request->user()?->hasPermission('employee_histories.create') || $request->user()?->hasPermission('employee_histories.update') || $request->user()?->hasPermission('employees.update');
+                $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.update')) || ($this->isLocalBypass() || $request->user()?->hasPermission('employees.update'));
                 // Pengangkatan juga boleh via employees.update (legacy), tapi gate history tetap cek
-                $canHistoryEff = $canHistory || $request->user()?->hasPermission('employees.update');
+                $canHistoryEff = $canHistory || ($this->isLocalBypass() || $request->user()?->hasPermission('employees.update'));
                 if (! $canHistoryEff) {
                     $this->warnings[] = 'Riwayat pengangkatan tidak dibuat: butuh permission employee_histories.create/update.';
                 } else {
@@ -370,11 +371,15 @@ class UpdateEmployeeAction
                             'tanggal_sk' => $validated['pengangkatan_tanggal_sk'] ?? $request->input('pengangkatan_tanggal_sk'),
                         ];
 
-                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create') || $request->user()?->hasPermission('dokumen_sk.update');
+                        // Bedakan create vs update dari state kanonis sebelum menyimpan: ganti file
+                        // existing wajib dokumen_sk.update, upload pertama wajib dokumen_sk.create.
+                        $existingForDocPerm = $employee->appointments()->orderBy('tmt_pengangkatan')->orderBy('id')->first(['file_sk']);
+                        $requiredDocPerm = filled($existingForDocPerm?->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
+                        $canDoc = $this->isLocalBypass() || $request->user()?->hasPermission($requiredDocPerm);
                         $storedPengangkatanPath = null;
                         if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
                             if (! $canDoc) {
-                                $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
+                                $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: butuh permission '.$requiredDocPerm.'.';
                             } else {
                                 $file = $request->file('file_sk_pengangkatan');
                                 $appointmentData['file_sk'] = $this->files->storeEmployeeDocument($file, 'appointments/sk');
@@ -383,7 +388,7 @@ class UpdateEmployeeAction
                             }
                         } elseif ($request->filled('existing_document_id_pengangkatan')) {
                             if (! $canDoc) {
-                                $this->warnings[] = 'Berkas SK pengangkatan tidak diambil dari arsip: butuh permission dokumen_sk.create/update.';
+                                $this->warnings[] = 'Berkas SK pengangkatan tidak diambil dari arsip: butuh permission '.$requiredDocPerm.'.';
                             } else {
                                 $existingDoc = Document::where('id', $request->input('existing_document_id_pengangkatan'))
                                     ->where('employee_id', $employee->id)
@@ -401,6 +406,21 @@ class UpdateEmployeeAction
                         }
 
                         $appointment = $employee->appointment;
+                        // Otorisasi ulang setelah row terkunci: state file_sk bisa berubah antara
+                        // pre-check dan update (TOCTOU). Ganti wajib update, pertama wajib create.
+                        if (isset($appointmentData['file_sk'])) {
+                            $lockedOldFileSk = $appointment?->file_sk;
+                            $requiredAfterLock = filled($lockedOldFileSk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
+                            if (! $this->isLocalBypass() && ! $request->user()?->hasPermission($requiredAfterLock)) {
+                                $this->warnings[] = 'Berkas SK pengangkatan tidak diunggah: butuh permission '.$requiredAfterLock.'.';
+                                if ($storedPengangkatanPath !== null) {
+                                    $this->files->deleteEmployeeDocumentFile($storedPengangkatanPath);
+                                    $storedEmployeeDocumentPaths = array_values(array_diff($storedEmployeeDocumentPaths, [$storedPengangkatanPath]));
+                                    $storedPengangkatanPath = null;
+                                }
+                                unset($appointmentData['file_sk']);
+                            }
+                        }
                         if ($appointment) {
                             $appointment->update($appointmentData);
                             $appointmentChanged = true;
@@ -426,11 +446,10 @@ class UpdateEmployeeAction
                                 'file_path' => $appointmentData['file_sk'],
                                 'keterangan' => 'Diunggah otomatis saat edit pegawai',
                             ]);
+                            // Tunda penghapusan byte lama hingga setelah commit: bila rekalkulasi/TMT/audit
+                            // setelah blok ini melempar, transaksi di-rollback dan DB tetap menunjuk path lama.
                             if ($oldDocPath !== null && $oldDocPath !== $appointmentData['file_sk']) {
-                                // Hapus byte lama hanya bila tidak ada dokumen lain yang mereferensikannya
-                                if (! Document::where('file_path', $oldDocPath)->exists()) {
-                                    $this->files->deleteReplacedEmployeeDocumentFile($oldDocPath);
-                                }
+                                $replacedEmployeeDocumentPaths[] = $oldDocPath;
                             }
                         }
 
@@ -450,7 +469,7 @@ class UpdateEmployeeAction
             // 5. Berkas Lainnya untuk edit (juga warning)
             $wantsBerkasEdit = $request->filled('berkas_lainnya_jenis') && $request->hasFile('file_berkas_lainnya');
             if ($wantsBerkasEdit) {
-                $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                 if (! $canDoc) {
                     $this->warnings[] = 'Berkas lainnya tidak diunggah: butuh permission dokumen_sk.create.';
                 } elseif ($request->file('file_berkas_lainnya')->isValid()) {
@@ -539,7 +558,7 @@ class UpdateEmployeeAction
         };
 
         try {
-            return DB::transaction($transaction);
+            $result = DB::transaction($transaction);
         } catch (\Throwable $exception) {
             // Storage tidak ikut rollback transaksi DB; hanya file baru dari request ini yang dikompensasi.
             foreach (array_unique($storedEmployeeDocumentPaths) as $path) {
@@ -548,6 +567,16 @@ class UpdateEmployeeAction
 
             throw $exception;
         }
+
+        // Hapus byte lama hanya setelah commit pasti: masih cek referensi agar file
+        // legacy yang dibagi record lain tidak ikut terhapus.
+        foreach (array_unique($replacedEmployeeDocumentPaths) as $oldPath) {
+            if (! Document::where('file_path', $oldPath)->exists()) {
+                $this->files->deleteReplacedEmployeeDocumentFile($oldPath);
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -726,6 +755,12 @@ class UpdateEmployeeAction
             'kelas_jabatan_terakhir' => $latest->kelas_jabatan ?? $employee->kelas_jabatan_terakhir,
             'kelas_jabatan' => $latest->kelas_jabatan ?? $employee->kelas_jabatan_terakhir,
         ]);
+    }
+
+    /** Bypass lokal tanpa actor disengaja dibuka route/FormRequest; action mengikuti kontrak yang sama. */
+    private function isLocalBypass(): bool
+    {
+        return app()->environment('local') && config('services.simpeg.disable_employee_api_auth');
     }
 
     private function rebuildLatestSalary(Employee $employee): void

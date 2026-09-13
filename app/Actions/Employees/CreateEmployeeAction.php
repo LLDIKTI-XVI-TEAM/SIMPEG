@@ -83,7 +83,7 @@ class CreateEmployeeAction
                 // 1. Pangkat (RankHistory)
                 $wantsPangkat = $request->filled('pangkat_golongan_id') || $request->filled('pangkat_no_sk') || $request->filled('pangkat_tmt_pangkat') || $request->hasFile('file_sk_pangkat');
                 if ($wantsPangkat) {
-                    $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                    $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                     if (! $canHistory) {
                         $this->warnings[] = 'Riwayat kepangkatan tidak dibuat: butuh permission employee_histories.create.';
                     } else {
@@ -95,7 +95,7 @@ class CreateEmployeeAction
                             'is_latest' => ($data['pangkat_tmt_pangkat'] ?? null) !== null,
                         ];
 
-                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                        $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                         $storedPangkatPath = null;
                         if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                             if (! $canDoc) {
@@ -142,7 +142,7 @@ class CreateEmployeeAction
                 $hasJenisJabatan = $request->filled('jabatan_jabatan_id') || $request->filled('jabatan_jenis_jabatan_id');
                 $wantsJabatan = $hasJabatanReference || $hasJenisJabatan;
                 if ($wantsJabatan) {
-                    $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                    $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                     if (! $canHistory) {
                         $this->warnings[] = 'Riwayat jabatan tidak dibuat: butuh permission employee_histories.create.';
                     } else {
@@ -163,7 +163,7 @@ class CreateEmployeeAction
                             'is_latest' => ($data['jabatan_tmt_jabatan'] ?? null) !== null,
                         ];
 
-                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                        $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                         $storedJabatanPath = null;
                         if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                             if (! $canDoc) {
@@ -203,7 +203,7 @@ class CreateEmployeeAction
                 // 3. KGB (SalaryHistory)
                 $wantsKgb = $request->filled('kgb_gaji_pokok') || $request->filled('kgb_no_sk') || $request->filled('kgb_tmt_kgb') || $request->hasFile('file_sk_kgb');
                 if ($wantsKgb) {
-                    $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                    $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                     if (! $canHistory) {
                         $this->warnings[] = 'Riwayat KGB tidak dibuat: butuh permission employee_histories.create.';
                     } else {
@@ -215,7 +215,7 @@ class CreateEmployeeAction
                             'is_latest' => ($data['kgb_tmt_kgb'] ?? null) !== null,
                         ];
 
-                        $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                        $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                         $storedKgbPath = null;
                         if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                             if (! $canDoc) {
@@ -249,7 +249,7 @@ class CreateEmployeeAction
                 // 4. Pengangkatan (Appointment)
                 $wantsPengangkatan = $request->filled('pengangkatan_jenis_pengangkatan') || $request->filled('pengangkatan_no_sk') || $request->filled('pengangkatan_tmt_pengangkatan') || $request->hasFile('file_sk_pengangkatan');
                 if ($wantsPengangkatan) {
-                    $canHistory = $request->user()?->hasPermission('employee_histories.create');
+                    $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create'));
                     if (! $canHistory) {
                         $this->warnings[] = 'Riwayat pengangkatan tidak dibuat: butuh permission employee_histories.create.';
                     } else {
@@ -266,7 +266,7 @@ class CreateEmployeeAction
                                 'tanggal_sk' => $data['pengangkatan_tanggal_sk'] ?? null,
                             ];
 
-                            $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                            $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                             $storedPengangkatanPath = null;
                             if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
                                 if (! $canDoc) {
@@ -318,7 +318,7 @@ class CreateEmployeeAction
                     && $request->hasFile('file_berkas_lainnya')
                     && $request->file('file_berkas_lainnya')->isValid();
                 if ($wantsBerkas) {
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                    $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                     if (! $canDoc) {
                         $this->warnings[] = 'Berkas lainnya tidak diunggah: butuh permission dokumen_sk.create.';
                     } else {
@@ -351,7 +351,7 @@ class CreateEmployeeAction
                     }
                 } elseif ($request->filled('berkas_lainnya_jenis')) {
                     // Jenis terisi tapi file tidak ada atau tidak valid — tetap warning jika tanpa permission file
-                    $canDoc = $request->user()?->hasPermission('dokumen_sk.create');
+                    $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create'));
                     if (! $canDoc && $request->hasFile('file_berkas_lainnya')) {
                         $this->warnings[] = 'Berkas lainnya tidak diunggah: butuh permission dokumen_sk.create.';
                     }
@@ -397,6 +397,12 @@ class CreateEmployeeAction
         unset($data['clear_program_studi']);
 
         return $data;
+    }
+
+    /** Bypass lokal tanpa actor disengaja dibuka route/FormRequest; action mengikuti kontrak yang sama. */
+    private function isLocalBypass(): bool
+    {
+        return app()->environment('local') && config('services.simpeg.disable_employee_api_auth');
     }
 
     /** Caller non-HTTP juga tidak boleh menulis snapshot lifecycle melalui create. */

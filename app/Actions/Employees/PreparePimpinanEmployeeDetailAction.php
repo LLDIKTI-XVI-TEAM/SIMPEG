@@ -47,9 +47,12 @@ class PreparePimpinanEmployeeDetailAction
         $canUpdateEmployeeHistory = $viewer->hasPermission('employee_histories.update') || $viewer->hasPermission('employee_histories.create');
         $canDeleteEmployeeHistory = $viewer->hasPermission('employee_histories.delete');
         $hasEducationHistoryMutation = $canCreateEmployeeHistory || $canUpdateEmployeeHistory || $canDeleteEmployeeHistory;
-        $canCreateDocument = $viewer->hasPermission('dokumen_sk.create');
-        $canUpdateDocument = $viewer->hasPermission('dokumen_sk.update');
-        $canDeleteDocument = $viewer->hasPermission('dokumen_sk.delete');
+        // Surface Pimpinan read-only: tidak ada endpoint mutasi pimpinan, seluruh handler
+        // submit* di view adalah no-op. Sembunyikan kontrol Upload/Ganti walau grant dokumen ada;
+        // mutasi granular dilakukan via surface rbac.pegawai.* yang ber-scope.
+        $canCreateDocument = false;
+        $canUpdateDocument = false;
+        $canDeleteDocument = false;
         $canUpdateEmployee = $viewer->hasPermission('employees.update');
         $canDeactivateEmployee = $viewer->hasPermission('employees.deactivate');
         $canRestoreEmployee = $viewer->hasPermission('employees.restore');

@@ -26,11 +26,25 @@ class DeleteDisciplineRecordAction
             $record->delete();
 
             if ($filePath) {
-                // Mirror harus hilang dalam transaksi yang sama. Cleanup fisik
-                // setelah commit lalu melihat referensi yang benar-benar tersisa.
+                // Hapus hanya mirror milik riwayat ini. Dua riwayat legacy bisa berbagi
+                // file_sk yang sama sehingga mirror ganda dengan history_id berbeda;
+                // predicate path-only akan menghapus arsip riwayat yang masih hidup.
                 Document::where('employee_id', $employee->id)
-                    ->where('file_path', $filePath)
                     ->where('jenis_dokumen', 'sk_hukuman_disiplin')
+                    ->where('history_id', $recordId)
+                    ->delete();
+                // Fallback legacy: row tanpa history_id hanya dihapus bila path cocok.
+                Document::where('employee_id', $employee->id)
+                    ->where('jenis_dokumen', 'sk_hukuman_disiplin')
+                    ->whereNull('history_id')
+                    ->where('file_path', $filePath)
+                    ->whereNotExists(function ($query) use ($employee, $filePath): void {
+                        $query->selectRaw('1')
+                            ->from('discipline_records')
+                            ->whereColumn('discipline_records.employee_id', 'documents.employee_id')
+                            ->where('discipline_records.employee_id', $employee->id)
+                            ->where('discipline_records.file_sk', $filePath);
+                    })
                     ->delete();
             }
 
