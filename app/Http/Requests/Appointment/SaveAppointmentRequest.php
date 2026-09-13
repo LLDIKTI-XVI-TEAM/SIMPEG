@@ -12,10 +12,9 @@ class SaveAppointmentRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
-            return true;
-        }
-
+        // Dikecualikan dari bypass lokal: rekalkulasi TMT/saldo butuh actor User.
+        // Bypass di route sudah tidak dibuka; authorize tetap tolak anonymous agar gagal
+        // di boundary (403), bukan rollback di tengah transaksi domain.
         $employee = $this->route('employee');
         if (! $employee instanceof Employee || ! ($user = $this->user())) {
             return false;

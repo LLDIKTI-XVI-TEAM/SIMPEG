@@ -195,14 +195,17 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminEmployeeReadMiddleware('employee_histories.read'))
             ->whereUuid('employee')
             ->name('pengangkatan.show');
+        // Pengangkatan dikecualikan dari bypass lokal: perubahan TMT memicu rekalkulasi
+        // saldo/audit yang wajib aktor User teratribusi. Bypass di sini akan lolos authorize
+        // lalu selalu rollback di tengah transaksi (actor null). Selalu minta auth.
         Route::post('/{employee}/pengangkatan', [AppointmentController::class, 'save'])
             // FormRequest menentukan lifecycle create/update setelah memeriksa
             // pengangkatan existing; middleware ini hanya meneruskan kandidatnya.
-            ->middleware($adminSubModuleMutationMiddleware('employee_histories.create,employee_histories.update'))
+            ->middleware(['permission:employee_histories.create,employee_histories.update', 'employee.scope'])
             ->whereUuid('employee')
             ->name('pengangkatan.save');
         Route::post('/{employee}/pengangkatan/upload-sk', [AppointmentController::class, 'uploadSk'])
-            ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.create,dokumen_sk.update'))
+            ->middleware(['permission:dokumen_sk.create,dokumen_sk.update', 'employee.scope'])
             ->whereUuid('employee')
             ->name('pengangkatan.upload-sk');
         Route::post('/{employee}/assign-atasan', [EmployeeController::class, 'assignSupervisor'])
