@@ -9,6 +9,6 @@ class NotificationController extends Controller
 {
     public function index(PaginateNotificationsAction $action)
     {
-        return view('admin.notifikasi.index', $action->execute(auth()->user()?->employee_id));
+        return view('admin.notifikasi.index', $action->execute(auth()->id()));
     }
 }

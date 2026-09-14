@@ -9,10 +9,7 @@ class UpdateEwsConfigRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Konfigurasi EWS mengubah perilaku scheduler dan formula peringatan untuk
-        // seluruh pegawai; hanya super_admin yang boleh mengubahnya. Route sudah
-        // memakai role middleware, pemeriksaan ini menjadi lapisan backend kedua.
-        return $this->user()?->role === 'super_admin';
+        return (bool) $this->user()?->hasPermission('ews.configure');
     }
 
     /** @return array<string, string> */

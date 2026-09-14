@@ -93,12 +93,19 @@
             $activeRole = ($authUser && method_exists($authUser, 'getEffectiveRole'))
                 ? ($authUser->getEffectiveRole() ?? 'pegawai')
                 : ($authUser?->role ?? 'pegawai');
-            $canAdministerLeaveBalance = ($layoutCapabilities['cuti.balance.reconcile'] ?? false)
-                || ($layoutCapabilities['cuti.manual.manage'] ?? false);
+            $canAdministerLeaveBalance = $layoutCapabilities['cuti.balance.read'] ?? false;
             $canViewEmployeeStatistics = $layoutCapabilities['employees.read'] ?? false;
+            $canManageLeaveCancellations = $layoutCapabilities['cuti.cancellation.manage'] ?? false;
+            $canConfigureLeave = $layoutCapabilities['cuti.configure'] ?? false;
+            $canManageReferenceTables = $layoutCapabilities['reference_tables.manage'] ?? false;
+            $canReadEws = $layoutCapabilities['ews.read'] ?? false;
+            $canConfigureEws = $layoutCapabilities['ews.configure'] ?? false;
             $canReadAudit = $layoutCapabilities['audit_logs.read'] ?? false;
-            $canManageLeaveCancellations = $activeRole === 'admin_kepegawaian'
-                && ($layoutCapabilities['cuti.cancellation.manage'] ?? false);
+
+            // Hitung permission dan hierarki sekali; simulasi aktif hanya menyediakan revert.
+            $switchRoleOptions = $authUser && ! $authUser->temporary_role
+                ? $authUser->switchableRoleOptions()
+                : [];
 
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
@@ -162,7 +169,7 @@
                     'items' => array_filter([
                         ['label' => 'Data Pegawai', 'route' => 'data-pegawai', 'icon' => 'users', 'permissions' => ['employees.read']],
                         $activeRole === 'kepala_bagian' ? ['label' => 'Daftar Bawahan', 'route' => 'kepala-bagian.bawahan.index', 'icon' => 'users'] : null,
-                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open', 'permissions' => ['employees.read']],
+                        ['label' => 'Dokumen & SK', 'route' => 'dokumen', 'icon' => 'folder-open', 'permissions' => ['dokumen_sk.read']],
                         ['label' => 'Export Pegawai', 'route' => 'laporan.pegawai', 'icon' => 'document-arrow-up'],
                         ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar', 'permissions' => ['employees.read']],
                     ])
@@ -173,36 +180,34 @@
                         $activeRole === 'kepala_bagian' ? ['label' => 'Cuti Bawahan', 'route' => 'kepala-bagian.cuti.index', 'icon' => 'check-badge'] : null,
                         ['label' => in_array($activeRole, ['pegawai'], true) ? 'Pengajuan Cuti' : 'Monitoring Cuti', 'route' => 'cuti', 'icon' => 'calendar'],
                         ['label' => 'Rekap Cuti', 'route' => 'cuti.rekap', 'icon' => 'document-text'],
-                        ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal', 'permissions' => ['cuti.balance.reconcile', 'cuti.manual.manage']],
+                        ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal', 'permissions' => ['cuti.balance.read']],
                         $canManageLeaveCancellations
                             ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge', 'permissions' => ['cuti.cancellation.manage']]
                             : null,
                         ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'document-arrow-down'],
-                        $activeRole === 'super_admin' && ($layoutCapabilities['cuti.configure'] ?? false)
-                            ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth', 'permissions' => ['cuti.configure']]
-                            : null,
+                        $canConfigureLeave ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth'] : null,
                     ])
                 ],
                 [
                     'group' => 'EWS & Notifikasi',
                     'items' => array_filter([
                         $activeRole === 'kepala_bagian' ? ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'] : null,
-                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell', 'permissions' => ['notifications.read']],
+                        ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
                         $activeRole === 'pegawai' ? ['label' => 'EWS Saya', 'route' => 'ews.saya', 'icon' => 'exclamation-triangle'] : null,
-                        ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'],
-                        ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'],
+                        $canReadEws ? ['label' => 'EWS Aktif', 'route' => 'ews', 'icon' => 'exclamation-triangle'] : null,
+                        $canConfigureEws ? ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'] : null,
                         $activeRole === 'super_admin' ? ['label' => 'Channel Notifikasi', 'route' => 'data-master.channel-notifikasi.index', 'icon' => 'adjustments-horizontal'] : null,
                     ])
                 ],
                 [
                     'group' => 'Administrasi Sistem',
-                    'items' => [
+                    'items' => array_filter([
                         ['label' => 'Kelola Akses User', 'route' => 'user-management', 'icon' => 'shield-check'],
                         ['label' => 'Role & Permission', 'route' => 'rbac', 'icon' => 'key'],
-                        ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'],
-                        ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days', 'permissions' => ['hari_libur.read']],
+                        $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
+                        ['label' => 'Hari Libur', 'route' => 'hari-libur', 'icon' => 'calendar-days'],
                         ['label' => 'Audit Log', 'route' => 'audit-log', 'icon' => 'clipboard-document-list', 'permissions' => ['audit_logs.read']],
-                    ]
+                    ])
                 ]
             ];
 
@@ -228,14 +233,21 @@
                             $canAdministerLeaveBalance
                                 ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
                                 : null,
+                            $canManageLeaveCancellations
+                                ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
+                                : null,
+                            $canConfigureLeave
+                                ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth']
+                                : null,
                         ])
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'EWS', 'route' => 'pimpinan.ews.index', 'icon' => 'exclamation-triangle'],
-                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell', 'permissions' => ['notifications.read']],
-                        ]
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                            $canConfigureEws ? ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'] : null,
+                        ])
                     ],
                     [
                         'group' => 'Laporan',
@@ -246,7 +258,13 @@
                             ['label' => 'Export Cuti', 'route' => 'cuti.laporan', 'icon' => 'clipboard-document-list'],
                             ['label' => 'Riwayat Kepangkatan', 'route' => 'pimpinan.laporan.kepangkatan', 'icon' => 'document-chart-bar'],
                         ]
-                    ]
+                    ],
+                    [
+                        'group' => 'Administrasi Sistem',
+                        'items' => array_filter([
+                            $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
+                        ]),
+                    ],
                 ];
             }
 
@@ -272,20 +290,33 @@
                             $canAdministerLeaveBalance
                                 ? ['label' => 'Administrasi Pemakaian Cuti', 'route' => 'cuti.saldo.administrasi', 'icon' => 'adjustments-horizontal']
                                 : null,
+                            $canManageLeaveCancellations
+                                ? ['label' => 'Permohonan Pembatalan Cuti', 'route' => 'cuti.cancellations.index', 'icon' => 'check-badge']
+                                : null,
+                            $canConfigureLeave
+                                ? ['label' => 'Konfigurasi Approval Cuti', 'route' => 'cuti.config', 'icon' => 'cog-6-tooth']
+                                : null,
                         ]),
                     ],
                     [
                         'group' => 'EWS & Notifikasi',
-                        'items' => [
+                        'items' => array_filter([
                             ['label' => 'EWS Bawahan', 'route' => 'kepala-bagian.ews.index', 'icon' => 'exclamation-triangle'],
-                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell', 'permissions' => ['notifications.read']],
-                        ],
+                            ['label' => 'Notifikasi', 'route' => 'notifications.index', 'icon' => 'bell'],
+                            $canConfigureEws ? ['label' => 'Konfigurasi EWS', 'route' => 'ews.config', 'icon' => 'cog-6-tooth'] : null,
+                        ]),
                     ],
                     [
                         'group' => 'Laporan',
                         'items' => [
                             ['label' => 'Statistik Kepegawaian', 'route' => 'reporting.employee-statistics', 'icon' => 'chart-bar', 'permissions' => ['employees.read']],
                         ],
+                    ],
+                    [
+                        'group' => 'Administrasi Sistem',
+                        'items' => array_filter([
+                            $canManageReferenceTables ? ['label' => 'Data Master', 'route' => 'data-master', 'icon' => 'table-cells'] : null,
+                        ]),
                     ],
                 ];
             }
@@ -334,7 +365,15 @@
                             continue;
                         }
                         $routeExists = \Illuminate\Support\Facades\Route::has($menu['route']);
-                        $isLocked    = in_array($menu['route'], $myLockedMenus);
+                        $delegatedCapabilityRoutes = [
+                            'data-master' => $canManageReferenceTables,
+                            'ews' => $canReadEws,
+                            'ews.config' => $canConfigureEws,
+                            'cuti.config' => $canConfigureLeave,
+                            'cuti.cancellations.index' => $canManageLeaveCancellations,
+                        ];
+                        $isLocked = in_array($menu['route'], $myLockedMenus)
+                            && ! ($delegatedCapabilityRoutes[$menu['route']] ?? false);
                         $requiredPermissions = $menu['permissions'] ?? [];
                         $hasRequiredPermission = $requiredPermissions === [];
 
@@ -670,14 +709,9 @@
                                 </svg>
                                 <span>Profil Saya</span>
                             </a>
-                            {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
-                                 switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
-                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
-                                {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
-                                     selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
-                                     role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
-                                     yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
-                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
+                            {{-- Target menu mengikuti permission dan hierarki role asli; revert tetap tersedia setelah revoke. --}}
+                            @if($switchRoleOptions !== [] || $authUser?->temporary_role)
+                                @if($switchRoleOptions !== [])
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"
@@ -722,26 +756,24 @@
                                             class="mt-1 space-y-0.5 rounded-lg bg-soft/60 p-1 border border-border/50"
                                             style="display: none;"
                                         >
-                                            @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
-                                                @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
-                                                    <form method="POST" action="{{ route('switch-role') }}">
-                                                        @csrf
-                                                        <input type="hidden" name="target_role" value="{{ $roleKey }}">
-                                                        <button
-                                                            type="submit"
-                                                            role="menuitem"
-                                                            class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-surface hover:text-primary transition-colors font-sans text-left group"
-                                                        >
-                                                            <span class="h-1.5 w-1.5 rounded-full bg-muted/60 group-hover:bg-primary shrink-0 transition-colors"></span>
-                                                            <span class="truncate">Switch ke {{ $roleLabel }}</span>
-                                                        </button>
-                                                    </form>
-                                                @endif
+                                            @foreach($switchRoleOptions as $roleKey => $roleLabel)
+                                                <form method="POST" action="{{ route('switch-role') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="target_role" value="{{ $roleKey }}">
+                                                    <button
+                                                        type="submit"
+                                                        role="menuitem"
+                                                        class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-surface hover:text-primary transition-colors font-sans text-left group"
+                                                    >
+                                                        <span class="h-1.5 w-1.5 rounded-full bg-muted/60 group-hover:bg-primary shrink-0 transition-colors"></span>
+                                                        <span class="truncate">Switch ke {{ $roleLabel }}</span>
+                                                    </button>
+                                                </form>
                                             @endforeach
                                         </div>
                                     </div>
                                 @endif
-                                @if(auth()->user()->temporary_role)
+                                @if($authUser?->temporary_role)
                                     <div class="border-t border-border/60 my-1 pt-1">
                                         <form method="POST" action="{{ route('revert-role') }}">
                                             @csrf

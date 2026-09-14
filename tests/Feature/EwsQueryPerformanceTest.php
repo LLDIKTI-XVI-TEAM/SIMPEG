@@ -9,6 +9,8 @@ use App\Actions\Dashboards\BuildPimpinanDashboardAction;
 use App\Actions\Profiles\ShowProfilePageAction;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
@@ -177,6 +179,11 @@ class EwsQueryPerformanceTest extends TestCase
     {
         $kepalaBagian = Employee::factory()->create();
         $user = User::factory()->kepalaBagian()->create(['employee_id' => $kepalaBagian->id]);
+        // Kode: route kabag.ews memakai permission:ews.read yang tidak ada di seeder kabag.
+        Role::where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching(
+                Permission::where('name', 'ews.read')->pluck('id')->all()
+            );
         $this->createDirectReportAlerts($kepalaBagian, 5);
 
         [, $smallPageQueries] = $this->measureQueries(

@@ -7,14 +7,9 @@ use Illuminate\Validation\Rule;
 
 class ListHariLiburPageRequest extends FormRequest
 {
-    /**
-     * Kalender hari libur adalah konfigurasi sistem yang memengaruhi kalkulasi
-     * hari kerja cuti dan jadwal EWS, sehingga pembacaannya tetap dibatasi
-     * Super Admin walaupun route sudah memasang gerbang role yang sama.
-     */
     public function authorize(): bool
     {
-        return $this->user()?->role === 'super_admin';
+        return $this->user() !== null;
     }
 
     public function rules(): array

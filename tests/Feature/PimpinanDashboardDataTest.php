@@ -15,6 +15,7 @@ use App\Models\RefJenisPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Js;
 use Tests\TestCase;
 
 class PimpinanDashboardDataTest extends TestCase
@@ -61,6 +62,12 @@ class PimpinanDashboardDataTest extends TestCase
             'nama_lengkap' => 'Eka Pramesti',
             'nip' => '198505052011052005',
             'golongan_terakhir' => 'III/d',
+        ]);
+        // Denominator mencakup pegawai tanpa golongan di luar identitas viewer yang dikecualikan query.
+        Employee::factory()->create([
+            'nama_lengkap' => 'Pegawai Tanpa Golongan',
+            'status_aktif' => 'Aktif',
+            'golongan_terakhir' => null,
         ]);
         $rank = RefGolongan::create(['kode' => 'III/d', 'nama' => 'Penata Tingkat I']);
         RankHistory::create([
@@ -115,6 +122,7 @@ class PimpinanDashboardDataTest extends TestCase
         ]))->get(route('pimpinan.dashboard'));
 
         $response->assertOk()
+            ->assertViewHas('totalPegawai', 2)
             ->assertSee('Eka Pramesti')
             ->assertSee('SK-321/2026')
             ->assertSee('Admin Kepegawaian')
@@ -125,7 +133,7 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertSee('globalSearch($el.dataset.searchUrl)', false)
             ->assertSee("dashboardChart({ type: 'doughnut'", false)
             ->assertSee("dashboardChart({ type: 'horizontal-bar'", false)
-            ->assertSee('data: [1], tooltipTotal: 2', false)
+            ->assertSee('data: '.Js::from([1]).', tooltipTotal: 2', false)
             ->assertSee("dashboardChart({ type: 'line'", false)
             ->assertSee('0 disetujui · 0 ditangguhkan')
             ->assertDontSee('Ahmad Fauzi')

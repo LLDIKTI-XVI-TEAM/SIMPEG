@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Documents\DeleteBerkasLainnyaAction;
 use App\Actions\Documents\StoreBerkasLainnyaAction;
 use App\Actions\Documents\UpdateBerkasLainnyaAction;
+use App\Actions\Employees\ListEmployeeArchiveOptionsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\DeleteBerkasLainnyaRequest;
 use App\Http\Requests\Documents\StoreBerkasLainnyaRequest;
 use App\Http\Requests\Documents\UpdateBerkasLainnyaRequest;
+use App\Http\Requests\Employee\ListEmployeeArchiveOptionsRequest;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Support\Documents\DocumentCategory;
@@ -17,16 +19,31 @@ use Illuminate\Http\Request;
 
 class EmployeeDocumentController extends Controller
 {
+    /** Menyajikan pilihan arsip berhalaman untuk form edit tanpa path berkas privat. */
+    public function archiveOptions(
+        ListEmployeeArchiveOptionsRequest $request,
+        Employee $employee,
+        ListEmployeeArchiveOptionsAction $action,
+    ): JsonResponse {
+        return response()->json($action->execute($employee, $request->validated()));
+    }
+
     /**
      * Mengembalikan daftar dokumen arsip milik pegawai, bisa difilter per kategori.
      * Digunakan oleh dropdown "Pilih dari Arsip" di form tambah riwayat.
      */
     public function index(Employee $employee, Request $request): JsonResponse
     {
+        $viewer = $request->user();
         $kategori = $request->query('kategori');
+        // P1 privacy: pimpinan tetap 200 tapi ktp_kk excluded.
+        if ($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan' && $kategori === 'ktp_kk') {
+            abort(404);
+        }
 
         $query = $employee->documents()
             ->when($kategori, fn ($q) => $q->where('jenis_dokumen', $kategori))
+            ->when($viewer !== null && $viewer->getEffectiveRole() === 'pimpinan', fn ($q) => $q->whereIn('jenis_dokumen', DocumentCategory::visibleToPimpinanKeys()))
             ->orderByDesc('tanggal_dokumen')
             ->orderByDesc('created_at');
 

@@ -20,14 +20,16 @@
 
     <div class="space-y-6" x-data="{
         followup: { open: false, action: '', status: '', label: '', employee: '', type: '', note: '' },
-        openFollowup(dataset) {
+        openFollowupFromButton(event) {
+            const button = event.currentTarget;
+
             this.followup = {
                 open: true,
-                action: dataset.followupAction,
-                status: dataset.followupStatus,
-                label: dataset.followupLabel,
-                employee: dataset.followupEmployee,
-                type: dataset.followupType,
+                action: button.dataset.followupAction,
+                status: button.dataset.followupStatus,
+                label: button.dataset.followupLabel,
+                employee: button.dataset.followupEmployee,
+                type: button.dataset.followupType,
                 note: '',
             };
         },
@@ -184,7 +186,8 @@
                                 <x-ui.table-td align="center" padding="lg" class="text-sm font-semibold text-muted">{{ ($alerts->firstItem() ?? 1) + $index }}</x-ui.table-td>
                                 <x-ui.table-td padding="lg" class="text-sm">
                                     <div class="font-semibold leading-snug text-ink transition-colors hover:text-primary">
-                                        <a href="{{ route('pegawai.show', $alert['pegawai_id']) }}">{{ $alert['nama'] }}</a>
+                                        @php $ewsDetailUrl = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('pegawai.show', $alert['pegawai_id']) : route('rbac.pegawai.show', $alert['pegawai_id']); @endphp
+                                        <a href="{{ $ewsDetailUrl }}">{{ $alert['nama'] }}</a>
                                     </div>
                                     <div class="mt-1 text-xs text-muted">{{ $alert['nip'] }}</div>
                                 </x-ui.table-td>
@@ -287,9 +290,10 @@
                                                 <div class="flex items-center gap-1.5">
                                                     <x-ui.tooltip text="Tandai Ditangani" position="top">
                                                         <x-ui.button
+                                                            type="button"
                                                             variant="success"
                                                             size="compact-icon"
-                                                            @click="openFollowup($event.currentTarget.dataset)"
+                                                            @click="openFollowupFromButton($event)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
                                                             data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
                                                             data-followup-status="ditangani"
@@ -306,9 +310,10 @@
 
                                                     <x-ui.tooltip text="Tandai Tidak Perlu" position="top">
                                                         <x-ui.button
+                                                            type="button"
                                                             variant="danger"
                                                             size="compact-icon"
-                                                            @click="openFollowup($event.currentTarget.dataset)"
+                                                            @click="openFollowupFromButton($event)"
                                                             data-alert-id="{{ $alert['alert_id'] }}"
                                                             data-followup-action="{{ route('ews.followup.update', $alert['alert_id']) }}"
                                                             data-followup-status="tidak_perlu"

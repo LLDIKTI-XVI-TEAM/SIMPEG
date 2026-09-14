@@ -237,7 +237,10 @@ class EmployeeStatusLifecycleService
             ]);
         }
 
-        if (! $this->authorization->effectiveRoleAllows($user->getEffectiveRole(), $requiredPermission)) {
+        if (! $this->authorization->effectiveRoleAllows(
+            $user->getEffectiveRole(),
+            $requiredPermission
+        )) {
             throw ValidationException::withMessages([
                 'status_pegawai_id' => 'Mengaktifkan kembali pegawai hanya dapat dilakukan oleh Super Admin atau Admin Kepegawaian.',
             ]);

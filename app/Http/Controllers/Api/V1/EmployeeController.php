@@ -19,6 +19,7 @@ use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Models\Employee;
+use App\Support\Employees\EmployeeMutationPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,19 +30,29 @@ class EmployeeController extends Controller
     {
         return response()->json([
             'message' => 'Daftar pegawai berhasil diambil.',
-            'employees' => $action->execute($request->validated()),
+            'employees' => $action->execute($request->validated(), $request->user()),
         ]);
     }
 
     public function store(StoreEmployeeRequest $request, CreateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($request->validated(), $request);
+        $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Data pegawai berhasil ditambahkan.',
-                'employee' => $employee,
-            ], 201);
+            $message = 'Data pegawai berhasil ditambahkan.';
+            if (! empty($warnings)) {
+                $message .= ' Peringatan: '.implode(' ', $warnings);
+            }
+            $payload = [
+                'message' => $message,
+                'employee' => EmployeeMutationPayload::forActor($employee, $request->user()),
+            ];
+            if (! empty($warnings)) {
+                $payload['warnings'] = $warnings;
+            }
+
+            return response()->json($payload, 201);
         }
 
         return back()->with('success', 'Data pegawai berhasil ditambahkan.');
@@ -83,12 +94,22 @@ class EmployeeController extends Controller
     public function update(UpdateEmployeeRequest $request, Employee $employee, UpdateEmployeeAction $action): JsonResponse|RedirectResponse
     {
         $employee = $action->execute($employee, $request->validated(), $request);
+        $warnings = $action->warnings;
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Data pegawai berhasil diperbarui.',
-                'employee' => $employee,
-            ]);
+            $message = 'Data pegawai berhasil diperbarui.';
+            if (! empty($warnings)) {
+                $message .= ' Peringatan: '.implode(' ', $warnings);
+            }
+            $payload = [
+                'message' => $message,
+                'employee' => EmployeeMutationPayload::forActor($employee, $request->user()),
+            ];
+            if (! empty($warnings)) {
+                $payload['warnings'] = $warnings;
+            }
+
+            return response()->json($payload);
         }
 
         return back()->with('success', 'Data pegawai berhasil diperbarui.');
@@ -106,7 +127,8 @@ class EmployeeController extends Controller
     {
         $employee->load([
             'jenisPegawai:id,nama',
-            'statusPegawai:id,nama',
+            // Kelompok diperlukan agar refresh baris tetap memakai predicate aktif kanonis.
+            'statusPegawai:id,nama,kelompok',
             'rankHistories:id,employee_id,no_sk,tanggal_sk,tmt_pangkat,file_sk,is_latest,created_at',
             'positionHistories' => fn ($query) => $query
                 ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])

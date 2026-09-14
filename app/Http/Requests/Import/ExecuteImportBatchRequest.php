@@ -15,8 +15,7 @@ class ExecuteImportBatchRequest extends FormRequest
 
         $user = $this->user();
 
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return $user !== null && $user->hasPermission('employees.import');
     }
 
     /** @return array<string, array<int, string>> */

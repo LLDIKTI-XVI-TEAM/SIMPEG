@@ -148,8 +148,9 @@ class EmployeeCreateIntegrationTest extends TestCase
         $disk->assertExists($documentPath);
         Storage::disk('public')->assertMissing($documentPath);
 
-        // Check if detail page renders
-        $detailResponse = $this->actingAs($user)->get(route('pegawai.show', $employee->id));
+        // Check if detail page renders (halaman show admin dialihkan ke surface
+        // RBAC untuk role non-super-admin; ikuti redirect lalu pastikan konten tetap ada)
+        $detailResponse = $this->actingAs($user)->followingRedirects()->get(route('pegawai.show', $employee->id));
         $detailResponse->assertStatus(200);
         $detailResponse->assertSee('Budi Santoso Uji');
         $detailResponse->assertSee('Kepala Lembaga');
@@ -328,7 +329,6 @@ class EmployeeCreateIntegrationTest extends TestCase
         foreach ([
             route('pegawai.create'),
             route('pegawai.edit', $employee),
-            route('pegawai.show', $employee),
         ] as $url) {
             $this->actingAs($user)
                 ->get($url)
@@ -336,6 +336,14 @@ class EmployeeCreateIntegrationTest extends TestCase
                 ->assertSee($jabatanAktif->nama)
                 ->assertDontSee($jabatanNonaktif->nama);
         }
+
+        // Halaman show admin dialihkan ke surface RBAC untuk role non-super-admin.
+        $this->actingAs($user)
+            ->followingRedirects()
+            ->get(route('pegawai.show', $employee))
+            ->assertOk()
+            ->assertSee($jabatanAktif->nama)
+            ->assertDontSee($jabatanNonaktif->nama);
     }
 
     public function test_null_tmt_source_histories_are_not_latest_and_leave_derived_dates_null(): void
@@ -369,7 +377,11 @@ class EmployeeCreateIntegrationTest extends TestCase
         ];
 
         $this->actingAs($user);
-        app(CreateEmployeeAction::class)->execute($data, Request::create('/pegawai', 'POST', $data));
+        // Request manual tidak membawa user terautentikasi; tanpa resolver,
+        // gate permission employee_histories.create menolak dan riwayat batal dibuat.
+        $request = Request::create('/pegawai', 'POST', $data);
+        $request->setUserResolver(fn () => $user);
+        app(CreateEmployeeAction::class)->execute($data, $request);
 
         $employee = Employee::where('nip', '199201012024011001')->firstOrFail();
         $this->assertFalse($employee->rankHistories()->firstOrFail()->is_latest);

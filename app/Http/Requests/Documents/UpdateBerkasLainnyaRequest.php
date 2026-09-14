@@ -18,7 +18,7 @@ class UpdateBerkasLainnyaRequest extends FormRequest
         $employee = $this->route('employee');
         $document = $this->route('document');
         $actorAllowed = DocumentAuthorization::allowsLocalApiBypass()
-            || DocumentAuthorization::canManage($this->user());
+            || DocumentAuthorization::canUpdate($this->user());
 
         return $actorAllowed
             && $employee instanceof Employee

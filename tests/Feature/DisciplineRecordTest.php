@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Histories\DeleteDisciplineRecordAction;
 use App\Models\AuditLog;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
@@ -16,7 +17,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -515,36 +515,6 @@ class DisciplineRecordTest extends TestCase
         $this->postJsonWithCsrf("/api/v1/pegawai/{$employee->id}/disiplin", $this->validPayload())->assertForbidden();
     }
 
-    public function test_direct_discipline_delete_route_is_absent(): void
-    {
-        $routeName = 'pegawai.disiplin.destroy';
-
-        $this->assertFalse(Route::has('api.v1.'.$routeName));
-    }
-
-    public function test_old_direct_delete_uri_is_unavailable_and_preserves_discipline_record(): void
-    {
-        $user = User::factory()->adminKepegawaian()->create();
-        $employee = Employee::factory()->create();
-        $record = DisciplineRecord::create($this->recordPayload($employee));
-
-        $response = $this->actingAs($user)
-            ->withSession(['_token' => 'test-token'])
-            ->deleteJson(
-                "/api/v1/pegawai/{$employee->id}/disiplin/{$record->id}",
-                [],
-                ['X-CSRF-TOKEN' => 'test-token'],
-            );
-
-        $this->assertSame([
-            'status_routing' => true,
-            'record_tetap_ada' => true,
-        ], [
-            'status_routing' => in_array($response->status(), [404, 405], true),
-            'record_tetap_ada' => DisciplineRecord::whereKey($record->id)->exists(),
-        ]);
-    }
-
     public function test_validation_rejects_invalid_discipline_payload(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -612,5 +582,89 @@ class DisciplineRecordTest extends TestCase
             'path juga direferensikan pegawai lain' => ['pegawai_lain'],
             'path juga direferensikan kategori lain' => ['kategori_lain'],
         ];
+    }
+
+    public function test_delete_discipline_action_locks_and_uses_freshest_canonical_state_from_db(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+
+        $stalePath = 'sk/disiplin-stale.pdf';
+        $freshPath = 'sk/disiplin-fresh.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($stalePath, 'stale content');
+        Storage::disk(Document::STORAGE_DISK)->put($freshPath, 'fresh content');
+
+        $record = DisciplineRecord::create($this->recordPayload($employee, [
+            'no_sk' => 'SK-DIS-CONCURRENT',
+            'file_sk' => $stalePath,
+        ]));
+
+        $mirror = Document::create([
+            'employee_id' => $employee->id,
+            'history_id' => $record->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Hukuman Disiplin',
+            'file_path' => $stalePath,
+        ]);
+
+        DisciplineRecord::where('id', $record->id)->update([
+            'file_sk' => $freshPath,
+            'no_sk' => 'SK-DIS-CONCURRENT-UPDATED',
+        ]);
+        $mirror->update(['file_path' => $freshPath]);
+
+        $this->assertSame($stalePath, $record->file_sk);
+
+        app(DeleteDisciplineRecordAction::class)->execute($employee, $record);
+
+        $this->assertDatabaseMissing('discipline_records', ['id' => $record->id]);
+        $this->assertDatabaseMissing('documents', ['id' => $mirror->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($freshPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($stalePath);
+
+        $audit = AuditLog::where('auditable_type', 'DisciplineRecord')
+            ->where('auditable_id', $record->id)
+            ->where('event', 'DELETE')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertSame($freshPath, $audit->old_values['file_sk']);
+        $this->assertSame('SK-DIS-CONCURRENT-UPDATED', $audit->old_values['no_sk']);
+    }
+
+    public function test_upload_sk_returns_canonical_rbac_download_url(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $record = DisciplineRecord::create($this->recordPayload($employee, [
+            'file_sk' => null,
+        ]));
+
+        $file = UploadedFile::fake()->create('sk-disiplin.pdf', 500, 'application/pdf');
+
+        $response = $this->actingAs($admin)->postJson(
+            "/api/v1/pegawai/{$employee->id}/disiplin/{$record->id}/upload-sk",
+            ['file_sk' => $file]
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Berkas SK hukuman disiplin berhasil diunggah.');
+
+        $downloadUrl = $response->json('record.download_url');
+        $this->assertNotEmpty($downloadUrl);
+
+        $expectedUrl = route('rbac.pegawai.discipline-attachments.download', [
+            'employee' => $employee->id,
+            'history' => $record->id,
+        ]);
+
+        $this->assertSame($expectedUrl, $downloadUrl);
+        $this->assertStringNotContainsString('type=', $downloadUrl);
+
+        $downloadResponse = $this->actingAs($admin)->get($downloadUrl);
+        $downloadResponse->assertOk();
     }
 }

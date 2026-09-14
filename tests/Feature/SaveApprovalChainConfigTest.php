@@ -12,7 +12,7 @@ use Tests\TestCase;
 /**
  * Menguji penyimpanan konfigurasi rantai approval cuti.
  * Konfigurasi ini adalah pengaturan tingkat sistem yang hanya boleh diubah pemegang cuti.configure
- * (di Fase 1 hanya super_admin), dan setiap perubahan wajib meninggalkan jejak audit.
+ * (untuk semua role selain pegawai), dan setiap perubahan wajib meninggalkan jejak audit.
  */
 class SaveApprovalChainConfigTest extends TestCase
 {
@@ -104,24 +104,37 @@ class SaveApprovalChainConfigTest extends TestCase
         $this->assertDatabaseCount('audit_logs', 0);
     }
 
-    public function test_non_super_admin_tidak_bisa_menyimpan_konfigurasi(): void
+    public function test_role_selain_pegawai_bisa_menyimpan_konfigurasi(): void
     {
         [$verifikator, $pimpinan] = $this->buatKandidatApprover();
 
-        // Role berwenang approve cuti pun tidak boleh mengonfigurasi approval chain.
-        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $role) {
+        foreach (['admin_kepegawaian', 'pimpinan', 'kepala_bagian'] as $role) {
             $user = User::factory()->state(['role' => $role])->create();
 
             $response = $this->actingAs($user)->post(route('cuti.config.update'), [
                 'stage2_approver_id' => $verifikator->id,
                 'stage3_approver_id' => $pimpinan->id,
-                'reason' => 'Percobaan oleh non super admin',
+                'reason' => 'Konfigurasi oleh role berwenang',
             ]);
 
-            $response->assertForbidden();
+            $response->assertRedirect(route('cuti.config'));
         }
 
-        // Tidak ada konfigurasi yang tersimpan dari percobaan non super admin.
+        $this->assertSame((string) $verifikator->id, (string) ApprovalConfig::getVal('stage2_approver_id'));
+    }
+
+    public function test_pegawai_tidak_bisa_menyimpan_konfigurasi(): void
+    {
+        [$verifikator, $pimpinan] = $this->buatKandidatApprover();
+
+        $response = $this->actingAs(User::factory()->pegawai()->create())->post(route('cuti.config.update'), [
+            'stage2_approver_id' => $verifikator->id,
+            'stage3_approver_id' => $pimpinan->id,
+            'reason' => 'Percobaan konfigurasi oleh pegawai.',
+        ]);
+
+        $response->assertForbidden();
+
         $this->assertNull(ApprovalConfig::getVal('stage2_approver_id'));
     }
 

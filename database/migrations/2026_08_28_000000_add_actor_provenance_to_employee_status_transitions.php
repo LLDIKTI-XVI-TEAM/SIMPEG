@@ -37,6 +37,10 @@ return new class extends Migration
             ->where('is_applied', true)
             ->update(['provenance_status' => 'legacy_historical']);
 
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement(
             'ALTER TABLE employee_status_transitions ADD CONSTRAINT '.self::CHECK_NAME.' CHECK ('
             ."provenance_status IN ('captured', 'missing', 'legacy_historical')"
@@ -85,11 +89,13 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement(
-            'DROP TRIGGER IF EXISTS '.self::IMMUTABLE_TRIGGER.' ON employee_status_transitions',
-        );
-        DB::statement('DROP FUNCTION IF EXISTS '.self::IMMUTABLE_FUNCTION.'()');
-        DB::statement('ALTER TABLE employee_status_transitions DROP CONSTRAINT IF EXISTS '.self::CHECK_NAME);
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement(
+                'DROP TRIGGER IF EXISTS '.self::IMMUTABLE_TRIGGER.' ON employee_status_transitions',
+            );
+            DB::statement('DROP FUNCTION IF EXISTS '.self::IMMUTABLE_FUNCTION.'()');
+            DB::statement('ALTER TABLE employee_status_transitions DROP CONSTRAINT IF EXISTS '.self::CHECK_NAME);
+        }
 
         Schema::table('employee_status_transitions', function (Blueprint $table): void {
             $table->dropIndex(['provenance_status']);

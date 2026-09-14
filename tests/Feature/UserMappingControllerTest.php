@@ -554,12 +554,19 @@ class UserMappingControllerTest extends TestCase
     {
         $admin = User::factory()->superAdmin()->create();
 
-        $this->actingAs($admin)
-            ->post(route('user-management.update'), [
-                'employee_id' => (string) Str::uuid(),
-                'keycloak_id' => 'kc-subject-unknown-employee',
-                'role' => 'pegawai',
-            ])
+        $this->actingAs($admin);
+
+        // Menjepit state setup: bila baris ini gagal, row ekstra berasal dari setup,
+        // bukan dari request invalid di bawah. Dump identitas row agar CI merah
+        // berikutnya langsung menyebut sumbernya (id/email/role/employee_id/keycloak_id).
+        $preUsers = DB::table('users')->get(['id', 'email', 'employee_id', 'role', 'keycloak_id']);
+        $this->assertCount(1, $preUsers, 'Setup harus tepat 1 user, ditemukan: '.$preUsers->toJson());
+
+        $this->post(route('user-management.update'), [
+            'employee_id' => (string) Str::uuid(),
+            'keycloak_id' => 'kc-subject-unknown-employee',
+            'role' => 'pegawai',
+        ])
             ->assertSessionHasErrors('employee_id');
 
         $this->assertDatabaseCount('users', 1);
@@ -606,18 +613,24 @@ class UserMappingControllerTest extends TestCase
         $admin = User::factory()->superAdmin()->create();
         $employee = Employee::factory()->create();
 
-        $this->actingAs($admin)
-            ->post(route('user-management.update'), $this->mappingPayload($employee, [
-                'role' => 'Super Admin',
-            ]))
+        $this->actingAs($admin);
+
+        // Menjepit state setup agar setiap request invalid terbukti zero side-effect sendiri-sendiri.
+        $preUsers = DB::table('users')->get(['id', 'email', 'employee_id', 'role', 'keycloak_id']);
+        $this->assertCount(1, $preUsers, 'Setup harus tepat 1 user, ditemukan: '.$preUsers->toJson());
+
+        $this->post(route('user-management.update'), $this->mappingPayload($employee, [
+            'role' => 'Super Admin',
+        ]))
             ->assertSessionHasErrors('role');
 
-        $this->actingAs($admin)
-            ->post(route('user-management.update'), [
-                'employee_id' => 'bukan-uuid',
-                'keycloak_id' => 'kc-subject-malformed-employee',
-                'role' => 'pegawai',
-            ])
+        $this->assertDatabaseCount('users', 1);
+
+        $this->post(route('user-management.update'), [
+            'employee_id' => 'bukan-uuid',
+            'keycloak_id' => 'kc-subject-malformed-employee',
+            'role' => 'pegawai',
+        ])
             ->assertSessionHasErrors('employee_id');
 
         $this->assertDatabaseCount('users', 1);

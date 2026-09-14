@@ -89,6 +89,11 @@ return [
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
+            // Laravel ParallelTesting (TestDatabases::testDatabase) mengisolasi worker
+            // dengan suffix _test_{token} dari DB dasar ini. Jangan append TEST_TOKEN
+            // manual di sini — akan double-suffix menjadi simpeg_test_test_1_test_1.
+            // Helper docker/ci/create-test-databases.sh sudah pre-create
+            // simpeg_test_test_0..N yang sesuai mekanisme native tersebut.
             'database' => env('DB_DATABASE', 'laravel'),
             'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),

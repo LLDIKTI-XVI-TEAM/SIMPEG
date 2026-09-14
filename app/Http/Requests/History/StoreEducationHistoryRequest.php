@@ -14,11 +14,8 @@ class StoreEducationHistoryRequest extends FormRequest
             return true;
         }
 
-        // Mutasi riwayat pendidikan hanya boleh dilakukan pengelola data kepegawaian.
-        $user = $this->user();
-
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        // Permission route dan scope record telah memvalidasi otorisasi mutasi.
+        return $this->user()?->hasPermission('employee_histories.create') ?? false;
     }
 
     public function rules(): array

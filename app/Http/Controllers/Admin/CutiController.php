@@ -66,8 +66,9 @@ class CutiController extends Controller
     {
         $employee = $request->user()?->employee;
 
-        // Akun tanpa data pegawai tidak boleh mengajukan cuti; tolak di backend, bukan hanya menyembunyikan menu.
-        abort_if($employee === null, 403, 'Akun Anda tidak tertaut ke data pegawai sehingga tidak dapat mengajukan cuti.');
+        // Self-service PATEN mensyaratkan pegawai aktif. Middleware global memberi UX redirect,
+        // sedangkan guard ini tetap fail-closed bila action dipanggil di luar urutan middleware biasa.
+        abort_if($employee === null || ! $employee->isActive(), 403, 'Akun Anda belum tertaut ke pegawai aktif sehingga tidak dapat mengajukan cuti.');
 
         $selectedLeaveTypeId = $request->old('jenis_cuti_id');
         $selectedLeaveCaseId = $request->old('leave_request_case_id');

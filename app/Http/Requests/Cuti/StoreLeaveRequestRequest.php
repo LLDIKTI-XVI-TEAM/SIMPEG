@@ -16,8 +16,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Memvalidasi pengajuan cuti oleh pegawai.
- * Otorisasi ditegakkan ganda: middleware route (permission:cuti.create) dan authorize() di sini
- * agar backend tidak hanya bergantung pada penyembunyian menu/tombol di UI.
+ * Otorisasi mengunci konteks self-service; kelayakan domain tetap divalidasi
+ * server-side agar backend tidak bergantung pada penyembunyian menu/tombol UI.
  * Aturan domain (atasan langsung, jenis cuti khusus PNS, dan kecukupan saldo) divalidasi di backend
  * sebagai sumber kebenaran, bukan sekadar batasan tampilan.
  */
@@ -25,8 +25,11 @@ class StoreLeaveRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Hanya pengguna dengan hak mengajukan cuti yang boleh menyimpan pengajuan.
-        return (bool) $this->user()?->hasPermission('cuti.create');
+        // Pengajuan adalah self-service PATEN: identity pegawai aktif menjadi
+        // gerbangnya. Role dan pivot RBAC tidak boleh mengubah eligibility.
+        $actor = $this->user();
+
+        return $actor?->hasPermission('cuti.create') ?? false;
     }
 
     /**
@@ -75,6 +78,18 @@ class StoreLeaveRequestRequest extends FormRequest
             'nomor_telepon' => ['required', 'string', 'max:20', 'regex:/^[0-9()+\-.\s]+$/'],
             // Lampiran opsional; batas 10 MB dan tipe dokumen/gambar yang lazim untuk surat pendukung.
             'lampiran' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png'],
+        ];
+    }
+
+    /**
+     * Menjelaskan koreksi rentang tanggal dalam bahasa yang dipakai form pengajuan.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'tanggal_selesai.after_or_equal' => 'Tanggal selesai harus sama dengan atau setelah tanggal mulai.',
         ];
     }
 

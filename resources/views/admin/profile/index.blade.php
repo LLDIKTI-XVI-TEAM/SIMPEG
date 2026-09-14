@@ -655,17 +655,19 @@
 
             </div>
 
-            {{-- SUPER ADMIN SHORTCUTS CARD (BOTTOM) --}}
-            @if(auth()->user()->getEffectiveRole() === 'super_admin')
+            {{-- Shortcut Data Master mengikuti permission; shortcut sistem lain tetap Super Admin. --}}
+            @php($canManageReferenceTables = auth()->user()->hasPermission('reference_tables.manage'))
+            @if($canManageReferenceTables || auth()->user()->getEffectiveRole() === 'super_admin')
             <x-ui.card padding="lg" class="mt-6">
             <div class="mb-6">
                 <h3 class="text-sm font-bold text-ink font-sans">
                     Aksi & Administrasi Sistem
                 </h3>
-                <p class="text-xs text-muted font-sans mt-0.5">Kelola pengguna, data master, dan audit sistem SIMPEG secara terpusat.</p>
+                <p class="text-xs text-muted font-sans mt-0.5">Kelola data master{{ auth()->user()->getEffectiveRole() === 'super_admin' ? ', pengguna, dan audit sistem' : '' }} SIMPEG secara terpusat.</p>
             </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    @if($canManageReferenceTables)
                     <x-ui.card as="a" href="{{ route('data-master') }}" variant="interactive" padding="none" class="flex h-full items-start gap-4 p-5 group">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -677,7 +679,9 @@
                             <p class="text-xs text-muted mt-1 leading-relaxed">Manajemen tabel master (Unit Kerja, Agama, Eselon, Golongan, dll).</p>
                         </div>
                     </x-ui.card>
+                    @endif
 
+                    @if(auth()->user()->getEffectiveRole() === 'super_admin')
                     <x-ui.card as="a" href="{{ route('user-management') }}" variant="interactive" padding="none" class="flex h-full items-start gap-4 p-5 group">
                         <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -702,6 +706,7 @@
                             <p class="text-xs text-muted mt-1 leading-relaxed">Pusat pelacakan riwayat segala perubahan data yang terjadi pada sistem.</p>
                         </div>
                     </x-ui.card>
+                    @endif
 
                 </div>
             </x-ui.card>

@@ -52,6 +52,6 @@ class SystemSettingsRemovalTest extends TestCase
             ->get(route('profil'))
             ->assertOk()
             ->assertDontSee('Kelola pengguna, data master, audit, dan data backup sistem SIMPEG secara terpusat.')
-            ->assertSee('Kelola pengguna, data master, dan audit sistem SIMPEG secara terpusat.');
+            ->assertSee('Kelola data master, pengguna, dan audit sistem SIMPEG secara terpusat.');
     }
 }

@@ -22,8 +22,11 @@ class ResubmitLeaveRequestRequest extends FormRequest
     {
         $leaveRequest = $this->route('leaveRequest');
 
+        $actor = $this->user();
+
         return $leaveRequest !== null
-            && $this->user()?->employee_id === $leaveRequest->employee_id
+            && $actor !== null
+            && $actor->employee_id === $leaveRequest->employee_id
             && ($leaveRequest->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER
                 || ($leaveRequest->status === 'menunggu_approval'
                     && $leaveRequest->approvals()->doesntExist()));

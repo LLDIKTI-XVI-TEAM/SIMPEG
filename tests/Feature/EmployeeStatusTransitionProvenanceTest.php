@@ -272,6 +272,46 @@ class EmployeeStatusTransitionProvenanceTest extends TestCase
         $this->assertDatabaseCount('audit_logs', 0);
     }
 
+    /** Snapshot dengan permission yang tidak cocok tetap ditolak scheduler. */
+    public function test_due_restore_menolak_snapshot_dengan_permission_tidak_cocok(): void
+    {
+        $nonaktif = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->firstOrFail();
+        $target = RefStatusPegawai::query()->where('kode', 'AKTIF')->firstOrFail();
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $nonaktif->id,
+            'status_aktif' => $nonaktif->nama,
+        ]);
+        $tanggal = now('Asia/Makassar')->toDateString();
+        $transitionId = (string) Str::uuid();
+
+        DB::table('employee_status_transitions')->insert([
+            'id' => $transitionId,
+            'employee_id' => $employee->id,
+            'status_pegawai_id' => $target->id,
+            'tanggal_efektif' => $tanggal,
+            'kind' => EmployeeStatusTransition::KIND_RESTORE,
+            'keterangan' => 'Snapshot restore dengan permission tidak cocok.',
+            'actor_user_id_snapshot' => (string) Str::uuid(),
+            'actor_name_snapshot' => 'Aktor Pimpinan Lama',
+            'actor_original_role' => 'pimpinan',
+            'actor_effective_role' => 'pimpinan',
+            'authorization_permission' => 'employees.update',
+            'authorization_action' => EmployeeStatusTransition::KIND_RESTORE,
+            'actor_simulation' => false,
+            'actor_ip_address' => '10.20.30.40',
+            'actor_user_agent' => 'SIMPEG-Provenance-Test/1.0',
+            'provenance_status' => EmployeeStatusTransition::PROVENANCE_CAPTURED,
+            'is_applied' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->assertSame(0, app(EmployeeStatusTransitionService::class)->applyDue($tanggal));
+        $this->assertFalse(EmployeeStatusTransition::query()->findOrFail($transitionId)->is_applied);
+        $this->assertFalse($employee->refresh()->isActive());
+        $this->assertDatabaseCount('employee_status_histories', 0);
+    }
+
     public function test_user_dihapus_setelah_schedule_tetap_mempertahankan_identitas_dan_menerapkan_semua_kind(): void
     {
         $actor = User::factory()->superAdmin()->create(['name' => 'Aktor Akan Dihapus']);

@@ -16,7 +16,7 @@ class DeleteBerkasLainnyaRequest extends FormRequest
         $employee = $this->route('employee');
         $document = $this->route('document');
         $actorAllowed = DocumentAuthorization::allowsLocalApiBypass()
-            || DocumentAuthorization::canManage($this->user());
+            || DocumentAuthorization::canDelete($this->user());
 
         return $actorAllowed
             && $employee instanceof Employee

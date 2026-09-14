@@ -3,17 +3,28 @@
 namespace App\Queries\Dashboards;
 
 use App\Models\Employee;
+use App\Models\User;
 
 class ActiveEmployeeSummaryQuery
 {
     /**
      * Menghitung widget pegawai aktif secara set-based tanpa memuat model pegawai.
      *
+     * Data milik sendiri dikecualikan kecuali untuk Super Admin efektif,
+     * konsisten dengan daftar Data Pegawai.
+     *
      * @return array{total: int, composition: array<string, int>, rank_distribution: array<string, int>}
      */
-    public function execute(): array
+    public function execute(?User $viewer = null): array
     {
         $active = Employee::query()->whereActiveStatus();
+
+        if ($viewer !== null
+            && $viewer->getEffectiveRole() !== 'super_admin'
+            && is_string($viewer->employee_id)
+            && $viewer->employee_id !== '') {
+            $active->whereKeyNot($viewer->employee_id);
+        }
         $composition = (clone $active)
             ->toBase()
             ->leftJoin('ref_jenis_pegawai', 'ref_jenis_pegawai.id', '=', 'employees.jenis_pegawai_id')

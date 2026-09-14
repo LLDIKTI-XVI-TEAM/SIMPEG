@@ -10,10 +10,7 @@ class UpdateJenisJabatanRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // Data referensi memengaruhi seluruh dropdown dan riwayat pegawai;
-        // hanya super_admin yang boleh mengelolanya (lapisan kedua di atas
-        // role middleware pada route).
-        return $this->user()?->role === 'super_admin';
+        return (bool) $this->user()?->hasPermission('reference_tables.manage');
     }
 
     /** @return array<string, array<int, mixed>> */

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Employee;
 use App\Models\Permission;
 use App\Models\RefJenisPegawai;
 use App\Models\Role;
@@ -47,13 +48,72 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertFalse($user->hasPermission('employees.create'));
     }
 
+    public function test_invalid_internal_role_is_fail_closed_for_paten_capabilities(): void
+    {
+        // Issue #6: authenticated tidak sama dengan authorized. Role internal
+        // kosong/tidak valid harus ditolak sebelum evaluasi PATEN maupun RBAC,
+        // termasuk capability user-context dan employee-self.
+        foreach ([null, '', 'role_tidak_terdaftar'] as $invalidRole) {
+            // Satu employee aktif per user: users.employee_id unik.
+            $user = User::factory()->create([
+                'role' => $invalidRole,
+                'employee_id' => Employee::factory()->create()->id,
+            ]);
+
+            foreach (['notifications.read', 'notifications.update', 'hari_libur.read'] as $permission) {
+                $this->assertFalse(
+                    $user->hasPermission($permission),
+                    "Role invalid harus fail-closed untuk PATEN user-context {$permission}."
+                );
+            }
+
+            foreach (['employees.read_self', 'cuti.create', 'cuti.read_own'] as $permission) {
+                $this->assertFalse(
+                    $user->hasPermission($permission),
+                    "Role invalid harus fail-closed untuk PATEN employee {$permission}."
+                );
+            }
+
+            $this->assertFalse($user->hasPermission('employees.create'));
+        }
+    }
+
+    public function test_deleted_canonical_role_is_fail_closed_for_paten_and_rbac(): void
+    {
+        // Row role kanonis dihapus harus fail-closed untuk PATEN & RBAC — DB adalah source of truth.
+        foreach (['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $canonicalRole) {
+            $role = Role::where('name', $canonicalRole)->firstOrFail();
+            $roleId = $role->id;
+            $role->delete();
+
+            $user = User::factory()->create([
+                'role' => $canonicalRole,
+                'employee_id' => Employee::factory()->create()->id,
+            ]);
+
+            foreach (['notifications.read', 'hari_libur.read', 'employees.read_self', 'cuti.create'] as $permission) {
+                $this->assertFalse(
+                    $user->hasPermission($permission),
+                    "Role kanonis terhapus {$canonicalRole} harus fail-closed untuk {$permission}."
+                );
+            }
+
+            $this->assertFalse($user->hasPermission('employees.read'));
+            $this->assertFalse($user->hasPermission('audit_logs.read'));
+
+            // Kembalikan untuk iterasi berikutnya.
+            Role::create(['id' => $roleId, 'name' => $canonicalRole, 'display_name' => $canonicalRole]);
+            $this->seed(RbacSeeder::class);
+        }
+    }
+
     public function test_permission_records_are_seeded_idempotently(): void
     {
-        // Re-seed tidak boleh menduplikasi permission (firstOrCreate + sync).
+        // Re-seed tidak boleh menduplikasi permission (updateOrCreate + sync).
+        $before = Permission::count();
         $this->seed(RbacSeeder::class);
 
-        // Seeder gabungan mencakup permission operasional, cuti, data referensi, dan simulasi role.
-        $this->assertSame(43, Permission::count());
+        $this->assertSame($before, Permission::count());
         $this->assertTrue(
             Role::where('name', 'super_admin')->firstOrFail()
                 ->permissions()->where('name', 'hari_libur.delete')->exists()
@@ -187,6 +247,30 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertSame(1, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
     }
 
+    public function test_operational_permissions_are_provisioned_during_migration_for_default_roles(): void
+    {
+        $names = ['employee_histories.export', 'dokumen_sk.read', 'ews.read'];
+        Permission::query()->whereIn('name', $names)->delete();
+
+        $migration = require database_path('migrations/2026_08_31_000002_provision_operational_rbac_permissions.php');
+        $migration->up();
+        $migration->up();
+
+        foreach ($names as $name) {
+            $permission = Permission::query()->where('name', $name)->firstOrFail();
+
+            foreach (['super_admin', 'admin_kepegawaian', 'pimpinan'] as $roleName) {
+                $role = Role::query()->where('name', $roleName)->firstOrFail();
+                $this->assertDatabaseHas('role_permissions', [
+                    'role_id' => $role->id,
+                    'permission_id' => $permission->id,
+                ]);
+            }
+
+            $this->assertSame(3, DB::table('role_permissions')->where('permission_id', $permission->id)->count());
+        }
+    }
+
     public function test_permission_middleware_allows_user_with_permission(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -197,19 +281,25 @@ class RbacPermissionMiddlewareTest extends TestCase
         $response->assertCreated();
     }
 
-    public function test_role_middleware_blocks_role_outside_hari_libur_allowlist(): void
+    public function test_hari_libur_mutation_requires_permission_bukan_allowlist_role(): void
     {
-        // Hari libur sengaja dibatasi super_admin sebelum cek permission aksi dijalankan.
-        $user = User::factory()->adminKepegawaian()->create();
+        $permission = Permission::query()->where('name', 'hari_libur.create')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()
+            ->permissions()
+            ->syncWithoutDetaching([$permission->id]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
         $this->actingAs($user);
         $response = $this->postJsonWithCsrf('/api/v1/hari-libur', [
-            'tanggal' => '2026-01-01',
-            'nama' => 'Tahun Baru Masehi',
-            'tipe' => 'libur_nasional',
+            // 2026-01-01 sudah dised ReferenceSeeder; pakai tanggal bebas
+            // agar hook unik-tanggal tidak mengaburkan asersi permission.
+            'tanggal' => '2026-06-15',
+            'nama' => 'Cuti Bersama Pengujian',
+            'tipe' => 'cuti_bersama',
         ]);
 
-        $response->assertForbidden();
+        $response->assertCreated();
     }
 
     public function test_permission_enforced_even_when_route_role_allows(): void
@@ -232,6 +322,21 @@ class RbacPermissionMiddlewareTest extends TestCase
     public function test_admin_kepegawaian_can_read_audit_logs_with_permission(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user);
+        $response = $this->getJson('/api/v1/audit-log');
+
+        $response->assertOk();
+    }
+
+    public function test_audit_logs_require_permission_bukan_allowlist_role(): void
+    {
+        $permission = Permission::query()->where('name', 'audit_logs.read')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()
+            ->permissions()
+            ->syncWithoutDetaching([$permission->id]);
+        $employee = Employee::factory()->create();
+        $user = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
 
         $this->actingAs($user);
         $response = $this->getJson('/api/v1/audit-log');
@@ -294,9 +399,30 @@ class RbacPermissionMiddlewareTest extends TestCase
         $this->assertTrue($role->permissions()->where('name', 'discipline_records.create')->exists());
     }
 
-    public function test_discipline_delete_permission_is_not_seeded(): void
+    public function test_discipline_delete_permission_is_seeded_for_admin(): void
     {
-        $this->assertFalse(Permission::where('name', 'discipline_records.delete')->exists());
+        $this->assertTrue(Permission::where('name', 'discipline_records.delete')->exists());
+        $this->assertTrue(
+            Role::where('name', 'admin_kepegawaian')->firstOrFail()
+                ->permissions()->where('name', 'discipline_records.delete')->exists()
+        );
+    }
+
+    public function test_employees_export_permission_is_seeded_for_admin_only(): void
+    {
+        $this->assertTrue(Permission::where('name', 'employees.export')->exists());
+        $this->assertTrue(
+            Role::where('name', 'admin_kepegawaian')->firstOrFail()
+                ->permissions()->where('name', 'employees.export')->exists()
+        );
+
+        foreach (['pimpinan', 'kepala_bagian', 'pegawai'] as $roleName) {
+            $this->assertFalse(
+                Role::where('name', $roleName)->firstOrFail()
+                    ->permissions()->where('name', 'employees.export')->exists(),
+                "Role {$roleName} tidak boleh memiliki employees.export secara default."
+            );
+        }
     }
 
     public function test_employee_family_permissions_exist_and_are_assigned_to_admin_kepegawaian(): void

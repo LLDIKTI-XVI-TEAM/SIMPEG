@@ -1,0 +1,159 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Employee;
+use App\Models\Permission;
+use App\Models\RefStatusPegawai;
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
+
+class EmployeeApiScopeTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RbacSeeder::class);
+    }
+
+    public static function statusBarisPegawai(): array
+    {
+        return [['AKTIF', true], ['TUGAS_BELAJAR', true], ['PENSIUN', false]];
+    }
+
+    #[DataProvider('statusBarisPegawai')]
+    public function test_refresh_baris_mempertahankan_keaktifan_dari_kelompok_status(string $kode, bool $aktif): void
+    {
+        $this->seedReferenceData();
+        $status = RefStatusPegawai::where('kode', $kode)->firstOrFail();
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => $status->nama,
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->getJson("/api/v1/pegawai/{$employee->id}/table-row")
+            ->assertOk()
+            ->assertJsonPath('employee.id', $employee->id)
+            ->assertJsonPath('employee.status_nama', $status->nama)
+            ->assertJsonPath('employee.is_aktif', $aktif);
+
+        $this->assertSame($status->id, $employee->fresh()->status_pegawai_id);
+        $this->assertDatabaseCount('employee_status_histories', 0);
+    }
+
+    public function test_pegawai_hanya_boleh_membaca_keluarga_dan_riwayat_milik_sendiri(): void
+    {
+        $ownEmployee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $pegawai = User::factory()->pegawai()->create(['employee_id' => $ownEmployee->id]);
+
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$ownEmployee->id}/keluarga")
+            ->assertOk();
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$ownEmployee->id}/riwayat-kepangkatan")
+            ->assertOk();
+
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$otherEmployee->id}/keluarga")
+            ->assertForbidden();
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$otherEmployee->id}/riwayat-kepangkatan")
+            ->assertForbidden();
+    }
+
+    public function test_super_admin_dan_admin_kepegawaian_tetap_boleh_membaca_data_pegawai_lain(): void
+    {
+        $target = Employee::factory()->create();
+
+        foreach ([User::factory()->superAdmin()->create(), User::factory()->adminKepegawaian()->create()] as $manager) {
+            $this->actingAs($manager)
+                ->getJson("/api/v1/pegawai/{$target->id}/keluarga")
+                ->assertOk();
+            $this->actingAs($manager)
+                ->getJson("/api/v1/pegawai/{$target->id}/riwayat-kepangkatan")
+                ->assertOk();
+        }
+    }
+
+    public function test_pimpinan_ditolak_pada_endpoint_keluarga_mentah_lintas_pegawai(): void
+    {
+        // Payload keluarga admin memuat NIK; Pimpinan wajib memakai surface
+        // khusus yang dimasking, bukan endpoint API mentah lintas pegawai.
+        $target = Employee::factory()->create();
+        $pimpinan = User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]);
+
+        $this->actingAs($pimpinan)
+            ->getJson("/api/v1/pegawai/{$target->id}/keluarga")
+            ->assertForbidden();
+        $this->actingAs($pimpinan)
+            ->getJson("/api/v1/pegawai/{$target->id}/riwayat-kepangkatan")
+            ->assertForbidden();
+    }
+
+    public function test_grant_employee_read_pada_pegawai_tetap_hanya_mengizinkan_target_milik_sendiri(): void
+    {
+        $ownEmployee = Employee::factory()->create();
+        $otherEmployee = Employee::factory()->create();
+        $pegawai = User::factory()->pegawai()->create(['employee_id' => $ownEmployee->id]);
+        $permission = Permission::query()->where('name', 'employees.read')->firstOrFail();
+        Role::query()->where('name', 'pegawai')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$ownEmployee->id}/table-row")
+            ->assertOk();
+        $this->actingAs($pegawai)
+            ->getJson("/api/v1/pegawai/{$otherEmployee->id}/table-row")
+            ->assertForbidden();
+    }
+
+    public function test_grant_riwayat_pada_kabag_tidak_membuka_api_mentah_dan_detail_tetap_dibatasi_bawahan(): void
+    {
+        $kabagEmployee = Employee::factory()->create();
+        $directReport = Employee::factory()->create(['kepala_bagian_id' => $kabagEmployee->id]);
+        $unrelatedEmployee = Employee::factory()->create();
+        $kabag = User::factory()->kepalaBagian()->create(['employee_id' => $kabagEmployee->id]);
+        $permissionIds = Permission::query()->whereIn('name', ['employee_histories.read', 'employees.read'])->pluck('id');
+        Role::query()->where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching($permissionIds);
+
+        $this->actingAs($kabag)
+            ->getJson("/api/v1/pegawai/{$directReport->id}/riwayat-kepangkatan")
+            ->assertForbidden();
+        $this->actingAs($kabag)
+            ->getJson("/api/v1/pegawai/{$unrelatedEmployee->id}/riwayat-kepangkatan")
+            ->assertForbidden();
+
+        // Metadata bawahan tetap tersedia melalui detail berotorisasi, bukan payload mentah.
+        $this->actingAs($kabag)
+            ->get(route('rbac.pegawai.show', $directReport))
+            ->assertOk()
+            ->assertSee($directReport->nama_lengkap);
+        $this->actingAs($kabag)
+            ->get(route('rbac.pegawai.show', $unrelatedEmployee))
+            ->assertForbidden();
+    }
+
+    public function test_kepala_bagian_ditolak_pada_endpoint_keluarga_mentah_walaupun_bawahan_langsung(): void
+    {
+        $kabagEmployee = Employee::factory()->create();
+        $directReport = Employee::factory()->create(['kepala_bagian_id' => $kabagEmployee->id]);
+        $kabag = User::factory()->kepalaBagian()->create(['employee_id' => $kabagEmployee->id]);
+        $permission = Permission::query()->where('name', 'employee_families.read')->firstOrFail();
+        Role::query()->where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $this->actingAs($kabag)
+            ->getJson("/api/v1/pegawai/{$directReport->id}/keluarga")
+            ->assertForbidden();
+    }
+}

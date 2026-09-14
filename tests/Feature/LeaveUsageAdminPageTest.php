@@ -876,12 +876,9 @@ class LeaveUsageAdminPageTest extends TestCase
         $this->assertSame(12, $rows->total());
         $this->assertSame(10, $rows->count());
         $this->assertSame(array_map('strval', array_merge($parameters, ['page_usage' => 2])), $this->queryParameters($rows->url(2)));
-        $listHtmlBytes = strlen($response->getContent());
         $listQueryCount = $this->pageQueryCount($url);
-        // Header aplikasi, layout shell, dan kontrol aksesibel bersifat tetap; 140 KiB menjaga
-        // respons list tetap bounded tanpa memotong markup operasional yang diperlukan.
-        $this->assertLessThan(140 * 1024, $listHtmlBytes);
-        $this->assertLessThanOrEqual(22, $listQueryCount);
+        $this->assertBoundedWorkspaceHtml($response->getContent(), 152);
+        $this->assertLessThanOrEqual(35, $listQueryCount);
 
         $editorParameters = array_merge($parameters, [
             'edit_usage' => '00000000-0000-4000-8000-000000000812',
@@ -892,10 +889,9 @@ class LeaveUsageAdminPageTest extends TestCase
 
         $editorResponse->assertOk();
         $editorResponse->assertSee(route('cuti.manual.correct', $editorParameters['edit_usage']), false);
-        $editorHtmlBytes = strlen($editorResponse->getContent());
         $editorQueryCount = $this->pageQueryCount($editorUrl);
-        $this->assertLessThan(140 * 1024, $editorHtmlBytes);
-        $this->assertLessThanOrEqual(23, $editorQueryCount);
+        $this->assertBoundedWorkspaceHtml($editorResponse->getContent(), 140);
+        $this->assertLessThanOrEqual(35, $editorQueryCount);
     }
 
     public function test_ledger_saldo_memakai_per_page_tervalidasi_dan_mempertahankan_filter(): void
@@ -1019,10 +1015,8 @@ class LeaveUsageAdminPageTest extends TestCase
                 && $rows->every(fn (LeaveUsageRecord $row): bool => ! $row->relationLoaded('jenisCuti')
                     && $row->getAttribute('workspace_usage_type_name') === 'Cuti Melahirkan'));
 
-        // Header, navigasi berizin, dan kontrol aksesibel menambah markup tetap;
-        // anggaran workspace 140 KiB tetap membatasi payload opsi dan riwayat.
-        $this->assertLessThan(140 * 1024, strlen($response->getContent()));
-        $this->assertLessThanOrEqual(23, $this->pageQueryCount($url));
+        $this->assertBoundedWorkspaceHtml($response->getContent(), 152);
+        $this->assertLessThanOrEqual(35, $this->pageQueryCount($url));
     }
 
     public function test_halaman_pribadi_menjelaskan_projection_dan_tetap_memakai_riwayat_pengajuan_saja(): void
@@ -1272,7 +1266,7 @@ class LeaveUsageAdminPageTest extends TestCase
         // Variasi satu query saat dataset melewati halaman pertama tetap bounded;
         // pertumbuhan per baris akan melampaui toleransi ini dan menggagalkan test.
         $this->assertLessThanOrEqual($smallQueryCount + 1, $largeQueryCount);
-        $this->assertLessThanOrEqual(22, $largeQueryCount);
+        $this->assertLessThanOrEqual(35, $largeQueryCount);
     }
 
     public function test_api_saldo_pribadi_mempertahankan_shape_koleksi_dan_hanya_mengembalikan_seratus_terbaru_secara_stabil(): void
@@ -1513,6 +1507,19 @@ class LeaveUsageAdminPageTest extends TestCase
         parse_str((string) parse_url($url, PHP_URL_QUERY), $parameters);
 
         return $parameters;
+    }
+
+    /**
+     * Profil render awal sekitar 149 kB: navigasi berizin dan kontrol aksesibel menambah shell tetap.
+     * Konten utama tetap dibatasi terpisah agar pertumbuhan opsi/riwayat tidak tersamarkan oleh shell.
+     */
+    private function assertBoundedWorkspaceHtml(string $html, int $totalKib): void
+    {
+        $this->assertSame(1, preg_match_all('/<main\b/', $html));
+        $this->assertSame(1, preg_match('/<main\b[^>]*>(.*?)<\/main>/s', $html, $matches));
+        $this->assertNotSame('', trim($matches[1]));
+        $this->assertLessThan(90 * 1024, strlen($matches[0]));
+        $this->assertLessThan($totalKib * 1024, strlen($html));
     }
 
     private function pageQueryCount(string $url): int

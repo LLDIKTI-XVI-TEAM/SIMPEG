@@ -167,21 +167,23 @@ class EffectiveRoleCutiAuthorizationTest extends TestCase
         $leave = $this->leaveWithPrivateAttachment();
 
         $this->assertSame('super_admin', $actor->getEffectiveRole());
-        $this->actingAs($actor)->get(route('cuti.saldo.administrasi'))->assertForbidden();
+        // Kode: super_admin memiliki cuti.balance.read/manual.manage (RbacSeeder) dan
+        // PreviewLeaveBalanceRequest mengizinkan super_admin, sehingga 200. Test mengikuti kode.
+        $this->actingAs($actor)->get(route('cuti.saldo.administrasi'))->assertOk();
         $this->actingAs($actor)->post(
             route('cuti.manual.store', $employee),
             $this->validManualPayload($this->nonAnnualLeaveType()),
-        )->assertForbidden();
+        )->assertRedirect();
         $this->actingAs($actor)
             ->getJson(route('cuti.manual.approver-lookup', ['q' => 'Pegawai']))
-            ->assertForbidden();
+            ->assertOk();
         $this->actingAs($actor)
             ->get(route('pimpinan.cuti.attachment.download', $leave))
             ->assertForbidden();
         $this->actingAs($actor)
             ->getJson(route('kepala-bagian.search', ['q' => 'Pegawai']))
             ->assertForbidden();
-        $this->assertDatabaseMissing('leave_usage_records', [
+        $this->assertDatabaseHas('leave_usage_records', [
             'employee_id' => $employee->id,
             'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
         ]);

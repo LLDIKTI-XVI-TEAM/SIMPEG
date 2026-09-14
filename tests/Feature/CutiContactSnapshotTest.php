@@ -527,7 +527,7 @@ class CutiContactSnapshotTest extends TestCase
         $fallbackResponse->assertSee(e($teleponSnapshot), false);
         $fallbackResponse->assertDontSee($alamatSnapshot, false);
         $fallbackResponse->assertDontSee($teleponSnapshot, false);
-        $this->assertContactControlAccessibility($fallbackResponse->getContent(), false);
+        $this->assertContactControlAccessibility($fallbackResponse->getContent(), false, '-');
 
         $this->withoutMiddleware(ShareErrorsFromSession::class);
         $this->withViewErrors([
@@ -546,9 +546,9 @@ class CutiContactSnapshotTest extends TestCase
         $response->assertSee('for="nomor_telepon"', false);
         $response->assertSee('Alamat Selama Cuti', false);
         $response->assertSee('Nomor Telepon', false);
-        $this->assertContactControlAccessibility($response->getContent(), true);
-        $response->assertSee('<p id="alamat_selama_cuti_error"', false);
-        $response->assertSee('<p id="nomor_telepon_error"', false);
+        $this->assertContactControlAccessibility($response->getContent(), true, '-');
+        $response->assertSee('<p id="alamat_selama_cuti-error"', false);
+        $response->assertSee('<p id="nomor_telepon-error"', false);
         $response->assertSee('Alamat selama cuti wajib diisi.', false);
         $response->assertSee('Nomor telepon tidak valid.', false);
         $response->assertSee(e($alamatLama), false);
@@ -711,14 +711,14 @@ class CutiContactSnapshotTest extends TestCase
      * Memastikan atribut aksesibilitas terikat pada kontrol kontak yang tepat,
      * tanpa bergantung pada urutan atau baris atribut hasil kompilasi Blade.
      */
-    private function assertContactControlAccessibility(string $html, bool $hasErrors): void
+    private function assertContactControlAccessibility(string $html, bool $hasErrors, string $separator = '_'): void
     {
         $addressDescription = $hasErrors
-            ? 'alamat_selama_cuti_help alamat_selama_cuti_error'
-            : 'alamat_selama_cuti_help';
+            ? "alamat_selama_cuti{$separator}help alamat_selama_cuti{$separator}error"
+            : "alamat_selama_cuti{$separator}help";
         $phoneDescription = $hasErrors
-            ? 'nomor_telepon_help nomor_telepon_error'
-            : 'nomor_telepon_help';
+            ? "nomor_telepon{$separator}help nomor_telepon{$separator}error"
+            : "nomor_telepon{$separator}help";
         $document = new \DOMDocument;
         @$document->loadHTML($html);
 

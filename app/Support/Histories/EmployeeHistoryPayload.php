@@ -2,6 +2,7 @@
 
 namespace App\Support\Histories;
 
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
@@ -18,6 +19,19 @@ class EmployeeHistoryPayload
     public function primeAttachmentReferences(iterable $paths): void
     {
         $this->attachments->primeDocumentReferences($paths);
+    }
+
+    /**
+     * Mempertahankan kontrak data SK Pengangkatan Pertama dengan tanggal kalender yang deterministik.
+     *
+     * @return array<string, mixed>
+     */
+    public function appointment(Appointment $appointment, ?Employee $employee = null): array
+    {
+        return $this->withDownloadUrl($this->withDateOnlyFields($appointment->toArray(), [
+            'tanggal_sk' => $appointment->tanggal_sk,
+            'tmt_pengangkatan' => $appointment->tmt_pengangkatan,
+        ]), $employee, 'appointment', $appointment);
     }
 
     /**
@@ -80,8 +94,25 @@ class EmployeeHistoryPayload
     {
         $payload['download_url'] = $employee === null
             ? null
-            : $this->attachments->downloadUrl($employee, $type, $history, 'pegawai.history-attachments.download');
+            : $this->attachments->downloadUrl($employee, $type, $history, $this->historyRouteName());
 
         return $payload;
+    }
+
+    private function historyRouteName(): string
+    {
+        // Pertahankan surface RBAC: Kepala Bagian/Pegawai yang menyimpan via /rbac/pegawai/...
+        // harus mendapat URL rbac.pegawai.history-attachments.download, bukan pegawai.* (admin-only 403).
+        $routeName = request()?->route()?->getName();
+        if (is_string($routeName) && str_starts_with($routeName, 'rbac.')) {
+            return 'rbac.pegawai.history-attachments.download';
+        }
+
+        $user = request()?->user() ?? auth()->user();
+        if ($user !== null && in_array($user->getEffectiveRole(), ['kepala_bagian', 'pegawai'], true)) {
+            return 'rbac.pegawai.history-attachments.download';
+        }
+
+        return 'pegawai.history-attachments.download';
     }
 }

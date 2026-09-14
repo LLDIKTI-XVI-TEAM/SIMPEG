@@ -4,7 +4,7 @@
             <div>
                 <h1 class="text-2xl font-semibold text-ink">Laporan Riwayat Kepangkatan</h1>
                 <x-ui.breadcrumb :items="[
-                    ['label' => 'Dashboard', 'url' => route('pimpinan.dashboard')],
+                    ['label' => 'Dashboard', 'url' => route('dashboard')],
                     ['label' => 'Laporan'],
                     ['label' => 'Riwayat Kepangkatan']
                 ]" />

@@ -37,6 +37,10 @@ return new class extends Migration
             $table->index('source_ews_alert_id');
         });
 
+        if (DB::getDriverName() !== 'pgsql') {
+            return;
+        }
+
         DB::statement(
             'ALTER TABLE employee_status_transitions ADD CONSTRAINT '.self::SOURCE_KIND_CHECK
             .' CHECK ((kind = \'ews_retirement\') = (source_ews_alert_id IS NOT NULL))',
@@ -62,40 +66,38 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::transaction(function (): void {
-            // Approval mengunci ews_alerts sebelum membuat transition. Urutan lock
-            // yang sama mencegah writer baru lolos di antara preflight dan DDL.
-            DB::statement(
-                'LOCK TABLE ews_alerts, employee_status_transitions IN ACCESS EXCLUSIVE MODE',
-            );
-
-            // Kind ini tidak dapat direpresentasikan setelah source dihapus. Preflight
-            // wajib berhenti sebelum trigger, constraint, index, atau kolom dimutasi.
-            if (DB::table('employee_status_transitions')
-                ->where('kind', 'ews_retirement')
-                ->exists()) {
-                throw new RuntimeException(
-                    'Rollback source EWS ditolak: masih terdapat transisi kind ews_retirement.',
+        if (DB::getDriverName() === 'pgsql') {
+            DB::transaction(function (): void {
+                DB::statement(
+                    'LOCK TABLE ews_alerts, employee_status_transitions IN ACCESS EXCLUSIVE MODE',
                 );
-            }
 
-            DB::statement(
-                'DROP TRIGGER IF EXISTS '.self::IMMUTABLE_TRIGGER.' ON employee_status_transitions',
-            );
-            DB::statement('DROP FUNCTION IF EXISTS '.self::IMMUTABLE_FUNCTION.'()');
-            DB::statement(
-                'ALTER TABLE employee_status_transitions DROP CONSTRAINT IF EXISTS '.self::SOURCE_KIND_CHECK,
-            );
+                if (DB::table('employee_status_transitions')
+                    ->where('kind', 'ews_retirement')
+                    ->exists()) {
+                    throw new RuntimeException(
+                        'Rollback source EWS ditolak: masih terdapat transisi kind ews_retirement.',
+                    );
+                }
 
-            Schema::table('employee_status_transitions', function (Blueprint $table): void {
-                $table->dropIndex(['source_ews_alert_id']);
-                $table->dropConstrainedForeignId('source_ews_alert_id');
+                DB::statement(
+                    'DROP TRIGGER IF EXISTS '.self::IMMUTABLE_TRIGGER.' ON employee_status_transitions',
+                );
+                DB::statement('DROP FUNCTION IF EXISTS '.self::IMMUTABLE_FUNCTION.'()');
+                DB::statement(
+                    'ALTER TABLE employee_status_transitions DROP CONSTRAINT IF EXISTS '.self::SOURCE_KIND_CHECK,
+                );
             });
+        }
 
-            Schema::table('ews_alerts', function (Blueprint $table): void {
-                $table->dropIndex(['followup_group_id']);
-                $table->dropConstrainedForeignId('followup_group_id');
-            });
+        Schema::table('employee_status_transitions', function (Blueprint $table): void {
+            $table->dropIndex(['source_ews_alert_id']);
+            $table->dropConstrainedForeignId('source_ews_alert_id');
+        });
+
+        Schema::table('ews_alerts', function (Blueprint $table): void {
+            $table->dropIndex(['followup_group_id']);
+            $table->dropConstrainedForeignId('followup_group_id');
         });
     }
 };

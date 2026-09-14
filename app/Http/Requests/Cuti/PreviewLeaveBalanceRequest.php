@@ -12,8 +12,8 @@ class PreviewLeaveBalanceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->employee !== null
-            && $this->user()?->hasPermission('cuti.create');
+        // Preview form mengikuti PATEN pengajuan; data tetap milik Employee yang terikat ke akun.
+        return $this->user()?->hasPermission('cuti.create') ?? false;
     }
 
     /**

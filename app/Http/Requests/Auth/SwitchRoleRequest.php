@@ -9,9 +9,9 @@ class SwitchRoleRequest extends FormRequest
     /**
      * Determine if the user is authorized to make this request.
      *
-     * Invariant keamanan: aksi switch hanya tersedia bagi akun yang role ASLI-nya
-     * super_admin dan memiliki permission users.switch_role. Role lain tetap ditolak
-     * walaupun permission tersebut salah konfigurasi/terpasang pada role lain.
+     * Invariant keamanan: Switch Role adalah exception yang hanya tersedia bagi
+     * Super Admin, Admin Kepegawaian, atau Pimpinan asli dengan permission
+     * users.switch_role.
      */
     public function authorize(): bool
     {
@@ -21,7 +21,7 @@ class SwitchRoleRequest extends FormRequest
             return false;
         }
 
-        return $user->role === 'super_admin' && $user->hasPermission('users.switch_role');
+        return $user->canInitiateSwitchRole();
     }
 
     /**

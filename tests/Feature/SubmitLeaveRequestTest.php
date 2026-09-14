@@ -11,9 +11,11 @@ use App\Models\LeaveApprovalChain;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveUsageRecord;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\StorageRecoveryTask;
 use App\Models\SupervisorAssignment;
@@ -161,7 +163,12 @@ class SubmitLeaveRequestTest extends TestCase
 
                 LeaveUsageRecord::query()->create([
                     'employee_id' => $aktor['employee']->id,
-                    'leave_type_id' => RefJenisCuti::query()->where('code', 'tahunan')->value('id'),
+                    // setUp file ini hanya seed RBAC; pastikan tipe tahunan ada
+                    // agar fixture tidak menabrak NOT NULL leave_type_id.
+                    'leave_type_id' => RefJenisCuti::query()->firstOrCreate(
+                        ['code' => 'tahunan'],
+                        ['nama' => 'Cuti Tahunan', 'mengurangi_saldo_tahunan' => true, 'khusus_pns' => false],
+                    )->id,
                     'source_type' => LeaveUsageRecord::SOURCE_MANUAL_EXTERNAL,
                     'leave_request_id' => null,
                     'leave_request_case_id' => null,
@@ -246,15 +253,35 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertDatabaseCount('leave_requests', 0);
     }
 
-    public function test_super_admin_tidak_bisa_membuka_form_atau_mengajukan_cuti(): void
+    public function test_super_admin_bisa_membuka_form_dan_mengajukan_cuti(): void
     {
-        $employee = Employee::factory()->create();
-        $user = User::factory()->superAdmin()->create(['employee_id' => $employee->id]);
+        $aktor = $this->makePemohon(role: 'super_admin');
         $jenis = $this->jenisCuti('Cuti Super Admin');
+        $this->reconcileAnnualProjection($aktor, 2026);
 
-        $this->actingAs($user)->get(route('cuti.create'))->assertForbidden();
-        $this->actingAs($user)->post(route(self::ROUTE), $this->payload($jenis))->assertForbidden();
-        $this->assertDatabaseCount('leave_requests', 0);
+        $this->actingAs($aktor['user'])->get(route('cuti.create'))->assertOk();
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))
+            ->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+        ]);
+    }
+
+    public function test_pimpinan_aktif_dapat_membuka_form_dan_mengajukan_cuti_tanpa_grant_legacy(): void
+    {
+        $aktor = $this->makePemohon(role: 'pimpinan');
+        $jenis = $this->jenisCuti('Cuti Pimpinan');
+        $permission = Permission::query()->where('name', 'cuti.create')->firstOrFail();
+        Role::query()->where('name', 'pimpinan')->firstOrFail()->permissions()->detach($permission->id);
+        $this->reconcileAnnualProjection($aktor, 2026);
+
+        $this->actingAs($aktor['user'])->get(route('cuti.create'))->assertOk();
+        $this->actingAs($aktor['user'])->post(route(self::ROUTE), $this->payload($jenis))->assertRedirect(route('cuti'));
+        $this->assertDatabaseHas('leave_requests', [
+            'employee_id' => $aktor['employee']->id,
+            'jenis_cuti_id' => $jenis->id,
+        ]);
     }
 
     public function test_pegawai_berhasil_mengajukan_cuti(): void
@@ -970,6 +997,22 @@ class SubmitLeaveRequestTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['jenis_cuti_id', 'tanggal_mulai', 'tanggal_selesai', 'alasan']);
+    }
+
+    public function test_tanggal_selesai_sebelum_mulai_ditolak_dengan_pesan_bahasa_indonesia(): void
+    {
+        $aktor = $this->makePemohon();
+        $jenis = $this->jenisCuti('Cuti Sakit');
+
+        $response = $this->actingAs($aktor['user'])->postJson(route(self::ROUTE), $this->payload($jenis, [
+            'tanggal_mulai' => '2026-07-10',
+            'tanggal_selesai' => '2026-07-06',
+        ]));
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['tanggal_selesai'])
+            ->assertJsonPath('errors.tanggal_selesai.0', 'Tanggal selesai harus sama dengan atau setelah tanggal mulai.');
+        $this->assertDatabaseCount('leave_requests', 0);
     }
 
     public function test_gerbang_saldo_cocok_dengan_nama_jenis_cuti_terseed(): void
@@ -2272,7 +2315,7 @@ class SubmitLeaveRequestTest extends TestCase
         $this->assertMatchesRegularExpression('/<textarea\\b(?=[^>]*\\bid="alamat_selama_cuti")(?=[^>]*\\bname="alamat_selama_cuti")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="nomor_telepon")(?=[^>]*\\bname="nomor_telepon")[^>]*\\bdisabled\\b[^>]*>/', $content);
         $this->assertMatchesRegularExpression('/<input\\b(?=[^>]*\\bid="lampiran")(?=[^>]*\\bname="lampiran")[^>]*\\bdisabled\\b[^>]*>/', $content);
-        $this->assertMatchesRegularExpression('/<button\\b(?=[^>]*\\btype="submit")(?=[^>]*:disabled="saldoError \\|\\| true")[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<button\\b(?=[^>]*\\btype="submit")(?=[^>]*:disabled="isSubmissionBlocked\\(\\) \\|\\| true")[^>]*>/', $content);
     }
 
     public function test_get_form_menampilkan_label_peran_chain_yang_sebenarnya(): void

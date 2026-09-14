@@ -2,6 +2,8 @@
 
 namespace Tests\Unit\Support\Documents;
 
+use App\Models\Permission;
+use App\Models\Role;
 use App\Models\User;
 use App\Support\Documents\DocumentAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,11 +36,44 @@ class DocumentAuthorizationTest extends TestCase
         $this->assertTrue(DocumentAuthorization::canManage($user));
     }
 
-    public function test_pimpinan_has_no_document_access(): void
+    public function test_pimpinan_can_view_central_archive_with_document_permission(): void
     {
         $user = User::factory()->create(['role' => 'pimpinan']);
 
+        $this->assertTrue(DocumentAuthorization::canViewArchive($user));
+        $this->assertFalse(DocumentAuthorization::canManage($user));
+    }
+
+    public function test_kepala_bagian_can_view_archive_with_read_permission(): void
+    {
+        $user = User::factory()->create(['role' => 'kepala_bagian']);
+
+        // RbacSeeder default tanpa dokumen_sk.read → awalnya tidak boleh; setelah grant manual boleh (A1 arsip).
         $this->assertFalse(DocumentAuthorization::canViewArchive($user));
+
+        $user->refresh();
+        Role::where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id,
+            ]);
+
+        $this->assertTrue(DocumentAuthorization::canViewArchive($user->refresh()));
+        $this->assertFalse(DocumentAuthorization::canManage($user));
+    }
+
+    public function test_pegawai_can_view_archive_with_read_permission(): void
+    {
+        $user = User::factory()->create(['role' => 'pegawai']);
+
+        // RbacSeeder default tanpa dokumen_sk.read → awalnya tidak boleh; setelah grant manual boleh (scope dokumen sendiri).
+        $this->assertFalse(DocumentAuthorization::canViewArchive($user));
+
+        Role::where('name', 'pegawai')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'dokumen_sk.read')->firstOrFail()->id,
+            ]);
+
+        $this->assertTrue(DocumentAuthorization::canViewArchive($user->refresh()));
         $this->assertFalse(DocumentAuthorization::canManage($user));
     }
 

@@ -55,6 +55,17 @@ class AuditEventLabelTest extends TestCase
         $this->assertSame('IMPORT', $payload['event_label']);
     }
 
+    /** Lifecycle identitas SSO adalah autentikasi: tampil di kategori autentikasi, bukan aktivitas_sistem. */
+    public function test_event_identitas_sso_terklasifikasi_autentikasi(): void
+    {
+        foreach (['SSO_BINDING', 'SSO_MAPPING_REJECTED'] as $event) {
+            $payload = AuditLogViewPayload::forView($this->auditLog($event, 'User'));
+
+            $this->assertSame('autentikasi', $payload['kategori']);
+            $this->assertSame($event, $payload['event']);
+        }
+    }
+
     public function test_label_tidak_memakai_kata_ditolak(): void
     {
         foreach (['NOT_APPROVED', 'CHANGE_REQUESTED', 'DEFER'] as $event) {
@@ -122,13 +133,13 @@ class AuditEventLabelTest extends TestCase
         ]);
     }
 
-    private function auditLog(string $event): AuditLog
+    private function auditLog(string $event, string $auditableType = 'LeaveRequest'): AuditLog
     {
         return AuditLog::query()->create([
             'user_id' => null,
             'user_name' => 'Petugas Uji',
             'event' => $event,
-            'auditable_type' => 'LeaveRequest',
+            'auditable_type' => $auditableType,
             'auditable_id' => (string) Str::uuid(),
             'old_values' => null,
             'new_values' => null,

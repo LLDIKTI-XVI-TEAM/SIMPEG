@@ -74,6 +74,7 @@
         @endforelse
     </div>
 
+    @if($canReadHistories)
     <div class="space-y-3">
         <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
             Estimasi Jadwal Kepegawaian
@@ -94,6 +95,7 @@
             @endforeach
         </div>
     </div>
+    @endif
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <div class="space-y-4 rounded-lg border border-border bg-soft/30 p-4">
@@ -195,6 +197,7 @@
         </div>
     </div>
 
+    @if($canReadHistories)
     <div class="space-y-4 rounded-lg border border-border bg-soft/30 p-4">
         <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
             Informasi Pekerjaan Utama
@@ -220,7 +223,9 @@
             </div>
         </dl>
     </div>
+    @endif
 
+    @if($canReadHistories)
     <div class="space-y-4 rounded-lg border border-border bg-soft/30 p-4">
         <h3 class="border-b border-border pb-1.5 text-xs font-bold uppercase tracking-wider text-ink font-sans">
             Riwayat Perubahan Status Kepegawaian
@@ -269,4 +274,5 @@
             @endif
         </div>
     </div>
+    @endif
 </div>

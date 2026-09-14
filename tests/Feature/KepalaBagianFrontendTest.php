@@ -9,8 +9,10 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
 use App\Models\RefStatusPegawai;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
@@ -97,7 +99,7 @@ class KepalaBagianFrontendTest extends TestCase
             ->assertSee('Bawahan Tugas Belajar Dashboard');
     }
 
-    public function test_navigation_menampilkan_cuti_bawahan_dan_pengajuan_cuti_sendiri(): void
+    public function test_navigation_menampilkan_cuti_bawahan_dan_monitoring_cuti(): void
     {
         [$user] = $this->kepalaBagian();
 
@@ -1065,6 +1067,12 @@ class KepalaBagianFrontendTest extends TestCase
     public function test_ews_page_only_exposes_alerts_for_direct_reports(): void
     {
         [$user, $kepalaBagian] = $this->kepalaBagian();
+        // Kode: GET /kepala-bagian/ews memakai middleware permission:ews.read (web.php:840),
+        // sedangkan RbacSeeder tidak memberi ews.read ke kepala_bagian. Test mengikuti kode: grant eksplisit.
+        Role::where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching(
+                Permission::where('name', 'ews.read')->pluck('id')->all()
+            );
         $directReport = Employee::factory()->create([
             'nama_lengkap' => 'Bawahan EWS',
             'kepala_bagian_id' => $kepalaBagian->id,

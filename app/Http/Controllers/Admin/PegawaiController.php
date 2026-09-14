@@ -103,18 +103,6 @@ class PegawaiController extends Controller
 
             return $opts->isEmpty() ? collect(['II', 'III', 'IV']) : $opts;
         });
-        $golonganRefOptions = Cache::remember('ref.golongan', now()->addHours(6), function () {
-            return RefGolongan::orderBy('kode')->get();
-        });
-        $jabatanOptions = Cache::remember('ref.jabatan_with_jenis', now()->addHours(6), function () {
-            return RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
-        });
-        $jenisJabatanOptions = Cache::remember('ref.jenis_jabatan', now()->addHours(6), function () {
-            return RefJenisJabatan::orderBy('nama')->get();
-        });
-        $eselonOptions = Cache::remember('ref.eselon', now()->addHours(6), function () {
-            return RefEselon::orderBy('nama')->get();
-        });
 
         $filters = [
             'search' => trim((string) $request->query('search', '')),
@@ -200,7 +188,7 @@ class PegawaiController extends Controller
                 'sort' => $sort,
                 'direction' => $direction,
                 'per_page' => $perPage,
-            ]));
+            ]), $request->user());
             $initialRows = $initialPageData->items();
             $initialMeta = [
                 'total' => $initialPageData->total(),
@@ -222,11 +210,7 @@ class PegawaiController extends Controller
             'golonganOptions',
             'unitKerjaOptions',
             'jenisPegawaiOptions',
-            'statusOptions',
-            'golonganRefOptions',
-            'jabatanOptions',
-            'jenisJabatanOptions',
-            'eselonOptions'
+            'statusOptions'
         ));
     }
 
@@ -248,10 +232,21 @@ class PegawaiController extends Controller
     {
         try {
             $employee = $action->execute($request->validated(), $request);
+            $warnings = $action->warnings;
 
-            return redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.')
+            $successMsg = 'Data pegawai '.$employee->nama_lengkap.' berhasil ditambahkan.';
+            if (! empty($warnings)) {
+                $successMsg .= ' Peringatan: '.implode(' ', $warnings);
+            }
+
+            $redirect = redirect()->route($request->routeIs('rbac.pegawai.*') ? 'dashboard' : 'data-pegawai')
+                ->with('success', $successMsg)
                 ->with('employee_data_changed', true);
+            if (! empty($warnings)) {
+                $redirect = $redirect->with('warnings', $warnings);
+            }
+
+            return $redirect;
         } catch (\Throwable $e) {
             return back()
                 ->withInput($request->except(array_keys($request->allFiles())))
@@ -329,10 +324,19 @@ class PegawaiController extends Controller
 
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
+            $warnings = $action->warnings;
+
+            if ($request->routeIs('rbac.pegawai.*')) {
+                // Surface delegated tidak menerima model mentah melalui flash/sessionStorage setelah submit.
+                return redirect()->route('dashboard')
+                    ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                    ->with('warnings', $warnings)
+                    ->with('employee_data_changed', true);
+            }
 
             $employee->load([
                 'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
+                'statusPegawai:id,nama,kelompok',
                 'rankHistories:id,employee_id,no_sk,tanggal_sk,tmt_pangkat,file_sk,is_latest,created_at',
                 'positionHistories' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])
@@ -353,14 +357,24 @@ class PegawaiController extends Controller
             // (termasuk relasi dan file SK) tercatat di cache sessionStorage
             $editedEmployeeData = array_merge($employee->toArray(), $tableRow);
 
+            $successMsg = 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.';
+            if (! empty($warnings)) {
+                $successMsg .= ' Peringatan: '.implode(' ', $warnings);
+            }
+
             $redirect = redirect()->route('data-pegawai')
-                ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                ->with('success', $successMsg)
                 ->with('employee_data_changed', true)
                 ->with('edited_employee_id', $employee->id)
                 ->with('edited_employee_data', $editedEmployeeData);
+            if (! empty($warnings)) {
+                $redirect = $redirect->with('warnings', $warnings);
+            }
 
             // Jika ada berkas lainnya yang diunggah, bersihkan juga cache halaman dokumen
-            if ($request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid()) {
+            // Hanya jika file benar-benar tersimpan (ada permission), bukan warning
+            $hasBerkasUploaded = $request->hasFile('file_berkas_lainnya') && $request->file('file_berkas_lainnya')->isValid() && empty(array_filter($warnings, fn ($w) => str_contains($w, 'Berkas lainnya')));
+            if ($hasBerkasUploaded) {
                 $redirect = $redirect->with('document_data_changed', true);
             }
 

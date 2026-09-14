@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * @property string $id
+ * @property string|null $history_id
  * @property string $jenis_dokumen
  * @property string $nama_dokumen
  * @property string|null $nomor_dokumen
@@ -26,6 +27,7 @@ class Document extends Model
 
     protected $fillable = [
         'employee_id',
+        'history_id',
         'jenis_dokumen',
         'nama_dokumen',
         'nomor_dokumen',

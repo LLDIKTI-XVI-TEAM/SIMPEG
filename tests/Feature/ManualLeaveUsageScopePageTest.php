@@ -140,7 +140,7 @@ class ManualLeaveUsageScopePageTest extends TestCase
         $this->actingAs($actor)->get(route($dashboardRoute))->assertOk()
             ->assertSee('href="'.route('cuti.saldo.administrasi').'"', false);
 
-        $this->revoke($role, ['cuti.manual.manage', 'cuti.balance.reconcile']);
+        $this->revoke($role, ['cuti.manual.manage', 'cuti.balance.reconcile', 'cuti.balance.read']);
 
         $this->get(route('cuti.saldo.administrasi'))->assertForbidden();
         $this->get(route($dashboardRoute))->assertOk()
@@ -150,7 +150,7 @@ class ManualLeaveUsageScopePageTest extends TestCase
     public function test_action_langsung_menolak_aktor_tanpa_permission(): void
     {
         $actor = $this->actor('pegawai');
-        $this->revoke('pegawai', ['cuti.manual.manage', 'cuti.balance.reconcile']);
+        $this->revoke('pegawai', ['cuti.manual.manage', 'cuti.balance.reconcile', 'cuti.balance.read']);
 
         $this->expectException(AuthorizationException::class);
 
@@ -163,7 +163,7 @@ class ManualLeaveUsageScopePageTest extends TestCase
         $this->grant('pegawai', 'cuti.manual.manage');
         $action = app(ShowLeaveBalanceAdminAction::class);
         $this->assertTrue($action->execute([], $actor)['canManageManual']);
-        $this->revoke('pegawai', ['cuti.manual.manage', 'cuti.balance.reconcile']);
+        $this->revoke('pegawai', ['cuti.manual.manage', 'cuti.balance.reconcile', 'cuti.balance.read']);
 
         $this->expectException(AuthorizationException::class);
 

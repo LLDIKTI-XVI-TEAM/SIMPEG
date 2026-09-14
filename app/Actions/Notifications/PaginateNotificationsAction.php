@@ -10,9 +10,9 @@ class PaginateNotificationsAction
 {
     public function __construct(private readonly NotificationService $notifications) {}
 
-    public function execute(?string $employeeId, int $perPage = 10): array
+    public function execute(?string $userId, int $perPage = 10): array
     {
-        if ($employeeId === null) {
+        if ($userId === null) {
             return [
                 'notifications' => new LengthAwarePaginator([], 0, $perPage),
                 'unreadCount' => 0,
@@ -21,12 +21,12 @@ class PaginateNotificationsAction
 
         return [
             'notifications' => SimpegNotification::query()
-                ->where('user_id', $employeeId)
+                ->where('recipient_user_id', $userId)
                 ->orderBy('is_read')
                 ->orderByDesc('created_at')
                 ->orderByDesc('id')
                 ->paginate($perPage),
-            'unreadCount' => $this->notifications->unreadCountForEmployee($employeeId),
+            'unreadCount' => $this->notifications->unreadCountForUser($userId),
         ];
     }
 }

@@ -271,7 +271,7 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Tanggal Target')
             ->assertSee('Status Kelayakan')
             ->assertDontSee('href="#"', false)
-            ->assertSee(route('pimpinan.pegawai.show', $employee), false)
+            ->assertSee(route('rbac.pegawai.show', $employee), false)
             ->assertDontSee('data per halaman');
     }
 

@@ -19,16 +19,17 @@ final class EmployeeLifecycleAuthorization
     public function canRestore(?User $user): bool
     {
         return $user instanceof User
-            && $this->effectiveRoleAllows($user->getEffectiveRole(), self::RESTORE_PERMISSION)
+            && $this->effectiveRoleAllows(
+                $user->getEffectiveRole(),
+                self::RESTORE_PERMISSION
+            )
             && $user->hasPermission(self::RESTORE_PERMISSION);
     }
 
-    /**
-     * Permission lifecycle lain tetap permission-driven; reaktivasi memiliki allowlist
-     * role tambahan agar drift konfigurasi RBAC tidak memperluas kewenangan pemulihan.
-     */
-    public function effectiveRoleAllows(?string $effectiveRole, string $permission): bool
-    {
+    public function effectiveRoleAllows(
+        ?string $effectiveRole,
+        string $permission
+    ): bool {
         if ($permission !== self::RESTORE_PERMISSION) {
             return true;
         }

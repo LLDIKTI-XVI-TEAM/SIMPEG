@@ -191,7 +191,8 @@ class LegacyApprovedLeaveUsageMigrationTest extends TestCase
             $nonAnnualEmployee = $this->eligiblePnsEmployee();
             $largeEmployee = $this->eligiblePnsEmployee();
             $approver = Employee::factory()->create();
-            $approverUser = User::factory()->pimpinan()->create(['employee_id' => $approver->id]);
+            // Fixture schema lama tidak menjalankan observer inbox yang membutuhkan kolom baru.
+            $approverUser = User::factory()->pimpinan()->createQuietly(['employee_id' => $approver->id]);
 
             $annual2025 = $this->approvedRequest(
                 $annualEmployee,

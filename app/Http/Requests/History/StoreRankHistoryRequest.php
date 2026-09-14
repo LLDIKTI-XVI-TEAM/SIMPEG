@@ -16,9 +16,11 @@ class StoreRankHistoryRequest extends FormRequest
 
         // Mutasi riwayat pangkat hanya boleh dilakukan oleh pengelola data kepegawaian.
         $user = $this->user();
+        if (! $user) {
+            return false;
+        }
 
-        return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+        return $user->hasPermission('employee_histories.create');
     }
 
     public function rules(): array
@@ -29,6 +31,20 @@ class StoreRankHistoryRequest extends FormRequest
             'no_sk' => ['required', 'string', 'max:100'],
             'tanggal_sk' => ['required', 'date'],
             'file_sk' => SkFilePathRules::nullableUploadOrControlledPath(),
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'golongan_id.required' => 'Golongan wajib dipilih.',
+            'golongan_id.uuid' => 'Format ID Golongan tidak valid.',
+            'golongan_id.exists' => 'Golongan yang dipilih tidak valid.',
+            'tmt_pangkat.required' => 'TMT Pangkat wajib diisi.',
+            'tmt_pangkat.date' => 'Format TMT Pangkat tidak valid.',
+            'no_sk.required' => 'Nomor SK wajib diisi.',
+            'tanggal_sk.required' => 'Tanggal SK wajib diisi.',
+            'tanggal_sk.date' => 'Format Tanggal SK tidak valid.',
         ];
     }
 

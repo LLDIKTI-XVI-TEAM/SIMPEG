@@ -19,7 +19,7 @@ class UpdateHariLiburRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->user()?->role === 'super_admin';
+        return (bool) $this->user()?->hasPermission('hari_libur.update');
     }
 
     public function rules(): array

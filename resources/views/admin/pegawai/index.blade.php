@@ -1,36 +1,35 @@
 <div>
     @php
-        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? route('data-pegawai');
+        $defaultPrefix = auth()->user()?->getEffectiveRole() === 'super_admin' ? route('data-pegawai') : url('/rbac/pegawai');
+        $employeeShowUrlPrefix = $employeeShowUrlPrefix ?? $defaultPrefix;
         $serverRenderedDetailLinks = $serverRenderedDetailLinks ?? [];
         $isReadOnly = $isReadOnly ?? false;
         $openStatusModal = $openStatusModal ?? false;
         $statusFormEmployee = $statusFormEmployee ?? null;
-        $canChangeStatus = $canChangeStatus ?? false;
-        // Pemulihan pegawai (K-STATUS-04): boleh Super Admin atau Admin Kepegawaian selama
-        // role EFEKTIF memegang employees.restore; saat simulasi, tombol mengikuti role
-        // efektif (K-MTG-03).
-        $canRestoreEmployee = ! $isReadOnly
-            && auth()->user()?->hasPermission('employees.restore');
+        $isPimpinan = $isPimpinan ?? (auth()->user()?->getEffectiveRole() === 'pimpinan');
+        // Granular per-aksi: setiap kontrol dirender hanya bila permission spesifik dimiliki
+        // pada role efektif. isReadOnly dipertahankan untuk fallback legacy, bukan gate utama.
+        $canUpdateEmployee = $canUpdateEmployee ?? (bool) auth()->user()?->hasPermission('employees.update');
+        $canDeactivateEmployee = $canDeactivateEmployee ?? (bool) auth()->user()?->hasPermission('employees.deactivate');
+        $canRestoreEmployee = $canRestoreEmployee ?? (bool) auth()->user()?->hasPermission('employees.restore');
+        $canChangeStatus = $canChangeStatus ?? $canUpdateEmployee;
         $canManageSkRequirements = $canManageSkRequirements ?? false;
+        // Capability aksi pegawai permission-driven: dihitung dari permission role efektif
+        // (controller bisa mengoverride), bukan blanket role super_admin/admin_kepegawaian.
+        $canCreateEmployee = $canCreateEmployee ?? (bool) auth()->user()?->hasPermission('employees.create');
+        $canImportEmployees = $canImportEmployees ?? (bool) auth()->user()?->hasPermission('employees.import');
+        $canExportEmployees = $canExportEmployees ?? (bool) auth()->user()?->hasPermission('employees.export');
         $skRequirementMatrix = $skRequirementMatrix ?? ['skPool' => [], 'current' => [], 'namesByType' => [], 'lockedTypes' => []];
         $skRequirementVersion = $skRequirementVersion ?? 'unversioned';
+        $hasAnyMutation = $canUpdateEmployee || $canDeactivateEmployee || $canRestoreEmployee || $canCreateEmployee || $canImportEmployees || $canManageSkRequirements;
+        // Bulk export hanya relevan bila actor memang memiliki employees.export; jangan membuka checkbox
+        // hanya karena mutation lain. Rincian dokumen memakai endpoint strict/admin raw sehingga
+        // Pimpinan tetap badge read-only.
+        $canViewDocumentStatus = !$isPimpinan && (bool) auth()->user()?->hasPermission('dokumen_sk.read');
     @endphp
 
     <div x-data="{
-    @if (! $isReadOnly)
-    // ===== State Modal Riwayat =====
-    showRiwayatModal: false,
-    riwayatType: '',
-    riwayatEmployeeId: '',
-    riwayatEmployeeName: '',
-    isSubmitting: false,
-    errors: {},
-    successMessage: '',
-    newPangkat: { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null },
-    newJabatan: { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null },
-    newKgb: { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null },
-
-
+    @if ($hasAnyMutation || $canViewDocumentStatus)
     // ===== State Modal Nonaktifkan Pegawai =====
     showDeleteModal: false,
     deletePegawaiId: null,
@@ -97,7 +96,8 @@
         const matrix = this.cloneSkMatrix(this.skMatrixDraft);
 
         try {
-            const response = await fetch(@js(route('sk-requirements.update')), {
+            const skRoute = @js($isPimpinan ? route('rbac.sk-requirements.update') : route('sk-requirements.update'));
+            const response = await fetch(skRoute, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -148,7 +148,7 @@
     meta: @js($initialMeta),
     isLoading: false,
     perPage: {{ $perPage }},
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     dataChanged: @js(session('employee_data_changed', false)),
     editedEmployeeId: @js(session('edited_employee_id', null)),
     editedEmployeeData: @js(session('edited_employee_data', null)),
@@ -165,6 +165,9 @@
         status_aktif: '{{ $filters['status_aktif'] ?? '' }}',
     },
     searchTimer: null,
+    // Namespace cache per akun agar baris milik sendiri yang di-exclude
+    // tidak bocor antar akun atau antar simulasi role pada browser yang sama.
+    viewerKey: @js(auth()->user()?->employee_id ?? auth()->id() ?? 'guest'),
     skRequirementVersion: @js($skRequirementVersion),
     skRequirementStorageKey: 'simpeg:sk-requirements:version',
     skRequirementStorageListener: null,
@@ -267,7 +270,7 @@
 
     get cacheKey() {
         const f = this.filters;
-return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sa${f.status_aktif}_sort${this.sort}_dir${this.direction}`;
+return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perPage}_s${f.search}_g${f.golongan}_u${f.unit_kerja_id}_j${f.jenis_pegawai_id}_st${f.status_pegawai_id}_sa${f.status_aktif}_sort${this.sort}_dir${this.direction}`;
     },
 
     clearCacheByPrefixes(prefixes) {
@@ -283,7 +286,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         this.clearCacheByPrefixes(['pegawai_']);
     },
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     clearEmployeeLifecycleCache() {
         // Perubahan status aktif/nonaktif memengaruhi daftar pegawai aktif.
         this.clearCacheByPrefixes(['pegawai_']);
@@ -298,7 +301,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                 const data = JSON.parse(cached);
                 this.pegawaiRows = data.rows;
                 this.meta = data.meta;
-                @if (! $isReadOnly)
+                @if ($hasAnyMutation)
                 // Pilihan baris tidak boleh terbawa antar halaman atau antar mode filter.
                 this.$nextTick(() => {
                     document.querySelectorAll('.row-check').forEach(c => c.checked = false);
@@ -338,7 +341,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
             sessionStorage.setItem(cKey, JSON.stringify({ rows, meta }));
             this.pegawaiRows = rows;
             this.meta = meta;
-            @if (! $isReadOnly)
+            @if ($hasAnyMutation)
             // Reset semua checkbox saat data baru dimuat
             this.$nextTick(() => {
                 document.querySelectorAll('.row-check').forEach(c => c.checked = false);
@@ -356,7 +359,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         this.fetchPage(1);
     },
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     /**
      * Nonaktifkan dan pulihkan memindahkan pegawai antar daftar sehingga jumlah data di server
      * berubah. Halaman dimuat ulang agar jumlah baris, penomoran, dan rentang data tidak
@@ -388,7 +391,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         this.fetchPage(1);
     },
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     // Tanggal hari ini dalam zona waktu lokal (toISOString memakai UTC dan dapat
     // menghasilkan tanggal kemarin pada jam-jam awal); dipakai default modal.
     todayLocal() {
@@ -410,7 +413,8 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         this.deletePegawaiAlasan = '';
         this.showDeleteModal = true;
     },
-
+    @endif
+    @if ($canViewDocumentStatus)
     async openDocumentStatus(employee) {
         this.documentStatusEmployee = { id: employee.id, nama_lengkap: employee.nama_lengkap, nip: employee.nip };
         this.documentStatus = { status_kelengkapan: employee.is_lengkap, is_dinilai: employee.dokumen_is_dinilai, is_lengkap: employee.is_lengkap === 'lengkap', total_wajib: employee.dokumen_total_wajib, tersedia_count: employee.dokumen_tersedia_count, belum_ada_count: 0, perlu_perbaikan_count: 0, required_sks: [], total_riwayat: 0, file_tersedia: 0, records: [], total_dokumen: 0, dokumen_tersedia: 0, documents: [] };
@@ -435,7 +439,8 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
             this.isLoadingDocumentStatus = false;
         }
     },
-
+    @endif
+    @if ($hasAnyMutation)
     async confirmDeletePegawai() {
         if (!this.deletePegawaiId) return;
         // Kontrak perubahan status resmi: tanggal efektif + alasan wajib (US-2.9).
@@ -507,7 +512,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         }
         this.isRestoring = true;
         try {
-            // Endpoint restore memakai gate role super_admin + permission di backend,
+            // Endpoint restore permission-driven (employees.restore pada role efektif),
             // sehingga tombol ini hanya mempercepat akses dan bukan penentu otorisasi.
             const res = await fetch(`/api/v1/pegawai/${this.restorePegawaiId}/restore`, {
                 method: 'POST',
@@ -540,69 +545,6 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
             this.restorePegawaiName = '';
             this.restorePegawaiTanggal = '';
             this.restorePegawaiAlasan = '';
-        }
-    },
-
-    openRiwayatModal(type, employeeId, employeeName) {
-        this.riwayatType = type;
-        this.riwayatEmployeeId = employeeId;
-        this.riwayatEmployeeName = employeeName;
-        this.errors = {};
-        this.successMessage = '';
-        this.resetForm();
-        this.showRiwayatModal = true;
-    },
-    resetForm() {
-        this.newPangkat = { golongan_id: '', no_sk: '', tanggal_sk: '', tmt_pangkat: '', file_sk: null };
-        this.newJabatan = { jabatan_id: '', jenis_jabatan_id: '', eselon_id: '', unit_kerja_id: '', kelas_jabatan: '', no_sk: '', tanggal_sk: '', tmt_jabatan: '', file_sk: null };
-        this.newKgb = { gaji_pokok: '', no_sk: '', tanggal_sk: '', tmt_kgb: '', file_sk: null };
-    },
-    get modalTitle() {
-        const titles = { pangkat: 'Tambah Riwayat Kepangkatan', jabatan: 'Tambah Riwayat Jabatan', kgb: 'Tambah Riwayat KGB' };
-        return titles[this.riwayatType] || '';
-    },
-    async submitRiwayat() {
-        if (this.isSubmitting) return;
-        this.isSubmitting = true;
-        this.errors = {};
-        this.successMessage = '';
-        const endpoints = {
-            pangkat: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-kepangkatan`,
-            jabatan: `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-jabatan`,
-            kgb:     `/api/v1/pegawai/${this.riwayatEmployeeId}/riwayat-kgb`
-        };
-        const formData = new FormData();
-        let source = this.riwayatType === 'pangkat' ? this.newPangkat : this.riwayatType === 'jabatan' ? this.newJabatan : this.newKgb;
-        for (const [key, value] of Object.entries(source)) {
-            if (key === 'file_sk') continue;
-            if (value !== '' && value !== null) formData.append(key, value);
-        }
-        const fileInput = this.$refs.fileSkInput;
-        if (fileInput && fileInput.files.length > 0) formData.append('file_sk', fileInput.files[0]);
-        try {
-            const response = await fetch(endpoints[this.riwayatType], {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}', 'Accept': 'application/json' },
-                body: formData
-            });
-            const data = await response.json();
-            if (response.ok) {
-                this.successMessage = data.message || 'Riwayat berhasil ditambahkan.';
-                this.resetForm();
-                
-                // Ambil data terbaru dari backend dan update cache secara instan
-                this.patchEditedEmployee(this.riwayatEmployeeId);
-                
-                setTimeout(() => { this.showRiwayatModal = false; this.successMessage = ''; }, 1200);
-            } else if (response.status === 422 && data.errors) {
-                this.errors = data.errors;
-            } else {
-                this.errors = { _general: [data.message || 'Terjadi kesalahan saat menyimpan data.'] };
-            }
-        } catch (error) {
-            this.errors = { _general: ['Gagal terhubung ke server. Periksa koneksi Anda.'] };
-        } finally {
-            this.isSubmitting = false;
         }
     },
 
@@ -656,7 +598,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
     init() {
         this.registerSkRequirementCacheListener();
 
-        @if (! $isReadOnly)
+        @if ($hasAnyMutation)
         if (this.dataChanged) {
             if (this.editedEmployeeId && this.editedEmployeeData) {
                 // Perbarui cache secara sinkron tanpa loading delay untuk pengalaman instant save
@@ -744,7 +686,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </svg>
                     <span>Refresh</span>
                 </x-ui.button>
-                @if(!$isReadOnly)
+                @if($canExportEmployees)
                 <x-ui.button type="button" variant="secondary" onclick="exportFilteredData()" id="export-btn">
                     <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                         viewBox="0 0 24 24" stroke-width="1.5">
@@ -759,6 +701,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </svg>
                     Export PDF
                 </x-ui.button>
+                @endif
                 @if ($canManageSkRequirements)
                 <x-ui.button type="button" variant="secondary" id="sk-requirement-btn" @click="openSkRequirementModal()"
                     aria-label="Atur SK Wajib per Jenis Pegawai">
@@ -769,6 +712,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     <span>SK Wajib</span>
                 </x-ui.button>
                 @endif
+                @if (($canCreateEmployee ?? false) || ($canImportEmployees ?? false))
                 <div class="relative" x-data="{ open: false }">
                     <x-ui.button type="button" @click="open = !open" @click.outside="open = false" id="add-pegawai-btn"
                         ::aria-expanded="open.toString()" aria-controls="add-pegawai-menu">
@@ -780,7 +724,8 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                     </x-ui.button>
                     <div id="add-pegawai-menu" x-show="open" style="display: none;" x-transition
                         class="absolute right-0 top-full mt-1.5 w-full rounded-lg border border-border bg-surface p-1 shadow-lg z-20">
-                        <a href="{{ route('pegawai.create') }}" wire:navigate
+                        @if ($canCreateEmployee ?? false)
+                        <a href="{{ $isPimpinan ? route('rbac.pegawai.create') : route('pegawai.create') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24" stroke-width="1.5">
@@ -789,6 +734,8 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             </svg>
                             Tambah Manual
                         </a>
+                        @endif
+                        @if ($canImportEmployees ?? false)
                         <a href="{{ route('pegawai.import') }}" wire:navigate
                             class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink hover:bg-soft transition-colors font-sans mt-1">
                             <svg class="w-4 h-4 text-muted shrink-0" fill="none" stroke="currentColor"
@@ -798,16 +745,9 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                             </svg>
                             Import Pegawai
                         </a>
+                        @endif
                     </div>
                 </div>
-                @else
-                <a href="{{ route('pimpinan.laporan.nominatif') }}"
-                    class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft shadow-sm cursor-pointer">
-                    <svg class="w-4 h-4 mr-1.5 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                    </svg>
-                    Laporan Pegawai
-                </a>
                 @endif
             </div>
         </div>
@@ -819,22 +759,23 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         @php
             $tableColumns = [
                 ['key' => 'nama_lengkap', 'label' => 'Pegawai', 'sortable' => true],
-                ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true, 'width' => 'min-w-64'],
-                ['key' => 'golongan_terakhir', 'label' => 'Golongan & Jenis', 'sortable' => true, 'width' => 'whitespace-nowrap'],
-                ['key' => 'tmt', 'label' => 'TMT'],
-                ['key' => 'status_nama', 'label' => 'Status'],
-                ['key' => 'is_lengkap', 'label' => 'Dokumen'],
-                ['key' => 'aksi', 'label' => 'Aksi'],
+                ['key' => 'jabatan', 'label' => 'Jabatan & Unit', 'sortable' => true],
+                ['key' => 'golongan_terakhir', 'label' => 'Golongan & Jenis', 'sortable' => true, 'width' => 'w-28'],
+                ['key' => 'tmt', 'label' => 'TMT', 'width' => 'w-28'],
+                ['key' => 'status_nama', 'label' => 'Status', 'width' => 'w-24'],
+                ['key' => 'is_lengkap', 'label' => 'Dokumen', 'width' => 'w-40'],
+                ['key' => 'aksi', 'label' => 'Aksi', 'width' => 'w-32'],
             ];
-            if (! ($isReadOnly ?? false)) {
+            if ($canExportEmployees) {
                 array_unshift($tableColumns, ['key' => 'check', 'label' => '', 'width' => 'w-10']);
             }
         @endphp
+        <div data-testid="employee-table" class="[&_table]:table-fixed [&_table]:min-w-[58rem] [&_th]:whitespace-normal [&_th_button]:text-left">
         <x-ui.data-table rows="pegawaiRows" meta="meta" :columns="$tableColumns" fetchPage="fetchPage(page)"
             isLoading="isLoading" perPage="perPage" setPerPage="setPerPage($event.target.value)" sort="sort"
             direction="direction" setSort="setSort(col)" searchModel="filters.search"
             searchPlaceholder="Cari nama atau NIP" hasActiveFilters="filters.search || filters.golongan || filters.unit_kerja_id || filters.jenis_pegawai_id || (filters.status_pegawai_id && filters.status_pegawai_id !== 'all')" emptyTitle="Belum ada data pegawai."
-            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="!($isReadOnly ?? false) ? 'check-all' : null"
+            emptyIcon="none" :colspanCount="count($tableColumns)" :checkAllId="$canExportEmployees ? 'check-all' : null"
             filterClass="lg:grid-cols-6 xl:grid-cols-[minmax(12rem,1.05fr)_minmax(11rem,1fr)_minmax(9rem,.8fr)_minmax(9rem,.8fr)_minmax(13.5rem,1.2fr)]"
             searchCols="col-span-1 sm:col-span-2 lg:col-span-2 xl:col-span-1">
             {{-- ---- Filter Slots ---- --}}
@@ -892,7 +833,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                         x-bind:data-nip="p.nip">
 
                         {{-- Checkbox --}}
-                        @if (! ($isReadOnly ?? false))
+                        @if ($canExportEmployees)
                             <td class="px-4 py-3">
                                 <x-form.checkbox x-bind:disabled="!p.is_aktif" size="sm" class="row-check" />
                             </td>
@@ -900,7 +841,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
 
                         {{-- Pegawai --}}
                         <td class="px-4 py-3">
-                            <div class="flex items-center gap-3">
+                            <div class="flex items-start gap-2">
                                 <x-ui.tooltip dynamicText="'Buka detail ' + p.nama_lengkap" position="right">
                                     @if ($isReadOnly)
                                         <a :href="detailUrl(p)" wire:navigate
@@ -922,22 +863,22 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                         @else
                                             <a :href="`/pegawai/${p.id}`"
                                         @endif
-                                            class="block truncate text-sm font-semibold text-ink transition hover:text-primary"
+                                            class="block wrap-anywhere text-sm font-semibold text-ink transition hover:text-primary"
                                             x-text="p.nama_lengkap"></a>
                                     </x-ui.tooltip>
-                                    <p class="text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
+                                    <p class="wrap-anywhere text-xs text-muted" x-text="'NIP. ' + p.nip"></p>
                                 </div>
                             </div>
                         </td>
 
                         {{-- Jabatan & Unit --}}
-                        <td class="min-w-64 px-4 py-3">
+                        <td class="wrap-anywhere px-4 py-3">
                             <p class="text-sm font-medium text-ink" x-text="p.jabatan"></p>
                             <p class="text-xs text-muted" x-text="p.unit_kerja"></p>
                         </td>
 
                         {{-- Golongan & Jenis --}}
-                        <td class="px-4 py-3 whitespace-nowrap">
+                        <td class="px-4 py-3">
                             <p class="text-sm font-medium text-ink" x-text="p.golongan_terakhir || '-'"></p>
                             <p class="text-xs text-muted" x-text="p.jenis_pegawai || '-'"></p>
                         </td>
@@ -959,25 +900,25 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                 'bg-danger/10 text-danger':   p.status_key === 'nonaktif' || p.status_key === 'pensiun',
                                 'bg-muted/10 text-muted':     !['aktif','cuti','mutasi','nonaktif','pensiun'].includes(p.status_key),
                             }">
-                                <span x-text="p.status_nama"></span>
+                                <span class="whitespace-normal text-left" x-text="p.status_nama"></span>
                             </x-ui.badge>
                         </td>
 
                         {{-- Dokumen --}}
                         <td class="px-4 py-3">
-                            @if ($isReadOnly)
+                            @if (! $canViewDocumentStatus)
                             <x-ui.badge variant="none" size="md" dot x-bind:class="docBadgeClass(p.is_lengkap)"
                                 title="Status kelengkapan dokumen">
-                                <span x-text="docStatusWithCount(p)"></span>
+                                <span class="whitespace-normal text-left" x-text="docStatusWithCount(p)"></span>
                             </x-ui.badge>
                             @else
                             <button type="button" @click="openDocumentStatus(p)"
-                                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                class="inline-flex min-h-11 w-full items-center gap-1.5 rounded-md px-2.5 py-1 text-left text-xs font-medium transition hover:ring-2 hover:ring-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                                 :class="docBadgeClass(p.is_lengkap, true)" title="Klik untuk melihat rincian status dokumen">
                                 <span class="h-1.5 w-1.5 rounded-full shrink-0"
                                     :class="docDotClass(p.is_lengkap)"></span>
                                 <span x-text="docStatusWithCount(p)"></span>
-                                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                <svg class="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
                                 </svg>
@@ -987,15 +928,15 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
 
                         {{-- Aksi --}}
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-start gap-1.5">
+                            <div class="grid grid-cols-2 gap-1">
                                 {{-- Detail --}}
                                 <x-ui.tooltip text="Detail" position="top">
                                     @if ($isReadOnly)
                                         <a :href="detailUrl(p)" :aria-label="'Detail pegawai ' + p.nama_lengkap" wire:navigate
                                     @else
-                                        <a :href="`/pegawai/${p.id}`" wire:navigate
+                                        <a :href="`/pegawai/${p.id}`" :aria-label="'Detail pegawai ' + p.nama_lengkap" wire:navigate
                                     @endif
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                        class="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -1005,11 +946,11 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                         </svg>
                                     </a>
                                 </x-ui.tooltip>
-                                @if (!$isReadOnly)
+                                @if ($canUpdateEmployee)
                                 {{-- Edit --}}
                                 <x-ui.tooltip text="Edit" position="top">
-                                    <a :href="`/pegawai/${p.id}/edit`" wire:navigate
-                                        class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                    <a :href="`{{ $isPimpinan ? '/rbac/pegawai' : '/pegawai' }}/${p.id}/edit`" :aria-label="'Edit pegawai ' + p.nama_lengkap" wire:navigate
+                                        class="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -1026,7 +967,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                     <x-ui.tooltip text="Ubah Status" position="top">
                                         <button type="button" data-testid="change-status-trigger" @click="openStatusModal(p)"
                                             :aria-label="'Ubah status pegawai ' + p.nama_lengkap"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
+                                            class="flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Zm6-10.125a1.875 1.875 0 1 1-3.75 0 1.875 1.875 0 0 1 3.75 0Zm-3.75 6c0-1.035.84-1.875 1.875-1.875h.008c1.035 0 1.875.84 1.875 1.875v.375H6.75v-.375Z" />
                                             </svg>
@@ -1034,12 +975,12 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                     </x-ui.tooltip>
                                 @endif
 
-                                @if (! $isReadOnly && auth()->user()->hasPermission('employees.deactivate'))
+                                @if ($canDeactivateEmployee)
                                     {{-- Nonaktifkan dengan mengubah status pegawai (bukan delete); hanya untuk baris aktif. --}}
                                     <x-ui.tooltip text="Nonaktifkan Pegawai" position="top-end">
                                         <button x-show="p.is_aktif" type="button" @click="deletePegawai(p.id, p.nama_lengkap)"
                                             :aria-label="'Nonaktifkan pegawai ' + p.nama_lengkap"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
+                                            class="flex h-11 w-11 items-center justify-center rounded-lg border border-danger/30 bg-surface text-danger transition hover:bg-danger/10 shadow-sm">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -1057,7 +998,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
                                     <x-ui.tooltip text="Aktifkan Kembali" position="top-end">
                                         <button type="button" @click="restorePegawai(p.id, p.nama_lengkap)"
                                             :aria-label="'Aktifkan kembali pegawai ' + p.nama_lengkap"
-                                            class="flex h-8 w-8 items-center justify-center rounded-lg border border-success/40 bg-surface text-success transition hover:bg-success/10 shadow-sm">
+                                            class="flex h-11 w-11 items-center justify-center rounded-lg border border-success/40 bg-surface text-success transition hover:bg-success/10 shadow-sm">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -1073,9 +1014,10 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
             </template>
 
         </x-ui.data-table>
+        </div>
 
 
-        @if (! ($isReadOnly ?? false))
+        @if ($canExportEmployees)
         {{-- ============================================================ --}}
         {{-- BULK ACTION FLOATING BAR --}}
         {{-- ============================================================ --}}
@@ -1098,7 +1040,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
         </div>
         @endif
 
-        @if (! $isReadOnly)
+        @if ($canViewDocumentStatus)
         {{-- ============================================================ --}}
         {{-- MODAL RINCIAN STATUS DOKUMEN --}}
         {{-- ============================================================ --}}
@@ -1456,219 +1398,6 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
             </div>
         </x-ui.modal>
 
-        {{-- ============================================================ --}}
-
-        {{-- MODAL TAMBAH RIWAYAT (Pangkat / Jabatan / KGB) --}}
-        {{-- ============================================================ --}}
-        <x-ui.modal show="showRiwayatModal" closeAction="showRiwayatModal = false" maxWidth="lg"
-            bodyClass="p-5 space-y-4">
-            <x-slot:header>
-                <div class="flex items-center justify-between w-full">
-                    <div>
-                        <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
-                        <p class="text-xs text-muted font-sans mt-0.5" x-text="'Pegawai: ' + riwayatEmployeeName"></p>
-                    </div>
-                    <button type="button" @click="showRiwayatModal = false"
-                        class="rounded-lg p-1.5 text-muted transition-colors hover:bg-soft hover:text-ink focus:outline-none"
-                        aria-label="Tutup">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-            </x-slot:header>
-
-            {{-- Success message --}}
-            <template x-if="successMessage">
-                <div class="rounded-lg bg-success/10 p-3 text-xs text-success font-bold font-sans"
-                    x-text="successMessage"></div>
-            </template>
-
-            {{-- General error --}}
-            <template x-if="errors._general">
-                <div class="rounded-lg bg-danger/10 p-3 text-xs text-danger font-bold font-sans"
-                    x-text="errors._general[0]"></div>
-            </template>
-
-            {{-- ===== FORM KEPANGKATAN ===== --}}
-            <template x-if="riwayatType === 'pangkat'">
-                <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Golongan <span
-                                    class="text-danger">*</span></label>
-                            <select x-model="newPangkat.golongan_id"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="">Pilih Golongan</option>
-                                @foreach($golonganRefOptions ?? [] as $ref)
-                                    <option value="{{ $ref->id }}">{{ $ref->nama }}</option>
-                                @endforeach
-                            </select>
-                            <template x-if="errors.golongan_id">
-                                <p class="text-xs text-danger font-sans" x-text="errors.golongan_id[0]"></p>
-                            </template>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">No. SK <span
-                                    class="text-danger">*</span></label>
-                            <input type="text" x-model="newPangkat.no_sk" placeholder="SK-..."
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <template x-if="errors.no_sk">
-                                <p class="text-xs text-danger font-sans" x-text="errors.no_sk[0]"></p>
-                            </template>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
-                            <input type="date" x-model="newPangkat.tanggal_sk"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">TMT Pangkat</label>
-                            <input type="date" x-model="newPangkat.tmt_pangkat"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">File SK</label>
-                        <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
-                    </div>
-                </div>
-            </template>
-
-            {{-- ===== FORM JABATAN ===== --}}
-            <template x-if="riwayatType === 'jabatan'">
-                <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Jabatan <span
-                                    class="text-danger">*</span></label>
-                            <select x-model="newJabatan.jabatan_id"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="">Pilih Jabatan</option>
-                                {{-- Hanya jabatan aktif ditawarkan karena validasi riwayat jabatan
-                                     menolak jabatan nonaktif; menampilkannya berarti menyuguhkan
-                                     pilihan yang pasti gagal disimpan. --}}
-                                @foreach(collect($jabatanOptions ?? [])->where('is_active', true) as $ref)
-                                    <option value="{{ data_get($ref, 'id') }}">{{ data_get($ref, 'nama') }}</option>
-                                @endforeach
-                            </select>
-                            <template x-if="errors.jabatan_id">
-                                <p class="text-xs text-danger font-sans" x-text="errors.jabatan_id[0]"></p>
-                            </template>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Jenis Jabatan</label>
-                            <select x-model="newJabatan.jenis_jabatan_id"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="">Pilih Jenis</option>
-                                @foreach($jenisJabatanOptions ?? [] as $ref)
-                                    <option value="{{ data_get($ref, 'id') }}">{{ data_get($ref, 'nama') }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Unit Kerja</label>
-                            <select x-model="newJabatan.unit_kerja_id"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                <option value="">Pilih Unit</option>
-                                @foreach($unitKerjaOptions ?? [] as $unit)
-                                    <option value="{{ data_get($unit, 'id') }}">{{ data_get($unit, 'nama') }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Kelas Jabatan</label>
-                            <input type="text" x-model="newJabatan.kelas_jabatan" placeholder="cth: 9"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">No. SK</label>
-                            <input type="text" x-model="newJabatan.no_sk" placeholder="SK-..."
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
-                            <input type="date" x-model="newJabatan.tanggal_sk"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">TMT Jabatan</label>
-                        <input type="date" x-model="newJabatan.tmt_jabatan"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">File SK</label>
-                        <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
-                    </div>
-                </div>
-            </template>
-
-            {{-- ===== FORM KGB ===== --}}
-            <template x-if="riwayatType === 'kgb'">
-                <div class="space-y-3">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Gaji Pokok <span
-                                    class="text-danger">*</span></label>
-                            <input type="number" x-model="newKgb.gaji_pokok" placeholder="0"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                            <template x-if="errors.gaji_pokok">
-                                <p class="text-xs text-danger font-sans" x-text="errors.gaji_pokok[0]"></p>
-                            </template>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">No. SK</label>
-                            <input type="text" x-model="newKgb.no_sk" placeholder="SK-..."
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">Tanggal SK</label>
-                            <input type="date" x-model="newKgb.tanggal_sk"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-semibold text-ink font-sans">TMT KGB</label>
-                            <input type="date" x-model="newKgb.tmt_kgb"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        </div>
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-semibold text-ink font-sans">File SK</label>
-                        <input type="file" x-ref="fileSkInput" accept=".pdf,.jpg,.jpeg,.png"
-                            class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink focus:outline-none font-sans">
-                    </div>
-                </div>
-            </template>
-
-            {{-- Footer tombol --}}
-            <div class="flex justify-end gap-3 pt-3 border-t border-border">
-                <x-ui.button type="button" variant="secondary" @click="showRiwayatModal = false">
-                    Batal
-                </x-ui.button>
-                <x-ui.button type="button" @click="submitRiwayat()" ::disabled="isSubmitting">
-                    <template x-if="isSubmitting">
-                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                            </circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                        </svg>
-                    </template>
-                    <span x-text="isSubmitting ? 'Menyimpan...' : 'Simpan Riwayat'"></span>
-                </x-ui.button>
-            </div>
-        </x-ui.modal>
         @endif
 
     @if ($canChangeStatus)
@@ -1770,7 +1499,7 @@ return `pegawai_mv${this.skRequirementVersion}_pp${this.perPage}_s${f.search}_g$
 
     </div>{{-- end x-data --}}
 
-    @if (! $isReadOnly)
+    @if ($hasAnyMutation)
     <script>
         function updateBulkBar() {
             // Baris yang dinonaktifkan (mode daftar nonaktif) tidak boleh ikut dihitung sebagai

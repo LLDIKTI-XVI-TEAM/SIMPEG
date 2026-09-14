@@ -23,12 +23,15 @@ class AppServiceProvider extends ServiceProvider
     /** @var list<string> Permission yang dipakai oleh item menu pada layout aplikasi. */
     private const LAYOUT_MENU_PERMISSIONS = [
         'employees.read',
+        'dokumen_sk.read',
+        'cuti.balance.read',
         'cuti.balance.reconcile',
         'cuti.manual.manage',
         'cuti.cancellation.manage',
         'cuti.configure',
-        'notifications.read',
-        'hari_libur.read',
+        'reference_tables.manage',
+        'ews.read',
+        'ews.configure',
         'audit_logs.read',
     ];
 

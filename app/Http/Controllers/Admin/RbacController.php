@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Rbac\SaveRolePermissionMatrixRequest;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Support\Rbac\PatenCapability;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -15,12 +16,28 @@ class RbacController extends Controller
     public function index(): View
     {
         $roles = Role::with('permissions')->get();
-        $permissions = Permission::all();
+        // Capability PATEN tidak boleh diubah melalui matriks RBAC. Baris lama
+        // tetap dipertahankan di database untuk kompatibilitas data, tetapi UI
+        // dan penyimpanan matriks tidak lagi memperlakukannya sebagai grant.
+        $permissions = Permission::query()
+            ->whereNotIn('name', PatenCapability::PERMISSION_NAMES)
+            ->get();
         $permissionsByModule = $permissions->groupBy('module');
+        $lockedPermissionIdsByRole = $roles->mapWithKeys(function (Role $role) use ($permissions): array {
+            $lockedPermissionIds = $permissions
+                ->filter(fn (Permission $permission): bool => $permission->name === 'users.switch_role'
+                        && ! in_array($role->name, SaveRolePermissionMatrixAction::SWITCH_ROLE_ASSIGNABLE_ROLES, true))
+                ->pluck('id')
+                ->values()
+                ->all();
+
+            return [$role->id => $lockedPermissionIds];
+        })->all();
 
         return view('admin.rbac.index', [
             'roles' => $roles,
             'permissionsByModule' => $permissionsByModule,
+            'lockedPermissionIdsByRole' => $lockedPermissionIdsByRole,
             'title' => 'Role & Permission / RBAC',
         ]);
     }

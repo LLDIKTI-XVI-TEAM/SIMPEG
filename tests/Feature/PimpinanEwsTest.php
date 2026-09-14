@@ -50,6 +50,7 @@ class PimpinanEwsTest extends TestCase
             ->assertSee('Aktif')
             ->assertDontSee('href="#"', false)
             ->assertDontSee('data per halaman')
-            ->assertSee(route('pimpinan.pegawai.show', $pppkEmployee), false);
+            // Kode: pimpinan/ews/index.blade.php:61 menautkan ke rbac.pegawai.show.
+            ->assertSee(route('rbac.pegawai.show', $pppkEmployee), false);
     }
 }

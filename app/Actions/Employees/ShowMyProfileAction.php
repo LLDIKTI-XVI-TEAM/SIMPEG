@@ -18,6 +18,20 @@ class ShowMyProfileAction
     {
         abort_if($employee === null, 404, 'Data pegawai untuk akun ini belum terhubung.');
 
-        return $this->payload->response($this->payload->loadRelations($employee));
+        $user = request()->user();
+        $canReadLeaveRequests = $user?->hasPermission('cuti.read_own') || $user?->hasPermission('cuti.read_all');
+        $canReadLeaveBalances = $user?->hasPermission('cuti.balance.read');
+        $canReadEwsAlerts = $user?->hasPermission('ews.read');
+
+        if (app()->environment('local') && config('services.simpeg.disable_employee_api_auth')) {
+            $canReadLeaveRequests = $canReadLeaveBalances = $canReadEwsAlerts = true;
+        }
+
+        return $this->payload->response(
+            $this->payload->loadRelations($employee, true, true, true, true, $canReadLeaveRequests, $canReadLeaveBalances, $canReadEwsAlerts),
+            $canReadLeaveRequests,
+            $canReadLeaveBalances,
+            $canReadEwsAlerts
+        );
     }
 }

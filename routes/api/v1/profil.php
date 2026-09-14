@@ -6,9 +6,8 @@ use App\Http\Controllers\Api\V1\MyEducationHistoryController;
 use App\Http\Controllers\Api\V1\MyFamilyController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:pegawai'])
+Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
     ->get('/profil-saya', [EmployeeController::class, 'myProfile'])
-    ->middleware('permission:employees.read_self')
     ->name('profil-saya.show');
 
 Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
@@ -18,23 +17,21 @@ Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
 // ============================================================
 // Data keluarga profil bersifat read-only dan employee selalu di-resolve dari sesi login.
 // ============================================================
-Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:pegawai'])
+Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
     ->prefix('profil-saya/keluarga')
     ->name('profil-saya.keluarga.')
     ->group(function (): void {
         Route::get('/', [MyFamilyController::class, 'index'])
-            ->middleware('permission:employee_families.read')
             ->name('index');
     });
 
 // ============================================================
 // Riwayat pendidikan profil bersifat read-only dan employee selalu di-resolve dari sesi login.
 // ============================================================
-Route::middleware(['web', 'keycloak.auth', 'session.timeout', 'role:pegawai'])
+Route::middleware(['web', 'keycloak.auth', 'session.timeout'])
     ->prefix('profil-saya/pendidikan')
     ->name('profil-saya.pendidikan.')
     ->group(function (): void {
         Route::get('/', [MyEducationHistoryController::class, 'index'])
-            ->middleware('permission:employee_histories.read')
             ->name('index');
     });

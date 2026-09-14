@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasUuid;
+use App\Support\Rbac\PatenCapability;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,51 @@ class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasUuid, Notifiable;
+
+    protected static function booted(): void
+    {
+        static::saved(function (self $user): void {
+            if ($user->employee_id === null) {
+                return;
+            }
+
+            // Saat SSO baru mengikat Employee ke User, inbox historis yang belum
+            // memiliki recipient dapat dipulihkan hanya bila mappingnya tunggal.
+            if (self::query()->where('employee_id', $user->employee_id)->count() === 1) {
+                SimpegNotification::query()
+                    ->where('user_id', $user->employee_id)
+                    ->whereNull('recipient_user_id')
+                    ->update(['recipient_user_id' => $user->id]);
+            }
+        });
+    }
+
+    /**
+     * Hierarki role SIMPEG: rank lebih kecil = role lebih rendah.
+     * Switch role hanya boleh dari role ber-rank lebih tinggi menuju role
+     * ber-rank lebih rendah; aturan ini dipakai canSwitchToRole() dan turunannya.
+     *
+     * @var array<string, int>
+     */
+    public const ROLE_RANKS = [
+        'super_admin' => 5,
+        'admin_kepegawaian' => 4,
+        'pimpinan' => 3,
+        'kepala_bagian' => 2,
+        'pegawai' => 1,
+    ];
+
+    /**
+     * Label tampilan role untuk menu simulasi (konsisten dengan halaman admin).
+     *
+     * @var array<string, string>
+     */
+    public const ROLE_LABELS = [
+        'admin_kepegawaian' => 'Admin Kepegawaian',
+        'pimpinan' => 'Pimpinan',
+        'kepala_bagian' => 'Kepala Bagian',
+        'pegawai' => 'Pegawai',
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -87,7 +133,7 @@ class User extends Authenticatable
     {
         if ($this->temporary_role !== null) {
             // Validasi bahwa temporary_role harus selalu berada di hierarki yang lebih rendah dari role asli saat ini
-            if ($this->canSwitchToRole($this->temporary_role)) {
+            if ($this->isSwitchTargetBelowOriginalRole($this->temporary_role)) {
                 return $this->temporary_role;
             }
         }
@@ -106,6 +152,29 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
+        // Issue #6: authenticated tidak sama dengan authorized. Role internal
+        // yang kosong/tidak valid selalu fail-closed sebelum evaluasi PATEN
+        // maupun RBAC; PATEN tidak boleh bergantung pada pivot, tetapi tetap
+        // mensyaratkan identitas role internal yang sah.
+        if (! $this->hasValidInternalRole()) {
+            return false;
+        }
+
+        // PATEN tidak menggunakan pivot role_permissions, namun prasyaratnya
+        // berbeda menurut konteks. Hak record seperti approval/proof tidak
+        // boleh direduksi menjadi boolean global pada User.
+        if (PatenCapability::requiresActiveEmployee($permission)) {
+            return $this->hasActiveEmployeeIdentity();
+        }
+
+        if (PatenCapability::isUserContextCapability($permission)) {
+            return $this->exists && $this->getKey() !== null;
+        }
+
+        if (PatenCapability::requiresRecordContext($permission)) {
+            return false;
+        }
+
         $effectiveRole = $this->getEffectiveRole();
 
         if ($effectiveRole === null || $effectiveRole === '') {
@@ -119,31 +188,126 @@ class User extends Authenticatable
     }
 
     /**
-     * Menentukan apakah user dapat switch ke target_role yang dipilih.
+     * Role internal sah adalah role efektif yang terdaftar pada tabel roles.
+     * Berlaku untuk seluruh evaluasi PATEN/RBAC agar role kosong/tidak valid
+     * selalu fail-closed sesuai kontrak Issue #6.
      *
-     * Switch hanya diperbolehkan dari role asli super_admin menuju role tujuan yang diizinkan
-     * (Admin Kepegawaian, Pimpinan, Kepala Bagian, atau Pegawai). Target bukan allowlist atau
-     * switch ke role yang sama ditolak fail-closed. Allowlist eksplisit dipakai sebagai aturan
-     * domain (bukan perhitungan level numerik) agar batas target selalu jelas dan stabil.
+     * Semua nama role, termasuk kanonis (ROLE_RANKS), wajib dibuktikan via
+     * database sebagai source of truth — PATEN tidak meng-query pivot sehingga
+     * FK cascade pada role_permissions tidak cukup sebagai proof existence.
      */
-    public function canSwitchToRole(string $targetRole): bool
+    private function hasValidInternalRole(): bool
     {
-        // Switch ke role yang sama dengan role asli tidak pernah diizinkan.
+        $role = $this->getEffectiveRole();
+
+        if (! is_string($role) || $role === '') {
+            return false;
+        }
+
+        return Role::query()->where('name', $role)->exists();
+    }
+
+    /**
+     * Identitas pegawai aktif adalah prasyarat bersama capability PATEN.
+     * Status menggunakan predicate kanonis Employee::isActive() dan tidak
+     * pernah memakai nama role, claim SSO, maupun grant legacy.
+     */
+    private function hasActiveEmployeeIdentity(): bool
+    {
+        return $this->employee_id !== null && $this->employee()->first()?->isActive() === true;
+    }
+
+    /** Menentukan validitas hierarki target simulasi tanpa mengevaluasi permission. */
+    private function isSwitchTargetBelowOriginalRole(string $targetRole): bool
+    {
         if ($targetRole === $this->role) {
             return false;
         }
 
-        // Hanya role asli super_admin yang boleh melakukan simulasi; invite asal role lain
-        // (miskonfigurasi) tidak boleh dianggap sebagai origin yang sah.
-        if ($this->role !== 'super_admin') {
+        $originRank = self::ROLE_RANKS[$this->role] ?? null;
+        $targetRank = self::ROLE_RANKS[$targetRole] ?? null;
+
+        return $originRank !== null && $targetRank !== null && $targetRank < $originRank;
+    }
+
+    /**
+     * Mengecek permission pada role asli tanpa membaca temporary_role.
+     * Dipakai untuk boundary origin-role agar evaluasi role efektif tidak rekursif.
+     */
+    public function hasOriginalRolePermission(string $permission): bool
+    {
+        if ($this->role === null || $this->role === '') {
             return false;
         }
 
-        return in_array($targetRole, [
-            'admin_kepegawaian',
-            'pimpinan',
-            'kepala_bagian',
-            'pegawai',
-        ], true);
+        return Role::query()
+            ->where('name', $this->role)
+            ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
+            ->exists();
+    }
+
+    /**
+     * Switch Role dibatasi pada role asal yang disetujui. Hak memulai simulasi
+     * tetap membutuhkan permission users.switch_role dari konfigurasi RBAC.
+     */
+    public function canInitiateSwitchRole(): bool
+    {
+        return isset(self::ROLE_RANKS[$this->role ?? ''])
+            && $this->hasOriginalRolePermission('users.switch_role');
+    }
+
+    /**
+     * Menentukan apakah role asli boleh memulai simulasi role.
+     *
+     * Capability memulai simulasi berasal dari permission asal. Hierarki hanya
+     * menentukan target yang sah: selalu harus lebih rendah dari role asli.
+     * Permission fitur biasa tetap ditentukan dari effective role saat simulasi.
+     */
+    public function canSwitchToRole(string $targetRole): bool
+    {
+        if (! $this->canInitiateSwitchRole()) {
+            return false;
+        }
+
+        return $this->isSwitchTargetBelowOriginalRole($targetRole);
+    }
+
+    /**
+     * Opsi role tujuan simulasi untuk role asal yang diizinkan: seluruh role
+     * ber-rank lebih rendah dari role asli, dengan label tampilannya.
+     *
+     * @return array<string, string>
+     */
+    public function switchableRoleOptions(): array
+    {
+        if (! $this->canInitiateSwitchRole()) {
+            return [];
+        }
+
+        $originRank = self::ROLE_RANKS[$this->role] ?? null;
+
+        if ($originRank === null) {
+            return [];
+        }
+
+        $options = [];
+
+        foreach (self::ROLE_LABELS as $roleKey => $label) {
+            $targetRank = self::ROLE_RANKS[$roleKey] ?? null;
+
+            if ($targetRank !== null && $targetRank < $originRank) {
+                $options[$roleKey] = $label;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * True bila user ini memiliki minimal satu role tujuan simulasi yang sah.
+     */
+    public function canSwitchToAnyRole(): bool
+    {
+        return $this->switchableRoleOptions() !== [];
     }
 }

@@ -32,17 +32,6 @@
             </x-ui.button>
         </form>
 
-        @if(app()->environment('local'))
-        <x-ui.button
-            as="a"
-            href="{{ route('dev-login') }}"
-            variant="secondary"
-            size="lg"
-            :full-width="true"
-        >
-            Gunakan Demo Login (Lokal)
-        </x-ui.button>
-        @endif
     </div>
 
 </x-layouts.auth>

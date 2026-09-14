@@ -16,10 +16,12 @@ use App\Models\Role;
 use App\Models\SalaryHistory;
 use App\Models\SkRequirement;
 use App\Models\User;
+use App\Queries\Dashboards\ActiveEmployeeSummaryQuery;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Database\Seeders\SkRequirementSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -45,6 +47,19 @@ class EmployeeIndexTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_link_edit_dirender_dengan_prefix_surface_tanpa_variabel_php_di_alpine(): void
+    {
+        foreach (['admin_kepegawaian' => '/pegawai/', 'pimpinan' => '/rbac/pegawai/'] as $role => $prefix) {
+            Role::where('name', $role)->firstOrFail()->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'employees.update')->firstOrFail()->id,
+            ]);
+            $url = $role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai');
+            $response = $this->actingAs(User::factory()->create(['role' => $role]))->get($url)->assertOk();
+            $response->assertDontSee('$isPimpinan', false)
+                ->assertSee(':href="`'.$prefix.'${p.id}/edit`"', false);
+        }
+    }
+
     public function test_admin_kepegawaian_can_list_employees(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
@@ -56,6 +71,21 @@ class EmployeeIndexTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('message', 'Daftar pegawai berhasil diambil.');
         $response->assertJsonPath('employees.data.0.nama_lengkap', 'Budi Santoso');
+    }
+
+    public function test_daftar_tidak_memuat_modal_riwayat_tanpa_tombol_tetapi_tetap_memulihkan_baris_edit(): void
+    {
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertDontSee('showRiwayatModal', false)
+            ->assertDontSee('openRiwayatModal', false)
+            ->assertDontSee('submitRiwayat', false)
+            ->assertDontSee('newPangkat', false)
+            ->assertDontSee('newJabatan', false)
+            ->assertDontSee('newKgb', false)
+            ->assertSee('this.patchEditedEmployee(this.editedEmployeeId)', false)
+            ->assertSee('this.applyEditedDataToCache(this.editedEmployeeId, this.editedEmployeeData)', false);
     }
 
     public function test_super_admin_can_list_employees(): void
@@ -78,6 +108,59 @@ class EmployeeIndexTest extends TestCase
         $response = $this->getJson(self::PEGAWAI_ENDPOINT);
 
         $response->assertForbidden();
+    }
+
+    public function test_daftar_mengecualikan_data_milik_sendiri_kecuali_super_admin(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Milik Sendiri Unik']);
+        Employee::factory()->create(['nama_lengkap' => 'Milik Orang Lain Unik']);
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => $self->id]);
+
+        $response = $this->actingAs($user)->getJson(self::PEGAWAI_ENDPOINT.'?search=Unik');
+
+        $response->assertOk();
+        $names = collect($response->json('employees.data'))->pluck('nama_lengkap')->all();
+        $this->assertNotContains('Milik Sendiri Unik', $names);
+        $this->assertContains('Milik Orang Lain Unik', $names);
+        $response->assertJsonPath('employees.total', 1);
+    }
+
+    public function test_super_admin_tetap_melihat_data_milik_sendiri_di_daftar(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Milik Sendiri Super Unik']);
+        Employee::factory()->create(['nama_lengkap' => 'Milik Orang Lain Super Unik']);
+        $user = User::factory()->superAdmin()->create(['employee_id' => $self->id]);
+
+        $response = $this->actingAs($user)->getJson(self::PEGAWAI_ENDPOINT.'?search=Super%20Unik');
+
+        $response->assertOk();
+        $response->assertJsonPath('employees.total', 2);
+    }
+
+    public function test_profil_saya_tetap_bisa_melihat_data_sendiri(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Profil Saya Unik']);
+        $user = User::factory()->pegawai()->create(['employee_id' => $self->id]);
+
+        $response = $this->actingAs($user)->getJson('/api/v1/profil-saya');
+
+        $response->assertOk()
+            ->assertJsonPath('employee.id', $self->id)
+            ->assertJsonPath('employee.nama_lengkap', 'Profil Saya Unik');
+    }
+
+    public function test_dashboard_mengecualikan_data_milik_sendiri_kecuali_super_admin(): void
+    {
+        $self = Employee::factory()->create(['nama_lengkap' => 'Dashboard Self Unik']);
+        $other = Employee::factory()->create(['nama_lengkap' => 'Dashboard Other Unik']);
+        $user = User::factory()->adminKepegawaian()->create(['employee_id' => $self->id]);
+
+        $summary = app(ActiveEmployeeSummaryQuery::class)->execute($user);
+        $this->assertSame(1, $summary['total']);
+
+        $superAdmin = User::factory()->superAdmin()->create(['employee_id' => $other->id]);
+        $summarySuper = app(ActiveEmployeeSummaryQuery::class)->execute($superAdmin);
+        $this->assertSame(2, $summarySuper['total']);
     }
 
     public function test_default_only_lists_active_employees(): void
@@ -746,5 +829,24 @@ class EmployeeIndexTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1, 'employees.data')
             ->assertJsonPath('employees.data.0.is_lengkap', $expected);
+    }
+
+    public function test_local_api_bypass_returns_non_empty_list_for_anonymous_viewer(): void
+    {
+        $this->app->detectEnvironment(fn () => 'local');
+        config(['services.simpeg.disable_employee_api_auth' => true]);
+
+        // Middleware route ditentukan saat registrasi, bukan saat request dijalankan.
+        Route::middleware('api')->prefix('api/v1')->name('api.v1.')
+            ->group(base_path('routes/api/v1/pegawai.php'));
+
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Local Bypass']);
+
+        $response = $this->getJson(self::PEGAWAI_ENDPOINT);
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Daftar pegawai berhasil diambil.');
+        $this->assertNotEmpty($response->json('employees.data'));
+        $this->assertSame('Pegawai Local Bypass', $response->json('employees.data.0.nama_lengkap'));
     }
 }

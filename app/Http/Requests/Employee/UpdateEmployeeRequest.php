@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Employee;
 
 use App\Models\Employee;
+use App\Support\Employees\EmployeeIdentifierPrivacy;
 use App\Support\EmployeeValidationRules;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
@@ -21,7 +22,7 @@ class UpdateEmployeeRequest extends FormRequest
         $user = $this->user();
 
         return $user !== null
-            && in_array($user->role, ['super_admin', 'admin_kepegawaian'], true);
+            && $user->hasPermission('employees.update');
     }
 
     public function rules(): array
@@ -36,6 +37,13 @@ class UpdateEmployeeRequest extends FormRequest
         }
 
         $rules = EmployeeValidationRules::update($employee);
+
+        if (! EmployeeIdentifierPrivacy::canManage($this->user())
+            && ! (app()->environment('local') && config('services.simpeg.disable_employee_api_auth'))) {
+            // Field kosong pun ditolak agar form delegated tidak menghapus identitas yang tidak dapat dibacanya.
+            $rules['nik'] = ['missing'];
+            $rules['no_kk'] = ['missing'];
+        }
 
         // Lifecycle pegawai hanya boleh diubah lewat endpoint status khusus agar
         // histori, audit, otorisasi, dan notifikasi tidak dapat dilewati.
@@ -97,6 +105,14 @@ class UpdateEmployeeRequest extends FormRequest
                 $rules['pppk_tmt_pengangkatan'] = ['prohibited'];
                 $rules['tanggal_akhir_kontrak'] = ['prohibited'];
             }
+
+            // Berkas Lainnya untuk edit (juga warning)
+            $rules['berkas_lainnya_jenis'] = ['nullable', 'string', 'in:KTP,KK,SK Mutasi,SK Pensiun,Lainnya'];
+            $rules['berkas_lainnya_jenis_manual'] = ['nullable', 'string', 'max:100'];
+            $rules['berkas_lainnya_nomor'] = ['nullable', 'string', 'max:100'];
+            $rules['berkas_lainnya_deskripsi'] = ['nullable', 'string', 'max:2000'];
+            $rules['berkas_lainnya_tanggal'] = ['nullable', 'date'];
+            $rules['file_berkas_lainnya'] = ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png'];
 
             // Override foto khusus web (file upload)
             $rules['foto'] = ['nullable', 'image', 'max:10240', 'mimes:jpg,jpeg,png'];

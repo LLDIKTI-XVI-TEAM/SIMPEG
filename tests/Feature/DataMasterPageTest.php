@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use App\Models\Permission;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
 use App\Models\RefJenisJabatan;
 use App\Models\RefJenjangPendidikan;
 use App\Models\RefUnitKerja;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -384,12 +386,57 @@ class DataMasterPageTest extends TestCase
             ->assertSee('1 pemakai');
     }
 
-    public function test_bukan_super_admin_tidak_boleh_membuka_halaman(): void
+    public function test_role_tanpa_permission_data_master_tidak_boleh_membuka_halaman(): void
     {
         $user = User::factory()->adminKepegawaian()->create();
 
         $this->actingAs($user)
             ->get(route('data-master'))
             ->assertForbidden();
+    }
+
+    public function test_role_dengan_permission_data_master_dapat_membuka_menu_dan_crud_referensi(): void
+    {
+        $this->berikanPermissionDataMasterKeRole('admin_kepegawaian');
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-master'))
+            ->assertOk()
+            ->assertSee('href="'.route('data-master').'"', false);
+
+        $this->withSession(['_token' => 'test-token'])
+            ->post(route('data-master.eselon.store'), [
+                '_token' => 'test-token',
+                'tab' => 'eselon',
+                'kode' => 'I.b',
+                'nama' => 'Eselon RBAC',
+            ], ['X-CSRF-TOKEN' => 'test-token'])
+            ->assertStatus(302);
+
+        $this->assertDatabaseHas('ref_eselon', [
+            'kode' => 'I.b',
+            'nama' => 'Eselon RBAC',
+        ]);
+    }
+
+    public function test_permission_data_master_tidak_membuka_channel_notifikasi(): void
+    {
+        $this->berikanPermissionDataMasterKeRole('admin_kepegawaian');
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)
+            ->get(route('data-master.channel-notifikasi.index'))
+            ->assertForbidden();
+    }
+
+    private function berikanPermissionDataMasterKeRole(string $roleName): void
+    {
+        $role = Role::query()->where('name', $roleName)->firstOrFail();
+        $permission = Permission::query()
+            ->where('name', 'reference_tables.manage')
+            ->firstOrFail();
+
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
     }
 }

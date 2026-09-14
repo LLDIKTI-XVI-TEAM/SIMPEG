@@ -11,13 +11,12 @@ use Illuminate\Validation\Validator;
 
 class UpdateSkRequirementMatrixRequest extends FormRequest
 {
-    /** Pengelolaan matriks mengikuti role efektif dan permission backend. */
+    /** Pengelolaan matriks permission-driven: cukup permission pada role efektif. */
     public function authorize(): bool
     {
         $user = $this->user();
 
         return $user !== null
-            && in_array($user->getEffectiveRole(), ['super_admin', 'admin_kepegawaian'], true)
             && $user->hasPermission('sk_requirements.manage');
     }
 
