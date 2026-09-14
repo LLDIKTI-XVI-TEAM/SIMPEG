@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\Permission;
+use App\Models\RefStatusPegawai;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class EmployeeApiScopeTest extends TestCase
@@ -19,6 +21,32 @@ class EmployeeApiScopeTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+    }
+
+    public static function statusBarisPegawai(): array
+    {
+        return [['AKTIF', true], ['TUGAS_BELAJAR', true], ['PENSIUN', false]];
+    }
+
+    #[DataProvider('statusBarisPegawai')]
+    public function test_refresh_baris_mempertahankan_keaktifan_dari_kelompok_status(string $kode, bool $aktif): void
+    {
+        $this->seedReferenceData();
+        $status = RefStatusPegawai::where('kode', $kode)->firstOrFail();
+        $employee = Employee::factory()->create([
+            'status_pegawai_id' => $status->id,
+            'status_aktif' => $status->nama,
+        ]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->getJson("/api/v1/pegawai/{$employee->id}/table-row")
+            ->assertOk()
+            ->assertJsonPath('employee.id', $employee->id)
+            ->assertJsonPath('employee.status_nama', $status->nama)
+            ->assertJsonPath('employee.is_aktif', $aktif);
+
+        $this->assertSame($status->id, $employee->fresh()->status_pegawai_id);
+        $this->assertDatabaseCount('employee_status_histories', 0);
     }
 
     public function test_pegawai_hanya_boleh_membaca_keluarga_dan_riwayat_milik_sendiri(): void
