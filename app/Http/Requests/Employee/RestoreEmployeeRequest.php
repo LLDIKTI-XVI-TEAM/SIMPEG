@@ -9,17 +9,17 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Kontrak perubahan status resmi saat pegawai nonaktif diaktifkan kembali (US-2.10 AC-4).
  *
- * Pemulihan adalah perubahan status administrasi resmi: role efektif apa pun yang
- * memiliki permission employees.restore boleh menjalankannya (dikelola lewat RBAC
- * matrix), dengan tanggal efektif dan alasan wajib; riwayat status serta audit
+ * Pemulihan adalah perubahan status administrasi resmi: Super Admin atau Admin
+ * Kepegawaian yang memiliki permission employees.restore boleh menjalankannya
+ * (K-STATUS-04), dengan tanggal efektif dan alasan wajib; riwayat status serta audit
  * ditulis oleh RestoreEmployeeAction dalam satu transaksi.
  */
 class RestoreEmployeeRequest extends FormRequest
 {
     /**
-     * Pemulihan pegawai memerlukan permission employees.restore pada role efektif.
-     * hasPermission() sudah memperhitungkan temporary_role sehingga simulasi role
-     * tidak dibypass oleh role asli.
+     * Pemulihan pegawai memerlukan permission employees.restore pada role efektif
+     * Super Admin atau Admin Kepegawaian. hasPermission() sudah memperhitungkan
+     * temporary_role sehingga simulasi role tidak dibypass oleh role asli.
      */
     public function authorize(): bool
     {

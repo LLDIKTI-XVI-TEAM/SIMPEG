@@ -94,7 +94,7 @@ class PimpinanGranularPermissionUiTest extends TestCase
         $this->assertNotEquals(403, $response->status());
     }
 
-    public function test_pimpinan_hanya_restore_melihat_restore_tidak_edit(): void
+    public function test_pimpinan_dengan_restore_permission_tetap_tidak_melihat_restore(): void
     {
         $employee = Employee::factory()->create();
         // Buat employee nonaktif untuk test restore
@@ -103,7 +103,9 @@ class PimpinanGranularPermissionUiTest extends TestCase
 
         $user = $this->pimpinanWithPermissions(['employees.restore']);
 
-        $this->assertPimpinanIndexSee($user, 'Aktifkan Kembali', true);
+        $this->assertTrue($user->hasPermission('employees.restore'));
+        $this->assertPimpinanIndexSee($user, 'Aktifkan Kembali', false);
+        $this->assertPimpinanIndexSee($user, 'restorePegawai(', false);
         $this->assertPimpinanIndexSee($user, '/rbac/pegawai/${p.id}/edit', false);
         $this->assertPimpinanIndexSee($user, 'Tambah Manual', false);
     }

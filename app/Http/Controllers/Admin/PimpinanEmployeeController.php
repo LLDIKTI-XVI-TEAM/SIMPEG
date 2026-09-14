@@ -15,6 +15,7 @@ use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
 use App\Models\User;
 use App\Services\Documents\SkRequirementMatrixVersionService;
+use App\Services\Employees\EmployeeLifecycleAuthorization;
 use App\Support\Documents\DocumentCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -76,7 +77,7 @@ class PimpinanEmployeeController extends Controller
         $canImportEmployees = $user?->hasPermission('employees.import') ?? false;
         $canUpdateEmployee = $user?->hasPermission('employees.update') ?? false;
         $canDeactivateEmployee = $user?->hasPermission('employees.deactivate') ?? false;
-        $canRestoreEmployee = $user?->hasPermission('employees.restore') ?? false;
+        $canRestoreEmployee = app(EmployeeLifecycleAuthorization::class)->canRestore($user);
         $canExportEmployees = $user?->hasPermission('employees.export') ?? false;
         // Ubah Status adalah aksi administratif kepegawaian, bukan pimpinan — tetap false untuk pimpinan
         $canChangeStatus = false;

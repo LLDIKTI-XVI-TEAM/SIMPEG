@@ -310,8 +310,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->assertTrue($employee->refresh()->isActive());
     }
 
-    /** Kontrak permission-driven: FormRequest menerima role ber-permission employees.restore. */
-    public function test_form_request_restore_menerima_pimpinan_yang_diberi_permission(): void
+    public function test_form_request_restore_menolak_pimpinan_meski_permission_diberikan(): void
     {
         $role = Role::query()->where('name', 'pimpinan')->firstOrFail();
         $permission = Permission::query()->where('name', 'employees.restore')->firstOrFail();
@@ -322,11 +321,10 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $request->setUserResolver(static fn (): User => $user);
 
         $this->assertTrue($user->hasPermission('employees.restore'));
-        $this->assertTrue($request->authorize());
+        $this->assertFalse($request->authorize());
     }
 
-    /** Saat simulasi, permission tetap dievaluasi dari role efektif (konsisten kontrak RBAC). */
-    public function test_form_request_restore_mengikuti_permission_role_efektif_saat_simulasi(): void
+    public function test_form_request_restore_menolak_role_efektif_pimpinan_saat_simulasi(): void
     {
         $role = Role::query()->where('name', 'pimpinan')->firstOrFail();
         $permission = Permission::query()->where('name', 'employees.restore')->firstOrFail();
@@ -341,18 +339,18 @@ class EmployeeDeactivateRestoreTest extends TestCase
 
         $this->assertSame('pimpinan', $user->getEffectiveRole());
         $this->assertTrue($user->hasPermission('employees.restore'));
-        $this->assertTrue($request->authorize());
+        $this->assertFalse($request->authorize());
     }
 
-    public function test_restore_action_immediate_menerima_pimpinan_ber_permission(): void
+    public function test_restore_action_immediate_menolak_pimpinan_meski_permission_diberikan(): void
     {
-        $this->assertRestoreActionAcceptsPimpinan(now('Asia/Makassar')->toDateString());
+        $this->assertRestoreActionRejectsPimpinan(now('Asia/Makassar')->toDateString());
     }
 
-    public function test_restore_action_future_menjadwalkan_pimpinan_ber_permission(): void
+    public function test_restore_action_future_menolak_pimpinan_meski_permission_diberikan(): void
     {
-        $this->assertRestoreActionAcceptsPimpinan(now('Asia/Makassar')->addDay()->toDateString());
-        $this->assertDatabaseCount('employee_status_transitions', 1);
+        $this->assertRestoreActionRejectsPimpinan(now('Asia/Makassar')->addDay()->toDateString());
+        $this->assertDatabaseCount('employee_status_transitions', 0);
     }
 
     public function test_restore_requires_tanggal_efektif_and_alasan(): void
@@ -668,7 +666,7 @@ class EmployeeDeactivateRestoreTest extends TestCase
         $this->assertSame(0, AuditLog::query()->where('auditable_type', 'Employee')->count());
     }
 
-    private function assertRestoreActionAcceptsPimpinan(string $effectiveDate): void
+    private function assertRestoreActionRejectsPimpinan(string $effectiveDate): void
     {
         $role = Role::query()->where('name', 'pimpinan')->firstOrFail();
         $permission = Permission::query()->where('name', 'employees.restore')->firstOrFail();
@@ -681,23 +679,20 @@ class EmployeeDeactivateRestoreTest extends TestCase
         ]);
         $request = Request::create('/pegawai/restore', 'POST', [
             'tanggal_efektif' => $effectiveDate,
-            'alasan' => 'Reaktivasi oleh pimpinan ber-permission.',
+            'alasan' => 'Reaktivasi dari role yang tidak diizinkan.',
         ], [], [], [
             'REMOTE_ADDR' => '127.0.0.1',
             'HTTP_USER_AGENT' => 'SIMPEG-Restore-Action-Test/1.0',
         ]);
         $request->setUserResolver(static fn (): User => $user);
 
-        app(RestoreEmployeeAction::class)->execute($employee, $request);
-
-        if ($effectiveDate <= now('Asia/Makassar')->toDateString()) {
-            $this->assertTrue($employee->refresh()->isActive());
-            $this->assertDatabaseHas('employee_status_histories', ['employee_id' => $employee->id]);
-            $this->assertDatabaseHas('audit_logs', ['auditable_id' => $employee->id]);
-        } else {
-            // Tanggal efektif masa depan: dijadwalkan, belum diaplikasikan.
+        try {
+            app(RestoreEmployeeAction::class)->execute($employee, $request);
+            $this->fail('RestoreEmployeeAction wajib menolak role efektif Pimpinan.');
+        } catch (ValidationException) {
             $this->assertFalse($employee->refresh()->isActive());
-            $this->assertDatabaseCount('employee_status_histories', 0);
+            $this->assertDatabaseMissing('employee_status_histories', ['employee_id' => $employee->id]);
+            $this->assertDatabaseMissing('audit_logs', ['auditable_id' => $employee->id]);
         }
     }
 
