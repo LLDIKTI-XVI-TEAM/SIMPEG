@@ -79,7 +79,8 @@ class DisciplineRecordController extends Controller
             $employee,
             'discipline',
             $record,
-            'pegawai.history-attachments.download',
+            'rbac.pegawai.discipline-attachments.download',
+            false,
         );
 
         return response()->json([

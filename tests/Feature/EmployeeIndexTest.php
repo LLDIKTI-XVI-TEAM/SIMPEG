@@ -801,4 +801,19 @@ class EmployeeIndexTest extends TestCase
             ->assertJsonCount(1, 'employees.data')
             ->assertJsonPath('employees.data.0.is_lengkap', $expected);
     }
+
+    public function test_local_api_bypass_returns_non_empty_list_for_anonymous_viewer(): void
+    {
+        $this->app->detectEnvironment(fn () => 'local');
+        config(['services.simpeg.disable_employee_api_auth' => true]);
+
+        Employee::factory()->create(['nama_lengkap' => 'Pegawai Local Bypass']);
+
+        $response = $this->getJson(self::PEGAWAI_ENDPOINT);
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Daftar pegawai berhasil diambil.');
+        $this->assertNotEmpty($response->json('employees.data'));
+        $this->assertSame('Pegawai Local Bypass', $response->json('employees.data.0.nama_lengkap'));
+    }
 }

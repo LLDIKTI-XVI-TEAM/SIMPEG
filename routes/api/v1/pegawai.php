@@ -36,23 +36,27 @@ $adminEmployeeMutationMiddleware = static fn (string $permission): array => $dis
 $adminSubModuleMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
     ? []
     : ['permission:'.$permission, 'employee.scope'];
+// Mutasi koleksi yang membuat rekam baru belum memiliki target UUID; scope record tidak relevan.
+$employeeCollectionMutationMiddleware = static fn (string $permission): array => $disableEmployeeApiAuth
+    ? []
+    : ['permission:'.$permission];
 
 // Role middleware menjadi pagar kasar area admin pegawai; permission middleware menjadi pagar aksi per route.
 // Keduanya dipertahankan sebagai defense-in-depth agar akses admin tidak hanya bergantung pada satu lapis kontrol.
 Route::middleware($employeeGroupMiddleware)
     ->prefix('pegawai')
     ->name('pegawai.')
-    ->group(function () use ($adminEmployeeMutationMiddleware, $adminSubModuleMutationMiddleware, $adminEmployeeReadMiddleware, $strictEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
+    ->group(function () use ($adminEmployeeMutationMiddleware, $adminSubModuleMutationMiddleware, $employeeCollectionMutationMiddleware, $adminEmployeeReadMiddleware, $strictEmployeeReadMiddleware, $disableEmployeeApiAuth): void {
         Route::get('/', [EmployeeController::class, 'index'])
             // Daftar dipakai oleh halaman pemantauan Pimpinan dan tidak menerima UUID target;
             // pembatasan employee.scope diterapkan pada endpoint yang menunjuk satu rekam pegawai.
             ->middleware($disableEmployeeApiAuth ? [] : ['permission:employees.read'])
             ->name('index');
         Route::post('/', [EmployeeController::class, 'store'])
-            ->middleware($adminEmployeeMutationMiddleware('employees.create'))
+            ->middleware($employeeCollectionMutationMiddleware('employees.create'))
             ->name('store');
         Route::post('/check-identity', [EmployeeController::class, 'checkIdentity'])
-            ->middleware($adminEmployeeMutationMiddleware('employees.create'))
+            ->middleware($employeeCollectionMutationMiddleware('employees.create'))
             ->name('check-identity');
         Route::post('/import', [EmployeeImportController::class, 'store'])
             // Import tidak menunjuk rekam pegawai existing; employee.scope hanya

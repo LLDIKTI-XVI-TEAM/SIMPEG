@@ -632,4 +632,39 @@ class DisciplineRecordTest extends TestCase
         $this->assertSame($freshPath, $audit->old_values['file_sk']);
         $this->assertSame('SK-DIS-CONCURRENT-UPDATED', $audit->old_values['no_sk']);
     }
+
+    public function test_upload_sk_returns_canonical_rbac_download_url(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+
+        $admin = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $record = DisciplineRecord::create($this->recordPayload($employee, [
+            'file_sk' => null,
+        ]));
+
+        $file = UploadedFile::fake()->create('sk-disiplin.pdf', 500, 'application/pdf');
+
+        $response = $this->actingAs($admin)->postJson(
+            "/api/v1/pegawai/{$employee->id}/disiplin/{$record->id}/upload-sk",
+            ['file_sk' => $file]
+        );
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Berkas SK hukuman disiplin berhasil diunggah.');
+
+        $downloadUrl = $response->json('record.download_url');
+        $this->assertNotEmpty($downloadUrl);
+
+        $expectedUrl = route('rbac.pegawai.discipline-attachments.download', [
+            'employee' => $employee->id,
+            'history' => $record->id,
+        ]);
+
+        $this->assertSame($expectedUrl, $downloadUrl);
+        $this->assertStringNotContainsString('type=', $downloadUrl);
+
+        $downloadResponse = $this->actingAs($admin)->get($downloadUrl);
+        $downloadResponse->assertOk();
+    }
 }

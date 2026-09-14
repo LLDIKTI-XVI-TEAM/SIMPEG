@@ -32,8 +32,14 @@ class ListEmployeesAction
         $direction = $validated['direction'] ?? 'asc';
         $perPage = (int) ($validated['per_page'] ?? 10);
 
-        // Dataset selalu dimulai dari scope kanonis aktor (global / bawahan / self).
-        $employees = $this->employeeScope->for($viewer);
+        $localBypass = app()->environment('local')
+            && config('services.simpeg.disable_employee_api_auth');
+
+        // Dataset selalu dimulai dari scope kanonis aktor (global / bawahan / self),
+        // kecuali pemanggilan lokal terkonfigurasi tanpa aktor yang mengeksekusi bypass.
+        $employees = $localBypass && $viewer === null
+            ? Employee::query()
+            : $this->employeeScope->for($viewer);
 
         if ($viewer !== null
             && $viewer->getEffectiveRole() !== 'super_admin'

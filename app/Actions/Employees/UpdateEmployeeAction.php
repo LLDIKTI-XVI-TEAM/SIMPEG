@@ -351,11 +351,22 @@ class UpdateEmployeeAction
             // 4. Pengangkatan (Appointment)
             $wantsPengangkatan = $request->filled('pengangkatan_jenis_pengangkatan') || $request->hasFile('file_sk_pengangkatan') || $request->filled('existing_document_id_pengangkatan');
             if ($wantsPengangkatan) {
-                $canHistory = ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('employee_histories.update')) || ($this->isLocalBypass() || $request->user()?->hasPermission('employees.update'));
-                // Pengangkatan juga boleh via employees.update (legacy), tapi gate history tetap cek
-                $canHistoryEff = $canHistory || ($this->isLocalBypass() || $request->user()?->hasPermission('employees.update'));
-                if (! $canHistoryEff) {
-                    $this->warnings[] = 'Riwayat pengangkatan tidak dibuat: butuh permission employee_histories.create/update.';
+                // Selector kanonis deterministik "pengangkatan pertama": TMT paling awal, lalu id paling kecil.
+                $appointment = $employee->appointments()
+                    ->orderBy('tmt_pengangkatan')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->first();
+
+                $requiredHistoryPermission = $appointment === null
+                    ? 'employee_histories.create'
+                    : 'employee_histories.update';
+
+                $canHistory = $this->isLocalBypass()
+                    || $request->user()?->hasPermission($requiredHistoryPermission);
+
+                if (! $canHistory) {
+                    $this->warnings[] = 'Riwayat pengangkatan tidak '.($appointment === null ? 'dibuat' : 'diperbarui').': butuh permission '.$requiredHistoryPermission.'.';
                 } else {
                     // Validasi inti sebelum menyimpan berkas agar tidak menghasilkan Document orphan.
                     $hasCore = $request->filled('pengangkatan_jenis_pengangkatan');
@@ -373,8 +384,7 @@ class UpdateEmployeeAction
 
                         // Bedakan create vs update dari state kanonis sebelum menyimpan: ganti file
                         // existing wajib dokumen_sk.update, upload pertama wajib dokumen_sk.create.
-                        $existingForDocPerm = $employee->appointments()->orderBy('tmt_pengangkatan')->orderBy('id')->first(['file_sk']);
-                        $requiredDocPerm = filled($existingForDocPerm?->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
+                        $requiredDocPerm = filled($appointment?->file_sk) ? 'dokumen_sk.update' : 'dokumen_sk.create';
                         $canDoc = $this->isLocalBypass() || $request->user()?->hasPermission($requiredDocPerm);
                         $storedPengangkatanPath = null;
                         if ($request->hasFile('file_sk_pengangkatan') && $request->file('file_sk_pengangkatan')->isValid()) {
@@ -405,7 +415,6 @@ class UpdateEmployeeAction
                             }
                         }
 
-                        $appointment = $employee->appointment;
                         // Otorisasi ulang setelah row terkunci: state file_sk bisa berubah antara
                         // pre-check dan update (TOCTOU). Ganti wajib update, pertama wajib create.
                         if (isset($appointmentData['file_sk'])) {
@@ -425,7 +434,7 @@ class UpdateEmployeeAction
                             $appointment->update($appointmentData);
                             $appointmentChanged = true;
                         } else {
-                            $appointment = $employee->appointment()->create($appointmentData);
+                            $appointment = $employee->appointments()->create($appointmentData);
                             $appointmentChanged = true;
                         }
 

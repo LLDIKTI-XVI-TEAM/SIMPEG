@@ -1471,4 +1471,94 @@ class EmployeeUpdateTest extends TestCase
             'nomor_dokumen' => 'SK-KGB-WITHCREATE-002',
         ]);
     }
+
+    public function test_appointment_lifecycle_via_employee_update_requires_granular_history_permissions(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create(['nama_lengkap' => 'Nama Sebelum Edit']);
+
+        // Scenario 1: employees.update = true, employee_histories.create/update = false, no Appointment
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.create')->firstOrFail()->id,
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $payloadScenario1 = $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Skenario 1',
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_tmt_pengangkatan' => '2020-01-01',
+            'pengangkatan_no_sk' => 'SK-PENGANGKATAN-001',
+            'pengangkatan_tanggal_sk' => '2020-01-01',
+        ]);
+
+        $response1 = $this->actingAs($user)->post(route('pegawai.update', $employee->id), $payloadScenario1);
+        $response1->assertRedirect(route('data-pegawai'));
+        $response1->assertSessionHas('warnings', fn (array $w): bool => in_array('Riwayat pengangkatan tidak dibuat: butuh permission employee_histories.create.', $w, true));
+        $this->assertSame('Nama Skenario 1', $employee->fresh()->nama_lengkap);
+        $this->assertDatabaseMissing('appointments', ['employee_id' => $employee->id]);
+
+        // Scenario 2: employees.update = true, employee_histories.create = true, no Appointment
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employee_histories.create')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $payloadScenario2 = $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Skenario 2',
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_tmt_pengangkatan' => '2020-01-01',
+            'pengangkatan_no_sk' => 'SK-PENGANGKATAN-001',
+            'pengangkatan_tanggal_sk' => '2020-01-01',
+        ]);
+
+        $response2 = $this->actingAs($user)->post(route('pegawai.update', $employee->id), $payloadScenario2);
+        $response2->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('appointments', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PENGANGKATAN-001',
+        ]);
+
+        // Scenario 3: existing Appointment, employee_histories.create = true, employee_histories.update = false
+        $payloadScenario3 = $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Skenario 3',
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_tmt_pengangkatan' => '2020-01-01',
+            'pengangkatan_no_sk' => 'SK-PENGANGKATAN-DIUBAH-999',
+            'pengangkatan_tanggal_sk' => '2020-01-01',
+        ]);
+
+        $response3 = $this->actingAs($user)->post(route('pegawai.update', $employee->id), $payloadScenario3);
+        $response3->assertRedirect(route('data-pegawai'));
+        $response3->assertSessionHas('warnings', fn (array $w): bool => in_array('Riwayat pengangkatan tidak diperbarui: butuh permission employee_histories.update.', $w, true));
+        $this->assertDatabaseHas('appointments', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PENGANGKATAN-001',
+        ]);
+        $this->assertDatabaseMissing('appointments', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PENGANGKATAN-DIUBAH-999',
+        ]);
+
+        // Scenario 4: existing Appointment, employee_histories.update = true
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $payloadScenario4 = $this->validPayload($employee, [
+            'nama_lengkap' => 'Nama Skenario 4',
+            'pengangkatan_jenis_pengangkatan' => 'PNS',
+            'pengangkatan_tmt_pengangkatan' => '2020-01-01',
+            'pengangkatan_no_sk' => 'SK-PENGANGKATAN-DIUBAH-999',
+            'pengangkatan_tanggal_sk' => '2020-01-01',
+        ]);
+
+        $response4 = $this->actingAs($user)->post(route('pegawai.update', $employee->id), $payloadScenario4);
+        $response4->assertRedirect(route('data-pegawai'));
+        $this->assertDatabaseHas('appointments', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PENGANGKATAN-DIUBAH-999',
+        ]);
+    }
 }

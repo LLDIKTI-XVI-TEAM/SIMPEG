@@ -105,4 +105,18 @@ class EmployeeApiScopeTest extends TestCase
             ->getJson("/api/v1/pegawai/{$unrelatedEmployee->id}/riwayat-kepangkatan")
             ->assertForbidden();
     }
+
+    public function test_kepala_bagian_ditolak_pada_endpoint_keluarga_mentah_walaupun_bawahan_langsung(): void
+    {
+        $kabagEmployee = Employee::factory()->create();
+        $directReport = Employee::factory()->create(['kepala_bagian_id' => $kabagEmployee->id]);
+        $kabag = User::factory()->kepalaBagian()->create(['employee_id' => $kabagEmployee->id]);
+        $permission = Permission::query()->where('name', 'employee_families.read')->firstOrFail();
+        Role::query()->where('name', 'kepala_bagian')->firstOrFail()
+            ->permissions()->syncWithoutDetaching([$permission->id]);
+
+        $this->actingAs($kabag)
+            ->getJson("/api/v1/pegawai/{$directReport->id}/keluarga")
+            ->assertForbidden();
+    }
 }

@@ -43,14 +43,31 @@ class EnsureEmployeeApiScope
             abort(403);
         }
 
-        $managers = $mode === 'strict' ? self::STRICT_MANAGER_ROLES : self::MANAGER_ROLES;
-
-        if (in_array($effectiveRole, $managers, true)) {
-            return $next($request);
-        }
-
         $target = $request->route('employee') ?? $request->route('id') ?? $request->route('employeeId');
         $targetEmployeeId = $target instanceof Employee ? $target->id : $target;
+
+        if ($mode === 'strict') {
+            if (in_array($effectiveRole, self::STRICT_MANAGER_ROLES, true)) {
+                return $next($request);
+            }
+
+            if ($effectiveRole === 'pegawai') {
+                abort_unless(
+                    is_string($user->employee_id)
+                        && is_string($targetEmployeeId)
+                        && hash_equals($user->employee_id, $targetEmployeeId),
+                    403,
+                );
+
+                return $next($request);
+            }
+
+            abort(403);
+        }
+
+        if (in_array($effectiveRole, self::MANAGER_ROLES, true)) {
+            return $next($request);
+        }
 
         if ($effectiveRole === 'kepala_bagian') {
             abort_unless(is_string($targetEmployeeId) && $targetEmployeeId !== '', 403);
