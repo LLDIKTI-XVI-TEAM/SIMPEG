@@ -557,8 +557,10 @@ class UserMappingControllerTest extends TestCase
         $this->actingAs($admin);
 
         // Menjepit state setup: bila baris ini gagal, row ekstra berasal dari setup,
-        // bukan dari request invalid di bawah.
-        $this->assertDatabaseCount('users', 1);
+        // bukan dari request invalid di bawah. Dump identitas row agar CI merah
+        // berikutnya langsung menyebut sumbernya (id/email/role/employee_id/keycloak_id).
+        $preUsers = DB::table('users')->get(['id', 'email', 'employee_id', 'role', 'keycloak_id']);
+        $this->assertCount(1, $preUsers, 'Setup harus tepat 1 user, ditemukan: '.$preUsers->toJson());
 
         $this->post(route('user-management.update'), [
             'employee_id' => (string) Str::uuid(),
@@ -614,7 +616,8 @@ class UserMappingControllerTest extends TestCase
         $this->actingAs($admin);
 
         // Menjepit state setup agar setiap request invalid terbukti zero side-effect sendiri-sendiri.
-        $this->assertDatabaseCount('users', 1);
+        $preUsers = DB::table('users')->get(['id', 'email', 'employee_id', 'role', 'keycloak_id']);
+        $this->assertCount(1, $preUsers, 'Setup harus tepat 1 user, ditemukan: '.$preUsers->toJson());
 
         $this->post(route('user-management.update'), $this->mappingPayload($employee, [
             'role' => 'Super Admin',
