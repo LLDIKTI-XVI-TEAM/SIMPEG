@@ -64,7 +64,7 @@ return new class extends Migration
     public function up(): void
     {
         DB::transaction(function (): void {
-            Permission::query()->firstOrCreate(
+            $permission = Permission::query()->firstOrCreate(
                 ['name' => 'cuti.administrative_postponement.manage'],
                 ['module' => 'cuti', 'description' => 'Menangguhkan cuti yang disetujui secara administratif'],
             );
@@ -78,6 +78,10 @@ return new class extends Migration
                     Permission::query()->whereIn('name', self::ADMIN_DEFAULT_PERMISSIONS)->pluck('id')->all()
                 );
             }
+
+            $admin->permissions()->syncWithoutDetaching([
+                $permission->id,
+            ]);
 
             $channelIds = DB::table('ref_notification_channels')->whereIn('code', ['in_app', 'email'])->pluck('id', 'code');
             if ($channelIds->count() !== 2) {

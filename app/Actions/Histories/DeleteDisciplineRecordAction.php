@@ -16,14 +16,20 @@ class DeleteDisciplineRecordAction
 
     public function execute(Employee $employee, DisciplineRecord $record, ?Request $request = null): void
     {
-        abort_unless($record->employee_id === $employee->id, 404);
+        $filePath = DB::transaction(function () use ($employee, $record, $request): ?string {
+            /** @var DisciplineRecord $lockedRecord */
+            $lockedRecord = DisciplineRecord::query()
+                ->whereKey($record->id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $filePath = $record->file_sk;
-        $oldValues = $record->toArray();
-        $recordId = $record->id;
+            abort_unless($lockedRecord->employee_id === $employee->id, 404);
 
-        DB::transaction(function () use ($employee, $filePath, $record, $request, $oldValues, $recordId): void {
-            $record->delete();
+            $filePath = $lockedRecord->file_sk;
+            $oldValues = $lockedRecord->toArray();
+            $recordId = $lockedRecord->id;
+
+            $lockedRecord->delete();
 
             if ($filePath) {
                 // Hapus hanya mirror milik riwayat ini. Dua riwayat legacy bisa berbagi
@@ -49,6 +55,8 @@ class DeleteDisciplineRecordAction
             }
 
             AuditService::log('DELETE', 'DisciplineRecord', $recordId, $oldValues, null, $request);
+
+            return $filePath;
         });
 
         if ($filePath) {

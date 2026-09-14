@@ -71,6 +71,39 @@ class RbacFreshInstallMatrixTest extends TestCase
         ]);
     }
 
+    public function test_migration_grants_administrative_postponement_to_existing_admin_without_reseeding_matrix(): void
+    {
+        $admin = Role::query()->firstOrCreate(
+            ['name' => 'admin_kepegawaian'],
+            ['guard_name' => 'web', 'description' => 'Admin Kepegawaian'],
+        );
+
+        $postponementPermission = Permission::where('name', 'cuti.administrative_postponement.manage')->first();
+        if ($postponementPermission) {
+            $admin->permissions()->detach($postponementPermission->id);
+            $postponementPermission->delete();
+        }
+
+        $revokedPermission = Permission::query()->firstOrCreate(
+            ['name' => 'cuti.manual.manage'],
+            ['module' => 'cuti', 'description' => 'Manage cuti manual'],
+        );
+        $admin->permissions()->detach($revokedPermission->id);
+
+        $migration = require database_path('migrations/2026_09_06_000002_add_administrative_leave_postponement_access_and_notifications.php');
+        $migration->up();
+
+        $this->assertTrue(
+            $admin->fresh()->permissions()->where('name', 'cuti.administrative_postponement.manage')->exists(),
+            'Existing admin_kepegawaian harus menerima permission cuti.administrative_postponement.manage'
+        );
+
+        $this->assertFalse(
+            $admin->fresh()->permissions()->where('name', 'cuti.manual.manage')->exists(),
+            'Permission yang dicabut operator tidak boleh di-regrant oleh migrasi'
+        );
+    }
+
     /** @return list<string> */
     private function actualPermissions(string $role): array
     {

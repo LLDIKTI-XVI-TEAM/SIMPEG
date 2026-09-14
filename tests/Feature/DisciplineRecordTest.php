@@ -582,4 +582,53 @@ class DisciplineRecordTest extends TestCase
             'path juga direferensikan kategori lain' => ['kategori_lain'],
         ];
     }
+
+    public function test_delete_discipline_action_locks_and_uses_freshest_canonical_state_from_db(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $employee = Employee::factory()->create();
+
+        $stalePath = 'sk/disiplin-stale.pdf';
+        $freshPath = 'sk/disiplin-fresh.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($stalePath, 'stale content');
+        Storage::disk(Document::STORAGE_DISK)->put($freshPath, 'fresh content');
+
+        $record = DisciplineRecord::create($this->recordPayload($employee, [
+            'no_sk' => 'SK-DIS-CONCURRENT',
+            'file_sk' => $stalePath,
+        ]));
+
+        $mirror = Document::create([
+            'employee_id' => $employee->id,
+            'history_id' => $record->id,
+            'jenis_dokumen' => 'sk_hukuman_disiplin',
+            'nama_dokumen' => 'SK Hukuman Disiplin',
+            'file_path' => $stalePath,
+        ]);
+
+        DisciplineRecord::where('id', $record->id)->update([
+            'file_sk' => $freshPath,
+            'no_sk' => 'SK-DIS-CONCURRENT-UPDATED',
+        ]);
+        $mirror->update(['file_path' => $freshPath]);
+
+        $this->assertSame($stalePath, $record->file_sk);
+
+        app(\App\Actions\Histories\DeleteDisciplineRecordAction::class)->execute($employee, $record);
+
+        $this->assertDatabaseMissing('discipline_records', ['id' => $record->id]);
+        $this->assertDatabaseMissing('documents', ['id' => $mirror->id]);
+        Storage::disk(Document::STORAGE_DISK)->assertMissing($freshPath);
+        Storage::disk(Document::STORAGE_DISK)->assertExists($stalePath);
+
+        $audit = AuditLog::where('auditable_type', 'DisciplineRecord')
+            ->where('auditable_id', $record->id)
+            ->where('event', 'DELETE')
+            ->latest()
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertSame($freshPath, $audit->old_values['file_sk']);
+        $this->assertSame('SK-DIS-CONCURRENT-UPDATED', $audit->old_values['no_sk']);
+    }
 }

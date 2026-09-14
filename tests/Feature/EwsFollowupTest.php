@@ -236,6 +236,70 @@ class EwsFollowupTest extends TestCase
             ->count());
     }
 
+    public function test_pangkat_approval_denied_when_actor_lacks_dokumen_sk_create_permission(): void
+    {
+        $role = Role::where('name', 'admin_kepegawaian')->firstOrFail();
+        $dokumenCreatePermission = Permission::where('name', 'dokumen_sk.create')->firstOrFail();
+        $role->permissions()->detach($dokumenCreatePermission->id);
+
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create([
+            'tanggal_kenaikan_pangkat_berikutnya' => now()->subDay()->toDateString(),
+        ]);
+        $golongan = RefGolongan::where('kode', 'III/b')->firstOrFail();
+        $alert = $this->activeAlertFor($employee, 'KENAIKAN_PANGKAT', now()->subDay()->toDateString(), 30);
+
+        $response = $this->actingAs($user)
+            ->from(route('ews'))
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'SK pangkat baru tanpa izin dokumen.',
+                'golongan_id' => $golongan->id,
+                'tmt_pangkat' => '2026-07-22',
+                'no_sk' => 'SK-PANGKAT-DENIED-001',
+                'tanggal_sk' => '2026-07-25',
+                'file_sk' => UploadedFile::fake()->create('sk-pangkat-denied.pdf', 128, 'application/pdf'),
+            ]);
+
+        $response->assertForbidden();
+
+        $this->assertDatabaseMissing('rank_histories', [
+            'no_sk' => 'SK-PANGKAT-DENIED-001',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'nomor_dokumen' => 'SK-PANGKAT-DENIED-001',
+        ]);
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_ACTIVE, $alert->fresh()->followup_status);
+        $this->assertNull($alert->fresh()->handled_at);
+
+        // Ketika permission dokumen_sk.create tersedia, approval berhasil
+        $role->permissions()->syncWithoutDetaching([$dokumenCreatePermission->id]);
+        $user->refresh();
+
+        $successResponse = $this->actingAs($user)
+            ->from(route('ews'))
+            ->postWithCsrf(route('ews.followup.update', $alert), [
+                'followup_status' => EwsAlert::FOLLOWUP_STATUS_HANDLED,
+                'handled_note' => 'SK pangkat baru dengan izin dokumen.',
+                'golongan_id' => $golongan->id,
+                'tmt_pangkat' => '2026-07-22',
+                'no_sk' => 'SK-PANGKAT-ALLOWED-001',
+                'tanggal_sk' => '2026-07-25',
+                'file_sk' => UploadedFile::fake()->create('sk-pangkat-allowed.pdf', 128, 'application/pdf'),
+            ]);
+
+        $successResponse->assertSessionHasNoErrors()->assertRedirect(route('ews'));
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-ALLOWED-001',
+        ]);
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'nomor_dokumen' => 'SK-PANGKAT-ALLOWED-001',
+        ]);
+        $this->assertSame(EwsAlert::FOLLOWUP_STATUS_HANDLED, $alert->fresh()->followup_status);
+    }
+
     public function test_kgb_approval_creates_new_history_and_resets_ews_from_configured_tmt(): void
     {
 

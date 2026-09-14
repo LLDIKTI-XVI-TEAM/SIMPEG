@@ -21,10 +21,23 @@ class UpdateEwsAlertFollowupRequest extends FormRequest
             return false;
         }
 
+        if (
+            ($this->isRankApproval() || $this->isKgbApproval())
+            && ! $user->hasPermission('dokumen_sk.create')
+        ) {
+            return false;
+        }
+
         // Persetujuan pensiun adalah penonaktifan lifecycle, sehingga permission
         // update umum tidak cukup untuk mengubah akses akun pegawai.
-        return ! $this->isPensionApproval()
-            || $user->hasPermission('employees.deactivate');
+        if (
+            $this->isPensionApproval()
+            && ! $user->hasPermission('employees.deactivate')
+        ) {
+            return false;
+        }
+
+        return true;
     }
 
     /** @return array<string, array<int, mixed>> */
