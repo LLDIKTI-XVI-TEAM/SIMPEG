@@ -352,7 +352,7 @@ class PegawaiController extends Controller
 
             $employee->load([
                 'jenisPegawai:id,nama',
-                'statusPegawai:id,nama',
+                'statusPegawai:id,nama,kelompok',
                 'rankHistories:id,employee_id,no_sk,tanggal_sk,tmt_pangkat,file_sk,is_latest,created_at',
                 'positionHistories' => fn ($query) => $query
                     ->select(['id', 'employee_id', 'no_sk', 'tanggal_sk', 'file_sk', 'is_latest', 'tmt_jabatan', 'jabatan_id', 'unit_kerja_id', 'created_at'])

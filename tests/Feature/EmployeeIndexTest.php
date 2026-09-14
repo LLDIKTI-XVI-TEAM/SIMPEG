@@ -47,6 +47,19 @@ class EmployeeIndexTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public function test_link_edit_dirender_dengan_prefix_surface_tanpa_variabel_php_di_alpine(): void
+    {
+        foreach (['admin_kepegawaian' => '/pegawai/', 'pimpinan' => '/rbac/pegawai/'] as $role => $prefix) {
+            Role::where('name', $role)->firstOrFail()->permissions()->syncWithoutDetaching([
+                Permission::where('name', 'employees.update')->firstOrFail()->id,
+            ]);
+            $url = $role === 'pimpinan' ? route('pimpinan.pegawai.index') : route('data-pegawai');
+            $response = $this->actingAs(User::factory()->create(['role' => $role]))->get($url)->assertOk();
+            $response->assertDontSee('$isPimpinan', false)
+                ->assertSee(':href="`'.$prefix.'${p.id}/edit`"', false);
+        }
+    }
+
     public function test_admin_kepegawaian_can_list_employees(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

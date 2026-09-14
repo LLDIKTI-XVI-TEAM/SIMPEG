@@ -33,7 +33,13 @@
 
         {{-- Validation Errors --}}
         @if ($errors->any())
-            <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form" class="mb-4" />
+            <x-ui.alert variant="danger" title="Terdapat kesalahan pengisian form" class="mb-4">
+                <ul class="list-disc pl-5">
+                    @foreach ($errors->all() as $message)
+                        <li>{{ $message }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
         @endif
 
         {{-- Form Card --}}
@@ -42,7 +48,7 @@
             activeTab: 'utama',
             subTab: 'pangkat',
             nip: {{ json_encode(old('nip', $p->nip ?? '')) }},
-            nipError: '',
+            nipError: @js($errors->first('nip')),
             nipSuccess: '',
             isCheckingNip: false,
             nik: {{ json_encode($canEditSensitiveIdentifiers ? old('nik', $p->nik ?? '') : '') }},
@@ -292,7 +298,7 @@
                     if (doc.tanggal_dokumen) document.getElementById('pengangkatan_tanggal_sk').value = doc.tanggal_dokumen;
                 }
             }
-        }">
+        }" @if ($errors->has('nip')) x-init="$nextTick(() => $refs.nip.focus())" @endif>
 
             {{-- Tab Bar Navigasi --}}
             <div class="border-b border-border flex flex-wrap gap-4 md:gap-6 mb-6">
@@ -369,8 +375,9 @@
                             <label for="nip"
                                 class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIP</label>
                             <div class="relative w-full">
-                                <input id="nip" name="nip" type="text" maxlength="18" x-model="nip"
-                                    @input="validateNipLocal" value="{{ $p->nip }}" placeholder="198503122010011001"
+                                <input id="nip" name="nip" type="text" maxlength="18" x-model="nip" x-ref="nip"
+                                    aria-describedby="nip-error" :aria-invalid="Boolean(nipError).toString()"
+                                    @input="validateNipLocal" value="{{ old('nip', $p->nip) }}" placeholder="198503122010011001"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2 pr-20 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
                                 @if ($canCheckIdentity)
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -387,8 +394,8 @@
                                 <p class="text-xs text-muted">Keunikan NIP diperiksa saat menyimpan.</p>
                             @endunless
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
-                            <p x-show="nipError" class="text-xs text-danger font-semibold mt-1 font-sans"
-                                x-text="nipError"></p>
+                            <p id="nip-error" x-show="nipError" class="text-xs text-danger font-semibold mt-1 font-sans"
+                                x-text="nipError">{{ $errors->first('nip') }}</p>
                             <p x-show="nipSuccess" class="text-xs text-success font-semibold mt-1 font-sans"
                                 x-text="nipSuccess"></p>
                         </div>
@@ -1481,11 +1488,11 @@
                 </div>
 
                 {{-- Action Buttons --}}
-                <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
+                <div class="border-t border-border pt-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                     <div>
                         <a href="javascript:void(0)"
                             onclick="window.location.href = '{{ $returnUrl ?? route('data-pegawai') }}'"
-                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft">
+                            class="inline-flex w-full items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft sm:w-auto">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -1494,7 +1501,7 @@
                             Batal
                         </a>
                     </div>
-                    <div class="flex items-center gap-3">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                         {{-- Tombol Sebelumnya --}}
                         <x-ui.button type="button" variant="secondary" x-show="activeTab !== 'utama'"
                             @click="activeTab = activeTab === 'pengangkatan' ? 'kontak' : (activeTab === 'kontak' ? 'pelengkap' : 'utama')"

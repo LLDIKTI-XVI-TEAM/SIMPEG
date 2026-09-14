@@ -1024,7 +1024,7 @@ return `pegawai_mv${this.skRequirementVersion}_vw${this.viewerKey}_pp${this.perP
                                 @if ($canUpdateEmployee)
                                 {{-- Edit --}}
                                 <x-ui.tooltip text="Edit" position="top">
-                                    <a :href="$isPimpinan ? `/rbac/pegawai/${p.id}/edit` : `/pegawai/${p.id}/edit`" wire:navigate
+                                    <a :href="`{{ $isPimpinan ? '/rbac/pegawai' : '/pegawai' }}/${p.id}/edit`" :aria-label="'Edit pegawai ' + p.nama_lengkap" wire:navigate
                                         class="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-surface text-primary transition hover:bg-soft shadow-sm">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" stroke-width="1.5">

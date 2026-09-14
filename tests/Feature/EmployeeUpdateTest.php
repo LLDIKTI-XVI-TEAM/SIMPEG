@@ -59,6 +59,47 @@ class EmployeeUpdateTest extends TestCase
         $response->assertRedirect('/login');
     }
 
+    public static function statusTampilanSetelahEdit(): array
+    {
+        return [['AKTIF', true], ['TUGAS_BELAJAR', true], ['PENSIUN', false]];
+    }
+
+    #[DataProvider('statusTampilanSetelahEdit')]
+    public function test_payload_tabel_setelah_edit_mempertahankan_status_resmi(string $kode, bool $aktif): void
+    {
+        $status = RefStatusPegawai::where('kode', $kode)->firstOrFail();
+        $employee = Employee::factory()->create(['status_pegawai_id' => $status->id, 'status_aktif' => $status->nama]);
+
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->post(route('pegawai.update', $employee), ['nama_lengkap' => 'Nama Sesudah Edit'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('data-pegawai'))
+            ->assertSessionHas('edited_employee_data', fn (array $data): bool => $data['id'] === $employee->id
+                && $data['is_aktif'] === $aktif && $data['status_nama'] === $status->nama);
+
+        $this->assertSame($status->id, $employee->fresh()->status_pegawai_id);
+        $this->assertSame($aktif, $employee->fresh()->isActive());
+        $this->assertDatabaseCount('employee_status_histories', 0);
+    }
+
+    public function test_validasi_nip_duplikat_web_ditampilkan_pada_field_tanpa_mengubah_data(): void
+    {
+        $employee = Employee::factory()->create(['nip' => '198001012006041001']);
+        $other = Employee::factory()->create(['nip' => '198001012006041002']);
+        $editUrl = route('pegawai.edit', $employee);
+        $response = $this->actingAs(User::factory()->adminKepegawaian()->create())->from($editUrl)
+            ->post(route('pegawai.update', $employee), ['nip' => $other->nip]);
+        $response->assertRedirect($editUrl)->assertSessionHasErrors('nip');
+        $message = session('errors')->first('nip');
+
+        $html = $this->get($editUrl)->assertOk()->assertSee($message)->getContent();
+        $this->assertMatchesRegularExpression('/id="nip-error"[^>]*>\s*'.preg_quote(e($message), '/').'\s*<\/p>/s', $html);
+        $this->assertStringContainsString('aria-describedby="nip-error"', $html);
+        $this->assertStringContainsString('value="'.$other->nip.'"', $html);
+        $this->assertSame('198001012006041001', $employee->fresh()->nip);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
     public function test_admin_kepegawaian_can_update_employee(): void
     {
         $user = User::factory()->adminKepegawaian()->create();

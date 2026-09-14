@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SwitchRoleTest extends TestCase
@@ -213,6 +214,12 @@ class SwitchRoleTest extends TestCase
         $user = $this->createUserWithRole('pegawai');
         $this->assertSame([], $user->switchableRoleOptions());
         $this->assertFalse($user->canSwitchToAnyRole());
+
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('id="role-switch-menu"', false)
+            ->assertDontSee('action="'.route('switch-role').'"', false);
 
         // Kode: target invalid = validasi 302 + session errors (SwitchRoleRequest::withValidator), bukan 403.
         $this->actingAs($user)
@@ -907,29 +914,48 @@ class SwitchRoleTest extends TestCase
         $this->assertEquals('admin_kepegawaian', $audit->new_values['_effective_role'] ?? null);
     }
 
-    /** Submenu switch disembunyikan saat simulasi aktif agar UI tidak menyesatkan; revert tetap tampil. */
-    public function test_switch_menu_hidden_during_active_simulation(): void
+    /** Simulasi melarang chained switch walau target berizin, dan revoke tetap menyediakan revert. */
+    #[DataProvider('switchRoleMenuCases')]
+    public function test_switch_menu_hidden_during_active_simulation(string $originalRole, array $expectedTargets): void
     {
-        $user = $this->createUserWithRole('super_admin');
+        $targetRole = $expectedTargets[0];
+        $this->grantSwitchPermission($originalRole);
+        $this->grantSwitchPermission($targetRole);
+        $user = $this->createUserWithRole($originalRole);
 
-        // Tanpa simulasi: Super Admin melihat submenu "Simulasi Role" + aksi switch.
+        $this->actingAs($user)
+            ->post(route('switch-role'), ['target_role' => $targetRole])
+            ->assertRedirect(route('dashboard'));
+        $user->refresh();
+
         $this->actingAs($user)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertSee('Simulasi Role')
-            ->assertSee('Switch ke Pegawai');
+            ->assertDontSee('id="role-switch-menu"', false)
+            ->assertDontSee('action="'.route('switch-role').'"', false)
+            ->assertSee('Kembalikan Role Asli')
+            ->assertSee('action="'.route('revert-role').'"', false);
 
-        // Aktifkan simulasi role pegawai: role efektif menurun sehingga submenu switch
-        // tidak lagi dirender (guard eksplisit + permission efektif), hanya revert yang tampil.
-        $this->actingAs($user)->post(route('switch-role'), ['target_role' => 'pegawai']);
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        Role::where('name', $originalRole)->firstOrFail()->permissions()->detach($switchPermission);
+        Role::where('name', $targetRole)->firstOrFail()->permissions()->detach($switchPermission);
 
-        $user->refresh();
+        $this->actingAs($user->refresh())
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('action="'.route('switch-role').'"', false)
+            ->assertSee('Kembalikan Role Asli')
+            ->assertSee('action="'.route('revert-role').'"', false);
 
-        $response = $this->actingAs($user)->get(route('cuti'));
-        $response->assertOk();
-        $response->assertDontSee('Simulasi Role');
-        $response->assertDontSee('Switch ke');
-        $response->assertSee('Kembalikan Role Asli');
+        $this->assertSame($targetRole, $user->refresh()->temporary_role);
+        $this->actingAs($user)->post(route('revert-role'))->assertRedirect(route('dashboard'));
+        $this->assertNull($user->refresh()->temporary_role);
+
+        $this->actingAs($user)
+            ->get(route('cuti'))
+            ->assertOk()
+            ->assertDontSee('action="'.route('switch-role').'"', false)
+            ->assertDontSee('action="'.route('revert-role').'"', false);
     }
 
     /** Capability layout selama simulasi harus mengikuti permission role tujuan, bukan role asli. */
@@ -1035,45 +1061,53 @@ class SwitchRoleTest extends TestCase
         $this->assertDatabaseHas('audit_logs', ['event' => 'REVERT_ROLE', 'auditable_id' => $user->id]);
     }
 
-    /** UI Switch Role tampil untuk setiap role asal yang diizinkan dan ber-permission. */
-    public function test_switch_menu_visible_for_allowed_origin_roles_with_permission(): void
+    /** Form aktual hanya memuat target lebih rendah; pencabutan permission menutup menu pada request berikutnya. */
+    #[DataProvider('switchRoleMenuCases')]
+    public function test_switch_menu_follows_granted_and_revoked_permission(string $originalRole, array $expectedTargets): void
     {
-        $superAdmin = $this->createUserWithRole('super_admin');
+        $this->grantSwitchPermission($originalRole);
+        $user = $this->createUserWithRole($originalRole);
 
-        $this->actingAs($superAdmin)
+        $response = $this->actingAs($user)
             ->get(route('cuti'))
             ->assertOk()
-            ->assertSee('Simulasi Role')
-            ->assertSee('Switch ke Pimpinan')
-            ->assertSee('Switch ke Pegawai');
+            ->assertSee('id="role-switch-menu"', false)
+            ->assertSee('action="'.route('switch-role').'"', false)
+            ->assertDontSee('action="'.route('revert-role').'"', false);
 
-        $this->grantSwitchPermission('admin_kepegawaian');
-        $admin = $this->createUserWithRole('admin_kepegawaian');
+        foreach (['super_admin', 'admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai'] as $targetRole) {
+            $targetInput = '<input type="hidden" name="target_role" value="'.$targetRole.'">';
 
-        // Kode: submenu hanya untuk role asli super_admin (app.blade.php:600,605). Test mengikuti kode.
-        $this->actingAs($admin)
+            if (in_array($targetRole, $expectedTargets, true)) {
+                $response->assertSee($targetInput, false);
+            } else {
+                $response->assertDontSee($targetInput, false);
+            }
+        }
+
+        $switchPermission = Permission::where('name', 'users.switch_role')->firstOrFail();
+        Role::where('name', $originalRole)->firstOrFail()->permissions()->detach($switchPermission);
+
+        $this->actingAs($user->refresh())
             ->get(route('cuti'))
             ->assertOk()
-            ->assertDontSee('Simulasi Role');
+            ->assertDontSee('id="role-switch-menu"', false)
+            ->assertDontSee('action="'.route('switch-role').'"', false);
+    }
 
-        // Pimpinan melihat entri disabled, bukan submenu aksi.
-        $this->grantSwitchPermission('pimpinan');
-        $pimpinan = $this->createUserWithRole('pimpinan');
-
-        $this->actingAs($pimpinan)
-            ->get(route('cuti'))
-            ->assertOk()
-            ->assertDontSee('Simulasi Role')
-            ->assertDontSee('Switch ke');
-
-        $this->grantSwitchPermission('kepala_bagian');
-        $kepalaBagian = $this->createUserWithRole('kepala_bagian');
-
-        $this->actingAs($kepalaBagian)
-            ->get(route('cuti'))
-            ->assertOk()
-            ->assertDontSee('Simulasi Role')
-            ->assertDontSee('Switch ke');
+    /**
+     * Target eksplisit mengunci hierarki produk tanpa memakai helper yang sedang diuji.
+     *
+     * @return array<string, array{string, list<string>}>
+     */
+    public static function switchRoleMenuCases(): array
+    {
+        return [
+            'super_admin' => ['super_admin', ['admin_kepegawaian', 'pimpinan', 'kepala_bagian', 'pegawai']],
+            'admin_kepegawaian' => ['admin_kepegawaian', ['pimpinan', 'kepala_bagian', 'pegawai']],
+            'pimpinan' => ['pimpinan', ['kepala_bagian', 'pegawai']],
+            'kepala_bagian' => ['kepala_bagian', ['pegawai']],
+        ];
     }
 
     /** Request yang ditolak role efektif tidak boleh diklaim sebagai penggunaan yang berhasil. */

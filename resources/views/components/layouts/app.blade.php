@@ -102,6 +102,11 @@
             $canConfigureEws = $layoutCapabilities['ews.configure'] ?? false;
             $canReadAudit = $layoutCapabilities['audit_logs.read'] ?? false;
 
+            // Hitung permission dan hierarki sekali; simulasi aktif hanya menyediakan revert.
+            $switchRoleOptions = $authUser && ! $authUser->temporary_role
+                ? $authUser->switchableRoleOptions()
+                : [];
+
             // Menu terlarang/dikunci untuk masing-masing role
             $lockedMenus = [
                 'super_admin' => [],
@@ -704,14 +709,9 @@
                                 </svg>
                                 <span>Profil Saya</span>
                             </a>
-                            {{-- Switch Role Menu (hanya Super Admin ber-permission yang belum dalam simulasi dapat
-                                 switch; saat simulasi aktif, hanya aksi revert yang tampil) --}}
-                            @if(auth()->check() && ((auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role')) || auth()->user()->temporary_role))
-                                {{-- Submenu switch hanya untuk Super Admin original yang TIDAK sedang dalam simulasi:
-                                     selama simulasi role efektif sudah menurun, permission switch_role tidak dimiliki
-                                     role tujuan dan backend menolak switch beruntun; guard eksplisit ini mencegah UI
-                                     yang menyesatkan dan memastikan aksi hanya tampil bagi Super Admin asli. --}}
-                                @if(auth()->user()->role === 'super_admin' && auth()->user()->hasPermission('users.switch_role') && ! auth()->user()->temporary_role)
+                            {{-- Target menu mengikuti permission dan hierarki role asli; revert tetap tersedia setelah revoke. --}}
+                            @if($switchRoleOptions !== [] || $authUser?->temporary_role)
+                                @if($switchRoleOptions !== [])
                                     <div x-data="{ switchRoleOpen: false }" class="pt-0.5">
                                         <button
                                             type="button"
@@ -756,26 +756,24 @@
                                             class="mt-1 space-y-0.5 rounded-lg bg-soft/60 p-1 border border-border/50"
                                             style="display: none;"
                                         >
-                                            @foreach(['admin_kepegawaian' => 'Admin Kepegawaian', 'pimpinan' => 'Pimpinan', 'kepala_bagian' => 'Kepala Bagian', 'pegawai' => 'Pegawai'] as $roleKey => $roleLabel)
-                                                @if(auth()->user()->role !== $roleKey && auth()->user()->temporary_role !== $roleKey)
-                                                    <form method="POST" action="{{ route('switch-role') }}">
-                                                        @csrf
-                                                        <input type="hidden" name="target_role" value="{{ $roleKey }}">
-                                                        <button
-                                                            type="submit"
-                                                            role="menuitem"
-                                                            class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-surface hover:text-primary transition-colors font-sans text-left group"
-                                                        >
-                                                            <span class="h-1.5 w-1.5 rounded-full bg-muted/60 group-hover:bg-primary shrink-0 transition-colors"></span>
-                                                            <span class="truncate">Switch ke {{ $roleLabel }}</span>
-                                                        </button>
-                                                    </form>
-                                                @endif
+                                            @foreach($switchRoleOptions as $roleKey => $roleLabel)
+                                                <form method="POST" action="{{ route('switch-role') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="target_role" value="{{ $roleKey }}">
+                                                    <button
+                                                        type="submit"
+                                                        role="menuitem"
+                                                        class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-surface hover:text-primary transition-colors font-sans text-left group"
+                                                    >
+                                                        <span class="h-1.5 w-1.5 rounded-full bg-muted/60 group-hover:bg-primary shrink-0 transition-colors"></span>
+                                                        <span class="truncate">Switch ke {{ $roleLabel }}</span>
+                                                    </button>
+                                                </form>
                                             @endforeach
                                         </div>
                                     </div>
                                 @endif
-                                @if(auth()->user()->temporary_role)
+                                @if($authUser?->temporary_role)
                                     <div class="border-t border-border/60 my-1 pt-1">
                                         <form method="POST" action="{{ route('revert-role') }}">
                                             @csrf
