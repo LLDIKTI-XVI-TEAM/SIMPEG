@@ -200,7 +200,8 @@ class PimpinanEmployeeDetailTest extends TestCase
     /**
      * Kontrak permission-driven: capability halaman mengikuti permission yang diberikan
      * pada role pimpinan — bukan blanket read-only. Pimpinan yang diberi permission
-     * lifecycle pegawai melihat kontrol mutasi terkait di daftarnya.
+     * deactivasi pegawai melihat kontrol terkait di daftarnya, tetapi kontrol restore
+     * tetap tidak ditampilkan sesuai invariant lifecycle K-STATUS-04.
      */
     public function test_daftar_pimpinan_menampilkan_kontrol_lifecycle_sesuai_permission_mutasi(): void
     {
@@ -215,13 +216,16 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->pluck('id');
         $role->permissions()->syncWithoutDetaching($permissionIds);
 
-        $this->actingAs(User::factory()->pimpinan()->create())
+        $user = User::factory()->pimpinan()->create();
+        $this->assertTrue($user->hasPermission('employees.restore'));
+
+        $this->actingAs($user)
             ->get(route('pimpinan.pegawai.index'))
             ->assertOk()
             ->assertSee('deletePegawai(p.id, p.nama_lengkap)', false)
-            ->assertSee('restorePegawai(p.id, p.nama_lengkap)', false)
             ->assertSee('showDeleteModal', false)
-            ->assertSee('showRestoreModal', false);
+            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
+            ->assertDontSee('showRestoreModal', false);
     }
 
     /** Pimpinan tanpa permission lifecycle tetap melihat daftar tanpa kontrol mutasi. */

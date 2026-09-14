@@ -230,12 +230,7 @@ class EmployeeStatusTransitionProvenanceTest extends TestCase
         $this->assertTrue($employee->refresh()->isActive());
     }
 
-    /**
-     * Kontrak permission-driven: snapshot restore dengan permission employees.restore
-     * sah diterapkan scheduler dari role efektif mana pun — allowlist role sudah dihapus;
-     * yang divalidasi hanyalah kesesuaian permission pada snapshot provenance.
-     */
-    public function test_due_restore_menerapkan_snapshot_ber_permission_employees_restore(): void
+    public function test_due_restore_menolak_snapshot_role_efektif_di_luar_allowlist(): void
     {
         $nonaktif = RefStatusPegawai::query()->where('kode', 'NONAKTIF')->firstOrFail();
         $target = RefStatusPegawai::query()->where('kode', 'AKTIF')->firstOrFail();
@@ -246,15 +241,15 @@ class EmployeeStatusTransitionProvenanceTest extends TestCase
         $tanggal = now('Asia/Makassar')->toDateString();
         $transitionId = (string) Str::uuid();
 
-        // Meniru row captured dari deployment lama/sumber eksternal. Scheduler
-        // memvalidasi invariant snapshot (permission cocok) tanpa membaca RBAC live.
+        // Meniru row captured dari deployment lama/sumber eksternal. Scheduler wajib
+        // memvalidasi ulang invariant snapshot tanpa membaca konfigurasi RBAC live.
         DB::table('employee_status_transitions')->insert([
             'id' => $transitionId,
             'employee_id' => $employee->id,
             'status_pegawai_id' => $target->id,
             'tanggal_efektif' => $tanggal,
             'kind' => EmployeeStatusTransition::KIND_RESTORE,
-            'keterangan' => 'Snapshot restore ber-permission.',
+            'keterangan' => 'Snapshot restore dengan role tidak sah.',
             'actor_user_id_snapshot' => (string) Str::uuid(),
             'actor_name_snapshot' => 'Aktor Pimpinan Lama',
             'actor_original_role' => 'pimpinan',
@@ -270,10 +265,11 @@ class EmployeeStatusTransitionProvenanceTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->assertSame(1, app(EmployeeStatusTransitionService::class)->applyDue($tanggal));
-        $this->assertTrue(EmployeeStatusTransition::query()->findOrFail($transitionId)->is_applied);
-        $this->assertTrue($employee->refresh()->isActive());
-        $this->assertDatabaseCount('employee_status_histories', 1);
+        $this->assertSame(0, app(EmployeeStatusTransitionService::class)->applyDue($tanggal));
+        $this->assertFalse(EmployeeStatusTransition::query()->findOrFail($transitionId)->is_applied);
+        $this->assertFalse($employee->refresh()->isActive());
+        $this->assertDatabaseCount('employee_status_histories', 0);
+        $this->assertDatabaseCount('audit_logs', 0);
     }
 
     /** Snapshot dengan permission yang tidak cocok tetap ditolak scheduler. */
