@@ -73,6 +73,21 @@ class EmployeeIndexTest extends TestCase
         $response->assertJsonPath('employees.data.0.nama_lengkap', 'Budi Santoso');
     }
 
+    public function test_daftar_tidak_memuat_modal_riwayat_tanpa_tombol_tetapi_tetap_memulihkan_baris_edit(): void
+    {
+        $this->actingAs(User::factory()->adminKepegawaian()->create())
+            ->get(route('data-pegawai'))
+            ->assertOk()
+            ->assertDontSee('showRiwayatModal', false)
+            ->assertDontSee('openRiwayatModal', false)
+            ->assertDontSee('submitRiwayat', false)
+            ->assertDontSee('newPangkat', false)
+            ->assertDontSee('newJabatan', false)
+            ->assertDontSee('newKgb', false)
+            ->assertSee('this.patchEditedEmployee(this.editedEmployeeId)', false)
+            ->assertSee('this.applyEditedDataToCache(this.editedEmployeeId, this.editedEmployeeData)', false);
+    }
+
     public function test_super_admin_can_list_employees(): void
     {
         $user = User::factory()->superAdmin()->create();

@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Documents\DeleteBerkasLainnyaAction;
 use App\Actions\Documents\StoreBerkasLainnyaAction;
 use App\Actions\Documents\UpdateBerkasLainnyaAction;
+use App\Actions\Employees\ListEmployeeArchiveOptionsAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\DeleteBerkasLainnyaRequest;
 use App\Http\Requests\Documents\StoreBerkasLainnyaRequest;
 use App\Http\Requests\Documents\UpdateBerkasLainnyaRequest;
+use App\Http\Requests\Employee\ListEmployeeArchiveOptionsRequest;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Support\Documents\DocumentCategory;
@@ -17,6 +19,15 @@ use Illuminate\Http\Request;
 
 class EmployeeDocumentController extends Controller
 {
+    /** Menyajikan pilihan arsip berhalaman untuk form edit tanpa path berkas privat. */
+    public function archiveOptions(
+        ListEmployeeArchiveOptionsRequest $request,
+        Employee $employee,
+        ListEmployeeArchiveOptionsAction $action,
+    ): JsonResponse {
+        return response()->json($action->execute($employee, $request->validated()));
+    }
+
     /**
      * Mengembalikan daftar dokumen arsip milik pegawai, bisa difilter per kategori.
      * Digunakan oleh dropdown "Pilih dari Arsip" di form tambah riwayat.

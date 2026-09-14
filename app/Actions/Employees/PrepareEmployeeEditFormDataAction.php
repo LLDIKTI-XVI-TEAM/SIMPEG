@@ -16,6 +16,7 @@ use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
 use App\Support\Employees\EmployeeIdentifierPrivacy;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class PrepareEmployeeEditFormDataAction
 {
@@ -102,62 +103,33 @@ class PrepareEmployeeEditFormDataAction
             );
         });
 
-        // Dokumen arsip per kategori untuk fitur "Pilih dari Arsip"
-        $arsipPangkat = $p->documents()
-            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
-            ->where('jenis_dokumen', 'sk_pangkat')
-            ->orderByDesc('tanggal_dokumen')
-            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        $arsipJabatan = $p->documents()
-            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
-            ->where('jenis_dokumen', 'sk_jabatan')
-            ->orderByDesc('tanggal_dokumen')
-            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        $arsipKgb = $p->documents()
-            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
-            ->where('jenis_dokumen', 'sk_kgb')
-            ->orderByDesc('tanggal_dokumen')
-            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
-
-        $arsipPengangkatan = $p->documents()
-            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
-            ->where('jenis_dokumen', 'sk_pengangkatan')
-            ->orderByDesc('tanggal_dokumen')
-            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
-            ->map(fn ($d) => [
-                'id' => $d->id,
-                'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
-                'nomor_dokumen' => $d->nomor_dokumen,
-                'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'nama_dokumen' => $d->nama_dokumen,
-            ]);
+        // Pencarian arsip dimuat terpisah; redirect validasi hanya memulihkan maksimal empat pilihan sah.
+        $archiveSelections = [];
+        $selectedIds = collect(['pangkat', 'jabatan', 'kgb', 'pengangkatan'])
+            ->mapWithKeys(fn (string $type) => ['sk_'.$type => old('existing_document_id_'.$type)])
+            ->filter(fn ($id) => is_string($id) && Str::isUuid($id));
+        if ($canReadDocuments && $selectedIds->isNotEmpty()) {
+            $documents = $p->documents()->whereIn('id', $selectedIds->values())
+                ->get(['id', 'jenis_dokumen', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])->keyBy('id');
+            foreach ($selectedIds as $category => $documentId) {
+                $document = $documents->get($documentId);
+                if ($document === null || $document->jenis_dokumen !== $category) {
+                    continue;
+                }
+                $archiveSelections[$category] = [
+                    'id' => $document->id,
+                    'label' => ($document->nomor_dokumen ?? 'Tanpa No.').($document->tanggal_dokumen ? ' — '.$document->tanggal_dokumen->format('d/m/Y') : ''),
+                    'nomor_dokumen' => $document->nomor_dokumen,
+                    'tanggal_dokumen' => $document->tanggal_dokumen?->format('Y-m-d'),
+                    'nama_dokumen' => $document->nama_dokumen,
+                ];
+            }
+        }
 
         return compact(
             'canEditSensitiveIdentifiers',
             'canCheckIdentity',
+            'canReadDocuments',
             'p',
             'jenisPegawai',
             'agama',
@@ -172,10 +144,7 @@ class PrepareEmployeeEditFormDataAction
             'latestRank',
             'latestPosition',
             'latestSalary',
-            'arsipPangkat',
-            'arsipJabatan',
-            'arsipKgb',
-            'arsipPengangkatan',
+            'archiveSelections',
         );
     }
 }

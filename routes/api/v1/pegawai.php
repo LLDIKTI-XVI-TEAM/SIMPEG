@@ -121,6 +121,11 @@ Route::middleware($employeeGroupMiddleware)
             ->middleware($adminSubModuleMutationMiddleware('dokumen_sk.create,dokumen_sk.update'))
             ->whereUuid(['employee', 'discipline'])
             ->name('disiplin.upload-sk');
+        Route::get('/{employee}/pilihan-arsip', [EmployeeDocumentController::class, 'archiveOptions'])
+            // Dua permission harus sama-sama tersedia; scope identitas diperiksa oleh FormRequest.
+            ->middleware(['permission:employees.update', 'permission:dokumen_sk.read'])
+            ->whereUuid('employee')
+            ->name('pilihan-arsip');
         Route::get('/{employee}/arsip-dokumen', [EmployeeDocumentController::class, 'index'])
             ->middleware($strictEmployeeReadMiddleware('dokumen_sk.read'))
             ->whereUuid('employee')

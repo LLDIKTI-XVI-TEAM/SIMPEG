@@ -4,10 +4,6 @@ namespace App\Livewire\Admin\Pegawai;
 
 use App\Actions\Employees\ShowSkRequirementMatrixAction;
 use App\Models\Employee;
-use App\Models\RefEselon;
-use App\Models\RefGolongan;
-use App\Models\RefJabatan;
-use App\Models\RefJenisJabatan;
 use App\Models\RefJenisPegawai;
 use App\Models\RefStatusPegawai;
 use App\Models\RefUnitKerja;
@@ -49,18 +45,6 @@ class Index extends Component
                 ->values();
 
             return $opts->isEmpty() ? collect(['II', 'III', 'IV']) : $opts;
-        });
-        $golonganRefOptions = Cache::remember('ref.golongan', now()->addHours(6), function () {
-            return RefGolongan::orderBy('kode')->get();
-        });
-        $jabatanOptions = Cache::remember('ref.jabatan_with_jenis', now()->addHours(6), function () {
-            return RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
-        });
-        $jenisJabatanOptions = Cache::remember('ref.jenis_jabatan', now()->addHours(6), function () {
-            return RefJenisJabatan::orderBy('nama')->get();
-        });
-        $eselonOptions = Cache::remember('ref.eselon', now()->addHours(6), function () {
-            return RefEselon::orderBy('nama')->get();
         });
 
         $filters = [
@@ -176,10 +160,6 @@ class Index extends Component
             'unitKerjaOptions',
             'jenisPegawaiOptions',
             'statusOptions',
-            'golonganRefOptions',
-            'jabatanOptions',
-            'jenisJabatanOptions',
-            'eselonOptions',
             'canChangeStatus',
             'statusChangeOptions',
             'statusFormEmployee',

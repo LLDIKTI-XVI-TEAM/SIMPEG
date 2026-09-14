@@ -1,3 +1,7 @@
+@push('head')
+    @vite('resources/js/pages/employee-archive-picker.js')
+@endpush
+
 <div>
     @php
         $fotoUrl = $p->foto_url;
@@ -63,52 +67,44 @@
             skPangkatName: {{ json_encode($latestRank?->admin_attachment_download_url ? basename($latestRank->file_sk) : "") }},
             skPangkatSize: '',
             skPangkatError: '',
-            skPangkatMode: 'upload', // 'upload' | 'arsip'
-            selectedArsipPangkatId: '',
-            arsipPangkatList: {{ json_encode($arsipPangkat) }},
+            skPangkatMode: @js(isset($archiveSelections['sk_pangkat']) ? 'arsip' : 'upload'),
             skJabatanName: {{ json_encode($latestPosition?->admin_attachment_download_url ? basename($latestPosition->file_sk) : "") }},
             skJabatanSize: '',
             skJabatanError: '',
-            skJabatanMode: 'upload',
-            selectedArsipJabatanId: '',
-            arsipJabatanList: {{ json_encode($arsipJabatan) }},
+            skJabatanMode: @js(isset($archiveSelections['sk_jabatan']) ? 'arsip' : 'upload'),
             skKgbName: {{ json_encode($latestSalary?->admin_attachment_download_url ? basename($latestSalary->file_sk) : "") }},
             skKgbSize: '',
             skKgbError: '',
-            skKgbMode: 'upload',
-            selectedArsipKgbId: '',
-            arsipKgbList: {{ json_encode($arsipKgb) }},
+            skKgbMode: @js(isset($archiveSelections['sk_kgb']) ? 'arsip' : 'upload'),
             skPengangkatanName: {{ json_encode($p->appointment?->admin_attachment_download_url ? basename($p->appointment->file_sk) : "") }},
             skPengangkatanSize: '',
             skPengangkatanError: '',
-            skPengangkatanMode: 'upload',
-            selectedArsipPengangkatanId: '',
-            arsipPengangkatanList: {{ json_encode($arsipPengangkatan ?? []) }},
+            skPengangkatanMode: @js(isset($archiveSelections['sk_pengangkatan']) ? 'arsip' : 'upload'),
 
-            // Riwayat bersifat append-only: form riwayat selalu menambah record baru sehingga nilai awal dikosongkan.
+            // Riwayat baru tetap kosong; hanya draft kiriman yang dipulihkan bila validasi gagal.
             pangkatForm: {
-                golongan_id: '',
-                no_sk: '',
-                tanggal_sk: '',
-                tmt_pangkat: '',
+                golongan_id: @js(old('pangkat_golongan_id', '')),
+                no_sk: @js(old('pangkat_no_sk', '')),
+                tanggal_sk: @js(old('pangkat_tanggal_sk', '')),
+                tmt_pangkat: @js(old('pangkat_tmt_pangkat', '')),
             },
 
             jabatanForm: {
-                jabatan_id: '',
-                jenis_jabatan_id: '',
-                eselon_id: '',
-                unit_kerja_id: '',
-                kelas_jabatan: '',
-                no_sk: '',
-                tanggal_sk: '',
-                tmt_jabatan: '',
+                jabatan_id: @js(old('jabatan_jabatan_id', '')),
+                jenis_jabatan_id: @js(old('jabatan_jenis_jabatan_id', '')),
+                eselon_id: @js(old('jabatan_eselon_id', '')),
+                unit_kerja_id: @js(old('jabatan_unit_kerja_id', '')),
+                kelas_jabatan: @js(old('jabatan_kelas_jabatan', '')),
+                no_sk: @js(old('jabatan_no_sk', '')),
+                tanggal_sk: @js(old('jabatan_tanggal_sk', '')),
+                tmt_jabatan: @js(old('jabatan_tmt_jabatan', '')),
             },
 
             kgbForm: {
-                gaji_pokok: '',
-                no_sk: '',
-                tanggal_sk: '',
-                tmt_kgb: '',
+                gaji_pokok: @js(old('kgb_gaji_pokok', '')),
+                no_sk: @js(old('kgb_no_sk', '')),
+                tanggal_sk: @js(old('kgb_tanggal_sk', '')),
+                tmt_kgb: @js(old('kgb_tmt_kgb', '')),
             },
 
             validateUtama() {
@@ -258,8 +254,7 @@
                 if (res.error) e.target.value = '';
             },
             // Pilih dari arsip: autofill No SK & Tanggal SK
-            onSelectArsipPangkat() {
-                const doc = this.arsipPangkatList.find(d => d.id === this.selectedArsipPangkatId);
+            onSelectArsipPangkat(doc) {
                 if (doc) {
                     this.skPangkatName = doc.nama_dokumen;
                     this.skPangkatSize = '';
@@ -268,8 +263,7 @@
                     if (doc.tanggal_dokumen) this.pangkatForm.tanggal_sk = doc.tanggal_dokumen;
                 }
             },
-            onSelectArsipJabatan() {
-                const doc = this.arsipJabatanList.find(d => d.id === this.selectedArsipJabatanId);
+            onSelectArsipJabatan(doc) {
                 if (doc) {
                     this.skJabatanName = doc.nama_dokumen;
                     this.skJabatanSize = '';
@@ -278,8 +272,7 @@
                     if (doc.tanggal_dokumen) this.jabatanForm.tanggal_sk = doc.tanggal_dokumen;
                 }
             },
-            onSelectArsipKgb() {
-                const doc = this.arsipKgbList.find(d => d.id === this.selectedArsipKgbId);
+            onSelectArsipKgb(doc) {
                 if (doc) {
                     this.skKgbName = doc.nama_dokumen;
                     this.skKgbSize = '';
@@ -288,8 +281,7 @@
                     if (doc.tanggal_dokumen) this.kgbForm.tanggal_sk = doc.tanggal_dokumen;
                 }
             },
-            onSelectArsipPengangkatan() {
-                const doc = this.arsipPengangkatanList.find(d => d.id === this.selectedArsipPengangkatanId);
+            onSelectArsipPengangkatan(doc) {
                 if (doc) {
                     this.skPengangkatanName = doc.nama_dokumen;
                     this.skPengangkatanSize = '';
@@ -918,17 +910,18 @@
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK
                                         Pangkat</label>
                                     {{-- Toggle Upload / Arsip --}}
-                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans"
-                                        x-show="arsipPangkatList.length > 0">
+                                    @if ($canReadDocuments)
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans">
                                         <button type="button" @click="skPangkatMode = 'upload'"
                                             :class="skPangkatMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Upload
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Upload
                                             Baru</button>
                                         <button type="button" @click="skPangkatMode = 'arsip'"
                                             :class="skPangkatMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
                                             Arsip</button>
                                     </div>
+                                    @endif
                                 </div>
 
                                 {{-- Mode: Upload Baru --}}
@@ -936,6 +929,7 @@
                                     <div
                                         class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
                                         <input type="file" id="file_sk_pangkat" name="file_sk_pangkat"
+                                            :disabled="skPangkatMode !== 'upload'"
                                             accept=".pdf,image/*" @change="handleSkPangkatChange"
                                             class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor"
@@ -972,23 +966,13 @@
                                 </div>
 
                                 {{-- Mode: Pilih dari Arsip --}}
-                                <div x-show="skPangkatMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_pangkat"
-                                        :value="selectedArsipPangkatId">
-                                    <select x-model="selectedArsipPangkatId" @change="onSelectArsipPangkat()"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="">-- Pilih dokumen dari arsip --</option>
-                                        <template x-for="doc in arsipPangkatList" :key="doc.id">
-                                            <option :value="doc.id" x-text="doc.label"></option>
-                                        </template>
-                                    </select>
-                                    <template x-if="selectedArsipPangkatId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
-                                            No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                    <p class="text-xs text-muted font-sans" x-show="arsipPangkatList.length === 0">Tidak
-                                        ada dokumen SK Pangkat di arsip untuk pegawai ini.</p>
-                                </div>
+                                @if ($canReadDocuments)
+                                <x-employees.archive-picker
+                                    :url="url('/api/v1/pegawai/'.$p->id.'/pilihan-arsip')"
+                                    category="sk_pangkat" name="existing_document_id_pangkat" label="SK Pangkat"
+                                    mode="skPangkatMode" :selected="$archiveSelections['sk_pangkat'] ?? null"
+                                    @archive-selected="onSelectArsipPangkat($event.detail)" />
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1121,22 +1105,24 @@
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK
                                         Jabatan</label>
-                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans"
-                                        x-show="arsipJabatanList.length > 0">
+                                    @if ($canReadDocuments)
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans">
                                         <button type="button" @click="skJabatanMode = 'upload'"
                                             :class="skJabatanMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Upload
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Upload
                                             Baru</button>
                                         <button type="button" @click="skJabatanMode = 'arsip'"
                                             :class="skJabatanMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
                                             Arsip</button>
                                     </div>
+                                    @endif
                                 </div>
                                 <div x-show="skJabatanMode === 'upload'" class="mt-1">
                                     <div
                                         class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
                                         <input type="file" id="file_sk_jabatan" name="file_sk_jabatan"
+                                            :disabled="skJabatanMode !== 'upload'"
                                             accept=".pdf,image/*" @change="handleSkJabatanChange"
                                             class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor"
@@ -1172,21 +1158,13 @@
                                             x-text="skJabatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skJabatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_jabatan"
-                                        :value="selectedArsipJabatanId">
-                                    <select x-model="selectedArsipJabatanId" @change="onSelectArsipJabatan()"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="">-- Pilih dokumen dari arsip --</option>
-                                        <template x-for="doc in arsipJabatanList" :key="doc.id">
-                                            <option :value="doc.id" x-text="doc.label"></option>
-                                        </template>
-                                    </select>
-                                    <template x-if="selectedArsipJabatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
-                                            No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+                                @if ($canReadDocuments)
+                                <x-employees.archive-picker
+                                    :url="url('/api/v1/pegawai/'.$p->id.'/pilihan-arsip')"
+                                    category="sk_jabatan" name="existing_document_id_jabatan" label="SK Jabatan"
+                                    mode="skJabatanMode" :selected="$archiveSelections['sk_jabatan'] ?? null"
+                                    @archive-selected="onSelectArsipJabatan($event.detail)" />
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1259,22 +1237,24 @@
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK
                                         KGB</label>
-                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans"
-                                        x-show="arsipKgbList.length > 0">
+                                    @if ($canReadDocuments)
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans">
                                         <button type="button" @click="skKgbMode = 'upload'"
                                             :class="skKgbMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Upload
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Upload
                                             Baru</button>
                                         <button type="button" @click="skKgbMode = 'arsip'"
                                             :class="skKgbMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
                                             Arsip</button>
                                     </div>
+                                    @endif
                                 </div>
                                 <div x-show="skKgbMode === 'upload'" class="mt-1">
                                     <div
                                         class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
                                         <input type="file" id="file_sk_kgb" name="file_sk_kgb" accept=".pdf,image/*"
+                                            :disabled="skKgbMode !== 'upload'"
                                             @change="handleSkKgbChange"
                                             class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor"
@@ -1308,20 +1288,13 @@
                                             x-text="skKgbError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skKgbMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_kgb" :value="selectedArsipKgbId">
-                                    <select x-model="selectedArsipKgbId" @change="onSelectArsipKgb()"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="">-- Pilih dokumen dari arsip --</option>
-                                        <template x-for="doc in arsipKgbList" :key="doc.id">
-                                            <option :value="doc.id" x-text="doc.label"></option>
-                                        </template>
-                                    </select>
-                                    <template x-if="selectedArsipKgbId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
-                                            No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+                                @if ($canReadDocuments)
+                                <x-employees.archive-picker
+                                    :url="url('/api/v1/pegawai/'.$p->id.'/pilihan-arsip')"
+                                    category="sk_kgb" name="existing_document_id_kgb" label="SK KGB"
+                                    mode="skKgbMode" :selected="$archiveSelections['sk_kgb'] ?? null"
+                                    @archive-selected="onSelectArsipKgb($event.detail)" />
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1371,10 +1344,10 @@
                                     Pengangkatan <span class="text-danger">*</span></label>
                                 <select id="pengangkatan_jenis_pengangkatan" name="pengangkatan_jenis_pengangkatan"
                                     class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                    <option value="" disabled {{ empty($p->appointment->jenis_pengangkatan) ? 'selected' : '' }}>Pilih Jenis Pengangkatan</option>
-                                    <option value="CPNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'CPNS' ? 'selected' : '' }}>CPNS</option>
-                                    <option value="PNS" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PNS' ? 'selected' : '' }}>PNS</option>
-                                    <option value="PPPK" {{ ($p->appointment->jenis_pengangkatan ?? '') == 'PPPK' ? 'selected' : '' }}>PPPK</option>
+                                    <option value="" disabled @selected(!old('pengangkatan_jenis_pengangkatan', $p->appointment?->jenis_pengangkatan))>Pilih Jenis Pengangkatan</option>
+                                    <option value="CPNS" @selected(old('pengangkatan_jenis_pengangkatan', $p->appointment?->jenis_pengangkatan) === 'CPNS')>CPNS</option>
+                                    <option value="PNS" @selected(old('pengangkatan_jenis_pengangkatan', $p->appointment?->jenis_pengangkatan) === 'PNS')>PNS</option>
+                                    <option value="PPPK" @selected(old('pengangkatan_jenis_pengangkatan', $p->appointment?->jenis_pengangkatan) === 'PPPK')>PPPK</option>
                                 </select>
                             </div>
 
@@ -1386,7 +1359,7 @@
                                 <input id="pengangkatan_tmt_pengangkatan" name="pengangkatan_tmt_pengangkatan"
                                     type="date"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer"
-                                    value="{{ $p->appointment && $p->appointment->tmt_pengangkatan ? \Carbon\Carbon::parse($p->appointment->tmt_pengangkatan)->format('Y-m-d') : '' }}">
+                                    value="{{ old('pengangkatan_tmt_pengangkatan', $p->appointment?->tmt_pengangkatan?->format('Y-m-d')) }}">
                             </div>
 
                             {{-- Nomor SK Pengangkatan --}}
@@ -1397,7 +1370,7 @@
                                 <input id="pengangkatan_no_sk" name="pengangkatan_no_sk" type="text"
                                     placeholder="SK-882-KP-2024"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
-                                    value="{{ $p->appointment ? $p->appointment->no_sk : '' }}">
+                                    value="{{ old('pengangkatan_no_sk', $p->appointment?->no_sk) }}">
                             </div>
 
                             {{-- Tanggal SK --}}
@@ -1407,7 +1380,7 @@
                                     Terbit <span class="text-danger">*</span></label>
                                 <input id="pengangkatan_tanggal_sk" name="pengangkatan_tanggal_sk" type="date"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer"
-                                    value="{{ $p->appointment && $p->appointment->tanggal_sk ? \Carbon\Carbon::parse($p->appointment->tanggal_sk)->format('Y-m-d') : '' }}">
+                                    value="{{ old('pengangkatan_tanggal_sk', $p->appointment?->tanggal_sk?->format('Y-m-d')) }}">
                             </div>
 
                             {{-- Upload / Pilih Arsip SK Pengangkatan --}}
@@ -1415,22 +1388,24 @@
                                 <div class="flex items-center justify-between">
                                     <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">File SK
                                         Pengangkatan</label>
-                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans"
-                                        x-show="arsipPengangkatanList.length > 0">
+                                    @if ($canReadDocuments)
+                                    <div class="flex rounded-lg border border-border overflow-hidden text-xs font-sans">
                                         <button type="button" @click="skPengangkatanMode = 'upload'"
                                             :class="skPengangkatanMode === 'upload' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Upload
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Upload
                                             Baru</button>
                                         <button type="button" @click="skPengangkatanMode = 'arsip'"
                                             :class="skPengangkatanMode === 'arsip' ? 'bg-primary text-white' : 'bg-surface text-muted hover:text-ink'"
-                                            class="px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
+                                            class="min-h-11 px-3 py-1 transition font-semibold cursor-pointer">Pilih dari
                                             Arsip</button>
                                     </div>
+                                    @endif
                                 </div>
                                 <div x-show="skPengangkatanMode === 'upload'" class="mt-1">
                                     <div
                                         class="border-2 border-dashed border-border rounded-lg p-6 bg-soft/50 text-center relative hover:border-primary transition">
                                         <input type="file" id="file_sk_pengangkatan" name="file_sk_pengangkatan"
+                                            :disabled="skPengangkatanMode !== 'upload'"
                                             accept=".pdf,image/*" @change="handleSkPengangkatanChange"
                                             class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
                                         <svg class="mx-auto h-10 w-10 text-muted" fill="none" stroke="currentColor"
@@ -1466,22 +1441,13 @@
                                             x-text="skPengangkatanError"></p>
                                     </div>
                                 </div>
-                                <div x-show="skPengangkatanMode === 'arsip'" class="mt-1 space-y-2">
-                                    <input type="hidden" name="existing_document_id_pengangkatan"
-                                        :value="selectedArsipPengangkatanId">
-                                    <select x-model="selectedArsipPengangkatanId"
-                                        @change="onSelectArsipPengangkatan()"
-                                        class="w-full appearance-none rounded-lg border border-border bg-surface px-4 py-2 pr-10 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                                        <option value="">-- Pilih dokumen dari arsip --</option>
-                                        <template x-for="doc in arsipPengangkatanList" :key="doc.id">
-                                            <option :value="doc.id" x-text="doc.label"></option>
-                                        </template>
-                                    </select>
-                                    <template x-if="selectedArsipPengangkatanId">
-                                        <p class="text-xs text-success font-semibold font-sans">✓ Dokumen arsip dipilih.
-                                            No. SK dan Tanggal SK telah terisi otomatis.</p>
-                                    </template>
-                                </div>
+                                @if ($canReadDocuments)
+                                <x-employees.archive-picker
+                                    :url="url('/api/v1/pegawai/'.$p->id.'/pilihan-arsip')"
+                                    category="sk_pengangkatan" name="existing_document_id_pengangkatan" label="SK Pengangkatan"
+                                    mode="skPengangkatanMode" :selected="$archiveSelections['sk_pengangkatan'] ?? null"
+                                    @archive-selected="onSelectArsipPengangkatan($event.detail)" />
+                                @endif
                             </div>
                         </div>
                     </div>

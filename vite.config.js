@@ -15,6 +15,7 @@ export default defineConfig({
                 'resources/js/pages/dashboard-charts.js',
                 'resources/js/pages/chain-batch-editor.js',
                 'resources/js/pages/cuti-config-navigation.js',
+                'resources/js/pages/employee-archive-picker.js',
             ],
             refresh: true,
         }),

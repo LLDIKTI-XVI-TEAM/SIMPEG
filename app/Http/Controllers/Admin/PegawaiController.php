@@ -103,18 +103,6 @@ class PegawaiController extends Controller
 
             return $opts->isEmpty() ? collect(['II', 'III', 'IV']) : $opts;
         });
-        $golonganRefOptions = Cache::remember('ref.golongan', now()->addHours(6), function () {
-            return RefGolongan::orderBy('kode')->get();
-        });
-        $jabatanOptions = Cache::remember('ref.jabatan_with_jenis', now()->addHours(6), function () {
-            return RefJabatan::with('jenisJabatan')->orderBy('nama')->get();
-        });
-        $jenisJabatanOptions = Cache::remember('ref.jenis_jabatan', now()->addHours(6), function () {
-            return RefJenisJabatan::orderBy('nama')->get();
-        });
-        $eselonOptions = Cache::remember('ref.eselon', now()->addHours(6), function () {
-            return RefEselon::orderBy('nama')->get();
-        });
 
         $filters = [
             'search' => trim((string) $request->query('search', '')),
@@ -222,11 +210,7 @@ class PegawaiController extends Controller
             'golonganOptions',
             'unitKerjaOptions',
             'jenisPegawaiOptions',
-            'statusOptions',
-            'golonganRefOptions',
-            'jabatanOptions',
-            'jenisJabatanOptions',
-            'eselonOptions'
+            'statusOptions'
         ));
     }
 
