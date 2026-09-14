@@ -21,6 +21,32 @@ class KeycloakCallbackMappingTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Injeksi race via koneksi PDO mentah (di luar transaksi RefreshDatabase).
+     *
+     * @var list<array{dsn: string, username: string, password: string, id: string}>
+     */
+    private array $externalInjectedUsers = [];
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        // Rollback RefreshDatabase sudah selesai di parent. Hapus row yang di-commit
+        // via PDO mentah (lolos rollback) agar tidak mencemari test lain dalam
+        // worker paralel yang sama (mis. users count 1 vs 2).
+        foreach ($this->externalInjectedUsers as $row) {
+            try {
+                (new \PDO($row['dsn'], $row['username'], $row['password']))
+                    ->prepare('delete from users where id = ?')
+                    ->execute([$row['id']]);
+            } catch (\Throwable) {
+                // Cleanup best-effort; kegagalannya tidak boleh menutupi hasil test.
+            }
+        }
+        $this->externalInjectedUsers = [];
+    }
+
     public function test_first_keycloak_email_match_creates_local_super_admin(): void
     {
         config()->set('services.keycloak.employee_match_field', 'email');
@@ -1306,27 +1332,34 @@ class KeycloakCallbackMappingTest extends TestCase
             'email' => 'collision-insert@example.test',
         ]);
         $connection = config('database.connections.pgsql');
+        $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', $connection['host'], $connection['port'], $connection['database']);
         $injected = false;
 
-        DB::listen(function (QueryExecuted $query) use (&$injected, $connection): void {
+        DB::listen(function (QueryExecuted $query) use (&$injected, $dsn, $connection): void {
             if ($injected || ! str_contains((string) $query->sql, 'pg_advisory_xact_lock')) {
                 return;
             }
 
             $injected = true;
-            $pdo = new \PDO(
-                sprintf('pgsql:host=%s;port=%s;dbname=%s', $connection['host'], $connection['port'], $connection['database']),
-                $connection['username'],
-                $connection['password'],
-            );
+            $pdo = new \PDO($dsn, $connection['username'], $connection['password']);
+            $injectedId = (string) Str::uuid();
             $statement = $pdo->prepare('insert into users (id, name, email, password, role, created_at, updated_at) values (?, ?, ?, ?, ?, now(), now())');
             $statement->execute([
-                (string) Str::uuid(),
+                $injectedId,
                 'Collision Winner',
                 'collision-insert@example.test',
                 'collision-password',
                 'pegawai',
             ]);
+            // Didaftarkan untuk dihapus di tearDown (setelah rollback): koneksi mentah
+            // autocommit di luar transaksi RefreshDatabase sehingga lolos rollback dan
+            // akan mencemari test lain dalam worker paralel yang sama bila dibiarkan.
+            $this->externalInjectedUsers[] = [
+                'dsn' => $dsn,
+                'username' => $connection['username'],
+                'password' => $connection['password'],
+                'id' => $injectedId,
+            ];
         });
 
         $this->fakeKeycloakUser([
