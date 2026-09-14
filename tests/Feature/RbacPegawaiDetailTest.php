@@ -357,4 +357,82 @@ class RbacPegawaiDetailTest extends TestCase
         $responseC->assertOk();
         $responseC->assertDontSee('title="Edit riwayat pendidikan"', false);
     }
+
+    public function test_admin_pegawai_detail_granular_history_permissions(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Scenario A: create only (mempunyai create, tidak mempunyai update)
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $responseA = $this->actingAs($user)->get(route('pegawai.show', ['id' => $employee->id]));
+        $responseA->assertOk();
+        $responseA->assertSee('Tambah Riwayat Kepangkatan');
+        $responseA->assertSee('Tambah Data Pengangkatan');
+        $responseA->assertDontSee('title="Ganti Berkas SK"', false);
+        $responseA->assertDontSee('Edit Data Pengangkatan');
+
+        // Scenario B: update only (mempunyai update, tidak mempunyai create)
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.create')->firstOrFail()->id,
+        ]);
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $responseB = $this->actingAs($user)->get(route('pegawai.show', ['id' => $employee->id]));
+        $responseB->assertOk();
+        $responseB->assertDontSee('Tambah Riwayat Kepangkatan');
+        $responseB->assertDontSee('Tambah Data Pengangkatan');
+        $responseB->assertSee('title="Ganti Berkas SK"', false);
+        $responseB->assertSee('Edit Data Pengangkatan');
+
+        // Scenario C: super admin tanpa update tidak boleh bypass UI pada admin detail
+        $superAdmin = User::factory()->superAdmin()->create();
+        Role::where('name', 'super_admin')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $superAdmin->refresh();
+
+        $responseC = $this->actingAs($superAdmin)->get(route('pegawai.show', ['id' => $employee->id]));
+        $responseC->assertOk();
+        $responseC->assertDontSee('title="Ganti Berkas SK"', false);
+        $responseC->assertDontSee('Edit Data Pengangkatan');
+    }
+
+    public function test_appointment_lifecycle_permissions_on_rbac_detail(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Create only: melihat Tambah Data Pengangkatan, tidak melihat Edit Data Pengangkatan
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $responseCreate = $this->actingAs($user)->get(route('rbac.pegawai.show', $employee));
+        $responseCreate->assertOk();
+        $responseCreate->assertSee('Tambah Data Pengangkatan');
+        $responseCreate->assertDontSee('Edit Data Pengangkatan');
+
+        // Update only: melihat Edit Data Pengangkatan, tidak melihat Tambah Data Pengangkatan
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.create')->firstOrFail()->id,
+        ]);
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $responseUpdate = $this->actingAs($user)->get(route('rbac.pegawai.show', $employee));
+        $responseUpdate->assertOk();
+        $responseUpdate->assertSee('Edit Data Pengangkatan');
+        $responseUpdate->assertDontSee('Tambah Data Pengangkatan');
+    }
 }

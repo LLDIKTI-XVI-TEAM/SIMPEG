@@ -7,8 +7,10 @@ use App\Models\Appointment;
 use App\Models\Document;
 use App\Models\Employee;
 use App\Models\EwsAlert;
+use App\Models\Permission;
 use App\Models\PositionHistory;
 use App\Models\RankHistory;
+use App\Models\Role;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
 use App\Models\RefJabatan;
@@ -1310,5 +1312,163 @@ class EmployeeUpdateTest extends TestCase
         $this->assertSame('SK-AWAL-001', $employee->status_nomor_berkas);
         $this->assertDatabaseCount('employee_status_histories', 0);
         $this->assertDatabaseCount('audit_logs', 0);
+    }
+
+    public function test_new_history_file_requires_dokumen_sk_create_and_rejects_with_update_only(): void
+    {
+        Storage::fake(Document::STORAGE_DISK);
+        $user = User::factory()->adminKepegawaian()->create();
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::firstOrFail();
+        $jenisJabatan = RefJenisJabatan::firstOrFail();
+        $unitKerja = RefUnitKerja::firstOrFail();
+        $jabatan = RefJabatan::firstOrCreate(
+            ['nama' => 'Analis Kepegawaian SK Test'],
+            ['jenis_jabatan_id' => $jenisJabatan->id]
+        );
+
+        // 1. User has employee_histories.create and dokumen_sk.update, but NOT dokumen_sk.create
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'dokumen_sk.create')->firstOrFail()->id,
+        ]);
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'dokumen_sk.update')->firstOrFail()->id,
+            Permission::where('name', 'employee_histories.create')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $filePangkat = UploadedFile::fake()->create('sk-pangkat.pdf', 100, 'application/pdf');
+        $fileJabatan = UploadedFile::fake()->create('sk-jabatan.pdf', 100, 'application/pdf');
+        $fileKgb = UploadedFile::fake()->create('sk-kgb.pdf', 100, 'application/pdf');
+
+        $payloadWithoutDocCreate = $this->validPayload($employee, [
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-PANGKAT-NOCREATE-001',
+            'pangkat_tanggal_sk' => '2024-01-01',
+            'pangkat_tmt_pangkat' => '2024-01-02',
+            'file_sk_pangkat' => $filePangkat,
+
+            'jabatan_jabatan_id' => $jabatan->id,
+            'jabatan_unit_kerja_id' => $unitKerja->id,
+            'jabatan_no_sk' => 'SK-JABATAN-NOCREATE-001',
+            'jabatan_tanggal_sk' => '2024-01-01',
+            'jabatan_tmt_jabatan' => '2024-01-02',
+            'file_sk_jabatan' => $fileJabatan,
+
+            'kgb_gaji_pokok' => 5000000,
+            'kgb_no_sk' => 'SK-KGB-NOCREATE-001',
+            'kgb_tanggal_sk' => '2024-01-01',
+            'kgb_tmt_kgb' => '2024-01-02',
+            'file_sk_kgb' => $fileKgb,
+        ]);
+
+        $responseWithout = $this->actingAs($user)->post(
+            route('pegawai.update', $employee->id),
+            $payloadWithoutDocCreate
+        );
+
+        $responseWithout->assertRedirect(route('data-pegawai'));
+        $responseWithout->assertSessionHas('warnings', function (array $warnings): bool {
+            return in_array('Berkas SK kepangkatan tidak diunggah: butuh permission dokumen_sk.create.', $warnings, true)
+                && in_array('Berkas SK jabatan tidak diunggah: butuh permission dokumen_sk.create.', $warnings, true)
+                && in_array('Berkas SK KGB tidak diunggah: butuh permission dokumen_sk.create.', $warnings, true);
+        });
+
+        // Histories are created with file_sk = null
+        $this->assertDatabaseHas('rank_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-PANGKAT-NOCREATE-001',
+            'file_sk' => null,
+        ]);
+        $this->assertDatabaseHas('position_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-JABATAN-NOCREATE-001',
+            'file_sk' => null,
+        ]);
+        $this->assertDatabaseHas('salary_histories', [
+            'employee_id' => $employee->id,
+            'no_sk' => 'SK-KGB-NOCREATE-001',
+            'file_sk' => null,
+        ]);
+
+        // Documents mirrors must NOT be created
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nomor_dokumen' => 'SK-PANGKAT-NOCREATE-001',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nomor_dokumen' => 'SK-JABATAN-NOCREATE-001',
+        ]);
+        $this->assertDatabaseMissing('documents', [
+            'employee_id' => $employee->id,
+            'nomor_dokumen' => 'SK-KGB-NOCREATE-001',
+        ]);
+
+        // 2. User has dokumen_sk.create
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'dokumen_sk.create')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $filePangkat2 = UploadedFile::fake()->create('sk-pangkat2.pdf', 100, 'application/pdf');
+        $fileJabatan2 = UploadedFile::fake()->create('sk-jabatan2.pdf', 100, 'application/pdf');
+        $fileKgb2 = UploadedFile::fake()->create('sk-kgb2.pdf', 100, 'application/pdf');
+
+        $payloadWithDocCreate = $this->validPayload($employee, [
+            'pangkat_golongan_id' => $golongan->id,
+            'pangkat_no_sk' => 'SK-PANGKAT-WITHCREATE-002',
+            'pangkat_tanggal_sk' => '2024-02-01',
+            'pangkat_tmt_pangkat' => '2024-02-02',
+            'file_sk_pangkat' => $filePangkat2,
+
+            'jabatan_jabatan_id' => $jabatan->id,
+            'jabatan_unit_kerja_id' => $unitKerja->id,
+            'jabatan_no_sk' => 'SK-JABATAN-WITHCREATE-002',
+            'jabatan_tanggal_sk' => '2024-02-01',
+            'jabatan_tmt_jabatan' => '2024-02-02',
+            'file_sk_jabatan' => $fileJabatan2,
+
+            'kgb_gaji_pokok' => 5500000,
+            'kgb_no_sk' => 'SK-KGB-WITHCREATE-002',
+            'kgb_tanggal_sk' => '2024-02-01',
+            'kgb_tmt_kgb' => '2024-02-02',
+            'file_sk_kgb' => $fileKgb2,
+        ]);
+
+        $responseWith = $this->actingAs($user)->post(
+            route('pegawai.update', $employee->id),
+            $payloadWithDocCreate
+        );
+
+        $responseWith->assertRedirect(route('data-pegawai'));
+        $this->assertFalse(session()->has('warnings'));
+
+        $rankHistory = RankHistory::where('no_sk', 'SK-PANGKAT-WITHCREATE-002')->firstOrFail();
+        $this->assertNotNull($rankHistory->file_sk);
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'history_id' => $rankHistory->id,
+            'jenis_dokumen' => 'sk_pangkat',
+            'nomor_dokumen' => 'SK-PANGKAT-WITHCREATE-002',
+        ]);
+
+        $posHistory = PositionHistory::where('no_sk', 'SK-JABATAN-WITHCREATE-002')->firstOrFail();
+        $this->assertNotNull($posHistory->file_sk);
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'history_id' => $posHistory->id,
+            'jenis_dokumen' => 'sk_jabatan',
+            'nomor_dokumen' => 'SK-JABATAN-WITHCREATE-002',
+        ]);
+
+        $salHistory = SalaryHistory::where('no_sk', 'SK-KGB-WITHCREATE-002')->firstOrFail();
+        $this->assertNotNull($salHistory->file_sk);
+        $this->assertDatabaseHas('documents', [
+            'employee_id' => $employee->id,
+            'history_id' => $salHistory->id,
+            'jenis_dokumen' => 'sk_kgb',
+            'nomor_dokumen' => 'SK-KGB-WITHCREATE-002',
+        ]);
     }
 }

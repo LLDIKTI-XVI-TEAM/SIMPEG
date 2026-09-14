@@ -1865,4 +1865,44 @@ class PimpinanEmployeeDetailTest extends TestCase
     {
         return '/pimpinan/pegawai/'.$employee->id.'/hukuman-disiplin/'.$discipline->id.'/unduh';
     }
+
+    public function test_pimpinan_detail_does_not_render_mutation_controls_even_with_granted_permissions(): void
+    {
+        $employee = Employee::factory()->lengkap()->create();
+        $pimpinan = User::factory()->pimpinan()->create();
+
+        // Anomaly scenario: Grant all mutation permissions to pimpinan role
+        $mutationPermissions = Permission::whereIn('name', [
+            'employee_histories.create',
+            'employee_histories.update',
+            'employee_histories.delete',
+            'employee_families.create',
+            'employee_families.delete',
+            'discipline_records.create',
+            'discipline_records.delete',
+            'dokumen_sk.create',
+            'dokumen_sk.update',
+            'dokumen_sk.delete',
+        ])->get();
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->syncWithoutDetaching($mutationPermissions);
+        $pimpinan->refresh();
+
+        $response = $this->actingAs($pimpinan)
+            ->get(route('pimpinan.pegawai.show', $employee))
+            ->assertOk();
+
+        // Mutation buttons & actions must not be rendered on Pimpinan surface
+        $response->assertDontSee('Tambah Anggota Keluarga');
+        $response->assertDontSee('Tambah Keluarga');
+        $response->assertDontSee('Tambah Riwayat Kepangkatan');
+        $response->assertDontSee('Tambah Riwayat Jabatan');
+        $response->assertDontSee('Tambah Riwayat KGB');
+        $response->assertDontSee('Tambah Hukuman');
+        $response->assertDontSee('Tambah Pendidikan');
+        $response->assertDontSee('Tambah Data Pengangkatan');
+        $response->assertDontSee('Edit Data Pengangkatan');
+        $response->assertDontSee('Simpan Satyalancana');
+        $response->assertDontSee('openUploadSkModal', false);
+        $response->assertDontSee('title="Ganti Berkas SK"', false);
+    }
 }

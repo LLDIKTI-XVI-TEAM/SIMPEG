@@ -128,11 +128,11 @@ class UpdateEmployeeAction
                             $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: data riwayat kepangkatan tidak lengkap.';
                         }
                     } else {
-                        $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.update'));
+                        $canDoc = $this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create');
                         $storedPangkatPath = null;
                         if ($request->hasFile('file_sk_pangkat') && $request->file('file_sk_pangkat')->isValid()) {
                             if (! $canDoc) {
-                                $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: butuh permission dokumen_sk.create/update.';
+                                $this->warnings[] = 'Berkas SK kepangkatan tidak diunggah: butuh permission dokumen_sk.create.';
                             } else {
                                 $file = $request->file('file_sk_pangkat');
                                 $pangkatData['file_sk'] = $this->files->storeEmployeeDocument($file, 'ranks/sk');
@@ -141,7 +141,7 @@ class UpdateEmployeeAction
                             }
                         } elseif ($request->filled('existing_document_id_pangkat')) {
                             if (! $canDoc) {
-                                $this->warnings[] = 'Berkas SK kepangkatan tidak diambil dari arsip: butuh permission dokumen_sk.create/update.';
+                                $this->warnings[] = 'Berkas SK kepangkatan tidak diambil dari arsip: butuh permission dokumen_sk.create.';
                             } else {
                                 $existingDoc = Document::where('id', $request->input('existing_document_id_pangkat'))
                                     ->where('employee_id', $employee->id)
@@ -215,11 +215,11 @@ class UpdateEmployeeAction
                         'tmt_jabatan' => $validated['jabatan_tmt_jabatan'],
                     ];
 
-                    $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.update'));
+                    $canDoc = $this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create');
                     $storedJabatanPath = null;
                     if ($request->hasFile('file_sk_jabatan') && $request->file('file_sk_jabatan')->isValid()) {
                         if (! $canDoc) {
-                            $this->warnings[] = 'Berkas SK jabatan tidak diunggah: butuh permission dokumen_sk.create/update.';
+                            $this->warnings[] = 'Berkas SK jabatan tidak diunggah: butuh permission dokumen_sk.create.';
                         } else {
                             $file = $request->file('file_sk_jabatan');
                             $jabatanData['file_sk'] = $this->files->storeEmployeeDocument($file, 'positions/sk');
@@ -228,7 +228,7 @@ class UpdateEmployeeAction
                         }
                     } elseif ($request->filled('existing_document_id_jabatan')) {
                         if (! $canDoc) {
-                            $this->warnings[] = 'Berkas SK jabatan tidak diambil dari arsip: butuh permission dokumen_sk.create/update.';
+                            $this->warnings[] = 'Berkas SK jabatan tidak diambil dari arsip: butuh permission dokumen_sk.create.';
                         } else {
                             $existingDoc = Document::where('id', $request->input('existing_document_id_jabatan'))
                                 ->where('employee_id', $employee->id)
@@ -286,11 +286,11 @@ class UpdateEmployeeAction
                         'tmt_kgb' => $validated['kgb_tmt_kgb'] ?? null,
                     ];
 
-                    $canDoc = ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create')) || ($this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.update'));
+                    $canDoc = $this->isLocalBypass() || $request->user()?->hasPermission('dokumen_sk.create');
                     $storedKgbPath = null;
                     if ($request->hasFile('file_sk_kgb') && $request->file('file_sk_kgb')->isValid()) {
                         if (! $canDoc) {
-                            $this->warnings[] = 'Berkas SK KGB tidak diunggah: butuh permission dokumen_sk.create/update.';
+                            $this->warnings[] = 'Berkas SK KGB tidak diunggah: butuh permission dokumen_sk.create.';
                         } else {
                             $file = $request->file('file_sk_kgb');
                             $kgbData['file_sk'] = $this->files->storeEmployeeDocument($file, 'salaries/sk');
@@ -299,7 +299,7 @@ class UpdateEmployeeAction
                         }
                     } elseif ($request->filled('existing_document_id_kgb')) {
                         if (! $canDoc) {
-                            $this->warnings[] = 'Berkas SK KGB tidak diambil dari arsip: butuh permission dokumen_sk.create/update.';
+                            $this->warnings[] = 'Berkas SK KGB tidak diambil dari arsip: butuh permission dokumen_sk.create.';
                         } else {
                             $existingDoc = Document::where('id', $request->input('existing_document_id_kgb'))
                                 ->where('employee_id', $employee->id)

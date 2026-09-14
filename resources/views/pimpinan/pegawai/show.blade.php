@@ -587,12 +587,8 @@
                                 Menyimpan status kinerja.
                             </p>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer select-none">
-                            @if($canUpdateEmployee)
-                            <input type="checkbox" x-model="kinerjaBaik" @change="updateKinerjaBaik(kinerjaBaik)" :disabled="isUpdatingKinerja" aria-label="Toggle Kinerja Baik" class="sr-only peer">
-                            @else
+                        <label class="relative inline-flex items-center select-none opacity-80 cursor-not-allowed">
                             <input type="checkbox" x-model="kinerjaBaik" disabled aria-label="Toggle Kinerja Baik" class="sr-only peer">
-                            @endif
                             <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                         </label>
                         </div>
@@ -608,40 +604,15 @@
                                     Menyimpan kelayakan Satyalancana.
                                 </p>
                             </div>
-                            <label class="relative inline-flex items-center cursor-pointer select-none">
-                                @if($canUpdateEmployee)
-                                <input type="checkbox" x-model="satyalancanaEligible" @change="updateSatyalancanaEligibility()" :disabled="isUpdatingSatyalancana" aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
-                                @else
+                            <label class="relative inline-flex items-center select-none opacity-80 cursor-not-allowed">
                                 <input type="checkbox" x-model="satyalancanaEligible" disabled aria-label="Toggle Kelayakan Satyalancana" class="sr-only peer">
-                                @endif
                                 <div class="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
                             </label>
                         </div>
                         <div class="space-y-1">
                             <label for="satyalancana-note" class="text-[10px] font-bold text-muted uppercase tracking-wider font-sans">Catatan Manual</label>
-                            @if(! $canUpdateEmployee)
                             <textarea id="satyalancana-note" x-model="satyalancanaNote" rows="2" readonly class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:outline-none focus:ring-0 opacity-70 resize-none"></textarea>
-                            @else
-                            <textarea
-                                id="satyalancana-note"
-                                x-model="satyalancanaNote"
-                                rows="2"
-                                maxlength="1000"
-                                placeholder="Catatan kelayakan Satyalancana"
-                                class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink placeholder-muted shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                            ></textarea>
-                            @endif
                         </div>
-                        @if($canUpdateEmployee)
-                        <button
-                            type="button"
-                            @click="updateSatyalancanaEligibility()"
-                            :disabled="isUpdatingSatyalancana"
-                            class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-3 py-1.5 text-xs font-semibold text-primary shadow-sm transition-colors hover:bg-soft disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            Simpan Satyalancana
-                        </button>
-                        @endif
                     </div>
 
                     {{-- Kepala Bagian --}}
@@ -763,16 +734,6 @@
                     title="Data Keluarga"
                     description="Daftar istri/suami dan anak yang tercatat sebagai tanggungan."
                 >
-                    @if($canCreateFamily)
-                        <x-slot:actions>
-                            <x-ui.button type="button" size="sm" @click="openModal('keluarga', 'Tambah Anggota Keluarga')">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Keluarga
-                    </x-ui.button>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
                 {{-- Loading skeleton --}}
                 <div x-show="keluargaLoading" role="status" aria-live="polite" class="flex items-center justify-center gap-2 py-10 text-xs text-muted font-sans">
@@ -786,7 +747,7 @@
                 <x-pegawai.detail.table
                     name="keluarga"
                     :headings="['Nama Lengkap & NIK', 'Hubungan', 'TTL', 'Pekerjaan', 'Status']"
-                    :show-actions="$canDeleteFamily"
+                    :show-actions="false"
                     x-show="!keluargaLoading"
                 >
                             {{-- Surface read-only: baris dirender server dengan NIK
@@ -799,7 +760,7 @@
                             @endforeach
                             @if(($p->families ?? collect())->isEmpty())
                             <tr>
-                                <td colspan="{{ $canDeleteFamily ? 6 : 5 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="5" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki data anggota keluarga.
                                 </td>
                             </tr>
@@ -815,16 +776,6 @@
                     title="Riwayat Kepangkatan & Golongan"
                     description="Catatan kenaikan pangkat reguler maupun pilihan selama masa dinas."
                 >
-                    @if($canCreateEmployeeHistory)
-                        <x-slot:actions>
-                        <x-ui.button type="button" size="sm" @click="openModal('pangkat', 'Tambah Riwayat Kepangkatan')">
-                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                            Tambah Riwayat Kepangkatan
-                        </x-ui.button>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="kepangkatan"
@@ -838,29 +789,10 @@
                                     <td class="px-4 py-3" x-text="formatDate(p.tmt)"></td>
                                     <td class="px-4 py-3">
                                         <template x-if="p.download_url">
-                                            <div class="flex items-center gap-2">
-                                                <a :href="p.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('pangkat', p)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
-                                                        <span>Ganti</span>
-                                                    </button>
-                                                @endif
-                                            </div>
+                                            <a :href="p.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                         </template>
                                         <template x-if="!p.download_url">
-                                            <div>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('pangkat', p)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                                                        </svg>
-                                                        <span>Upload Berkas</span>
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </div>
+                                            <span class="text-muted">-</span>
                                         </template>
                                     </td>
                                 </tr>
@@ -881,16 +813,6 @@
                     title="Riwayat Jabatan & Struktural"
                     description="Catatan penugasan jabatan fungsional maupun struktural."
                 >
-                    @if($canCreateEmployeeHistory)
-                        <x-slot:actions>
-                        <x-ui.button type="button" size="sm" @click="openModal('jabatan', 'Tambah Riwayat Jabatan')">
-                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                            Tambah Riwayat Jabatan
-                        </x-ui.button>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="jabatan"
@@ -905,29 +827,10 @@
                                     <td class="px-4 py-3" x-text="formatDate(j.tmt)"></td>
                                     <td class="px-4 py-3">
                                         <template x-if="j.download_url">
-                                            <div class="flex items-center gap-2">
-                                                <a :href="j.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('jabatan', j)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
-                                                        <span>Ganti</span>
-                                                    </button>
-                                                @endif
-                                            </div>
+                                            <a :href="j.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                         </template>
                                         <template x-if="!j.download_url">
-                                            <div>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('jabatan', j)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                                                        </svg>
-                                                        <span>Upload Berkas</span>
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </div>
+                                            <span class="text-muted">-</span>
                                         </template>
                                     </td>
                                 </tr>
@@ -948,16 +851,6 @@
                     title="Riwayat Kenaikan Gaji Berkala (KGB)"
                     description="Catatan penyesuaian gaji berkala setiap 2 tahun sekali."
                 >
-                    @if($canCreateEmployeeHistory)
-                        <x-slot:actions>
-                        <x-ui.button type="button" size="sm" @click="openModal('kgb', 'Tambah Riwayat KGB')">
-                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                            </svg>
-                            Tambah Riwayat KGB
-                        </x-ui.button>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="kgb"
@@ -971,29 +864,10 @@
                                     <td class="px-4 py-3" x-text="formatDate(k.tmt)"></td>
                                     <td class="px-4 py-3">
                                         <template x-if="k.download_url">
-                                            <div class="flex items-center gap-2">
-                                                <a :href="k.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('kgb', k)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
-                                                        <span>Ganti</span>
-                                                    </button>
-                                                @endif
-                                            </div>
+                                            <a :href="k.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                         </template>
                                         <template x-if="!k.download_url">
-                                            <div>
-                                                @if($canUpdateDocument)
-                                                    <button type="button" @click="openUploadSkModal('kgb', k)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
-                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                                                        </svg>
-                                                        <span>Upload Berkas</span>
-                                                    </button>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </div>
+                                            <span class="text-muted">-</span>
                                         </template>
                                     </td>
                                 </tr>
@@ -1014,21 +888,11 @@
                     title="Riwayat Hukuman Disiplin"
                     description="Catatan sanksi disiplin pegawai yang mempengaruhi promosi kepegawaian."
                 >
-                    @if($canCreateDiscipline)
-                        <x-slot:actions>
-                            <x-ui.button type="button" size="sm" @click="openModal('disiplin', 'Tambah Hukuman Disiplin')">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Hukuman
-                    </x-ui.button>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
                 <x-pegawai.detail.table
                     name="disiplin"
                     :headings="['Jenis Hukuman', 'Alasan / Pelanggaran', 'Nomor SK', 'Tanggal SK', 'Masa Berlaku', 'Berkas']"
-                    :show-actions="$canDeleteDiscipline"
+                    :show-actions="false"
                 >
                             <template x-for="d in disiplinList" :key="d.id">
                                 <tr class="transition-colors hover:bg-soft/30 text-ink">
@@ -1046,23 +910,10 @@
                                         <a x-show="d.download_url" :href="d.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                         <span x-show="!d.download_url" class="text-muted">-</span>
                                     </td>
-                                    @if($canDeleteDiscipline)
-                                            <td class="px-4 py-3 text-right">
-                                        <button
-                                            type="button"
-                                            @click="deleteDisiplin(d.id, index)"
-                                            :disabled="isDeletingDisiplin"
-                                            class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
-                                            title="Hapus riwayat hukuman disiplin"
-                                        >
-                                            Hapus
-                                        </button>
-                                    </td>
-                                            @endif
                                 </tr>
                             </template>
                             <tr x-show="disiplinList.length === 0">
-                                <td colspan="{{ $canDeleteDiscipline ? 7 : 6 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini tidak memiliki riwayat hukuman disiplin.
                                 </td>
                             </tr>
@@ -1077,16 +928,6 @@
                     title="Riwayat Pendidikan Formal"
                     description="Riwayat kualifikasi akademis tertinggi staf."
                 >
-                    @if($canCreateEmployeeHistory)
-                        <x-slot:actions>
-                            <x-ui.button type="button" size="sm" @click="openModal('pendidikan', 'Tambah Riwayat Pendidikan')">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                        </svg>
-                        Tambah Pendidikan
-                    </x-ui.button>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
                 <div class="grid gap-3 rounded-lg border border-border bg-soft/30 p-4 sm:grid-cols-2">
                     <div>
@@ -1110,7 +951,7 @@
                 <x-pegawai.detail.table
                     name="pendidikan"
                     :headings="['Jenjang', 'Nama Institusi', 'Program Studi', 'Tahun Lulus', 'Nomor Ijazah', 'Berkas']"
-                    :show-actions="$hasEducationHistoryMutation"
+                    :show-actions="false"
                     x-show="!pendidikanLoading"
                 >
                             <template x-for="(edu, index) in pendidikanList" :key="edu.id ?? edu.no_ijazah">
@@ -1124,37 +965,10 @@
                                         <a x-show="edu.download_url" :href="edu.download_url" class="font-semibold text-primary hover:underline">Unduh Ijazah</a>
                                         <span x-show="!edu.download_url" class="text-muted">-</span>
                                     </td>
-                                            <td class="px-4 py-3 text-right">
-                                        <div class="inline-flex items-center gap-3">
-                                            @if($canUpdateEmployeeHistory)
-                                            <button
-                                                type="button"
-                                                @click="openEditPendidikan(edu)"
-                                                :disabled="isDeletingPendidikan"
-                                                class="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
-                                                title="Edit riwayat pendidikan"
-                                            >Edit</button>
-                                            @endif
-                                            @if($canDeleteEmployeeHistory)
-                                            <button
-                                                type="button"
-                                                @click="deletePendidikan(edu.id, index)"
-                                                :disabled="isDeletingPendidikan"
-                                                class="inline-flex items-center gap-1 text-[10px] font-semibold text-danger hover:underline disabled:opacity-40 font-sans cursor-pointer transition-opacity"
-                                                title="Hapus riwayat pendidikan"
-                                            >
-                                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.021-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                                Hapus
-                                            </button>
-                                            @endif
-                                        </div>
-                                    </td>
                                 </tr>
                             </template>
                             <tr x-show="!pendidikanLoading && pendidikanList.length === 0">
-                                <td colspan="{{ $hasEducationHistoryMutation ? 7 : 6 }}" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
+                                <td colspan="6" class="px-4 py-6 text-center text-xs text-muted font-sans font-semibold">
                                     Pegawai ini belum memiliki riwayat pendidikan formal.
                                 </td>
                             </tr>
@@ -1169,26 +983,6 @@
                     title="Data & SK Pengangkatan Pertama"
                     description="Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK."
                 >
-                    @if($canUpdateEmployeeHistory)
-                        <x-slot:actions>
-                            <template x-if="!appointmentData">
-                                <x-ui.button type="button" size="sm" @click="openAppointmentModal()">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    Tambah Data Pengangkatan
-                                </x-ui.button>
-                            </template>
-                            <template x-if="appointmentData">
-                                <x-ui.button type="button" variant="outline" size="sm" @click="openAppointmentModal()">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-                                    </svg>
-                                    Edit Data Pengangkatan
-                                </x-ui.button>
-                            </template>
-                        </x-slot:actions>
-                    @endif
                 </x-pegawai.detail.section-header>
 
                 <x-pegawai.detail.table
@@ -1203,29 +997,10 @@
                             <td class="px-4 py-3" x-text="formatDate(appointmentData.tmt_pengangkatan)"></td>
                             <td class="px-4 py-3">
                                 <template x-if="appointmentData.download_url">
-                                    <div class="flex items-center gap-2">
-                                        <a :href="appointmentData.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
-                                        @if($canUpdateEmployeeHistory)
-                                            <button type="button" @click="openUploadSkModal('pengangkatan', appointmentData)" class="text-xs text-muted hover:text-primary transition inline-flex items-center gap-0.5 cursor-pointer font-sans" title="Ganti Berkas SK">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" /></svg>
-                                                <span>Ganti</span>
-                                            </button>
-                                        @endif
-                                    </div>
+                                    <a :href="appointmentData.download_url" class="font-semibold text-primary hover:underline">Unduh SK</a>
                                 </template>
                                 <template x-if="!appointmentData.download_url">
-                                    <div>
-                                        @if($canUpdateEmployeeHistory)
-                                            <button type="button" @click="openUploadSkModal('pengangkatan', appointmentData)" class="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer font-sans">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                                                </svg>
-                                                <span>Upload Berkas</span>
-                                            </button>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
-                                    </div>
+                                    <span class="text-muted">-</span>
                                 </template>
                             </td>
                         </tr>
@@ -1284,566 +1059,6 @@
 
         </x-pegawai.detail.shell>
 
-        {{-- MODAL DYNAMIC FORM --}}
-        <div x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;" x-transition>
-            <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-ink/60 transition-opacity" @click="showModal = false"></div>
-                
-                {{-- Centering spacer --}}
-                <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
-                
-                <div class="relative z-10 inline-block transform overflow-hidden rounded-lg bg-surface px-4 pt-5 pb-4 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6 sm:align-middle border border-border">
-                    <div class="flex items-center justify-between border-b border-border pb-3 mb-4">
-                        <h3 class="text-sm font-bold text-ink font-sans" x-text="modalTitle"></h3>
-                        <button @click="showModal = false" class="text-muted hover:text-ink cursor-pointer">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    {{-- Modal Error --}}
-                    <template x-if="modalError">
-                        <div class="mb-4 rounded-lg bg-red-50 p-4 border border-red-200">
-                            <div class="flex">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div class="ml-3">
-                                    <h3 class="text-sm font-medium text-red-800" x-text="modalError"></h3>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-
-                    <form @submit.prevent="submitForm()" class="space-y-4">
-                        {{-- KELUARGA FORM --}}
-                        <template x-if="modalType === 'keluarga'">
-                            <div class="space-y-3">
-                                <x-form.input 
-                                    name="nama_anggota"
-                                    label="Nama Anggota Keluarga" 
-                                    x-model="newKeluarga.nama_anggota" 
-                                    required 
-                                />
-                                
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <x-form.select 
-                                        name="hubungan"
-                                        label="Hubungan" 
-                                        x-model="newKeluarga.hubungan"
-                                    >
-                                        <option value="Suami">Suami</option>
-                                        <option value="Istri">Istri</option>
-                                        <option value="Anak">Anak</option>
-                                    </x-form.select>
-                                    
-                                    <x-form.input 
-                                        name="nik"
-                                        label="NIK" 
-                                        type="text"
-                                        placeholder="16 digit NIK (opsional)"
-                                        minlength="16"
-                                        maxlength="16" 
-                                        pattern="[0-9]{16}"
-                                        title="NIK harus berupa 16 digit angka"
-                                        x-model="newKeluarga.nik" 
-                                        x-on:input="newKeluarga.nik = newKeluarga.nik.replace(/[^0-9]/g, '')"
-                                    />
-                                </div>
-
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <x-form.input 
-                                        name="tempat_lahir"
-                                        label="Tempat Lahir" 
-                                        x-model="newKeluarga.tempat_lahir" 
-                                    />
-                                    <x-form.date 
-                                        name="tanggal_lahir"
-                                        label="Tanggal Lahir" 
-                                        x-model="newKeluarga.tanggal_lahir" 
-                                        required 
-                                    />
-                                </div>
-
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <x-form.select 
-                                        name="jenis_kelamin"
-                                        label="Jenis Kelamin" 
-                                        x-model="newKeluarga.jenis_kelamin" 
-                                        required
-                                    >
-                                        <option value="L">Laki-laki</option>
-                                        <option value="P">Perempuan</option>
-                                    </x-form.select>
-                                    
-                                    <x-form.select 
-                                        name="status_tunjangan"
-                                        label="Status Tunjangan" 
-                                        x-model="newKeluarga.status_tunjangan" 
-                                        required
-                                    >
-                                        <option value="1">Ditanggung</option>
-                                        <option value="0">Tidak Ditanggung</option>
-                                    </x-form.select>
-                                </div>
-
-                                <x-form.input 
-                                    name="pekerjaan"
-                                    label="Pekerjaan" 
-                                    x-model="newKeluarga.pekerjaan" 
-                                />
-                            </div>
-                        </template>
-
-                        {{-- PANGKAT FORM --}}
-                        <template x-if="modalType === 'pangkat'">
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Golongan</label>
-                                    <x-form.select x-model="newPangkat.golongan_id" required>
-                                        <option value="">-- Pilih Golongan --</option>
-                                        @foreach($golonganOptions as $gol)
-                                            <option value="{{ $gol->id }}">{{ $gol->nama }} ({{ $gol->pangkat }})</option>
-                                        @endforeach
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pangkat</label>
-                                    <input type="text" x-model="newPangkat.no_sk" required placeholder="SK-321-KP-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newPangkat.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Golongan</label>
-                                    <input type="date" x-model="newPangkat.tmt_pangkat" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label for="file_sk_pangkat" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                        Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
-                                    </label>
-                                    <div class="flex items-center gap-2">
-                                        <label for="file_sk_pangkat" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
-                                            Pilih File
-                                        </label>
-                                        <input type="file" id="file_sk_pangkat" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
-                                            @change="newPangkat.file_sk = $event.target.files[0] || null">
-                                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newPangkat.file_sk ? 'text-ink' : 'text-muted'"
-                                            x-text="newPangkat.file_sk ? newPangkat.file_sk.name : 'Belum ada file dipilih'"></span>
-                                        <button x-show="newPangkat.file_sk" type="button"
-                                            @click="newPangkat.file_sk = null; document.getElementById('file_sk_pangkat').value = ''"
-                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
-                                    </div>
-                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
-                                </div>
-                            </div>
-                        </template>
-
-                        {{-- JABATAN FORM --}}
-                        <template x-if="modalType === 'jabatan'">
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jabatan</label>
-                                    <x-form.select x-model="newJabatan.jabatan_id" required>
-                                        <option value="">-- Pilih Jabatan --</option>
-                                        @foreach($jabatanOptions->where('is_active', true) as $jabatan)
-                                            <option value="{{ $jabatan->id }}">{{ $jabatan->nama }}{{ $jabatan->jenisJabatan ? ' - '.$jabatan->jenisJabatan->nama : '' }}</option>
-                                        @endforeach
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Jabatan</label>
-                                    <x-form.select x-model="newJabatan.jenis_jabatan_id">
-                                        <option value="">-- Pilih Jenis Jabatan --</option>
-                                        @foreach($jenisJabatanOptions as $jj)
-                                            <option value="{{ $jj->id }}">{{ $jj->nama }}</option>
-                                        @endforeach
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Kelas Jabatan</label>
-                                    <input type="text" x-model="newJabatan.kelas_jabatan" placeholder="8" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Eselon (Opsional)</label>
-                                    <x-form.select x-model="newJabatan.eselon_id">
-                                        <option value="">-- Pilih Eselon --</option>
-                                        @foreach($eselonOptions as $esl)
-                                            <option value="{{ $esl->id }}">{{ $esl->nama }}</option>
-                                        @endforeach
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Unit Kerja</label>
-                                    <x-form.select x-model="newJabatan.unit_kerja_id" required>
-                                        <option value="">-- Pilih Unit Kerja --</option>
-                                        @foreach($unitKerjaOptions as $unit)
-                                            <option value="{{ $unit->id }}">{{ $unit->nama }}</option>
-                                        @endforeach
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Jabatan</label>
-                                    <input type="text" x-model="newJabatan.no_sk" required placeholder="SK-910-JAB-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newJabatan.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Jabatan</label>
-                                    <input type="date" x-model="newJabatan.tmt_jabatan" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label for="file_sk_jabatan" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                        Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
-                                    </label>
-                                    <div class="flex items-center gap-2">
-                                        <label for="file_sk_jabatan" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
-                                            Pilih File
-                                        </label>
-                                        <input type="file" id="file_sk_jabatan" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
-                                            @change="newJabatan.file_sk = $event.target.files[0] || null">
-                                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newJabatan.file_sk ? 'text-ink' : 'text-muted'"
-                                            x-text="newJabatan.file_sk ? newJabatan.file_sk.name : 'Belum ada file dipilih'"></span>
-                                        <button x-show="newJabatan.file_sk" type="button"
-                                            @click="newJabatan.file_sk = null; document.getElementById('file_sk_jabatan').value = ''"
-                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
-                                    </div>
-                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
-                                </div>
-                            </div>
-                        </template>
-
-                        {{-- KGB FORM --}}
-                        <template x-if="modalType === 'kgb'">
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Gaji Pokok Baru</label>
-                                    <input type="number" x-model="newKgb.gaji_pokok" required placeholder="4100000" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Surat KGB</label>
-                                    <input type="text" x-model="newKgb.no_sk" required placeholder="KGB-012-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Surat Terbit</label>
-                                    <input type="date" x-model="newKgb.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT KGB</label>
-                                    <input type="date" x-model="newKgb.tmt_kgb" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label for="file_sk_kgb" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                        Upload SK <span class="font-normal normal-case text-muted">(opsional)</span>
-                                    </label>
-                                    <div class="flex items-center gap-2">
-                                        <label for="file_sk_kgb" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
-                                            Pilih File
-                                        </label>
-                                        <input type="file" id="file_sk_kgb" class="hidden" accept=".pdf,.jpg,.jpeg,.png"
-                                            @change="newKgb.file_sk = $event.target.files[0] || null">
-                                        <span class="min-w-0 flex-1 truncate text-xs font-sans" :class="newKgb.file_sk ? 'text-ink' : 'text-muted'"
-                                            x-text="newKgb.file_sk ? newKgb.file_sk.name : 'Belum ada file dipilih'"></span>
-                                        <button x-show="newKgb.file_sk" type="button"
-                                            @click="newKgb.file_sk = null; document.getElementById('file_sk_kgb').value = ''"
-                                            class="shrink-0 text-xs text-danger hover:underline font-sans">Hapus</button>
-                                    </div>
-                                    <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/JPEG/PNG, maks. 10 MB.</p>
-                                </div>
-                            </div>
-                        </template>
-
-                        {{-- DISIPLIN FORM --}}
-                        <template x-if="modalType === 'disiplin'">
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Hukuman</label>
-                                    <x-form.select x-model="newDisiplin.jenis_hukuman">
-                                        <option value="Ringan">Ringan</option>
-                                        <option value="Sedang">Sedang</option>
-                                        <option value="Berat">Berat</option>
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Deskripsi Pelanggaran</label>
-                                    <textarea x-model="newDisiplin.deskripsi" required placeholder="Keterlambatan absensi berulang" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans resize-none" rows="2"></textarea>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Hukuman</label>
-                                    <input type="text" x-model="newDisiplin.no_sk" required placeholder="SK-HD-023-2026" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit</label>
-                                    <input type="date" x-model="newDisiplin.tanggal_sk" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-2">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                                        File SK
-                                        <span class="font-normal normal-case text-muted">(opsional)</span>
-                                    </label>
-
-                                    {{-- Tab toggle: Dari Arsip | Unggah Baru --}}
-                                    <div class="flex gap-0.5 rounded-lg border border-border bg-soft p-0.5 w-fit">
-                                        <button type="button"
-                                            @click="disiplinFileMode = 'arsip'; newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
-                                            :class="disiplinFileMode === 'arsip' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
-                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
-                                        >Dari Arsip</button>
-                                        <button type="button"
-                                            @click="disiplinFileMode = 'baru'; newDisiplin.dokumen_id = ''; newDisiplin.no_sk = ''; newDisiplin.tanggal_sk = ''"
-                                            :class="disiplinFileMode === 'baru' ? 'bg-white shadow-sm text-ink' : 'text-muted hover:text-ink'"
-                                            class="rounded-md px-3 py-1 text-xs font-semibold font-sans transition-all cursor-pointer"
-                                        >Unggah Baru</button>
-                                    </div>
-
-                                    {{-- Panel: Dari Arsip --}}
-                                    <div x-show="disiplinFileMode === 'arsip'" class="space-y-1">
-                                        <div x-show="loadingArsip" class="text-xs text-muted font-sans py-1">Memuat daftar arsip...</div>
-                                        <template x-if="!loadingArsip">
-                                            <div class="space-y-1">
-                                                <x-form.select x-model="newDisiplin.dokumen_id"
-                                                    @change="
-                                                        const dok = arsipDokumen.find(d => d.id == $event.target.value);
-                                                        if (dok) {
-                                                            if (dok.nomor_dokumen) newDisiplin.no_sk = dok.nomor_dokumen;
-                                                            if (dok.tanggal) newDisiplin.tanggal_sk = dok.tanggal;
-                                                        }
-                                                    "
-                                                    class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                                    <option value="">-- Pilih dari Arsip Dokumen --</option>
-                                                    <template x-for="dok in arsipDokumen" :key="dok.id">
-                                                        <option :value="dok.id"
-                                                            x-text="dok.nama_dokumen + (dok.nomor_dokumen ? ' (' + dok.nomor_dokumen + ')' : '') + (dok.tanggal ? ' — ' + dok.tanggal : '')">
-                                                        </option>
-                                                    </template>
-                                                </x-form.select>
-                                                <p x-show="arsipDokumen.length === 0" class="text-[10px] text-muted italic font-sans">
-                                                    Belum ada arsip SK Hukuman Disiplin untuk pegawai ini.
-                                                    <a href="{{ route('dokumen') }}" target="_blank" class="text-primary underline">Unggah di halaman Arsip Dokumen</a>.
-                                                </p>
-                                            </div>
-                                        </template>
-                                    </div>
-
-                                    {{-- Panel: Unggah Baru --}}
-                                    <div x-show="disiplinFileMode === 'baru'" class="space-y-1">
-                                        <div class="flex items-center gap-2">
-                                            <label for="file_sk_disiplin" class="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 font-sans">
-                                                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                                                </svg>
-                                                Pilih File
-                                            </label>
-                                            <input
-                                                type="file"
-                                                id="file_sk_disiplin"
-                                                class="hidden"
-                                                accept=".pdf,.jpg,.jpeg,.png"
-                                                @change="newDisiplin.file_sk = $event.target.files[0] || null"
-                                            >
-                                            <span
-                                                class="min-w-0 flex-1 truncate text-xs font-sans"
-                                                :class="newDisiplin.file_sk ? 'text-ink' : 'text-muted'"
-                                                x-text="newDisiplin.file_sk ? newDisiplin.file_sk.name : 'Belum ada file dipilih'"
-                                            ></span>
-                                            <button
-                                                x-show="newDisiplin.file_sk"
-                                                type="button"
-                                                @click="newDisiplin.file_sk = null; document.getElementById('file_sk_disiplin').value = ''"
-                                                class="shrink-0 text-xs text-danger hover:underline font-sans"
-                                            >Hapus</button>
-                                        </div>
-                                        <p class="text-[10px] text-muted italic font-sans">Format PDF/JPG/PNG, maks. 10 MB. File akan masuk ke Arsip Dokumen otomatis.</p>
-                                    </div>
-                                </div>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Mulai</label>
-                                        <input type="date" x-model="newDisiplin.tanggal_mulai" required class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal Berakhir</label>
-                                        <input type="date" x-model="newDisiplin.tanggal_berakhir" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                </div>
-                                <p class="text-[10px] text-muted italic font-sans">* Kosongkan tanggal berakhir jika masa berlaku tidak ditentukan (aktif selamanya).</p>
-                            </div>
-                        </template>
-
-                        {{-- PENDIDIKAN FORM --}}
-                        <template x-if="modalType === 'pendidikan'">
-                            <div class="space-y-4">
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
-                                    <x-form.select x-model="newPendidikan.jenjang_id" required>
-                                        <option value="">-- Pilih Jenjang --</option>
-                                        @foreach($jenjangOptions as $jenjang)
-                                            <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
-                                        @endforeach
-                                    </x-form.select>
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
-                                    <input type="text" x-model="newPendidikan.nama_institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                </div>
-                                <div class="space-y-1">
-                                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                                    <select x-model="newPendidikan.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                        <option value="">-- Pilih Program Studi --</option>
-                                        @foreach($programStudiOptions as $programStudi)
-                                            <option value="{{ $programStudi->id }}">{{ $programStudi->nama }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus <span class="text-danger">*</span></label>
-                                        <input type="number" x-model="newPendidikan.tahun_lulus" required placeholder="2007" min="1900" :max="new Date().getFullYear() + 1" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                    <div class="space-y-1">
-                                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
-                                        <input type="text" x-model="newPendidikan.no_ijazah" placeholder="IJZ-S1-MAN-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-
-                        <div class="border-t border-border pt-6 flex justify-end gap-3 mt-6">
-                            <button
-                                type="button" 
-                                @click="showModal = false" 
-                                x-bind:disabled="isSubmitting"
-                                class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
-                                </svg>
-                                Batal
-                            </button>
-                            
-                            <button
-                                type="submit" 
-                                x-bind:disabled="isSubmitting"
-                                class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[130px] disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <span class="flex items-center" x-show="!isSubmitting">
-                                    <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                                    </svg>
-                                    Simpan
-                                </span>
-                                <span class="flex items-center justify-center gap-2" x-show="isSubmitting" style="display: none;">
-                                    <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    Menyimpan...
-                                </span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-    {{-- ============================================================ --}}
-    {{-- MODAL EDIT RIWAYAT PENDIDIKAN                                --}}
-    {{-- ============================================================ --}}
-    <div
-        x-show="showEditPendidikan"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4"
-        style="display:none;"
-        @keydown.escape.window="showEditPendidikan = false"
-    >
-        <div
-            @click.outside="showEditPendidikan = false"
-            class="w-full max-w-lg rounded-2xl bg-surface shadow-xl border border-border overflow-hidden"
-        >
-            {{-- Header --}}
-            <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-                <h3 class="text-sm font-bold text-ink font-sans">Edit Riwayat Pendidikan</h3>
-                <button type="button" @click="showEditPendidikan = false" class="text-muted hover:text-ink transition cursor-pointer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-
-            {{-- Body --}}
-            <form @submit.prevent="submitEditPendidikan()" class="px-6 py-5 space-y-4">
-                {{-- Error --}}
-                <div x-show="editPendidikanError" class="rounded-lg bg-danger/10 border border-danger/20 px-3 py-2 text-xs text-danger font-sans" x-text="editPendidikanError"></div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenjang Pendidikan <span class="text-danger">*</span></label>
-                    <x-form.select x-model="editPendidikanForm.jenjang_id" required>
-                        <option value="">-- Pilih Jenjang --</option>
-                        @foreach($jenjangOptions as $jenjang)
-                            <option value="{{ $jenjang->id }}">{{ $jenjang->nama }}</option>
-                        @endforeach
-                    </x-form.select>
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nama Institusi <span class="text-danger">*</span></label>
-                    <input type="text" x-model="editPendidikanForm.nama_institusi" required placeholder="Universitas Sam Ratulangi" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                </div>
-
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Program Studi</label>
-                    <select x-model="editPendidikanForm.program_studi_id" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                        <option value="">-- Pilih Program Studi --</option>
-                        @foreach($educationProgramStudiOptions as $programStudi)
-                            <option value="{{ $programStudi->id }}" :disabled="{{ $programStudi->is_active ? 'false' : 'editPendidikanForm.program_studi_id !== \''. $programStudi->id .'\'' }}">{{ $programStudi->nama }}{{ ! $programStudi->is_active ? ' (Nonaktif)' : '' }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tahun Lulus <span class="text-danger">*</span></label>
-                        <input type="number" x-model="editPendidikanForm.tahun_lulus" required placeholder="2007" min="1900" :max="new Date().getFullYear() + 1" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                    <div class="space-y-1">
-                        <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor Ijazah</label>
-                        <input type="text" x-model="editPendidikanForm.no_ijazah" placeholder="IJZ-S1-2007" class="w-full rounded-lg border border-border bg-white px-3 py-2 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                    </div>
-                </div>
-
-                {{-- Footer --}}
-                <div class="flex justify-end gap-3 pt-2 border-t border-border mt-4">
-                    <button type="button" @click="showEditPendidikan = false" :disabled="isUpdatingPendidikan"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
-                        Batal
-                    </button>
-                    <button type="submit" :disabled="isUpdatingPendidikan"
-                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[120px] disabled:opacity-50">
-                        <span x-show="!isUpdatingPendidikan">Simpan Perubahan</span>
-                        <span x-show="isUpdatingPendidikan" class="flex items-center gap-2">
-                            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                            </svg>
-                            Menyimpan...
-                        </span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     @if($canDeactivateEmployee)
     <x-ui.modal show="showDeactivateModal" title="Nonaktifkan Pegawai" closeAction="showDeactivateModal = false" maxWidth="sm">
         <form method="POST" action="{{ route('rbac.pegawai.destroy', $p->id) }}" class="space-y-4">
@@ -1886,207 +1101,7 @@
     </x-ui.modal>
     @endif
 
-    {{-- ============================================================ --}}
-    {{-- MODAL UPLOAD / GANTI BERKAS SK (PANGKAT, JABATAN, KGB)        --}}
-    {{-- ============================================================ --}}
-    <x-ui.modal
-        show="showUploadSkModal"
-        title="Upload / Ganti Berkas SK"
-        closeAction="if(!isUploadingSk) showUploadSkModal = false"
-        maxWidth="md"
-    >
-        <div class="space-y-4 text-xs font-sans">
-            {{-- Info Riwayat Yang Dipilih --}}
-            <div class="rounded-xl border border-border bg-soft/40 p-3.5 space-y-1.5">
-                <template x-if="uploadSkType === 'pangkat'">
-                    <div>
-                        <div class="font-bold text-ink text-sm" x-text="'Golongan ' + (uploadSkRecord?.golongan || '-')"></div>
-                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor SK: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt)"></div>
-                    </div>
-                </template>
-                <template x-if="uploadSkType === 'jabatan'">
-                    <div>
-                        <div class="font-bold text-ink text-sm" x-text="(uploadSkRecord?.jabatan || '-')"></div>
-                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor SK: ' + (uploadSkRecord?.no_sk || '-') + ' • Unit: ' + (uploadSkRecord?.unit || '-')"></div>
-                    </div>
-                </template>
-                <template x-if="uploadSkType === 'kgb'">
-                    <div>
-                        <div class="font-bold text-ink text-sm" x-text="'Gaji Pokok: ' + (uploadSkRecord?.gaji || '-')"></div>
-                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor Surat: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt)"></div>
-                    </div>
-                </template>
-                <template x-if="uploadSkType === 'pengangkatan'">
-                    <div>
-                        <div class="font-bold text-ink text-sm" x-text="'SK Pengangkatan ' + (uploadSkRecord?.jenis_pengangkatan || '-')"></div>
-                        <div class="text-muted text-xs mt-0.5" x-text="'Nomor SK: ' + (uploadSkRecord?.no_sk || '-') + ' • TMT: ' + formatDate(uploadSkRecord?.tmt_pengangkatan)"></div>
-                    </div>
-                </template>
-            </div>
 
-            {{-- Pesan Error --}}
-            <div x-show="uploadSkError" class="rounded-lg bg-danger/10 border border-danger/20 p-2.5 text-danger font-medium text-xs" x-text="uploadSkError"></div>
-
-            {{-- Input File --}}
-            <div class="space-y-1.5">
-                <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Pilih Berkas SK <span class="text-danger">*</span></label>
-                <div class="border-2 border-dashed border-border rounded-lg p-5 bg-soft/50 text-center relative hover:border-primary transition">
-                    <input type="file" id="upload_file_sk_input"
-                           accept=".pdf,.jpg,.jpeg,.png"
-                           @change="uploadSkFile = $event.target.files[0] || null"
-                           class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                    <svg class="mx-auto h-9 w-9 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                    </svg>
-                    <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK (PDF/JPG/PNG, maks 10MB)</p>
-                    <template x-if="uploadSkFile">
-                        <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
-                            <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            </svg>
-                            <span class="font-medium" x-text="uploadSkFile.name"></span>
-                            <span class="text-muted" x-text="'(' + (uploadSkFile.size ? (uploadSkFile.size / 1024 / 1024).toFixed(2) + ' MB' : '') + ')'"></span>
-                            <button type="button" @click.stop="uploadSkFile = null; document.getElementById('upload_file_sk_input').value = ''" class="ml-1 text-danger hover:underline cursor-pointer">Hapus</button>
-                        </div>
-                    </template>
-                    <template x-if="!uploadSkFile && uploadSkRecord?.download_url">
-                        <div class="mt-2 text-xs text-muted">
-                            Berkas saat ini: <a :href="uploadSkRecord.download_url" target="_blank" class="text-primary hover:underline font-semibold">Unduh SK</a>
-                        </div>
-                    </template>
-                </div>
-            </div>
-
-            {{-- Footer Buttons --}}
-            <div class="flex items-center justify-end gap-2 border-t border-border pt-4 mt-2">
-                <button type="button"
-                        @click="showUploadSkModal = false"
-                        :disabled="isUploadingSk"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
-                    Batal
-                </button>
-                <button type="button"
-                        @click="submitUploadSk"
-                        :disabled="isUploadingSk || !uploadSkFile"
-                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer disabled:opacity-50">
-                    <span x-show="!isUploadingSk" x-text="uploadSkRecord?.download_url ? 'Simpan Perubahan' : 'Upload Berkas'"></span>
-                    <span x-show="isUploadingSk" class="inline-flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>Mengunggah...</span>
-                    </span>
-                </button>
-            </div>
-        </div>
-    </x-ui.modal>
-
-    {{-- ============================================================ --}}
-    {{-- MODAL TAMBAH / EDIT DATA PENGANGKATAN PERTAMA                --}}
-    {{-- Hanya dirender bila pemicu mutasinya ada (read-only menyembunyikan). --}}
-    {{-- ============================================================ --}}
-    @if($canUpdateEmployeeHistory)
-    <x-ui.modal
-        show="showAppointmentModal"
-        title="Data & SK Pengangkatan Pertama"
-        closeAction="if(!isSavingAppointment) showAppointmentModal = false"
-        maxWidth="lg"
-    >
-        <form @submit.prevent="submitAppointment()" class="space-y-4 text-xs font-sans">
-            {{-- Error Message --}}
-            <div x-show="appointmentError" class="rounded-lg bg-danger/10 border border-danger/20 p-2.5 text-danger font-medium text-xs" x-text="appointmentError"></div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {{-- Jenis Pengangkatan --}}
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Jenis Pengangkatan <span class="text-danger">*</span></label>
-                    <div class="relative">
-                        <select x-model="appointmentForm.jenis_pengangkatan" required class="w-full appearance-none rounded-lg border border-border bg-surface px-3 py-2 pr-10 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                            <option value="CPNS">CPNS</option>
-                            <option value="PNS">PNS</option>
-                            <option value="PPPK">PPPK</option>
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-muted">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- TMT Pengangkatan --}}
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">TMT Pengangkatan <span class="text-danger">*</span></label>
-                    <input type="date" x-model="appointmentForm.tmt_pengangkatan" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                </div>
-
-                {{-- Nomor SK Pengangkatan --}}
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Nomor SK Pengangkatan <span class="text-danger">*</span></label>
-                    <input type="text" x-model="appointmentForm.no_sk" required placeholder="SK-882-KP-2024" class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
-                </div>
-
-                {{-- Tanggal SK Terbit --}}
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">Tanggal SK Terbit <span class="text-danger">*</span></label>
-                    <input type="date" x-model="appointmentForm.tanggal_sk" required class="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans cursor-pointer">
-                </div>
-
-                {{-- File SK Pengangkatan --}}
-                <div class="space-y-2 sm:col-span-2 border-t border-border pt-4">
-                    <label class="text-xs font-bold text-ink uppercase tracking-wider font-sans">
-                        File SK Pengangkatan
-                        <span x-show="!isEditingAppointment" class="text-muted font-normal">(Opsional)</span>
-                    </label>
-                    <div class="mt-1">
-                        <div class="border-2 border-dashed border-border rounded-lg p-5 bg-soft/50 text-center relative hover:border-primary transition">
-                            <input type="file" id="appointment_file_sk_input" name="file_sk_pengangkatan"
-                                   accept=".pdf,.jpg,.jpeg,.png"
-                                   @change="appointmentForm.file_sk = $event.target.files[0] || null"
-                                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
-                            <svg class="mx-auto h-9 w-9 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
-                            </svg>
-                            <p class="text-xs text-ink font-semibold mt-2 font-sans">Klik atau Seret berkas SK Pengangkatan (PDF/JPG/PNG, maks 10MB)</p>
-                            <template x-if="appointmentForm.file_sk">
-                                <div class="mt-3 inline-flex items-center gap-2 rounded bg-surface border border-border px-3 py-1.5 text-xs text-ink shadow-sm">
-                                    <svg class="w-4 h-4 text-success shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                    </svg>
-                                    <span class="font-medium" x-text="appointmentForm.file_sk.name"></span>
-                                    <span class="text-muted" x-text="'(' + (appointmentForm.file_sk.size ? (appointmentForm.file_sk.size / 1024 / 1024).toFixed(2) + ' MB' : '') + ')'"></span>
-                                    <button type="button" @click.stop="appointmentForm.file_sk = null; document.getElementById('appointment_file_sk_input').value = ''" class="ml-1 text-danger hover:underline cursor-pointer">Hapus</button>
-                                </div>
-                            </template>
-                            <template x-if="!appointmentForm.file_sk && appointmentData?.download_url">
-                                <div class="mt-2 text-xs text-muted">
-                                    Berkas saat ini: <a :href="appointmentData.download_url" target="_blank" class="text-primary hover:underline font-semibold" x-text="appointmentData.file_sk ? appointmentData.file_sk.split('/').pop() : 'Unduh SK'"></a>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Footer Buttons --}}
-            <div class="flex items-center justify-end gap-2 border-t border-border pt-4 mt-4">
-                <button type="button"
-                        @click="showAppointmentModal = false"
-                        :disabled="isSavingAppointment"
-                        class="inline-flex items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-xs font-semibold text-ink hover:bg-soft transition font-sans cursor-pointer disabled:opacity-50">
-                    Batal
-                </button>
-                <button type="submit"
-                        :disabled="isSavingAppointment"
-                        class="inline-flex items-center justify-center rounded-lg border border-primary bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 shadow-sm font-sans cursor-pointer min-w-[120px] disabled:opacity-50">
-                    <span x-show="!isSavingAppointment" x-text="isEditingAppointment ? 'Simpan Perubahan' : 'Simpan Data'"></span>
-                    <span x-show="isSavingAppointment" class="inline-flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>Menyimpan...</span>
-                    </span>
-                </button>
-            </div>
-        </form>
-    </x-ui.modal>
-    @endif
 </div>{{-- /x-data utama --}}
 
 </div>

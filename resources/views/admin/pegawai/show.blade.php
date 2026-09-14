@@ -23,8 +23,9 @@
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
         $canUpdateEmployeeHistory = auth()->check()
-            && (auth()->user()->hasPermission('employee_histories.update') || auth()->user()->hasPermission('employee_histories.create') || auth()->user()->getEffectiveRole() === 'super_admin');
-        $canDeleteEmployeeHistory = auth()->check() && auth()->user()->hasPermission('employee_histories.delete');
+            && auth()->user()->hasPermission('employee_histories.update');
+        $canDeleteEmployeeHistory = auth()->check()
+            && auth()->user()->hasPermission('employee_histories.delete');
         $hasEducationHistoryMutation = $canCreateEmployeeHistory || $canUpdateEmployeeHistory || $canDeleteEmployeeHistory;
 
         $detailTabs = [
@@ -1877,24 +1878,28 @@
                     title="Data & SK Pengangkatan Pertama"
                     description="Berkas dasar penerimaan kepegawaian sebagai CPNS/PNS/PPPK."
                 >
-                    @if($canUpdateEmployeeHistory)
+                    @if($canCreateEmployeeHistory || $canUpdateEmployeeHistory)
                         <x-slot:actions>
-                            <template x-if="!appointmentData">
-                                <x-ui.button type="button" size="sm" @click="openAppointmentModal()">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    Tambah Data Pengangkatan
-                                </x-ui.button>
-                            </template>
-                            <template x-if="appointmentData">
-                                <x-ui.button type="button" variant="outline" size="sm" @click="openAppointmentModal()">
-                                    <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
-                                    </svg>
-                                    Edit Data Pengangkatan
-                                </x-ui.button>
-                            </template>
+                            @if($canCreateEmployeeHistory)
+                                <template x-if="!appointmentData">
+                                    <x-ui.button type="button" size="sm" @click="openAppointmentModal()">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                        </svg>
+                                        Tambah Data Pengangkatan
+                                    </x-ui.button>
+                                </template>
+                            @endif
+                            @if($canUpdateEmployeeHistory)
+                                <template x-if="appointmentData">
+                                    <x-ui.button type="button" variant="outline" size="sm" @click="openAppointmentModal()">
+                                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                        </svg>
+                                        Edit Data Pengangkatan
+                                    </x-ui.button>
+                                </template>
+                            @endif
                         </x-slot:actions>
                     @endif
                 </x-pegawai.detail.section-header>
