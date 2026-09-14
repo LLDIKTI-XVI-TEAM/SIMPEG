@@ -1329,6 +1329,19 @@ class KeycloakCallbackMappingTest extends TestCase
             ]);
         });
 
+        $this->beforeApplicationDestroyed(function () use (&$injected, $connection): void {
+            if (! $injected) {
+                return;
+            }
+
+            $pdo = new \PDO(
+                sprintf('pgsql:host=%s;port=%s;dbname=%s', $connection['host'], $connection['port'], $connection['database']),
+                $connection['username'],
+                $connection['password'],
+            );
+            $pdo->exec("delete from users where email = 'collision-insert@example.test'");
+        });
+
         $this->fakeKeycloakUser([
             'id' => 'kc-collision-insert',
             'nickname' => 'collision-insert',
@@ -1416,6 +1429,8 @@ class KeycloakCallbackMappingTest extends TestCase
      */
     public function test_unique_violation_during_save_re_resolves_existing_bound_user(): void
     {
+        User::factory()->superAdmin()->create();
+
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Paralel Reuse',
             'email' => 'paralel-reuse@example.com',
