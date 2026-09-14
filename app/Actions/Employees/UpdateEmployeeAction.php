@@ -19,6 +19,7 @@ use App\Services\Cuti\EmploymentStartDateResolver;
 use App\Services\Cuti\LeaveBalanceRecalculationService;
 use App\Services\EmployeeFileStorageService;
 use App\Services\Employees\TmtCalculatorService;
+use App\Support\Employees\EmployeeIdentifierPrivacy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +47,13 @@ class UpdateEmployeeAction
     public function execute(Employee $employee, array $validated, Request $request): Employee
     {
         $this->warnings = [];
+        if (! $this->isLocalBypass() && ! EmployeeIdentifierPrivacy::canManage($request->user())) {
+            $restricted = array_intersect(['nik', 'no_kk'], array_keys($validated));
+            if ($restricted !== []) {
+                // Caller selain FormRequest juga tidak boleh menulis/mengosongkan identitas terlindungi.
+                throw ValidationException::withMessages(array_fill_keys($restricted, 'Identitas kependudukan hanya dapat diubah oleh pengelola kepegawaian.'));
+            }
+        }
         $lifecycleFields = array_intersect(
             Employee::LIFECYCLE_SNAPSHOT_FIELDS,
             array_keys($validated),

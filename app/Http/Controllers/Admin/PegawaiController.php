@@ -255,7 +255,7 @@ class PegawaiController extends Controller
                 $successMsg .= ' Peringatan: '.implode(' ', $warnings);
             }
 
-            $redirect = redirect()->route('data-pegawai')
+            $redirect = redirect()->route($request->routeIs('rbac.pegawai.*') ? 'dashboard' : 'data-pegawai')
                 ->with('success', $successMsg)
                 ->with('employee_data_changed', true);
             if (! empty($warnings)) {
@@ -341,6 +341,14 @@ class PegawaiController extends Controller
         try {
             $employee = $action->execute($employee, $request->validated(), $request);
             $warnings = $action->warnings;
+
+            if ($request->routeIs('rbac.pegawai.*')) {
+                // Surface delegated tidak menerima model mentah melalui flash/sessionStorage setelah submit.
+                return redirect()->route('dashboard')
+                    ->with('success', 'Data pegawai '.$employee->nama_lengkap.' berhasil diperbarui.')
+                    ->with('warnings', $warnings)
+                    ->with('employee_data_changed', true);
+            }
 
             $employee->load([
                 'jenisPegawai:id,nama',

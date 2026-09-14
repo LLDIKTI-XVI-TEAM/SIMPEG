@@ -2,7 +2,6 @@
 
 namespace App\Actions\Employees;
 
-use App\Models\Employee;
 use App\Models\RefAgama;
 use App\Models\RefEselon;
 use App\Models\RefGolongan;
@@ -13,31 +12,54 @@ use App\Models\RefProgramStudi;
 use App\Models\RefStatusPegawai;
 use App\Models\RefStatusPerkawinan;
 use App\Models\RefUnitKerja;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Services\Employees\EmployeeHistoryAttachmentService;
+use App\Support\Employees\EmployeeIdentifierPrivacy;
 use Illuminate\Database\Eloquent\Model;
 
 class PrepareEmployeeEditFormDataAction
 {
-    public function __construct(private readonly EmployeeHistoryAttachmentService $attachments) {}
+    public function __construct(
+        private readonly EmployeeHistoryAttachmentService $attachments,
+        private readonly EmployeeDashboardScopeService $employeeScope,
+    ) {}
 
     /**
-     * Prepare data needed for the employee edit form.
+     * Menyiapkan form sesuai permission, scope, dan privasi, termasuk saat Livewire merender ulang.
      *
      * @param  int|string  $id
      * @return array<string, mixed>
      */
-    public function execute($id): array
+    public function execute($id, bool $rbacSurface = false): array
     {
-        $p = Employee::with([
-            'appointment',
-            'appointments',
+        $viewer = auth()->user();
+        abort_unless($viewer !== null && $viewer->hasPermission('employees.update'), 403);
+        $canEditSensitiveIdentifiers = EmployeeIdentifierPrivacy::canManage($viewer);
+        $canReadHistories = $viewer->hasPermission('employee_histories.read');
+        $canReadDocuments = $viewer->hasPermission('dokumen_sk.read');
+
+        // Proyeksi eksplisit mencegah identitas terenkripsi ikut didekripsi/diserialisasi ke form delegated.
+        $columns = [
+            'id', 'nama_lengkap', 'nama_dengan_gelar', 'nip', 'foto', 'tempat_lahir',
+            'tanggal_lahir', 'jenis_kelamin', 'agama_id', 'status_kawin_id', 'golongan_darah',
+            'jenis_pegawai_id', 'status_pegawai_id', 'status_aktif', 'is_kepala_lembaga',
+            'golongan_terakhir', 'pangkat_terakhir', 'jabatan_terakhir', 'kelas_jabatan', 'kelas_jabatan_terakhir',
+            'pendidikan_terakhir', 'prodi_pendidikan_terakhir', 'program_studi_id',
+            'tanggal_pensiun', 'tanggal_akhir_kontrak', 'alamat', 'no_hp', 'email',
+            'email_pribadi', 'no_telepon_rumah',
+        ];
+        if ($canEditSensitiveIdentifiers) {
+            $columns = [...$columns, 'nik', 'no_kk'];
+        }
+        abort_unless($this->employeeScope->for($viewer)->whereKey($id)->exists(), 403);
+        $p = $this->employeeScope->for($viewer)->select($columns)->with([
+            'appointment' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0')),
+            'appointments' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0')),
             'jenisPegawai',
-            'positionHistories.jabatan',
-            'positionHistories.unitKerja',
-            'positionHistories.jenisJabatan',
-            'rankHistories.golongan',
-            'salaryHistories',
-            'documents',
+            'positionHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with(['jabatan', 'unitKerja', 'jenisJabatan']),
+            'rankHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with('golongan'),
+            'salaryHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0')),
+            'documents' => fn ($q) => $q->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0')),
         ])->findOrFail($id);
 
         $jenisPegawai = RefJenisPegawai::all();
@@ -67,16 +89,20 @@ class PrepareEmployeeEditFormDataAction
             'salary' => $latestSalary,
             'appointment' => $p->appointment,
         ])->filter();
-        $this->attachments->primeDocumentReferences($histories->pluck('file_sk'));
-        $histories->each(function (Model $history, string $type) use ($p): void {
+        if ($canReadDocuments) {
+            $this->attachments->primeDocumentReferences($histories->pluck('file_sk'));
+        }
+        $downloadRoute = $rbacSurface ? 'rbac.pegawai.history-attachments.download' : 'pegawai.history-attachments.download';
+        $histories->each(function (Model $history, string $type) use ($p, $canReadDocuments, $downloadRoute): void {
             $history->setAttribute(
                 'admin_attachment_download_url',
-                $this->attachments->downloadUrl($p, $type, $history, 'pegawai.history-attachments.download'),
+                $canReadDocuments ? $this->attachments->downloadUrl($p, $type, $history, $downloadRoute) : null,
             );
         });
 
         // Dokumen arsip per kategori untuk fitur "Pilih dari Arsip"
         $arsipPangkat = $p->documents()
+            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_pangkat')
             ->orderByDesc('tanggal_dokumen')
             ->get()
@@ -90,6 +116,7 @@ class PrepareEmployeeEditFormDataAction
             ]);
 
         $arsipJabatan = $p->documents()
+            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_jabatan')
             ->orderByDesc('tanggal_dokumen')
             ->get()
@@ -103,6 +130,7 @@ class PrepareEmployeeEditFormDataAction
             ]);
 
         $arsipKgb = $p->documents()
+            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_kgb')
             ->orderByDesc('tanggal_dokumen')
             ->get()
@@ -116,6 +144,7 @@ class PrepareEmployeeEditFormDataAction
             ]);
 
         $arsipPengangkatan = $p->documents()
+            ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_pengangkatan')
             ->orderByDesc('tanggal_dokumen')
             ->get()
@@ -129,6 +158,7 @@ class PrepareEmployeeEditFormDataAction
             ]);
 
         return compact(
+            'canEditSensitiveIdentifiers',
             'p',
             'jenisPegawai',
             'agama',

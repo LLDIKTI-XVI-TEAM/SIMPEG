@@ -16,9 +16,10 @@
             <nav class="flex items-center gap-1.5 text-xs text-muted">
                 <a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
-                <a href="{{ route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data
-                    Pegawai</a>
-                <span>/</span>
+                @if (($returnUrl ?? route('data-pegawai')) !== route('dashboard'))
+                    <a href="{{ $returnUrl ?? route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
+                    <span>/</span>
+                @endif
                 <span class="font-medium text-ink">Edit</span>
             </nav>
         </div>
@@ -44,8 +45,8 @@
             nipError: '',
             nipSuccess: '',
             isCheckingNip: false,
-            nik: {{ json_encode(old('nik', $p->nik ?? '')) }},
-            kk: {{ json_encode(old('no_kk', $p->no_kk ?? '')) }},
+            nik: {{ json_encode($canEditSensitiveIdentifiers ? old('nik', $p->nik ?? '') : '') }},
+            kk: {{ json_encode($canEditSensitiveIdentifiers ? old('no_kk', $p->no_kk ?? '') : '') }},
             nikError: '',
             nikSuccess: '',
             isCheckingNik: false,
@@ -330,7 +331,7 @@
                 </button>
             </div>
 
-            <form action="{{ route('pegawai.update', $p->id) }}" method="POST" enctype="multipart/form-data"
+            <form action="{{ $formActionUrl ?? route('pegawai.update', $p->id) }}" method="POST" enctype="multipart/form-data"
                 class="space-y-6" novalidate @submit="isSubmitting = true">
                 @csrf
 
@@ -619,6 +620,7 @@
                 {{-- TAB 2: DATA PELENGKAP --}}
                 <div x-show="activeTab === 'pelengkap'" class="space-y-6" style="display: none;" x-transition>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        @if ($canEditSensitiveIdentifiers)
                         {{-- NIK --}}
                         <div class="space-y-1">
                             <label for="nik" class="text-xs font-bold text-ink uppercase tracking-wider font-sans">NIK
@@ -656,6 +658,9 @@
                                 x-text="kkError"></p>
                         </div>
 
+                        @else
+                            <p class="text-sm text-muted sm:col-span-2">NIK dan nomor KK hanya tersedia bagi pengelola kepegawaian. Perubahan data lain tidak mengubah kedua identitas tersebut.</p>
+                        @endif
                         {{-- Tempat Lahir --}}
                         <div class="space-y-1">
                             <label for="tempat_lahir"
@@ -1469,7 +1474,7 @@
                 <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                     <div>
                         <a href="javascript:void(0)"
-                            onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ route('data-pegawai') }}'; }"
+                            onclick="window.location.href = '{{ $returnUrl ?? route('data-pegawai') }}'"
                             class="inline-flex items-center justify-center rounded-lg border border-primary/15 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-soft">
                             <svg class="w-4 h-4 mr-1.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                 stroke-width="1.5">

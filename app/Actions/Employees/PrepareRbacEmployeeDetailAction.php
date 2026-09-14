@@ -149,7 +149,10 @@ class PrepareRbacEmployeeDetailAction
 
         $employee->loadMissing(['programStudi', 'educationHistories.programStudi']);
 
-        $this->prepareAttachmentDownloadUrls($employee, $canReadHistories, $canReadDiscipline, $canReadDocuments, $viewer);
+        // Hak membaca metadata riwayat tidak mencakup berkas SK atau lampirannya.
+        if ($canReadDocuments) {
+            $this->prepareAttachmentDownloadUrls($employee, $canReadHistories, $canReadDiscipline, $canReadDocuments, $viewer);
+        }
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true) ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
         $latestRank = $employee->rankHistories->firstWhere('is_latest', true);

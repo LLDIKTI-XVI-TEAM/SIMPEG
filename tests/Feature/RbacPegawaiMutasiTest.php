@@ -145,7 +145,7 @@ class RbacPegawaiMutasiTest extends TestCase
                 'value' => '199001012020011001',
             ])
             ->assertOk()
-            ->assertJson(['available' => true]);
+            ->assertJson(['is_unique' => true]);
 
         // POST /api/v1/pegawai passes employee.scope and reaches StoreEmployeeRequest validation boundary (422 instead of 403)
         $this->actingAs($kepalaBagian)

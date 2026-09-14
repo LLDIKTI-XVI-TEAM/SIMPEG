@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Employee;
 
 use App\Models\Employee;
+use App\Support\Employees\EmployeeIdentifierPrivacy;
 use App\Support\EmployeeValidationRules;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
@@ -36,6 +37,13 @@ class UpdateEmployeeRequest extends FormRequest
         }
 
         $rules = EmployeeValidationRules::update($employee);
+
+        if (! EmployeeIdentifierPrivacy::canManage($this->user())
+            && ! (app()->environment('local') && config('services.simpeg.disable_employee_api_auth'))) {
+            // Field kosong pun ditolak agar form delegated tidak menghapus identitas yang tidak dapat dibacanya.
+            $rules['nik'] = ['missing'];
+            $rules['no_kk'] = ['missing'];
+        }
 
         // Lifecycle pegawai hanya boleh diubah lewat endpoint status khusus agar
         // histori, audit, otorisasi, dan notifikasi tidak dapat dilewati.

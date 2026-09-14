@@ -88,21 +88,30 @@ class EmployeeApiScopeTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_grant_riwayat_pada_kabag_tetap_hanya_mengizinkan_bawahan_langsung(): void
+    public function test_grant_riwayat_pada_kabag_tidak_membuka_api_mentah_dan_detail_tetap_dibatasi_bawahan(): void
     {
         $kabagEmployee = Employee::factory()->create();
         $directReport = Employee::factory()->create(['kepala_bagian_id' => $kabagEmployee->id]);
         $unrelatedEmployee = Employee::factory()->create();
         $kabag = User::factory()->kepalaBagian()->create(['employee_id' => $kabagEmployee->id]);
-        $permission = Permission::query()->where('name', 'employee_histories.read')->firstOrFail();
+        $permissionIds = Permission::query()->whereIn('name', ['employee_histories.read', 'employees.read'])->pluck('id');
         Role::query()->where('name', 'kepala_bagian')->firstOrFail()
-            ->permissions()->syncWithoutDetaching([$permission->id]);
+            ->permissions()->syncWithoutDetaching($permissionIds);
 
         $this->actingAs($kabag)
             ->getJson("/api/v1/pegawai/{$directReport->id}/riwayat-kepangkatan")
-            ->assertOk();
+            ->assertForbidden();
         $this->actingAs($kabag)
             ->getJson("/api/v1/pegawai/{$unrelatedEmployee->id}/riwayat-kepangkatan")
+            ->assertForbidden();
+
+        // Metadata bawahan tetap tersedia melalui detail berotorisasi, bukan payload mentah.
+        $this->actingAs($kabag)
+            ->get(route('rbac.pegawai.show', $directReport))
+            ->assertOk()
+            ->assertSee($directReport->nama_lengkap);
+        $this->actingAs($kabag)
+            ->get(route('rbac.pegawai.show', $unrelatedEmployee))
             ->assertForbidden();
     }
 

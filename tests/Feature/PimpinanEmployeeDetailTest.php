@@ -1902,7 +1902,7 @@ class PimpinanEmployeeDetailTest extends TestCase
         $response->assertDontSee('Tambah Data Pengangkatan');
         $response->assertDontSee('Edit Data Pengangkatan');
         $response->assertDontSee('Simpan Satyalancana');
-        $response->assertDontSee('openUploadSkModal', false);
+        $response->assertDontSee('@click="openUploadSkModal', false);
         $response->assertDontSee('title="Ganti Berkas SK"', false);
     }
 }

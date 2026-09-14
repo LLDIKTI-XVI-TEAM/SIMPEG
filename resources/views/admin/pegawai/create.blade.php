@@ -5,8 +5,10 @@
             <x-slot:breadcrumb>
                 <a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-ink">Dashboard</a>
                 <span>/</span>
-                <a href="{{ route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
-                <span>/</span>
+                @if (($returnUrl ?? route('data-pegawai')) !== route('dashboard'))
+                    <a href="{{ $returnUrl ?? route('data-pegawai') }}" wire:navigate class="transition-colors hover:text-ink">Data Pegawai</a>
+                    <span>/</span>
+                @endif
                 <span class="font-medium text-ink">Tambah</span>
             </x-slot:breadcrumb>
         </x-admin.page-header>
@@ -65,7 +67,7 @@
                 </x-ui.tab>
             </x-ui.tabs>
 
-            <form id="form-create-pegawai" action="{{ route('pegawai.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6" novalidate @submit="isSubmitting = true">
+            <form id="form-create-pegawai" action="{{ $formActionUrl ?? route('pegawai.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6" novalidate @submit="isSubmitting = true">
                 @csrf
 
 {{-- TAB 1: DATA UTAMA --}}
@@ -727,7 +729,7 @@
                 {{-- Action Buttons --}}
                 <div class="border-t border-border pt-6 flex justify-between items-center gap-3">
                     <div>
-                        <x-ui.button as="a" href="javascript:void(0)" variant="secondary" onclick="if(document.referrer.includes(window.location.hostname)) { history.back(); } else { window.location.href = '{{ route('data-pegawai') }}'; }">
+                        <x-ui.button as="a" href="{{ $returnUrl ?? route('data-pegawai') }}" variant="secondary">
                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                             </svg>

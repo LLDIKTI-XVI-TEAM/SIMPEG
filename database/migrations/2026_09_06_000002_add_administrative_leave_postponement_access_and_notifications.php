@@ -79,9 +79,12 @@ return new class extends Migration
                 );
             }
 
-            $admin->permissions()->syncWithoutDetaching([
-                $permission->id,
-            ]);
+            // Default hanya saat bootstrap; rerun harus menghormati pencabutan oleh operator.
+            if ($permission->wasRecentlyCreated || $admin->wasRecentlyCreated) {
+                $admin->permissions()->syncWithoutDetaching([
+                    $permission->id,
+                ]);
+            }
 
             $channelIds = DB::table('ref_notification_channels')->whereIn('code', ['in_app', 'email'])->pluck('id', 'code');
             if ($channelIds->count() !== 2) {

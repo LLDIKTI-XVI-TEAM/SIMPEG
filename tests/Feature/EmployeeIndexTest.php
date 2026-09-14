@@ -21,6 +21,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\ReferenceSeeder;
 use Database\Seeders\SkRequirementSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -806,6 +807,10 @@ class EmployeeIndexTest extends TestCase
     {
         $this->app->detectEnvironment(fn () => 'local');
         config(['services.simpeg.disable_employee_api_auth' => true]);
+
+        // Middleware route ditentukan saat registrasi, bukan saat request dijalankan.
+        Route::middleware('api')->prefix('api/v1')->name('api.v1.')
+            ->group(base_path('routes/api/v1/pegawai.php'));
 
         Employee::factory()->create(['nama_lengkap' => 'Pegawai Local Bypass']);
 

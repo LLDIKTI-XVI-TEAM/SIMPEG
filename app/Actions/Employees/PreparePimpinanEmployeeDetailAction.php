@@ -183,7 +183,10 @@ class PreparePimpinanEmployeeDetailAction
         // Relasi referensi dimuat di action agar surface Pimpinan tetap read-only dan tidak memicu query dari Blade.
         $employee->loadMissing(['programStudi', 'educationHistories.programStudi']);
 
-        $this->prepareAttachmentDownloadUrls($employee);
+        // Hak membaca metadata riwayat tidak mencakup berkas SK atau lampirannya.
+        if ($canReadDocuments) {
+            $this->prepareAttachmentDownloadUrls($employee);
+        }
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
             ?? $employee->statusHistories->first();
         $activePosition = $employee->positionHistories->firstWhere('is_latest', true);
