@@ -160,9 +160,9 @@ class EffectiveRoleCutiAuthorizationTest extends TestCase
         $this->assertOriginalRoleUnchanged($actor, 'kepala_bagian');
     }
 
-    public function test_super_admin_tanpa_simulasi_tetap_ditolak_dari_kapabilitas_role_tujuan(): void
+    public function test_super_admin_aktif_membaca_lampiran_dengan_permission_tanpa_mewarisi_mutasi_role_lain(): void
     {
-        $actor = User::factory()->superAdmin()->create();
+        $actor = User::factory()->superAdmin()->create(['employee_id' => Employee::factory()->create()->id]);
         $employee = Employee::factory()->create();
         $leave = $this->leaveWithPrivateAttachment();
 
@@ -177,7 +177,8 @@ class EffectiveRoleCutiAuthorizationTest extends TestCase
             ->assertForbidden();
         $this->actingAs($actor)
             ->get(route('pimpinan.cuti.attachment.download', $leave))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertDownload('Lampiran_Cuti_'.strtoupper(substr($leave->id, 0, 8)).'.pdf');
         $this->actingAs($actor)
             ->getJson(route('kepala-bagian.search', ['q' => 'Pegawai']))
             ->assertForbidden();
@@ -190,7 +191,7 @@ class EffectiveRoleCutiAuthorizationTest extends TestCase
     private function simulatedSuperAdmin(string $effectiveRole, ?Employee $employee = null): User
     {
         $actor = User::factory()->superAdmin()->create([
-            'employee_id' => $employee?->id,
+            'employee_id' => ($employee ?? Employee::factory()->create())->id,
         ]);
         $actor->forceFill([
             'temporary_role' => $effectiveRole,

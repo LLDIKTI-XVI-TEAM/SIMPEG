@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
+use App\Models\SupervisorAssignment;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +28,167 @@ class CutiDetailTimelineTest extends TestCase
     {
         parent::setUp();
         $this->seed(RbacSeeder::class);
+    }
+
+    public function test_monitoring_detail_dan_lampiran_tidak_melewati_scope_pegawai(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $actor = User::factory()->pegawai()->create();
+        Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'cuti.read_all')->valueOrFail('id'),
+        ]);
+
+        $this->actingAs($actor)->get(route('cuti.show', $leave))->assertForbidden();
+        $this->get(route('cuti.attachment.download', $leave))->assertForbidden();
+
+        $owner = User::factory()->pegawai()->create(['employee_id' => $leave->employee_id]);
+        $this->actingAs($owner)->get(route('cuti.show', $leave))->assertOk();
+    }
+
+    public function test_monitoring_detail_membatasi_bawahan_efektif_dan_mempertahankan_scope_identitas_asli(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $supervisor = Employee::factory()->create();
+        $actor = User::factory()->kepalaBagian()->create(['employee_id' => $supervisor->id]);
+        Role::where('name', 'kepala_bagian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'cuti.read_all')->valueOrFail('id'),
+        ]);
+        $assignment = SupervisorAssignment::create([
+            'employee_id' => $leave->employee_id,
+            'kepala_bagian_id' => $supervisor->id,
+            'supervisor_id' => $supervisor->id,
+            'tanggal_mulai' => today()->addDay(),
+        ]);
+
+        $this->actingAs($actor)->get(route('cuti.show', $leave))->assertForbidden();
+        $assignment->update(['tanggal_mulai' => today()]);
+        $this->get(route('cuti.show', $leave))->assertOk();
+
+        $simulated = User::factory()->superAdmin()->create(['temporary_role' => 'kepala_bagian']);
+        $this->actingAs($simulated)->get(route('cuti.show', $leave))->assertOk();
+    }
+
+    public function test_permission_monitoring_tidak_otomatis_memuat_saldo_lintas_pegawai(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $actor = User::factory()->pimpinan()->create();
+        $role = Role::where('name', 'pimpinan')->firstOrFail();
+        $balancePermission = Permission::where('name', 'cuti.balance.read')->valueOrFail('id');
+        $role->permissions()->detach($balancePermission);
+
+        $this->actingAs($actor)->get(route('cuti.show', $leave))
+            ->assertOk()
+            ->assertViewHas('verifierContext', fn ($context) => $context === null)
+            ->assertViewHas('targetBalance', fn ($balance) => $balance === null);
+
+        $role->permissions()->attach($balancePermission);
+        $this->get(route('cuti.show', $leave))
+            ->assertOk()->assertViewHas('verifierContext', fn ($context) => is_array($context));
+    }
+
+    public function test_pembaca_snapshot_dengan_izin_saldo_dan_scope_sah_tidak_memerlukan_izin_monitoring(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $employee = Employee::factory()->create();
+        $actor = User::factory()->pimpinan()->create(['employee_id' => $employee->id]);
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->detach(
+            Permission::where('name', 'cuti.read_all')->valueOrFail('id'),
+        );
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'cuti.balance.read')->valueOrFail('id'),
+        ]);
+        $leave->steps()->create([
+            'step_order' => 1, 'step_type' => 'pybmc', 'role_label' => 'PYBMC',
+            'approver_employee_id' => $employee->id, 'status' => 'approved', 'is_final' => true,
+        ]);
+
+        $this->actingAs($actor)->get(route('cuti.show', $leave))
+            ->assertOk()->assertViewHas('canAct', false)
+            ->assertViewHas('verifierContext', fn ($context) => is_array($context));
+
+        // Snapshot tetap memberi hak baca record, tetapi grant saldo tidak memperluas scope Pegawai.
+        Role::where('name', 'pegawai')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'cuti.balance.read')->valueOrFail('id'),
+        ]);
+        $actor->forceFill(['role' => 'pegawai'])->save();
+        $this->actingAs($actor)->get(route('cuti.show', $leave))
+            ->assertOk()->assertViewHas('verifierContext', fn ($context) => $context === null);
+    }
+
+    public function test_detail_role_adalah_redirect_berotorisasi_ke_detail_kanonis(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $actor = User::factory()->pimpinan()->create();
+
+        $this->actingAs($actor)->get(route('pimpinan.cuti.show', $leave))
+            ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']));
+
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->detach(
+            Permission::where('name', 'cuti.read_all')->valueOrFail('id'),
+        );
+        $this->get(route('pimpinan.cuti.show', $leave))->assertForbidden();
+        $this->get(route('cuti.show', $leave))->assertForbidden();
+    }
+
+    public function test_adapter_detail_mempertahankan_flash_validasi_dari_form_sebelumnya(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $actor = User::factory()->pegawai()->create(['employee_id' => $leave->employee_id]);
+        session()->flash('errors', (new ViewErrorBag)->put('default', new MessageBag([
+            'status' => ['Pengajuan sedang menunggu keputusan pembatalan.'],
+        ])));
+        session()->flash('_old_input', ['catatan' => 'Draft belum tersimpan']);
+
+        $this->actingAs($actor)->followingRedirects()->get(route('pimpinan.cuti.show', $leave))
+            ->assertOk()->assertSee('Pengajuan sedang menunggu keputusan pembatalan.');
+    }
+
+    public function test_error_dan_draft_catatan_hanya_dipulihkan_pada_modal_keputusan_yang_gagal(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $leave->forceFill(['status' => 'menunggu_approval'])->save();
+        $approver = User::factory()->pegawai()->create(['employee_id' => Employee::factory()->create()->id]);
+        $leave->steps()->create([
+            'step_order' => 1, 'step_type' => 'verifikator', 'role_label' => 'Verifikator',
+            'approver_employee_id' => $approver->employee_id, 'status' => 'active', 'is_final' => false,
+        ]);
+
+        foreach (['decline', 'postpone', 'approve'] as $failedForm) {
+            $response = $this->actingAs($approver)->withSession([
+                'errors' => (new ViewErrorBag)->put('default', new MessageBag(['komentar' => 'Catatan tidak valid.'])),
+                '_old_input' => ['decision_form' => $failedForm, 'komentar' => 'Draft keputusan gagal'],
+            ])->get(route('cuti.show', $leave))->assertOk();
+
+            foreach (['decline', 'postpone', 'approve'] as $form) {
+                $this->assertSame(1, preg_match('/<textarea\b([^>]*\bid="komentar-'.$form.'"[^>]*)>(.*?)<\/textarea>/s', $response->getContent(), $field));
+                if ($form === $failedForm) {
+                    $this->assertStringContainsString('aria-invalid="true"', $field[1]);
+                    $this->assertSame('Draft keputusan gagal', trim($field[2]));
+                    $response->assertSee('id="komentar-'.$form.'_error"', false);
+                } else {
+                    $this->assertStringNotContainsString('aria-invalid="true"', $field[1]);
+                    $this->assertSame('', trim($field[2]));
+                    $response->assertDontSee('id="komentar-'.$form.'_error"', false);
+                }
+            }
+        }
+    }
+
+    public function test_konteks_kembali_hanya_memilih_route_lokal_tanpa_memperluas_akses(): void
+    {
+        $leave = $this->administrativePostponementFixture();
+        $actor = User::factory()->pegawai()->create(['employee_id' => $leave->employee_id]);
+        foreach (['https://example.test', 'monitoring', ['pimpinan']] as $from) {
+            $this->actingAs($actor)->get(route('cuti.show', ['id' => $leave->id, 'from' => $from]))
+                ->assertOk()->assertViewHas('backLink', [
+                    'url' => route('cuti', ['scope' => 'own']),
+                    'label' => 'Kembali ke Pengajuan Cuti Saya',
+                ]);
+        }
+        $this->get(route('cuti.show', ['id' => $leave->id, 'from' => 'approval']))
+            ->assertOk()->assertViewHas('backLink', [
+                'url' => route('cuti.approval'), 'label' => 'Kembali ke Menunggu Tindakan Saya',
+            ]);
     }
 
     public function test_detail_final_menawarkan_penangguhan_administratif_hanya_kepada_pengelola_berizin(): void
@@ -519,8 +683,6 @@ class CutiDetailTimelineTest extends TestCase
         $files = [
             'app/Services/Cuti/LeaveProofService.php',
             'resources/views/admin/cuti/show.blade.php',
-            'resources/views/pimpinan/cuti/show.blade.php',
-            'resources/views/kabag/cuti/show.blade.php',
         ];
         $forbiddenTokens = [
             "'rejected'" => 'status legacy single-quoted',

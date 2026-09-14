@@ -1,5 +1,7 @@
-<x-layouts.app title="Persetujuan Cuti">
+<x-layouts.app title="Monitoring Cuti">
     @php
+        $returnFilters = \Illuminate\Support\Arr::only(request()->query(), ['search', 'status', 'unit_kerja_id', 'jenis_cuti_id', 'periode', 'per_page', 'page']);
+
         $statusVariant = [
             'menunggu_approval' => 'info',
             'disetujui' => 'success',
@@ -35,10 +37,10 @@
         {{-- PAGE HEADER --}}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <h1 class="text-2xl font-semibold text-ink">Persetujuan Cuti</h1>
+                <h1 class="text-2xl font-semibold text-ink">Monitoring Cuti</h1>
                 <x-ui.breadcrumb :items="[
                     ['label' => 'Dashboard', 'url' => route('pimpinan.dashboard')],
-                    ['label' => 'Persetujuan Cuti'],
+                    ['label' => 'Monitoring Cuti'],
                 ]" />
             </div>
             <div class="flex items-center gap-2">
@@ -101,8 +103,9 @@
                 gridClass="grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
             >
                 <div class="relative">
+                    <label for="status" class="sr-only">Status pengajuan cuti</label>
                     <x-form.select id="status" name="status" class="w-full" onchange="this.form.submit()">
-                        <option value="">Semua Status</option>
+                        <option value="all" @selected(($filters['status'] ?? 'all') === 'all')>Semua Status</option>
                         <option value="menunggu_saya" @selected(($filters['status'] ?? '') === 'menunggu_saya')>Menunggu Tindakan Saya</option>
                         <option value="menunggu" @selected(($filters['status'] ?? '') === 'menunggu')>Menunggu Keputusan</option>
                         <option value="menunggu_pembatalan" @selected(($filters['status'] ?? '') === 'menunggu_pembatalan')>Menunggu Keputusan Pembatalan</option>
@@ -117,6 +120,7 @@
                     </x-form.select>
                 </div>
                 <div class="relative">
+                    <label for="unit_kerja_id" class="sr-only">Unit kerja</label>
                     <x-form.select id="unit_kerja_id" name="unit_kerja_id" class="w-full" onchange="this.form.submit()">
                         <option value="">Semua unit</option>
                         @foreach ($unitKerjaOptions as $unit)
@@ -125,6 +129,7 @@
                     </x-form.select>
                 </div>
                 <div class="relative">
+                    <label for="jenis_cuti_id" class="sr-only">Jenis cuti</label>
                     <x-form.select id="jenis_cuti_id" name="jenis_cuti_id" class="w-full" onchange="this.form.submit()">
                         <option value="">Semua jenis cuti</option>
                         @foreach ($jenisCutiOptions as $jenisCuti)
@@ -133,6 +138,7 @@
                     </x-form.select>
                 </div>
                 <div class="relative">
+                    <label for="periode" class="sr-only">Periode cuti</label>
                     <x-form.select id="periode" name="periode" class="w-full" onchange="this.form.submit()">
                         <option value="">Semua Periode</option>
                         @foreach ($optPeriodes as $periodeOption)
@@ -198,7 +204,7 @@
                                 </x-ui.table-td>
                                 <x-ui.table-td>
                                     <div class="flex items-center justify-end gap-1.5">
-                                        <x-ui.button href="{{ route('pimpinan.cuti.show', $leave) }}" variant="secondary" size="compact-icon" title="Detail" aria-label="Detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai' }}">
+                                        <x-ui.button :href="route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan', 'return' => $returnFilters])" variant="secondary" size="compact-icon" title="Detail" aria-label="Detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai' }}">
                                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />

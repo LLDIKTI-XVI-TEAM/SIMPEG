@@ -8,7 +8,8 @@ use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
 use App\Models\RefHariLibur;
 use App\Models\User;
-use App\Services\Cuti\AdministrativeLeavePostponementAccess;
+use App\Services\Cuti\LeaveDetailNavigation;
+use App\Services\Cuti\LeaveRequestReadAccess;
 use App\Services\EmployeeFileStorageService;
 use App\Services\LeaveApprovalService;
 use Illuminate\Support\Carbon;
@@ -25,14 +26,18 @@ class BuildCutiDetailAction
         private readonly EmployeeFileStorageService $files,
         private readonly DownloadLeaveAttachmentAction $attachmentDownloads,
         private readonly BuildAdministrativeLeavePostponementContextAction $administrativeContext,
-        private readonly AdministrativeLeavePostponementAccess $administrativeAccess,
+        private readonly LeaveRequestReadAccess $readAccess,
+        private readonly LeaveDetailNavigation $navigation,
     ) {}
 
     /**
      * Akses baca memakai snapshot approver agar keputusan lama tetap dapat ditelusuri,
      * sedangkan izin bertindak tetap dibatasi pada tahap aktif dan status yang dapat diputus.
      *
+     * @param  array<string, mixed>  $returnFilters
      * @return array{
+     *     backLink: array{url: string, label: string},
+     *     decisionReturnParameters: array<string, mixed>,
      *     cuti: LeaveRequest,
      *     canAct: bool,
      *     isVerifierContext: bool,
@@ -51,8 +56,10 @@ class BuildCutiDetailAction
      *     activeStep: LeaveRequestStep|null
      * }
      */
-    public function execute(LeaveRequest $cuti, User $user): array
+    public function execute(LeaveRequest $cuti, User $user, ?string $from = null, array $returnFilters = []): array
     {
+        abort_unless($this->readAccess->canReadDetail($cuti, $user), 403);
+
         $isOwner = $cuti->employee_id === $user->employee_id;
         $relations = [
             'employee',
@@ -83,38 +90,20 @@ class BuildCutiDetailAction
         $isCurrentApprover = $employeeId !== null
             && $stage !== null
             && $this->approvals->approverEmployeeIdForStage($cuti, $stage) === $employeeId;
-        // Snapshot menyimpan seluruh pihak yang berwenang menelusuri pengajuan,
-        // termasuk approver yang sudah selesai atau masih menunggu tahapnya.
-        $isAnySnapshotApprover = $employeeId !== null
-            && $cuti->steps->contains(
-                fn (LeaveRequestStep $step): bool => $step->approver_employee_id === $employeeId,
-            );
         $canAct = $isCurrentApprover
             && in_array($cuti->status, LeaveApprovalService::ACTIONABLE_STATUSES, true);
         $canDownloadFormulir = $this->pdfAction->canDownload($cuti, $user);
-        $canReadAll = $user->hasPermission('cuti.read_all');
-
-        // Snapshot approver lama tetap boleh membaca pengajuan untuk kebutuhan audit,
-        // tetapi tidak memperoleh izin bertindak setelah tahapnya selesai.
-        // Pengelola administratif dalam scope perlu membuka keputusan sebelum dan setelah mutasi;
-        // akses ini tidak menambah hak unduh dokumen atau monitoring global.
-        abort_if(
-            ! $canReadAll
-            && $cuti->employee_id !== $user->employee_id
-            && ! $isAnySnapshotApprover
-            && ! $canDownloadFormulir
-            && ! $this->administrativeAccess->canManage($cuti, $user),
-            403,
-        );
+        $canReadBalance = $this->readAccess->canReadBalance($cuti, $user);
 
         $isRolloverReturn = $cuti->status === LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER;
         $latestCancellation = $isOwner ? $cuti->cancellationRequests->first() : null;
         $canRequestCancellation = $isOwner
-            && $user->hasPermission('cuti.create')
             && in_array($cuti->status, ['menunggu_approval', 'ditangguhkan'], true)
             && $latestCancellation?->status !== 'pending';
-        $isVerifierContext = $canAct || $canReadAll;
-        $targetBalance = $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
+        // Assignment aktif membawa konteks keputusan; monitoring saja tidak memberikan saldo lintas pegawai.
+        $isVerifierContext = $canAct || $canReadBalance;
+        $targetBalance = ($isOwner || $isVerifierContext)
+            && $isRolloverReturn && $cuti->employee !== null && $cuti->rollover_target_year !== null
             ? $this->balancePreview->execute(
                 $cuti->employee,
                 Carbon::create($cuti->rollover_target_year, 1, 1)->startOfDay(),
@@ -124,8 +113,12 @@ class BuildCutiDetailAction
             ? $this->verifierContext->execute($cuti->employee, $cuti->tanggal_mulai ?? now(), $cuti)
             : null;
 
+        $navigation = $this->navigation->resolve($user, $from, $returnFilters);
+
         return [
             ...$this->administrativeContext->execute($cuti, $user),
+            'backLink' => $navigation['backLink'],
+            'decisionReturnParameters' => $navigation['parameters'],
             'cuti' => $cuti,
             'canAct' => $canAct,
             'isVerifierContext' => $isVerifierContext,

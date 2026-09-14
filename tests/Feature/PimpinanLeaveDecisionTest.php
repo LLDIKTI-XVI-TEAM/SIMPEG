@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Appointment;
 use App\Models\Employee;
 use App\Models\LeaveApproval;
 use App\Models\LeaveBalance;
@@ -26,6 +27,19 @@ class PimpinanLeaveDecisionTest extends TestCase
         $this->seed(RbacSeeder::class);
     }
 
+    public function test_detail_role_lama_mengarahkan_approver_snapshot_ke_detail_kanonis(): void
+    {
+        $fixture = $this->dutyPostponementFixture();
+        $canonicalUrl = route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']);
+
+        $this->actingAs($fixture['user'])->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->assertRedirect($canonicalUrl);
+        $this->get($canonicalUrl)->assertOk()
+            ->assertViewIs('admin.cuti.show')
+            ->assertViewHas('canAct', true)
+            ->assertSee(route('cuti.approve', $fixture['leave']), false);
+    }
+
     public function test_duty_postponement_pimpinan_route_records_terminal_workflow(): void
     {
         $fixture = $this->dutyPostponementFixture();
@@ -36,7 +50,7 @@ class PimpinanLeaveDecisionTest extends TestCase
                 'revision_version' => $fixture['leave']->fresh()->revision_version,
                 'alasan' => 'Penugasan mendesak mewakili instansi.',
             ])
-            ->assertRedirect(route('pimpinan.cuti.show', $fixture['leave']))
+            ->assertRedirect(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertSessionHas('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
 
         $this->assertDatabaseHas('leave_requests', ['id' => $fixture['leave']->id, 'status' => LeaveRequest::STATUS_DUTY_POSTPONED]);
@@ -107,37 +121,38 @@ class PimpinanLeaveDecisionTest extends TestCase
         $fixture = $this->dutyPostponementFixture();
 
         $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSee('Ditangguhkan')
             ->assertDontSee('Tunda Sementara')
             ->assertSee('Tangguhkan karena Tugas Dinas')
-            ->assertSee(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), false)
+            ->assertSee(route('cuti.penangguhan-tugas-dinas', $fixture['leave']), false)
             ->assertSee('name="alasan"', false)
             ->assertSee('minlength="5"', false)
             ->assertSee('maxlength="500"', false)
             ->assertSee('Konfirmasi Penangguhan Tugas Dinas')
-            ->assertSee('openDutyPostponement($event)', false)
-            ->assertSee('closeDutyPostponement()', false)
-            ->assertSee("document.getElementById('pimpinan-duty-postponement-reason')?.focus()", false)
-            ->assertSee('dutyPostponementTrigger?.focus()', false)
-            ->assertSee('aria-describedby="pimpinan-duty-postponement-description"', false)
-            ->assertSee('id="pimpinan-decision-approved"', false)
-            ->assertSee('aria-describedby="pimpinan-decision-note-help"', false)
+            ->assertSee("open('dutyPostponement', \$event)", false)
+            ->assertSee('close()', false)
+            ->assertSee("key === 'dutyPostponement' ? 'alasan-duty-postponement'", false)
+            ->assertSee('lastTrigger?.focus()', false)
+            ->assertSee('aria-describedby="decision-description-duty-postponement"', false)
+            ->assertSee('id="komentar-approve"', false)
+            ->assertSee('for="komentar-approve"', false)
+            ->assertSee('aria-describedby="approve-confirmation-description"', false)
             ->assertDontSee('value="PERUBAHAN"', false)
             ->assertDontSee('Minta Perubahan')
             ->assertDontSee('memilih Perubahan');
 
         $fixture['leave']->forceFill(['status' => LeaveRequest::STATUS_CANCELLATION_PENDING])->save();
         $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSee('Menunggu Keputusan Pembatalan')
             ->assertDontSee('Status tidak tersedia');
 
         $fixture['leave']->forceFill(['status' => LeaveRequest::STATUS_CANCELLED])->save();
         $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSee('Dibatalkan')
             ->assertDontSee('Status tidak tersedia');
@@ -145,9 +160,9 @@ class PimpinanLeaveDecisionTest extends TestCase
         $other = Employee::factory()->create();
         $otherUser = User::factory()->pimpinan()->create(['employee_id' => $other->id]);
         $this->actingAs($otherUser)
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
-            ->assertDontSee(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
+            ->assertDontSee(route('cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
     }
 
     public function test_duty_postponement_pimpinan_detail_hides_action_for_non_annual_and_renders_terminal_history(): void
@@ -163,11 +178,11 @@ class PimpinanLeaveDecisionTest extends TestCase
         $fixture['leave']->forceFill(['jenis_cuti_id' => $sickType->id])->save();
 
         $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSee('Ditangguhkan')
             ->assertDontSee('Tunda Sementara')
-            ->assertDontSee(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
+            ->assertDontSee(route('cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
 
         $fixture['leave']->forceFill(['jenis_cuti_id' => $annualTypeId])->save();
         $this->actingAs($fixture['user'])
@@ -178,23 +193,24 @@ class PimpinanLeaveDecisionTest extends TestCase
             ]);
 
         $response = $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSeeInOrder([
-                'Timeline Persetujuan',
+                'Alur Persetujuan Cuti',
                 'Tahap 1 · PYBMC',
-                $fixture['approver']->nama_lengkap,
                 'Ditangguhkan karena Tugas Dinas',
+                $fixture['approver']->nama_lengkap,
                 'Tahap 2 · Kepala Lembaga',
                 'Dilewati',
                 'Dilewati karena penangguhan tugas dinas menutup pengajuan.',
-                'Riwayat Tindakan Resmi',
-                'Tahap 1 · '.$fixture['approver']->nama_lengkap,
+                'Riwayat Tindakan Approval',
                 'Ditangguhkan karena Tugas Dinas',
+                $fixture['approver']->nama_lengkap,
+                '- Tahap 1 (PYBMC)',
             ])
             ->assertDontSee('ditangguhkan_tugas_dinas')
             ->assertDontSee('duty_postponement_terminal')
-            ->assertDontSee(route('pimpinan.cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
+            ->assertDontSee(route('cuti.penangguhan-tugas-dinas', $fixture['leave']), false);
     }
 
     public function test_duty_postponement_pimpinan_detail_localizes_other_skipped_reasons(): void
@@ -206,10 +222,10 @@ class PimpinanLeaveDecisionTest extends TestCase
         $fixture['leave']->forceFill(['status' => 'tidak_disetujui'])->save();
 
         $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']))
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSeeInOrder([
-                'Timeline Persetujuan',
+                'Alur Persetujuan Cuti',
                 'Tahap 1 · PYBMC',
                 'Dilewati karena alur persetujuan telah ditutup.',
                 'Tahap 2 · Kepala Lembaga',
@@ -232,12 +248,12 @@ class PimpinanLeaveDecisionTest extends TestCase
                 'alasan' => 'abcd',
             ])
             ->assertOk()
-            ->assertSee('dutyPostponementOpen: true', false)
+            ->assertSee("decisionForm: 'dutyPostponement'", false)
             ->assertSee('Alasan tugas dinas minimal berisi 5 karakter.')
             ->assertSee('aria-invalid="true"', false)
             ->assertSee('data-error-autofocus="true"', false)
-            ->assertSee("document.getElementById('pimpinan-duty-postponement-reason')?.focus()", false)
-            ->assertSee('confirmOpen: false', false);
+            ->assertSee("document.getElementById('alasan-duty-postponement')?.focus()", false)
+            ->assertDontSee("decisionForm: 'approve'", false);
     }
 
     public function test_duty_postponement_pimpinan_detail_uses_neutral_fallbacks_for_unknown_step_and_action(): void
@@ -255,19 +271,20 @@ class PimpinanLeaveDecisionTest extends TestCase
         ]);
 
         $response = $this->actingAs($fixture['user'])
-            ->get(route('pimpinan.cuti.show', $fixture['leave']));
+            ->get(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'pimpinan']));
 
         $response->assertOk()
             ->assertSeeInOrder([
-                'Timeline Persetujuan',
+                'Alur Persetujuan Cuti',
                 'Tahap 1 · PYBMC',
-                $fixture['approver']->nama_lengkap,
                 'Status tidak tersedia',
+                $fixture['approver']->nama_lengkap,
             ])
             ->assertSeeInOrder([
-                'Riwayat Tindakan Resmi',
-                'Tahap 1 · '.$fixture['approver']->nama_lengkap,
+                'Riwayat Tindakan Approval',
                 'Tindakan tidak dikenal',
+                $fixture['approver']->nama_lengkap,
+                '- Tahap 1 (PYBMC)',
             ])
             ->assertDontSee('step_rahasia_pimpinan')
             ->assertDontSee('ACTION_RAHASIA_PIMPINAN');
@@ -311,7 +328,7 @@ class PimpinanLeaveDecisionTest extends TestCase
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
-            ->assertRedirect(route('pimpinan.cuti.show', $leave))
+            ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']))
             ->assertSessionHas('success', 'Pengajuan cuti berhasil disetujui.');
 
         $this->assertDatabaseHas('leave_requests', [
@@ -373,7 +390,7 @@ class PimpinanLeaveDecisionTest extends TestCase
                 'keputusan' => 'TIDAK_DISETUJUI',
                 'catatan' => 'Dokumen pendukung tidak sesuai.',
             ])
-            ->assertRedirect(route('pimpinan.cuti.show', $leave));
+            ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']));
 
         $this->assertDatabaseHas('leave_requests', ['id' => $leave->id, 'status' => 'tidak_disetujui']);
         $this->assertDatabaseHas('leave_request_steps', [
@@ -392,6 +409,12 @@ class PimpinanLeaveDecisionTest extends TestCase
     public function test_leave_detail_uses_the_actual_request_and_active_approval_step(): void
     {
         $pemohon = Employee::factory()->create(['nama_lengkap' => 'Pegawai Cuti Aktual']);
+        // Preview kanonis memerlukan TMT yang membuktikan masa kerja sebelum menampilkan hak tahunan.
+        Appointment::create([
+            'employee_id' => $pemohon->id,
+            'jenis_pengangkatan' => 'PNS',
+            'tmt_pengangkatan' => '2020-01-01',
+        ]);
         $approver = Employee::factory()->create();
         $pimpinan = User::factory()->pimpinan()->create(['employee_id' => $approver->id]);
         $jenisCuti = RefJenisCuti::create([
@@ -425,15 +448,22 @@ class PimpinanLeaveDecisionTest extends TestCase
             'carry_over' => 0,
             'terpakai' => 3,
             'sisa' => 9,
+            'sisa_n2' => 0,
+            'sisa_n1' => 0,
+            'sisa_tahun_berjalan' => 9,
+            'terpakai_tahun_berjalan' => 3,
+            'hangus' => 0,
         ]);
 
         $this->actingAs($pimpinan)
-            ->get(route('pimpinan.cuti.show', $leave))
+            ->get(route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']))
             ->assertOk()
             ->assertSee('Pegawai Cuti Aktual')
             ->assertSee('Cuti Sakit')
+            ->assertViewHas('verifierContext', fn (array $context): bool => $context['balance']['eligible']
+                && $context['balance']['saldo_dapat_diajukan'] === 9)
             ->assertSee('9 Hari')
-            ->assertSee(route('pimpinan.cuti.decision', $leave), false);
+            ->assertSee(route('cuti.approve', $leave), false);
     }
 
     public function test_leave_index_lists_real_requests_and_links_to_the_request_detail(): void
@@ -484,7 +514,7 @@ class PimpinanLeaveDecisionTest extends TestCase
 
     public function test_leave_index_renders_tahap_aktif_role_label_and_dash_for_terminal_request(): void
     {
-        $pimpinan = User::factory()->pimpinan()->create();
+        $pimpinan = User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]);
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Kontrak Kolom Tahap Pimpinan',
             'code' => 'cuti_kontrak_kolom_tahap_pimpinan',
@@ -533,7 +563,7 @@ class PimpinanLeaveDecisionTest extends TestCase
 
     public function test_terminal_leave_index_row_exposes_a_null_current_step_label_without_active_step_alias(): void
     {
-        $pimpinan = User::factory()->pimpinan()->create();
+        $pimpinan = User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]);
         $jenisCuti = RefJenisCuti::create([
             'nama' => 'Cuti Kontrak Terminal Pimpinan',
             'code' => 'cuti_kontrak_terminal_pimpinan',
@@ -562,7 +592,7 @@ class PimpinanLeaveDecisionTest extends TestCase
 
     public function test_leave_index_has_a_tahap_aktif_column(): void
     {
-        $response = $this->actingAs(User::factory()->pimpinan()->create())
+        $response = $this->actingAs(User::factory()->pimpinan()->create(['employee_id' => Employee::factory()->create()->id]))
             ->get(route('pimpinan.cuti.index'));
 
         $response->assertOk();

@@ -488,7 +488,9 @@ class LeaveApprovalUsageConcurrencyTest extends TestCase
             'role' => 'pimpinan',
             'employee_id' => $approver->id,
         ]);
-        $admin = User::factory()->adminKepegawaian()->create();
+        $admin = User::factory()->adminKepegawaian()->create([
+            'employee_id' => Employee::factory()->create()->id,
+        ]);
         $this->recordHistoricalAnnualUsage(
             $pemohon,
             [2024 => 0, 2025 => 0, 2026 => 0],

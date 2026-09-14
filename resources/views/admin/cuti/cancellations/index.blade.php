@@ -2,6 +2,7 @@
     @php
         $selectedStatus = $filters['status'] ?? 'pending';
         $perPage = (int) ($filters['per_page'] ?? 10);
+        $returnFilters = \Illuminate\Support\Arr::only(request()->query(), ['status', 'per_page', 'page']);
     @endphp
 
     <div
@@ -95,7 +96,7 @@
                                         {{ $leaveRequest?->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}
                                     </p>
                                     @if($leaveRequest !== null)
-                                        <a href="{{ route('cuti.show', $leaveRequest) }}" wire:navigate class="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-primary hover:underline">Lihat Pengajuan</a>
+                                        <a href="{{ route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'cancellations', 'return' => $returnFilters]) }}" wire:navigate class="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-primary hover:underline">Lihat Pengajuan</a>
                                     @endif
                                 </x-ui.table-td>
                                 <x-ui.table-td class="max-w-sm break-words whitespace-normal">{{ $cancellation->reason }}</x-ui.table-td>
@@ -157,7 +158,7 @@
                                     {{ $leaveRequest?->tanggal_mulai?->translatedFormat('d M Y') ?? '-' }}–{{ $leaveRequest?->tanggal_selesai?->translatedFormat('d M Y') ?? '-' }}
                                 </dd>
                                 @if($leaveRequest !== null)
-                                    <a href="{{ route('cuti.show', $leaveRequest) }}" wire:navigate class="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-primary hover:underline">Lihat Pengajuan</a>
+                                    <a href="{{ route('cuti.show', ['id' => $leaveRequest->id, 'from' => 'cancellations', 'return' => $returnFilters]) }}" wire:navigate class="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-primary hover:underline">Lihat Pengajuan</a>
                                 @endif
                             </div>
                             <div>

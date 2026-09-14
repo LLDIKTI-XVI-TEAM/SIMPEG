@@ -40,7 +40,7 @@ class KepalaBagianLeaveDecisionController extends Controller
             'TIDAK_DISETUJUI' => 'Pengajuan cuti tidak disetujui dan pemohon telah diberi tahu.',
         };
 
-        return redirect()->route('kepala-bagian.cuti.show', $leave)->with('success', $message);
+        return redirect()->route('cuti.show', ['id' => $leave->id, 'from' => 'bawahan'])->with('success', $message);
     }
 
     /** Menjaga scope bawahan sebelum Action memverifikasi approver snapshot di bawah lock. */
@@ -58,7 +58,7 @@ class KepalaBagianLeaveDecisionController extends Controller
         $payload = $request->validated();
         $action->execute($leave, $actor, $user, $payload['active_step_id'], $payload['revision_version'], $payload['alasan']);
 
-        return redirect()->route('kepala-bagian.cuti.show', $leave)
+        return redirect()->route('cuti.show', ['id' => $leave->id, 'from' => 'bawahan'])
             ->with('success', 'Cuti Tahunan ditangguhkan karena tugas dinas dan hak terkait telah dilindungi untuk satu tahun berikutnya.');
     }
 }

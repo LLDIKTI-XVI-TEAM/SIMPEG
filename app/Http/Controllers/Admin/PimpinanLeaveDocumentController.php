@@ -12,14 +12,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PimpinanLeaveDocumentController extends Controller
 {
-    public function show(LeaveRequest $leave, DownloadStoredLeaveProofAction $action): StreamedResponse
+    public function show(Request $request, LeaveRequest $leave, DownloadStoredLeaveProofAction $action): StreamedResponse
     {
-        return $action->execute($leave, true);
+        return $action->forActor($leave, $request->user(), true);
     }
 
-    public function download(LeaveRequest $leave, DownloadStoredLeaveProofAction $action): StreamedResponse
+    public function download(Request $request, LeaveRequest $leave, DownloadStoredLeaveProofAction $action): StreamedResponse
     {
-        return $action->execute($leave, false);
+        return $action->forActor($leave, $request->user(), false);
     }
 
     public function downloadAttachment(LeaveRequest $leave, Request $request, DownloadLeaveAttachmentAction $action): StreamedResponse

@@ -428,7 +428,9 @@ class CutiFormulirPdfTest extends TestCase
         $action = app(DownloadOfficialLeavePdfAction::class);
         $fixture = $this->makeOfficialFormFixture();
         $leaveRequest = $fixture['leave_request'];
-        $readAllViewer = User::factory()->adminKepegawaian()->create();
+        $readAllViewer = User::factory()->adminKepegawaian()->create([
+            'employee_id' => Employee::factory()->create()->id,
+        ]);
         $unrelated = $this->makeUnrelatedUser();
         $nonFinalFixture = $this->makeOfficialFormFixture(true, '198601012026041002', str_repeat('b', 64));
         $nonFinalFixture['leave_request']->update(['status' => 'menunggu_approval']);

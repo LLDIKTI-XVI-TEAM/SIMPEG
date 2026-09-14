@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Permission;
+use App\Models\PositionHistory;
 use App\Models\RefJenisCuti;
+use App\Models\RefUnitKerja;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
@@ -423,6 +425,70 @@ class CutiListDisplayTest extends TestCase
         $this->assertMatchesRegularExpression('/<th\b[^>]*>\s*Unit Kerja\s*<\/th>/s', $content);
     }
 
+    public function test_monitoring_memfilter_unit_riwayat_terkini_bukan_snapshot_jabatan(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+        $jenis = RefJenisCuti::create(['nama' => 'Cuti Uji Unit Monitoring']);
+        $target = RefUnitKerja::create(['nama' => 'Unit Monitoring Target']);
+        $other = RefUnitKerja::create(['nama' => 'Unit Monitoring Lain']);
+        $historical = RefUnitKerja::create(['nama' => 'Unit Monitoring Historis']);
+        $samePositionTarget = Employee::factory()->create(['jabatan_terakhir' => 'Analis Sama']);
+        $samePositionOther = Employee::factory()->create(['jabatan_terakhir' => 'Analis Sama']);
+        $differentPositionTarget = Employee::factory()->create(['jabatan_terakhir' => 'Analis Berbeda']);
+        $withoutUnit = Employee::factory()->create(['jabatan_terakhir' => 'Jabatan Bukan Unit']);
+
+        foreach ([[$samePositionTarget, $target], [$samePositionOther, $other], [$differentPositionTarget, $target]] as [$employee, $unit]) {
+            PositionHistory::create([
+                'employee_id' => $employee->id,
+                'nama_jabatan' => $employee->jabatan_terakhir,
+                'unit_kerja_id' => $unit->id,
+                'tmt_jabatan' => '2026-01-01',
+                'is_latest' => true,
+            ]);
+        }
+        // TMT lebih baru tanpa penanda terkini tidak boleh menjadi sumber unit monitoring.
+        PositionHistory::create([
+            'employee_id' => $samePositionTarget->id,
+            'nama_jabatan' => 'Jabatan Historis',
+            'unit_kerja_id' => $historical->id,
+            'tmt_jabatan' => '2030-01-01',
+            'is_latest' => false,
+        ]);
+        $first = $this->createLeave($samePositionTarget, $jenis, 'Unit target satu', 'menunggu_approval');
+        $this->createLeave($samePositionOther, $jenis, 'Unit lain', 'disetujui');
+        $second = $this->createLeave($differentPositionTarget, $jenis, 'Unit target dua', 'menunggu_approval');
+        $missing = $this->createLeave($withoutUnit, $jenis, 'Belum memiliki unit', 'disetujui');
+
+        $response = $this->actingAs($user)->get(route('cuti', ['unit' => $target->id]))->assertOk();
+        $this->assertEqualsCanonicalizing(
+            [$first->id, $second->id],
+            $response->viewData('riwayatCuti')->pluck('id')->all(),
+        );
+        $this->assertSame(['Unit Monitoring Target'], $response->viewData('riwayatCuti')->pluck('unit')->unique()->values()->all());
+        $this->assertSame(
+            [$target->id => 'Unit Monitoring Target', $other->id => 'Unit Monitoring Lain'],
+            $response->viewData('optUnits')->all(),
+        );
+        $response->assertViewHas('totalPengajuan', 4)
+            ->assertViewHas('jumlahMenunggu', 2)
+            ->assertViewHas('jumlahDisetujui', 2)
+            ->assertSee('value="'.$target->id.'" selected', false)
+            ->assertDontSee('Unit Monitoring Historis');
+
+        $all = $this->get(route('cuti'))->assertOk();
+        $this->assertSame('-', $all->viewData('riwayatCuti')->firstWhere('id', $missing->id)['unit']);
+        $this->get(route('cuti', ['unit' => $historical->id]))->assertOk()
+            ->assertViewHas('riwayatCuti', fn ($rows): bool => $rows->isEmpty());
+    }
+
+    public function test_monitoring_menolak_filter_unit_malformed_sebelum_query_uuid(): void
+    {
+        $user = User::factory()->adminKepegawaian()->create();
+
+        $this->actingAs($user)->get(route('cuti', ['unit' => 'bukan-uuid']))->assertNotFound();
+        $this->get(route('cuti', ['unit' => ['bukan-uuid']]))->assertNotFound();
+    }
+
     public function test_super_admin_tidak_melihat_cta_pengajuan_cuti(): void
     {
         $user = User::factory()->superAdmin()->create();
@@ -505,17 +571,18 @@ class CutiListDisplayTest extends TestCase
             ->assertOk()->assertSee('Ditangguhkan (Administratif)')->assertDontSee($reason)
             ->assertViewHas('totalDitangguhkan', 1)->assertViewHas('menungguTindakanSaya', 0)
             ->assertViewHas('leaves', fn ($rows): bool => $rows->total() === 1 && $rows->first()->id === $leave->id);
-        $this->get(route('pimpinan.cuti.show', $leave))->assertOk()
+        $canonicalUrl = route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']);
+        $this->get(route('pimpinan.cuti.show', $leave))->assertRedirect($canonicalUrl);
+        $this->get($canonicalUrl)->assertOk()->assertViewIs('admin.cuti.show')
             ->assertSee('Ditangguhkan (Administratif)')->assertDontSee($reason);
 
         $this->actingAs($admin)->get(route('dashboard'))->assertOk()
             ->assertViewHas('cutiDitangguhkan', 1)->assertViewHas('cutiMenunggu', 0);
     }
 
-    public function test_simulated_pegawai_is_scoped_to_own_leave_even_when_read_all_granted(): void
+    public function test_switch_role_mempertahankan_scope_identitas_dan_filter_own_mempersempit_daftar(): void
     {
-        // Pegawai sengaja diberi cuti.read_all (salah konfigurasi) untuk memastikan pengaman
-        // scope data-milik-sendiri memakai role efektif, bukan role asli penyerang.
+        // Grant efektif membuka monitoring, sedangkan Switch Role mempertahankan scope identitas asli.
         $pegawaiRole = Role::where('name', 'pegawai')->firstOrFail();
         $readAll = Permission::where('name', 'cuti.read_all')->firstOrFail();
         $pegawaiRole->permissions()->syncWithoutDetaching([$readAll->id]);
@@ -538,7 +605,7 @@ class CutiListDisplayTest extends TestCase
             'alasan' => 'Cuti milik sendiri',
             'status' => 'menunggu_approval',
         ]);
-        LeaveRequest::create([
+        $otherLeave = LeaveRequest::create([
             'employee_id' => $otherEmployee->id,
             'jenis_cuti_id' => $jenis->id,
             'tanggal_mulai' => '2026-08-03',
@@ -559,9 +626,18 @@ class CutiListDisplayTest extends TestCase
         $response = $this->actingAs($user)->get(route('cuti'));
         $response->assertOk();
 
-        // Scope data-milik-sendiri harus tetap membatasi ke cuti milik sendiri.
+        // Identitas Super Admin tetap global; filter own hanya mempersempit ke pengajuan sendiri.
         $riwayat = $response->viewData('riwayatCuti');
-        $this->assertSame(1, $riwayat->total());
-        $this->assertSame($ownLeave->id, $riwayat->getCollection()->first()['id']);
+        $this->assertSame(2, $riwayat->total());
+        $this->assertEqualsCanonicalizing(
+            [$ownLeave->id, $otherLeave->id],
+            $riwayat->getCollection()->pluck('id')->all(),
+        );
+
+        $this->get(route('cuti', ['scope' => 'own']))
+            ->assertOk()
+            ->assertViewHas('riwayatCuti', fn ($rows): bool => $rows->total() === 1 && $rows->first()['id'] === $ownLeave->id)
+            ->assertViewHas('totalPengajuan', 1)
+            ->assertDontSee('Cuti pegawai lain');
     }
 }

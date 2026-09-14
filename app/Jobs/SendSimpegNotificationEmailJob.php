@@ -6,9 +6,11 @@ use App\Mail\SimpegNotificationMail;
 use App\Models\Employee;
 use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
+use App\Models\User;
 use App\Services\LeaveApprovalService;
 use App\Services\Notifications\NotificationChannelResolver;
 use App\Services\Notifications\NotificationEventCatalog;
+use App\Services\Notifications\NotificationRecipientResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,6 +46,7 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
     public function handle(
         NotificationEventCatalog $catalog,
         NotificationChannelResolver $channels,
+        NotificationRecipientResolver $recipients,
     ): void {
         // Job tertunda harus menghormati kill-switch terbaru, bukan snapshot kebijakan saat enqueue.
         if (! $catalog->supportsChannel($this->eventKey, 'email')
@@ -74,14 +77,26 @@ class SendSimpegNotificationEmailJob implements ShouldQueue
             return;
         }
 
-        // Admin lain mungkin sudah memutus permohonan sebelum email dalam antrean sempat dikirim.
-        if ($this->eventKey === 'cuti.pembatalan_diajukan'
-            && ! LeaveCancellationRequest::query()
+        // Izin, binding, scope, dan status workflow dapat berubah setelah email masuk antrean.
+        if ($this->eventKey === 'cuti.pembatalan_diajukan') {
+            $cancellation = LeaveCancellationRequest::query()
+                ->with('leaveRequest:id,employee_id,status')
                 ->whereKey($this->data['leave_cancellation_request_id'] ?? null)
                 ->where('leave_request_id', $this->data['leave_request_id'] ?? null)
                 ->where('status', LeaveCancellationRequest::STATUS_PENDING)
-                ->exists()) {
-            return;
+                ->first(['id', 'leave_request_id']);
+            $leave = $cancellation?->leaveRequest;
+
+            if ($leave === null || $leave->status !== LeaveRequest::STATUS_CANCELLATION_PENDING) {
+                return;
+            }
+
+            // Email ditujukan ke Employee; mapping tunggal diperlukan untuk memeriksa otorisasi akun penerima.
+            $recipientUsers = User::query()->where('employee_id', $this->employeeId)->limit(2)->get(['id']);
+            if ($recipientUsers->count() !== 1
+                || ! $recipients->canReceiveCancellationDecision($recipientUsers->sole(), $leave)) {
+                return;
+            }
         }
 
         $employee = Employee::find($this->employeeId);

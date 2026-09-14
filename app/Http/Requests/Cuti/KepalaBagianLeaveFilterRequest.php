@@ -8,11 +8,13 @@ use Illuminate\Validation\Rule;
 
 class KepalaBagianLeaveFilterRequest extends FormRequest
 {
+    /** Scope bawahan melengkapi grant monitoring, bukan menggantikan permission efektif. */
     public function authorize(): bool
     {
-        return $this->user()?->getEffectiveRole() === 'kepala_bagian';
+        return $this->user()?->hasPermission('cuti.read_all') === true;
     }
 
+    /** Filter hanya mempersempit query bawahan efektif dan memakai pagination server. */
     public function rules(): array
     {
         return [

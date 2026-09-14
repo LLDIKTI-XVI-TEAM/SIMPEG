@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Actions\Cuti\DecideLeaveCancellationAction;
+use App\Actions\Cuti\RequestLeaveCancellationAction;
 use App\Models\AuditLog;
 use App\Models\Employee;
 use App\Models\LeaveBalance;
@@ -10,7 +11,9 @@ use App\Models\LeaveBalanceReservationEvent;
 use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
 use App\Models\SimpegNotification;
 use App\Models\User;
 use App\Services\LeaveApprovalService;
@@ -21,6 +24,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
 class LeaveCancellationWorkflowTest extends TestCase
@@ -90,7 +94,7 @@ class LeaveCancellationWorkflowTest extends TestCase
             ->get(route('cuti.show', $leave))
             ->assertOk()
             ->assertSee('Menunggu Keputusan Pembatalan', false)
-            ->assertSee('Proses persetujuan pengajuan ditahan sampai keputusan Admin Kepegawaian.')
+            ->assertSee('Proses persetujuan pengajuan ditahan sampai keputusan pengelola pembatalan.')
             ->assertDontSee('animate-pulse', false)
             ->assertSee($cancellation->reason, false);
 
@@ -127,6 +131,52 @@ class LeaveCancellationWorkflowTest extends TestCase
             ->assertViewHas('latestCancellation', fn (LeaveCancellationRequest $item): bool => $item->is($pending))
             ->assertSee($pending->reason)
             ->assertDontSee($rejected->reason);
+    }
+
+    public function test_owner_dapat_meminta_pembatalan_saat_checkbox_cuti_create_off_tanpa_membuka_pengajuan_asing(): void
+    {
+        Queue::fake();
+        $fixture = $this->makeLeaveFixture();
+        Role::query()->where('name', 'pegawai')->sole()->permissions()
+            ->detach(Permission::query()->where('name', 'cuti.create')->sole()->id);
+
+        $this->actingAs($fixture['otherUser'])
+            ->postJson(route('cuti.cancellations.store', $fixture['leave']), ['reason' => 'Bukan pengajuan saya.'])
+            ->assertForbidden();
+        $this->assertDatabaseCount('leave_cancellation_requests', 0);
+        $this->actingAs($fixture['ownerUser'])
+            ->get(route('cuti.show', $fixture['leave']))
+            ->assertOk()
+            ->assertSee('id="cancellation-reason"', false);
+        $this->actingAs($fixture['ownerUser'])
+            ->post(route('cuti.cancellations.store', $fixture['leave']), ['reason' => 'Ada perubahan kebutuhan.'])
+            ->assertRedirect(route('cuti.show', $fixture['leave']));
+
+        $this->assertDatabaseCount('leave_cancellation_requests', 1);
+        $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $fixture['leave']->fresh()->status);
+        $this->assertSame(5, $this->reservationAmount($fixture['leave']));
+    }
+
+    public function test_action_permohonan_menolak_binding_owner_nonaktif_sebelum_hold_dan_audit(): void
+    {
+        Queue::fake();
+        $fixture = $this->makeLeaveFixture();
+        $fixture['ownerEmployee']->update(['status_aktif' => 'Nonaktif']);
+        $request = Request::create('/dashboard/cuti/'.$fixture['leave']->id.'/pembatalan', 'POST');
+        $request->setUserResolver(fn () => $fixture['ownerUser']);
+
+        try {
+            app(RequestLeaveCancellationAction::class)->execute($fixture['leave'], $fixture['ownerUser'], 'Pemohon sudah nonaktif.', $request);
+            $this->fail('Action permohonan harus memeriksa lifecycle owner sebelum menahan workflow.');
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $this->assertDatabaseCount('leave_cancellation_requests', 0);
+        $this->assertDatabaseMissing('audit_logs', ['event' => 'LEAVE_CANCELLATION_REQUESTED']);
+        $this->assertSame('menunggu_approval', $fixture['leave']->fresh()->status);
+        $this->assertSame(5, $this->reservationAmount($fixture['leave']));
+        Queue::assertNothingPushed();
     }
 
     public function test_cancellation_rejects_non_owner_final_request_and_duplicate_pending_request_without_mutation(): void
@@ -279,7 +329,7 @@ class LeaveCancellationWorkflowTest extends TestCase
             ->assertDontSee('window.confirm', false)
             ->assertSee('x-bind:disabled="submitting"', false)
             ->assertSee('grid grid-cols-1 gap-3 sm:grid-cols-2', false)
-            ->assertSee('href="'.route('cuti.show', $fixture['leave']).'"', false)
+            ->assertSee('href="'.e(route('cuti.show', ['id' => $fixture['leave']->id, 'from' => 'cancellations'])).'"', false)
             ->assertViewHas('cancellations', function ($items) use ($oldestCancellation): bool {
                 return $items->total() === 11
                     && $items->first()?->id === $oldestCancellation->id
@@ -341,7 +391,7 @@ class LeaveCancellationWorkflowTest extends TestCase
             ->assertSee($cancellation->reason, false);
     }
 
-    public function test_decision_action_rechecks_admin_role_and_permission_before_mutation(): void
+    public function test_decision_action_rechecks_permission_before_mutation(): void
     {
         $fixture = $this->makeLeaveFixture();
         $cancellation = $this->createPendingCancellation($fixture['leave'], $fixture['ownerUser']);
@@ -355,7 +405,7 @@ class LeaveCancellationWorkflowTest extends TestCase
                 'DISETUJUI',
                 $request,
             );
-            $this->fail('Action keputusan pembatalan harus memeriksa ulang role dan permission Admin Kepegawaian.');
+            $this->fail('Action keputusan pembatalan harus memeriksa ulang permission pengelola.');
         } catch (AuthorizationException) {
             $this->assertSame(LeaveCancellationRequest::STATUS_PENDING, $cancellation->fresh()->status);
             $this->assertSame(LeaveRequest::STATUS_CANCELLATION_PENDING, $fixture['leave']->fresh()->status);

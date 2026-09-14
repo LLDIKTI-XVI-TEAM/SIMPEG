@@ -1,4 +1,10 @@
 <x-layouts.app title="Cuti Bawahan" subtitle="Daftar seluruh permohonan cuti dari bawahan langsung Anda.">
+    @php
+        $returnFilters = \Illuminate\Support\Arr::only(request()->query(), ['search', 'status', 'jenis_cuti_id', 'tahun', 'bulan', 'per_page', 'page']);
+        if (array_key_exists('status', $returnFilters) && $returnFilters['status'] === null) {
+            $returnFilters['status'] = 'all';
+        }
+    @endphp
     
     {{-- PAGE HEADER --}}
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -112,15 +118,15 @@
                         <x-ui.table-td padding="comfortable">
                             <div class="flex items-center gap-3">
                                 <x-ui.tooltip text="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}" position="right">
-                                    <a href="{{ route('kepala-bagian.cuti.show', $leave) }}"
+                                    <a href="{{ route('cuti.show', ['id' => $leave->id, 'from' => 'bawahan', 'return' => $returnFilters]) }}"
                                         class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary/10 text-xs font-bold text-primary transition-colors hover:border-primary hover:ring-2 hover:ring-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                        aria-label="Buka detail profil {{ $leave->employee?->nama_lengkap ?? '' }}">
+                                        aria-label="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? '' }}">
                                         <span>{{ substr($leave->employee?->nama_lengkap ?? '?', 0, 1) }}</span>
                                     </a>
                                 </x-ui.tooltip>
                                 <div class="min-w-0">
                                     <x-ui.tooltip text="Buka detail pengajuan cuti {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}" position="right">
-                                        <a href="{{ route('kepala-bagian.cuti.show', $leave) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">
+                                        <a href="{{ route('cuti.show', ['id' => $leave->id, 'from' => 'bawahan', 'return' => $returnFilters]) }}" class="block truncate text-sm font-semibold text-ink transition-colors hover:text-primary focus:outline-none rounded leading-tight">
                                             {{ $leave->employee?->nama_lengkap ?? 'Pegawai tidak tersedia' }}
                                         </a>
                                     </x-ui.tooltip>
@@ -151,7 +157,7 @@
                         <!-- AKSI -->
                         <x-ui.table-td align="right" padding="comfortable">
                             <div class="flex items-center justify-end gap-1.5">
-                                <x-ui.button as="a" href="{{ route('kepala-bagian.cuti.show', $leave) }}" variant="secondary" size="compact-icon" title="Lihat Detail" tooltip-position="top-end">
+                                <x-ui.button as="a" :href="route('cuti.show', ['id' => $leave->id, 'from' => 'bawahan', 'return' => $returnFilters])" variant="secondary" size="compact-icon" title="Lihat Detail" tooltip-position="top-end">
                                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path>
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -169,7 +175,7 @@
                     <x-ui.table-row>
                         <x-ui.table-td colspan="6" align="center" class="px-6 py-8 text-muted text-sm">
                             @if(($filters['status'] ?? '') === 'menunggu_approval')
-                                Tidak ada pengajuan Cuti yang menunggu tindakan Anda.
+                                Tidak ada pengajuan cuti bawahan yang menunggu keputusan.
                             @else
                                 Belum ada pengajuan cuti bawahan yang sesuai dengan filter.
                             @endif

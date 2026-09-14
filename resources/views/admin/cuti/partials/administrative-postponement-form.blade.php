@@ -7,7 +7,7 @@
 
         <x-ui.modal show="administrativeOpen" title="Tangguhkan Cuti secara Administratif" title-id="administrative-confirm-title"
             description-id="administrative-confirm-description" max-width="lg" header-class="[&_button]:min-h-11 [&_button]:min-w-11" close-action="if (!submitting) administrativeOpen = false">
-            <form method="POST" action="{{ route('cuti.penangguhan-administratif', $cuti) }}" class="space-y-4"
+            <form method="POST" action="{{ route('cuti.penangguhan-administratif', ['leaveRequest' => $cuti->id, ...$decisionReturnParameters]) }}" class="space-y-4"
                 @submit="if (submitting) { $event.preventDefault(); return; } submitting = true">
                 @csrf
                 <dl id="administrative-target-summary" class="space-y-2 rounded-lg border border-border bg-soft p-3 text-sm">

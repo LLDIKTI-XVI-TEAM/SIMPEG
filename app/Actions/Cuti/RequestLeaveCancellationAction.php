@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cuti;
 
+use App\Models\Employee;
 use App\Models\LeaveCancellationRequest;
 use App\Models\LeaveRequest;
 use App\Models\User;
@@ -28,7 +29,10 @@ class RequestLeaveCancellationAction
                 // Request utama selalu dikunci lebih dahulu agar pembatalan tidak berlomba dengan keputusan approver.
                 $locked = LeaveRequest::query()->whereKey($leaveRequest->id)->lockForUpdate()->firstOrFail();
 
-                if ($actor->employee_id === null || $actor->employee_id !== $locked->employee_id) {
+                // Ownership tetap PATEN, tetapi status nonaktif tidak boleh membuat hold lewat caller internal.
+                if ($actor->employee_id === null
+                    || $actor->employee_id !== $locked->employee_id
+                    || ! Employee::query()->whereKey($actor->employee_id)->whereActiveStatus()->exists()) {
                     abort(403, 'Anda tidak berwenang meminta pembatalan pengajuan cuti ini.');
                 }
 
@@ -88,7 +92,7 @@ class RequestLeaveCancellationAction
         }
 
         // Query penerima dan pengiriman dikerjakan setelah commit agar notifikasi tidak merujuk workflow yang rollback.
-        foreach ($this->recipients->cancellationDecisionRecipients() as $recipient) {
+        foreach ($this->recipients->cancellationDecisionRecipients($leaveRequest->refresh()) as $recipient) {
             $this->notifications->createForEmployee(
                 $recipient,
                 'cuti.pembatalan_diajukan',

@@ -8,6 +8,7 @@ use App\Models\LeaveRequestStep;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\Cuti\LeaveBalanceReservationService;
+use App\Services\Cuti\LeaveCancellationAccess;
 use App\Services\Cuti\LeaveUsageOverlapService;
 use App\Services\NotificationService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -22,6 +23,7 @@ final class DecideLeaveCancellationAction
         private readonly LeaveBalanceReservationService $reservations,
         private readonly LeaveUsageOverlapService $overlap,
         private readonly NotificationService $notifications,
+        private readonly LeaveCancellationAccess $access,
     ) {}
 
     public function execute(
@@ -34,7 +36,6 @@ final class DecideLeaveCancellationAction
 
         if (! $requestUser instanceof User
             || $requestUser->id !== $actor->id
-            || $actor->getEffectiveRole() !== 'admin_kepegawaian'
             || ! $actor->hasPermission('cuti.cancellation.manage')) {
             throw new AuthorizationException('Anda tidak berwenang memutuskan permohonan pembatalan cuti.');
         }
@@ -58,6 +59,12 @@ final class DecideLeaveCancellationAction
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            // Penantian lock tidak boleh mempertahankan role, simulasi, atau binding actor yang sudah berubah.
+            $currentActor = User::query()->find($actor->id);
+            if ($currentActor === null || ! $this->access->canManage($currentActor, $lockedRequest)) {
+                throw new AuthorizationException('Anda tidak berwenang memutuskan permohonan pembatalan cuti ini.');
+            }
+
             if ($lockedCancellation->leave_request_id !== $lockedRequest->id
                 || $lockedCancellation->status !== LeaveCancellationRequest::STATUS_PENDING
                 || $lockedRequest->status !== LeaveRequest::STATUS_CANCELLATION_PENDING) {
@@ -70,7 +77,7 @@ final class DecideLeaveCancellationAction
 
             $lockedCancellation->forceFill([
                 'status' => $decisionStatus,
-                'decided_by' => $actor->id,
+                'decided_by' => $currentActor->id,
                 'decided_at' => now(),
             ])->save();
 
@@ -86,7 +93,7 @@ final class DecideLeaveCancellationAction
                 $this->reservations->releaseForApprovedCancellation(
                     $lockedRequest,
                     $lockedCancellation,
-                    $actor,
+                    $currentActor,
                     $request,
                 );
             } else {
@@ -102,7 +109,18 @@ final class DecideLeaveCancellationAction
                 $lockedRequest->forceFill(['status' => $lockedCancellation->resume_status])->save();
             }
 
-            AuditService::logOrFail(
+            // Audit memakai snapshot yang diotorisasi, bukan Auth::user() yang mungkin masih memuat role lama.
+            $roleContext = ['_effective_role' => $currentActor->getEffectiveRole()];
+            if ($currentActor->temporary_role) {
+                $roleContext += [
+                    '_simulation' => true,
+                    '_original_role' => $currentActor->role,
+                ];
+            }
+
+            AuditService::logAsOrFail(
+                $currentActor->id,
+                $currentActor->name,
                 $decisionStatus === LeaveCancellationRequest::STATUS_APPROVED
                     ? 'LEAVE_CANCELLATION_APPROVED'
                     : 'LEAVE_CANCELLATION_REJECTED',
@@ -118,6 +136,7 @@ final class DecideLeaveCancellationAction
                     'leave_request_status_after' => $lockedRequest->status,
                 ],
                 $request,
+                simulationContext: $roleContext,
             );
 
             return $lockedCancellation;

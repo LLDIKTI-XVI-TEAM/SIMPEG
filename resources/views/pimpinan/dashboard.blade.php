@@ -433,7 +433,7 @@
                     </div>
                 </div>
                 <div class="border-t border-border px-6 py-4 bg-soft/20 text-center">
-                    <a href="{{ route('pimpinan.cuti.index', ['status' => 'menunggu']) }}" class="text-xs font-bold text-primary transition-colors font-sans hover:underline">
+                    <a href="{{ route('cuti.approval') }}" class="text-xs font-bold text-primary transition-colors font-sans hover:underline">
                         Buka antrean persetujuan cuti
                     </a>
                 </div>

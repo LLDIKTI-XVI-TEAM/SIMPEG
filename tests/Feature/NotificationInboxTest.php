@@ -14,7 +14,9 @@ use App\Services\NotificationService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Js;
 use Illuminate\Testing\TestResponse;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class NotificationInboxTest extends TestCase
@@ -173,6 +175,79 @@ class NotificationInboxTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.0.id', $higherUuidTie->id);
         $response->assertJsonPath('data.1.id', $lowerUuidTie->id);
+    }
+
+    /** @param array<string, mixed>|null $data */
+    #[DataProvider('approvalNotificationUrlProvider')]
+    public function test_approval_inbox_resolves_local_detail_for_bell_and_page_without_rewriting_record(string $type, ?array $data, string $expectedUrl): void
+    {
+        [$user, $employee] = $this->pegawaiWithEmployee();
+        $notification = $this->notificationFor($employee, $type, 'Permintaan persetujuan', false, ['data' => $data]);
+
+        $this->actingAs($user)->getJson(self::ENDPOINT)
+            ->assertOk()
+            ->assertJsonPath('data.0.data.url', $expectedUrl);
+
+        $this->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('openNotification('.Js::from($notification->id).', '.Js::from($expectedUrl).')', false);
+
+        // Normalisasi hanya untuk navigasi; payload historis dan status baca tetap utuh.
+        $this->assertSame($data, $notification->refresh()->data);
+        $this->assertFalse($notification->is_read);
+    }
+
+    public static function approvalNotificationUrlProvider(): array
+    {
+        $id = '00000000-0000-4000-8000-000000000001';
+        $detail = '/dashboard/cuti/'.$id.'?from=approval';
+
+        return [
+            'pengajuan dengan URL antrean lama' => ['cuti.pengajuan_baru', ['leave_request_id' => $id, 'url' => '/cuti/approval'], $detail],
+            'tahap berikutnya dengan URL antrean lama' => ['cuti.menunggu_persetujuan', ['leave_request_id' => $id, 'url' => '/cuti/approval'], $detail],
+            'URL asing kalah dari UUID pengajuan' => ['cuti.pengajuan_baru', ['leave_request_id' => $id, 'url' => 'https://example.test/asing'], $detail],
+            'UUID rusak mengabaikan URL asing' => ['cuti.menunggu_persetujuan', ['leave_request_id' => 'not-a-uuid', 'url' => 'https://example.test/asing'], '/cuti/approval'],
+            'UUID array tidak menjadi URL' => ['cuti.pengajuan_baru', ['leave_request_id' => [$id], 'url' => '/dashboard'], '/cuti/approval'],
+            'UUID hilang mengabaikan link alternatif' => ['cuti.menunggu_persetujuan', ['link' => 'https://example.test/asing'], '/cuti/approval'],
+            'payload kosong kembali ke antrean' => ['cuti.pengajuan_baru', null, '/cuti/approval'],
+        ];
+    }
+
+    #[DataProvider('unrelatedNotificationUrlProvider')]
+    public function test_other_notification_types_keep_existing_destination(string $type, string $target): void
+    {
+        [$user, $employee] = $this->pegawaiWithEmployee();
+        $data = ['leave_request_id' => '00000000-0000-4000-8000-000000000001', 'url' => $target];
+        $notification = $this->notificationFor($employee, $type, 'Notifikasi lain', false, ['data' => $data]);
+
+        $this->actingAs($user)->getJson(self::ENDPOINT)
+            ->assertOk()
+            ->assertJsonPath('data.0.data', $data);
+        $this->get(route('notifications.index'))
+            ->assertOk()
+            ->assertSee('openNotification('.Js::from($notification->id).', '.Js::from($target).')', false);
+    }
+
+    public static function unrelatedNotificationUrlProvider(): array
+    {
+        return [
+            'EWS' => ['ews.pangkat', '/dashboard/ews'],
+            'pembatalan' => ['cuti.pembatalan_diajukan', '/dashboard/cuti/pembatalan'],
+        ];
+    }
+
+    public function test_notification_detail_for_missing_request_does_not_grant_record_access(): void
+    {
+        [$user, $employee] = $this->pegawaiWithEmployee();
+        $id = '00000000-0000-4000-8000-000000000001';
+        $notification = $this->notificationFor($employee, 'cuti.pengajuan_baru', 'Pengajuan sudah tidak tersedia', false, [
+            'data' => ['leave_request_id' => $id, 'url' => '/cuti/approval'],
+        ]);
+
+        $this->actingAs($user);
+        $this->patchJsonWithCsrf(self::ENDPOINT."/{$notification->id}/tandai-dibaca")->assertOk();
+        $this->get('/dashboard/cuti/'.$id)->assertNotFound();
+        $this->assertTrue($notification->refresh()->is_read);
     }
 
     public function test_unread_count_is_scoped_to_own_unread_notifications(): void

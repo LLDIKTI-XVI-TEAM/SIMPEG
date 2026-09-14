@@ -3,21 +3,31 @@
 namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
+use App\Models\PositionHistory;
+use App\Models\RefJenisCuti;
+use App\Models\RefUnitKerja;
 use App\Models\User;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Services\LeaveApprovalService;
 use App\Support\Cuti\ApprovalStepLabel;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListPimpinanLeavesAction
 {
+    private const MAX_FILTER_OPTIONS = 100;
+
+    public function __construct(private readonly EmployeeDashboardScopeService $employeeScope) {}
+
     /**
-     * @return array{
-     *   leaves: LengthAwarePaginator,
-     *   menungguTindakanSaya: int, totalMenunggu: int, totalDisetujui: int, totalDitangguhkan: int
-     * }
+     * Scope diterapkan sebelum filter dan counter; assignment hanya mempersempit filter tindakan saya.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
      */
     public function execute(User $user, array $filters): array
     {
+        abort_unless($user->employee_id !== null && $user->employee?->isActive()
+            && $user->hasPermission('cuti.read_all'), 403);
+
         $query = LeaveRequest::query()->with([
             'employee',
             'jenisCuti',
@@ -25,7 +35,7 @@ class ListPimpinanLeavesAction
                 ->select(['id', 'leave_request_id', 'step_type', 'role_label', 'status', 'step_order'])
                 ->where('status', 'active')
                 ->orderBy('step_order'),
-        ]);
+        ])->whereIn('employee_id', $this->employeeScope->forIdentity($user)->select('employees.id'));
 
         // Base query untuk counter statistik
         $baseQuery = clone $query;
@@ -70,8 +80,9 @@ class ListPimpinanLeavesAction
             }
         }
 
-        $perPage = (int) request('per_page', 10);
-        $paginator = $query->latest()->paginate($perPage)->withQueryString();
+        $perPage = (int) ($filters['per_page'] ?? 10);
+        $perPage = in_array($perPage, [10, 25, 50], true) ? $perPage : 10;
+        $paginator = $query->latest()->orderByDesc('id')->paginate($perPage)->withQueryString();
 
         $paginator->getCollection()->transform(function (LeaveRequest $r): LeaveRequest {
             // Label memakai snapshot pengajuan, bukan nama approver atau konfigurasi terkini.
@@ -88,6 +99,23 @@ class ListPimpinanLeavesAction
 
         return [
             'leaves' => $paginator,
+            'filters' => $filters,
+            // Katalog bukan data pegawai; pilihan aktif tetap terlihat di dalam payload yang dibatasi.
+            'jenisCutiOptions' => RefJenisCuti::query()
+                ->when(filled($filters['jenis_cuti_id'] ?? null), fn ($types) => $types
+                    ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$filters['jenis_cuti_id']]))
+                ->orderBy('nama')->orderBy('id')->limit(self::MAX_FILTER_OPTIONS)->get(['id', 'nama']),
+            'unitKerjaOptions' => RefUnitKerja::query()
+                // Opsi mengikuti unit jabatan terkini dalam scope yang sama dengan baris pengajuan.
+                ->whereIn('id', PositionHistory::query()->select('unit_kerja_id')
+                    ->where('is_latest', true)
+                    ->whereIn('employee_id', $this->employeeScope->forIdentity($user)->select('employees.id')))
+                ->when(filled($filters['unit_kerja_id'] ?? null), fn ($units) => $units
+                    ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$filters['unit_kerja_id']]))
+                ->orderBy('nama')->orderBy('id')->limit(self::MAX_FILTER_OPTIONS)->get(['id', 'nama']),
+            // Awal bulan mencegah tanggal 29–31 melompati Februari saat membentuk opsi periode.
+            'optPeriodes' => collect(range(0, 11))
+                ->map(fn (int $offset): string => now()->startOfMonth()->subMonths($offset)->format('Y-m')),
             // Counter memakai predikat actionable yang sama dengan filter menunggu_saya agar angka
             // tidak menghitung pengajuan yang hanya menyimpan step aktif sebagai snapshot.
             'menungguTindakanSaya' => (clone $baseQuery)

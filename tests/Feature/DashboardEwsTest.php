@@ -7,6 +7,7 @@ use App\Models\EwsAlert;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Js;
 use Tests\TestCase;
 
 class DashboardEwsTest extends TestCase
@@ -119,7 +120,10 @@ class DashboardEwsTest extends TestCase
 
         $html = view('admin.dashboard', $payload)->render();
 
-        $this->assertStringContainsString('data: [1], tooltipTotal: 2', $html);
+        $this->assertStringContainsString(
+            'data: '.Js::from([0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]).', tooltipTotal: 2',
+            $html,
+        );
     }
 
     public function test_admin_dashboard_keeps_chart_tone_paired_to_filtered_composition_row(): void
@@ -136,8 +140,10 @@ class DashboardEwsTest extends TestCase
 
         $html = view('admin.dashboard', $payload)->render();
 
-        $this->assertStringContainsString('labels: ["PPPK"]', $html);
-        $this->assertStringContainsString('tones: ["secondary"]', $html);
+        $this->assertStringContainsString(
+            'labels: '.Js::from(['PPPK']).', data: '.Js::from([4]).', tones: '.Js::from(['secondary']),
+            $html,
+        );
         $this->assertStringContainsString('bg-secondary', $html);
     }
 

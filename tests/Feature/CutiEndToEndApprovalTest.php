@@ -138,7 +138,7 @@ class CutiEndToEndApprovalTest extends TestCase
                 'revision_version' => $leave->fresh()->revision_version,
                 'keputusan' => 'DISETUJUI',
             ])
-            ->assertRedirect(route('kepala-bagian.cuti.show', $leave))
+            ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'bawahan']))
             ->assertSessionHas('success');
 
         $this->assertDatabaseHas('leave_request_steps', [
@@ -170,7 +170,7 @@ class CutiEndToEndApprovalTest extends TestCase
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
-            ->assertRedirect(route('pimpinan.cuti.show', $leave));
+            ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']));
 
         $leave->refresh();
         $this->assertSame('disetujui', $leave->status);
@@ -342,7 +342,7 @@ class CutiEndToEndApprovalTest extends TestCase
                     'revision_version' => $leave->fresh()->revision_version,
                     'komentar' => "Menyetujui tahap {$step->step_order}.",
                 ])
-                ->assertRedirect(route('cuti.approval'));
+                ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'approval']));
 
             $this->assertDatabaseHas('leave_request_steps', [
                 'id' => $step->id,
@@ -481,17 +481,22 @@ class CutiEndToEndApprovalTest extends TestCase
             ->where('type', 'cuti.pengajuan_baru')
             ->sole();
         $this->assertSame($firstEffective->id, $initialNotification->data['leave_request_step_id'] ?? null);
+        $this->assertSame('/dashboard/cuti/'.$leave->id.'?from=approval', $initialNotification->data['url']);
 
         foreach ($steps as $step) {
             $user = $approverUsers->get($step->approver_employee_id);
             $this->assertInstanceOf(User::class, $user);
+            $this->actingAs($user)->get(route('cuti.show', $leave))
+                ->assertOk()->assertViewHas('canAct', true)
+                ->assertViewHas('activeStep', fn ($activeStep) => $activeStep?->id === $step->id)
+                ->assertSee('Konfirmasi Persetujuan');
             $this->actingAs($user)
                 ->post(route('cuti.approve', $leave->id), [
                     'active_step_id' => $step->id,
                     'revision_version' => $leave->fresh()->revision_version,
                     'komentar' => 'Satu tindakan per tahap approval.',
                 ])
-                ->assertRedirect(route('cuti.approval'));
+                ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'approval']));
         }
 
         $this->assertSame('disetujui', $leave->refresh()->status);

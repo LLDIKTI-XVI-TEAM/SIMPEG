@@ -52,27 +52,46 @@ class PimpinanFrontendViewTest extends TestCase
             'is_final' => true,
         ]);
 
-        $response = $this->actingAs($this->pimpinan(['employee_id' => $approver->id]))
+        $canonicalUrl = route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']);
+        $this->actingAs($this->pimpinan(['employee_id' => $approver->id]))
             ->get(route('pimpinan.cuti.show', $leave))
+            ->assertRedirect($canonicalUrl);
+        $response = $this->get($canonicalUrl)
             ->assertOk()
+            ->assertViewIs('admin.cuti.show')
+            ->assertViewHas('canAct', true)
             ->assertSee('Pegawai Cuti Tampilan')
             ->assertDontSee('Disetujui dengan Perubahan')
             ->assertDontSee('value="PERUBAHAN"', false)
             ->assertDontSee('Minta Perubahan')
             ->assertDontSee('memilih Perubahan')
-            ->assertSee('Wajib diisi jika memilih Ditangguhkan atau Tidak Disetujui…')
+            ->assertSee('Alasan Penundaan')
+            ->assertSee('Alasan Tidak Disetujui')
             ->assertDontSee('Tunda Sementara')
-            ->assertSee('aria-describedby="pimpinan-decision-help"', false)
-            ->assertSee('aria-describedby="pimpinan-decision-note-help"', false)
-            ->assertSee('aria-describedby="pimpinan-approval-confirmation-description"', false)
-            ->assertSee('id="pimpinan-approval-confirmation-description"', false)
-            ->assertSee('@keydown.escape.window="if (confirmOpen) { confirmOpen = false }"', false)
+            ->assertSee('for="komentar-postpone"', false)
+            ->assertSee('for="komentar-decline"', false)
+            ->assertSee('role="dialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('aria-describedby="approve-confirmation-description"', false)
+            ->assertSee('id="approve-confirmation-description"', false)
+            ->assertSee('@keydown.escape.window="if (decisionForm !== null) close()"', false)
+            ->assertSee('@keydown.tab="trapModalFocus($event)"', false)
             ->assertSee('name="active_step_id"', false)
             ->assertSee('value="'.$activeStep->id.'"', false)
-            ->assertSee(route('pimpinan.cuti.decision', $leave), false);
+            ->assertSee('name="revision_version"', false)
+            ->assertSee(route('cuti.approve', $leave), false)
+            ->assertSee(route('cuti.postpone', $leave), false)
+            ->assertSee(route('cuti.decline', $leave), false);
+
+        foreach (['postpone', 'decline'] as $decision) {
+            $this->assertMatchesRegularExpression(
+                '/<textarea(?=[^>]*\bid="komentar-'.$decision.'")(?=[^>]*\brequired\b)[^>]*>/s',
+                (string) $response->getContent(),
+            );
+        }
 
         $this->assertMatchesRegularExpression(
-            '/<button(?=[^>]*\bid="pimpinan-approval-confirmation-cancel")(?=[^>]*\bdata-modal-initial-focus="true")[^>]*>/s',
+            '/<button(?=[^>]*@click="close\(\)")(?=[^>]*\bdata-modal-initial-focus="true")[^>]*>/s',
             (string) $response->getContent(),
         );
     }
@@ -115,10 +134,18 @@ class PimpinanFrontendViewTest extends TestCase
             ->assertSee('Dikembalikan karena Rollover')
             ->assertSee('value="'.LeaveRequest::STATUS_RETURNED_FOR_ROLLOVER.'"', false);
 
+        $canonicalUrl = route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']);
         $this->actingAs($user)
             ->get(route('pimpinan.cuti.show', $leave))
+            ->assertRedirect($canonicalUrl);
+        $this->get($canonicalUrl)
             ->assertOk()
+            ->assertViewIs('admin.cuti.show')
+            ->assertViewHas('canAct', false)
             ->assertSee('Dikembalikan karena Rollover')
+            ->assertDontSee(route('cuti.approve', $leave), false)
+            ->assertDontSee(route('cuti.postpone', $leave), false)
+            ->assertDontSee(route('cuti.decline', $leave), false)
             ->assertDontSee(route('pimpinan.cuti.decision', $leave), false);
     }
 

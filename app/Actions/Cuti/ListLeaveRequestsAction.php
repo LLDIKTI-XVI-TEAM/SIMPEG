@@ -2,25 +2,33 @@
 
 namespace App\Actions\Cuti;
 
-use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\RefJenisCuti;
+use App\Models\RefUnitKerja;
 use App\Models\User;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use App\Support\Cuti\ApprovalStepLabel;
 use App\Support\Cuti\CutiPeriodFilter;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Membangun daftar pengajuan cuti dengan pagination/filtering di level database.
- * Mempertahankan scope data-milik-sendiri (cuti.read_all), menghitung counter ringkasan dari base query,
+ * Memisahkan daftar milik sendiri dari monitoring berizin, menghitung counter ringkasan dari base query,
  * dan menyediakan langkah aktif dinamis dari snapshot leave_request_steps (menggantikan stage_atasan/stage_kepala).
  */
 class ListLeaveRequestsAction
 {
+    private const MAX_FILTER_OPTIONS = 100;
+
+    public function __construct(private readonly EmployeeDashboardScopeService $employeeScope) {}
+
     /**
      * @return array{
      *   riwayatCuti: LengthAwarePaginator,
@@ -30,18 +38,25 @@ class ListLeaveRequestsAction
      *   optPeriodes: Collection<int, non-falsy-string>,
      *   optTahuns: Collection<int, string>,
      *   search: string, status: string, jenis: string, unit: string, periode: string,
-     *   isPegawai: bool, hasActiveFilters: bool
+     *   isPegawai: bool, ownScope: bool, canCreateLeave: bool, hasActiveFilters: bool
      * }
      */
     public function execute(User $user, Request $request): array
     {
+        abort_unless($user->employee_id !== null && $user->employee?->isActive(), 403);
+
         // Jangkar ke awal bulan agar Februari tidak terlewati saat tanggal berjalan 29-31.
         $bulanBerjalan = now()->startOfMonth();
-        $isPegawai = ! $user->hasPermission('cuti.read_all');
+        // Parameter hanya dapat mempersempit; scope selain own tidak pernah menjadi grant monitoring.
+        $ownScope = $request->query('scope') === 'own';
+        $isPegawai = $ownScope || ! $user->hasPermission('cuti.read_all');
         $search = $isPegawai ? '' : trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
         $jenis = (string) $request->query('jenis', '');
-        $unit = $isPegawai ? '' : (string) $request->query('unit', '');
+        $requestedUnit = $isPegawai ? '' : ($request->query('unit') ?? '');
+        // Filter unit memakai UUID referensi; input cacat ditolak sebelum menyentuh kolom UUID PostgreSQL.
+        abort_unless(is_string($requestedUnit) && ($requestedUnit === '' || Str::isUuid($requestedUnit)), 404);
+        $unit = $requestedUnit;
         $periode = (string) $request->query('periode', '');
         $tahun = (string) $request->query('tahun', '');
         $perPage = min(max((int) $request->query('per_page', 10), 10), 50);
@@ -52,6 +67,10 @@ class ListLeaveRequestsAction
             || (! $isPegawai && ($search !== '' || $unit !== ''));
 
         $query = LeaveRequest::query()
+            ->select(['leave_requests.*', 'monitoring_units.nama as monitoring_unit_name'])
+            ->leftJoinSub($this->currentPositions(), 'monitoring_positions', fn ($join) => $join
+                ->on('monitoring_positions.employee_id', '=', 'leave_requests.employee_id'))
+            ->leftJoin('ref_unit_kerja as monitoring_units', 'monitoring_units.id', '=', 'monitoring_positions.unit_kerja_id')
             ->with([
                 'employee',
                 'jenisCuti',
@@ -60,14 +79,14 @@ class ListLeaveRequestsAction
                     ->where('status', 'active')
                     ->orderBy('step_order'),
             ])
-            ->latest();
+            ->latest('leave_requests.created_at')
+            ->orderByDesc('leave_requests.id');
 
-        // Role pegawai (termasuk hasil simulasi role) selalu dibatasi ke data sendiri
-        // meski mapping permission salah konfigurasi.
-        $dibatasiKeDataSendiri = $user->getEffectiveRole() === 'pegawai' || ! $user->hasPermission('cuti.read_all');
-
-        if ($dibatasiKeDataSendiri) {
-            $query->where('employee_id', $user->employee_id);
+        if ($isPegawai) {
+            $query->where('leave_requests.employee_id', $user->employee_id);
+        } else {
+            // Permission efektif membuka monitoring, tetapi Switch Role tidak mengganti scope identitas.
+            $query->whereIn('leave_requests.employee_id', $this->employeeScope->forIdentity($user)->select('employees.id'));
         }
 
         // Base query (setelah scope, sebelum filter status) menjadi sumber counter ringkasan.
@@ -95,7 +114,7 @@ class ListLeaveRequestsAction
             $query->whereHas('jenisCuti', fn ($jenisQuery) => $jenisQuery->where('nama', $jenis));
         }
         if ($unit !== '') {
-            $query->whereHas('employee', fn ($employeeQuery) => $employeeQuery->where('jabatan_terakhir', $unit));
+            $query->where('monitoring_positions.unit_kerja_id', $unit);
         }
         if ($periode !== '') {
             CutiPeriodFilter::parse($periode)?->applyToDateColumn($query, 'tanggal_mulai');
@@ -124,14 +143,21 @@ class ListLeaveRequestsAction
             'jumlahDitangguhkan' => (clone $baseQuery)
                 ->whereIn('status', ['ditangguhkan', 'ditangguhkan_tugas_dinas', LeaveRequest::STATUS_ADMINISTRATIVELY_POSTPONED])
                 ->count(),
-            'optJenisCutis' => RefJenisCuti::orderBy('nama')->pluck('nama'),
+            'optJenisCutis' => RefJenisCuti::query()
+                ->when($jenis !== '', fn ($types) => $types
+                    ->orderByRaw('CASE WHEN nama = ? THEN 0 ELSE 1 END', [$jenis]))
+                ->orderBy('nama')->limit(self::MAX_FILTER_OPTIONS)->pluck('nama'),
             'optUnits' => $isPegawai
                 ? collect()
-                : Employee::query()
-                    ->whereNotNull('jabatan_terakhir')
-                    ->distinct()
-                    ->orderBy('jabatan_terakhir')
-                    ->pluck('jabatan_terakhir'),
+                : RefUnitKerja::query()
+                    ->whereIn('id', DB::query()->fromSub($this->currentPositions(), 'scoped_positions')
+                        ->select('scoped_positions.unit_kerja_id')
+                        ->whereIn('scoped_positions.employee_id', $this->employeeScope->forIdentity($user)->select('employees.id')))
+                    ->when($unit !== '', fn ($units) => $units
+                        ->orderByRaw('CASE WHEN id = ? THEN 0 ELSE 1 END', [$unit]))
+                    ->orderBy('nama')->orderBy('id')
+                    ->limit(self::MAX_FILTER_OPTIONS)
+                    ->pluck('nama', 'id'),
             // Portable periode options (verified current producer): 12 bulan terakhir, tanpa SQL PostgreSQL-only.
             'optPeriodes' => collect(range(0, 11))
                 ->map(fn (int $offset): string => $bulanBerjalan->copy()->subMonths($offset)->format('Y-m')),
@@ -143,8 +169,25 @@ class ListLeaveRequestsAction
             'periode' => $periode,
             'tahun' => $tahun,
             'isPegawai' => $isPegawai,
+            'ownScope' => $ownScope,
+            'canCreateLeave' => $user->getEffectiveRole() !== 'super_admin'
+                && $user->hasPermission('cuti.create') && ! $user->employee?->is_kepala_lembaga,
             'hasActiveFilters' => $hasActiveFilters,
         ];
+    }
+
+    /**
+     * Unit berasal dari riwayat terkini, bukan snapshot nama jabatan. Pemilihan deterministik menjaga
+     * filter, opsi, dan baris tetap konsisten tanpa menggandakan pengajuan bila penanda terkini inkonsisten.
+     */
+    private function currentPositions(): QueryBuilder
+    {
+        return DB::table('position_histories as position_rows')
+            ->selectRaw('DISTINCT ON (position_rows.employee_id) position_rows.employee_id, position_rows.unit_kerja_id')
+            ->where('position_rows.is_latest', true)
+            ->orderBy('position_rows.employee_id')
+            ->orderByDesc('position_rows.tmt_jabatan')
+            ->orderBy('position_rows.id');
     }
 
     /**
@@ -193,7 +236,7 @@ class ListLeaveRequestsAction
             'id' => $r->id,
             'nama' => $r->employee?->nama_lengkap ?? '-',
             'nip' => $r->employee?->nip ?? '-',
-            'unit' => $r->employee?->jabatan_terakhir ?? '-',
+            'unit' => $r->getAttribute('monitoring_unit_name') ?? '-',
             'jenis' => $r->jenisCuti?->nama ?? '-',
             'mulai' => optional($r->tanggal_mulai)->toDateString(),
             'selesai' => optional($r->tanggal_selesai)->toDateString(),

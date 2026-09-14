@@ -15,6 +15,7 @@ use App\Models\RefJenisPegawai;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Js;
 use Tests\TestCase;
 
 class PimpinanDashboardDataTest extends TestCase
@@ -56,7 +57,11 @@ class PimpinanDashboardDataTest extends TestCase
     {
         $this->seed(RbacSeeder::class);
 
-        $pimpinanEmployee = Employee::factory()->create(['nama_lengkap' => 'Pimpinan LLDIKTI']);
+        // Pegawai tanpa golongan tetap masuk penyebut persentase, bukan bucket grafik.
+        $pimpinanEmployee = Employee::factory()->create([
+            'nama_lengkap' => 'Pimpinan LLDIKTI',
+            'golongan_terakhir' => null,
+        ]);
         $employee = Employee::factory()->create([
             'nama_lengkap' => 'Eka Pramesti',
             'nip' => '198505052011052005',
@@ -121,11 +126,11 @@ class PimpinanDashboardDataTest extends TestCase
             ->assertSee(route('pimpinan.cuti.show', $leave), false)
             ->assertSee(route('pimpinan.ews.index', ['event' => 'Kenaikan Pangkat']), false)
             ->assertSee(route('pimpinan.cuti.index', ['status' => 'menunggu']), false)
-            ->assertSee('href="'.route('cuti').'"', false)
+            ->assertSee('href="'.route('cuti', ['scope' => 'own']).'"', false)
             ->assertSee('globalSearch($el.dataset.searchUrl)', false)
             ->assertSee("dashboardChart({ type: 'doughnut'", false)
             ->assertSee("dashboardChart({ type: 'horizontal-bar'", false)
-            ->assertSee('data: [1], tooltipTotal: 2', false)
+            ->assertSee('data: '.Js::from([1]).', tooltipTotal: 2', false)
             ->assertSee("dashboardChart({ type: 'line'", false)
             ->assertSee('0 disetujui · 0 ditangguhkan')
             ->assertDontSee('Ahmad Fauzi')

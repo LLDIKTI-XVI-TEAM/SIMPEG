@@ -7,7 +7,9 @@ use App\Models\Employee;
 use App\Models\LeaveProof;
 use App\Models\LeaveRequest;
 use App\Models\LeaveRequestStep;
+use App\Models\Permission;
 use App\Models\RefJenisCuti;
+use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,7 +43,7 @@ class PimpinanLeaveProofTest extends TestCase
                 'keputusan' => 'DISETUJUI',
                 'catatan' => 'Disetujui.',
             ])
-            ->assertRedirect(route('pimpinan.cuti.show', $leave));
+            ->assertRedirect(route('cuti.show', ['id' => $leave->id, 'from' => 'pimpinan']));
 
         $proof = LeaveProof::query()->where('leave_request_id', $leave->id)->first();
 
@@ -219,6 +221,30 @@ class PimpinanLeaveProofTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'pegawai']))
             ->get(route('pimpinan.cuti.document.download', $leave))
             ->assertForbidden();
+    }
+
+    public function test_semua_url_pdf_menolak_observer_setelah_permission_monitoring_dicabut(): void
+    {
+        [$leave, $pimpinan] = $this->leaveAwaitingFinalApproval();
+        $this->actingAs($pimpinan)->post(route('pimpinan.cuti.decision', $leave), [
+            'active_step_id' => $leave->steps()->where('status', 'active')->valueOrFail('id'),
+            'revision_version' => $leave->revision_version,
+            'keputusan' => 'DISETUJUI',
+            'catatan' => 'Disetujui.',
+        ])->assertRedirect();
+
+        $observer = User::factory()->pimpinan()->create();
+        $this->actingAs($observer)->get(route('pimpinan.cuti.document.show', $leave))->assertOk();
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->detach(
+            Permission::where('name', 'cuti.read_all')->valueOrFail('id'),
+        );
+
+        foreach (['pimpinan.cuti.document.show', 'pimpinan.cuti.document.download', 'cuti.formulir-pdf'] as $routeName) {
+            $this->get(route($routeName, $leave))->assertForbidden();
+        }
+
+        // Pencabutan monitoring tidak menghapus hak baca pihak pada snapshot keputusan.
+        $this->actingAs($pimpinan)->get(route('cuti.formulir-pdf', $leave))->assertOk();
     }
 
     /** @return array{LeaveRequest, User} */

@@ -3,13 +3,26 @@
 namespace App\Actions\Cuti;
 
 use App\Models\LeaveRequest;
+use App\Models\User;
 use App\Services\Cuti\LeaveProofDocumentStorageService;
+use App\Services\Cuti\LeaveRequestReadAccess;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class DownloadStoredLeaveProofAction
 {
-    public function __construct(private readonly LeaveProofDocumentStorageService $documents) {}
+    public function __construct(
+        private readonly LeaveProofDocumentStorageService $documents,
+        private readonly LeaveRequestReadAccess $readAccess,
+    ) {}
+
+    /** Caller HTTP wajib memeriksa record sebelum streaming artefak, bukan hanya role pada URL. */
+    public function forActor(LeaveRequest $leaveRequest, ?User $actor, bool $inline): StreamedResponse
+    {
+        abort_unless($this->readAccess->canRead($leaveRequest, $actor), 403);
+
+        return $this->execute($leaveRequest, $inline);
+    }
 
     /** Mengunduh PDF persetujuan asli, termasuk histori administratif, tanpa membuka path storage. */
     public function execute(
