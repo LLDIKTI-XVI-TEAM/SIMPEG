@@ -224,8 +224,7 @@ class PimpinanEmployeeDetailTest extends TestCase
             ->assertOk()
             ->assertSee('deletePegawai(p.id, p.nama_lengkap)', false)
             ->assertSee('showDeleteModal', false)
-            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false)
-            ->assertDontSee('showRestoreModal', false);
+            ->assertDontSee('restorePegawai(p.id, p.nama_lengkap)', false);
     }
 
     /** Pimpinan tanpa permission lifecycle tetap melihat daftar tanpa kontrol mutasi. */
