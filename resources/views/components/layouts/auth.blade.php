@@ -25,12 +25,18 @@
 
     {{-- Brand Header --}}
     <div class="mb-8 flex flex-col items-center gap-3 text-center">
-        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-sm">
-            <span class="text-lg font-bold text-white">S</span>
+        <div class="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl bg-primary shadow-sm">
+            <img
+                src="{{ asset('img/dikti16-favicon-blue-150x150.png') }}"
+                alt="LLDIKTI XVI"
+                class="h-full w-full object-cover"
+            >
         </div>
         <div>
             <p class="text-xl font-bold text-primary">SIMPEG</p>
-            <p class="text-sm text-muted">{{ $heading }}</p>
+            @if (filled($heading))
+                <p class="text-sm text-muted">{{ $heading }}</p>
+            @endif
         </div>
     </div>
 

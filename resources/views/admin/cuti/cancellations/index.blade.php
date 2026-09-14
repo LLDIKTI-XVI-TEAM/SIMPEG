@@ -1,4 +1,9 @@
 <x-layouts.app title="Antrean Pembatalan Cuti">
+    @php
+        $selectedStatus = $filters['status'] ?? 'pending';
+        $perPage = (int) ($filters['per_page'] ?? 10);
+    @endphp
+
     <div
         class="space-y-6"
         x-data="{
@@ -26,31 +31,27 @@
                 ['label' => 'Dashboard', 'url' => route('dashboard')],
                 ['label' => 'Antrean Pembatalan Cuti'],
             ]" />
-            <p class="mt-2 text-sm text-muted">Tinjau alasan pegawai sebelum menyetujui atau menolak permohonan pembatalan.</p>
+            <x-ui.alert variant="info" class="mt-4">
+                Tinjau alasan pegawai sebelum menyetujui atau menolak permohonan pembatalan.
+            </x-ui.alert>
         </div>
 
         @error('decision')
             <x-ui.alert variant="danger">{{ $message }}</x-ui.alert>
         @enderror
 
-        <form method="GET" action="{{ route('cuti.cancellations.index') }}" class="flex flex-wrap items-end gap-3">
-            <div>
-                <label for="status" class="mb-1 block text-sm font-medium text-ink">Status pembatalan</label>
-                <select id="status" name="status" onchange="this.form.submit()" class="min-h-11 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink">
-                    <option value="pending" @selected(($filters['status'] ?? 'pending') === 'pending')>Menunggu keputusan</option>
-                    <option value="approved" @selected(($filters['status'] ?? null) === 'approved')>Disetujui</option>
-                    <option value="rejected" @selected(($filters['status'] ?? null) === 'rejected')>Ditolak</option>
-                    <option value="all" @selected(($filters['status'] ?? null) === 'all')>Semua status</option>
-                </select>
-            </div>
-            <div>
-                <label for="per-page" class="mb-1 block text-sm font-medium text-ink">Baris per halaman</label>
-                <select id="per-page" name="per_page" onchange="this.form.submit()" class="min-h-11 rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink">
-                    @foreach([10, 25, 50] as $pageSize)
-                        <option value="{{ $pageSize }}" @selected((int) ($filters['per_page'] ?? 10) === $pageSize)>{{ $pageSize }} baris</option>
-                    @endforeach
-                </select>
-            </div>
+        <form method="GET" action="{{ route('cuti.cancellations.index') }}">
+            <input type="hidden" name="per_page" value="{{ $perPage }}">
+            <x-ui.filter-bar gridClass="grid-cols-1 sm:grid-cols-[16rem]">
+                <div class="relative">
+                    <x-form.select id="filter-status" name="status" :value="$selectedStatus" onchange="this.form.submit()" aria-label="Filter status pembatalan">
+                        <option value="pending">Menunggu keputusan</option>
+                        <option value="approved">Disetujui</option>
+                        <option value="rejected">Ditolak</option>
+                        <option value="all">Semua status</option>
+                    </x-form.select>
+                </div>
+            </x-ui.filter-bar>
         </form>
 
         <x-ui.card padding="none" class="overflow-hidden">
@@ -185,8 +186,38 @@
                 @endforelse
             </div>
 
-            <div class="border-t border-border px-6 py-4">
-                {{ $cancellations->links('vendor.pagination.simpeg') }}
+            <div class="flex flex-col items-center justify-between gap-4 border-t border-border bg-soft/20 px-6 py-4 sm:flex-row">
+                <div class="flex items-center gap-3 text-sm text-muted">
+                    <form method="GET" action="{{ route('cuti.cancellations.index') }}" class="flex items-center gap-2">
+                        <input type="hidden" name="status" value="{{ $selectedStatus }}">
+
+                        <span class="whitespace-nowrap">Tampilkan</span>
+                        <label for="per-page" class="sr-only">Jumlah baris per halaman</label>
+                        <select
+                            id="per-page"
+                            name="per_page"
+                            onchange="this.form.submit()"
+                            class="appearance-none bg-none rounded-md border border-border bg-surface px-2.5 py-1 text-center font-sans text-sm text-ink cursor-pointer focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                        >
+                            @foreach ([10, 25, 50] as $pageSize)
+                                <option value="{{ $pageSize }}" @selected($perPage === $pageSize)>{{ $pageSize }}</option>
+                            @endforeach
+                        </select>
+                        <span class="hidden sm:inline">data</span>
+                    </form>
+
+                    <div class="hidden border-l border-border pl-4 md:block">
+                        Menampilkan <span class="font-medium text-ink">{{ $cancellations->firstItem() ?? 0 }}</span>
+                        - <span class="font-medium text-ink">{{ $cancellations->lastItem() ?? 0 }}</span>
+                        dari <span class="font-medium text-ink">{{ $cancellations->total() }}</span>
+                    </div>
+                </div>
+
+                @if ($cancellations->hasPages())
+                    <div class="flex items-center gap-1.5">
+                        {{ $cancellations->onEachSide(1)->appends(request()->query())->links('vendor.pagination.simpeg') }}
+                    </div>
+                @endif
             </div>
         </x-ui.card>
 
