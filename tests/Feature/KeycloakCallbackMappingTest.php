@@ -1454,21 +1454,37 @@ class KeycloakCallbackMappingTest extends TestCase
             'email' => 'paralel-reuse@example.com',
         ]);
 
+        $connection = config('database.connections.pgsql');
+        $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s', $connection['host'], $connection['port'], $connection['database']);
         $injected = false;
-        DB::listen(function (QueryExecuted $query) use (&$injected, $employee): void {
+        DB::listen(function (QueryExecuted $query) use (&$injected, $dsn, $connection): void {
             if ($injected || ! str_contains((string) $query->sql, 'keycloak_username')) {
                 return;
             }
 
             $injected = true;
 
-            // Callback "pemenang" paralel baru saja commit user untuk pegawai + subject sama.
-            User::factory()->create([
-                'email' => 'paralel-reuse@example.com',
-                'keycloak_id' => 'kc-paralel-2',
-                'employee_id' => $employee->id,
-                'role' => 'pegawai',
+            // Callback "pemenang" paralel commit via koneksi sendiri (di luar transaksi test),
+            // seperti race sesungguhnya. Factory dalam transaksi akan ikut ter-rollback saat
+            // save pertama menabrak constraint sehingga retry tidak pernah menemukan pemenang.
+            // employee_id dibiarkan null (FK tidak melihat employee uncommitted milik test);
+            // resolver mengikatnya via subject+email dengan role pegawai yang sudah sah.
+            $pdo = new \PDO($dsn, $connection['username'], $connection['password']);
+            $winnerId = (string) Str::uuid();
+            $pdo->prepare('insert into users (id, name, email, password, keycloak_id, role, created_at, updated_at) values (?, ?, ?, ?, ?, ?, now(), now())')->execute([
+                $winnerId,
+                'Paralel Reuse',
+                'paralel-reuse@example.com',
+                'reuse-password',
+                'kc-paralel-2',
+                'pegawai',
             ]);
+            $this->externalInjectedUsers[] = [
+                'dsn' => $dsn,
+                'username' => $connection['username'],
+                'password' => $connection['password'],
+                'id' => $winnerId,
+            ];
         });
 
         $this->fakeKeycloakUser([
