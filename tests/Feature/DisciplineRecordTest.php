@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Histories\DeleteDisciplineRecordAction;
 use App\Models\AuditLog;
 use App\Models\DisciplineRecord;
 use App\Models\Document;
@@ -614,7 +615,7 @@ class DisciplineRecordTest extends TestCase
 
         $this->assertSame($stalePath, $record->file_sk);
 
-        app(\App\Actions\Histories\DeleteDisciplineRecordAction::class)->execute($employee, $record);
+        app(DeleteDisciplineRecordAction::class)->execute($employee, $record);
 
         $this->assertDatabaseMissing('discipline_records', ['id' => $record->id]);
         $this->assertDatabaseMissing('documents', ['id' => $mirror->id]);
