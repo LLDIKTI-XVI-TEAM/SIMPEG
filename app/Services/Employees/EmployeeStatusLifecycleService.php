@@ -242,8 +242,7 @@ class EmployeeStatusLifecycleService
             $requiredPermission
         )) {
             throw ValidationException::withMessages([
-                'status_pegawai_id' =>
-                    'Mengaktifkan kembali pegawai hanya dapat dilakukan oleh Super Admin atau Admin Kepegawaian.',
+                'status_pegawai_id' => 'Mengaktifkan kembali pegawai hanya dapat dilakukan oleh Super Admin atau Admin Kepegawaian.',
             ]);
         }
 
