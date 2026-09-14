@@ -21,42 +21,73 @@ class BackfillSkDocuments extends Command
         foreach ($employees as $employee) {
             foreach ($employee->rankHistories as $rank) {
                 if ($rank->file_sk && Storage::disk(Document::STORAGE_DISK)->exists($rank->file_sk)) {
-                    $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_pangkat')->where('file_path', $rank->file_sk)->exists();
-                    if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'history_id' => $rank->id, 'jenis_dokumen' => 'sk_pangkat', 'nama_dokumen' => 'SK Kenaikan Pangkat', 'nomor_dokumen' => $rank->no_sk, 'tanggal_dokumen' => $rank->tanggal_sk, 'file_path' => $rank->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat pangkat']);
+                    if ($this->ensureMirror(
+                        $employee,
+                        $rank->id,
+                        'sk_pangkat',
+                        'SK Kenaikan Pangkat',
+                        $rank->no_sk,
+                        $rank->tanggal_sk,
+                        $rank->file_sk,
+                        'Backfill otomatis dari riwayat pangkat',
+                        'Pangkat'
+                    )) {
                         $created++;
-                        $this->line("[Pangkat] {$employee->nama_lengkap}");
                     }
                 }
             }
+
             foreach ($employee->positionHistories as $pos) {
                 if ($pos->file_sk && Storage::disk(Document::STORAGE_DISK)->exists($pos->file_sk)) {
-                    $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_jabatan')->where('file_path', $pos->file_sk)->exists();
-                    if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'history_id' => $pos->id, 'jenis_dokumen' => 'sk_jabatan', 'nama_dokumen' => 'SK Jabatan '.($pos->nama_jabatan ?? ''), 'nomor_dokumen' => $pos->no_sk, 'tanggal_dokumen' => $pos->tanggal_sk, 'file_path' => $pos->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat jabatan']);
+                    if ($this->ensureMirror(
+                        $employee,
+                        $pos->id,
+                        'sk_jabatan',
+                        'SK Jabatan '.($pos->nama_jabatan ?? ''),
+                        $pos->no_sk,
+                        $pos->tanggal_sk,
+                        $pos->file_sk,
+                        'Backfill otomatis dari riwayat jabatan',
+                        'Jabatan'
+                    )) {
                         $created++;
-                        $this->line("[Jabatan] {$employee->nama_lengkap}");
                     }
                 }
             }
+
             foreach ($employee->salaryHistories as $sal) {
                 if ($sal->file_sk && Storage::disk(Document::STORAGE_DISK)->exists($sal->file_sk)) {
-                    $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_kgb')->where('file_path', $sal->file_sk)->exists();
-                    if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'history_id' => $sal->id, 'jenis_dokumen' => 'sk_kgb', 'nama_dokumen' => 'SK KGB', 'nomor_dokumen' => $sal->no_sk, 'tanggal_dokumen' => $sal->tanggal_sk, 'file_path' => $sal->file_sk, 'keterangan' => 'Backfill otomatis dari riwayat KGB']);
+                    if ($this->ensureMirror(
+                        $employee,
+                        $sal->id,
+                        'sk_kgb',
+                        'SK KGB',
+                        $sal->no_sk,
+                        $sal->tanggal_sk,
+                        $sal->file_sk,
+                        'Backfill otomatis dari riwayat KGB',
+                        'KGB'
+                    )) {
                         $created++;
-                        $this->line("[KGB] {$employee->nama_lengkap}");
                     }
                 }
             }
+
             if ($employee->appointment && $employee->appointment->file_sk) {
                 $appoint = $employee->appointment;
                 if (Storage::disk(Document::STORAGE_DISK)->exists($appoint->file_sk)) {
-                    $exists = Document::where('employee_id', $employee->id)->where('jenis_dokumen', 'sk_pengangkatan')->where('file_path', $appoint->file_sk)->exists();
-                    if (! $exists) {
-                        Document::create(['employee_id' => $employee->id, 'history_id' => $appoint->id, 'jenis_dokumen' => 'sk_pengangkatan', 'nama_dokumen' => 'SK Pengangkatan '.($appoint->jenis_pengangkatan ?? ''), 'nomor_dokumen' => $appoint->no_sk, 'tanggal_dokumen' => $appoint->tanggal_sk, 'file_path' => $appoint->file_sk, 'keterangan' => 'Backfill otomatis dari data pengangkatan']);
+                    if ($this->ensureMirror(
+                        $employee,
+                        $appoint->id,
+                        'sk_pengangkatan',
+                        'SK Pengangkatan '.($appoint->jenis_pengangkatan ?? ''),
+                        $appoint->no_sk,
+                        $appoint->tanggal_sk,
+                        $appoint->file_sk,
+                        'Backfill otomatis dari data pengangkatan',
+                        'Pengangkatan'
+                    )) {
                         $created++;
-                        $this->line("[Pengangkatan] {$employee->nama_lengkap}");
                     }
                 }
             }
@@ -65,5 +96,63 @@ class BackfillSkDocuments extends Command
         $this->info("Selesai. Total {$created} dokumen baru ditambahkan ke arsip.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Memastikan mirror dokumen untuk riwayat tertentu tersedia di arsip.
+     * Menggunakan history_id sebagai canonical identity, mengklaim row legacy
+     * yang history_id-nya null, atau membuat row baru jika belum ada.
+     */
+    private function ensureMirror(
+        Employee $employee,
+        string|int $historyId,
+        string $jenisDokumen,
+        string $namaDokumen,
+        ?string $nomorDokumen,
+        mixed $tanggalDokumen,
+        string $filePath,
+        string $keterangan,
+        string $label
+    ): bool {
+        // Step A — existing canonical mirror
+        $canonical = Document::query()
+            ->where('employee_id', $employee->id)
+            ->where('jenis_dokumen', $jenisDokumen)
+            ->where('history_id', $historyId)
+            ->first();
+
+        if ($canonical) {
+            return false;
+        }
+
+        // Step B — claim row legacy
+        $legacy = Document::query()
+            ->where('employee_id', $employee->id)
+            ->where('jenis_dokumen', $jenisDokumen)
+            ->whereNull('history_id')
+            ->where('file_path', $filePath)
+            ->first();
+
+        if ($legacy) {
+            $legacy->update(['history_id' => $historyId]);
+            $this->line("[{$label}] {$employee->nama_lengkap}");
+
+            return false;
+        }
+
+        // Step C — create mirror bila tidak ada candidate legacy
+        Document::create([
+            'employee_id' => $employee->id,
+            'history_id' => $historyId,
+            'jenis_dokumen' => $jenisDokumen,
+            'nama_dokumen' => $namaDokumen,
+            'nomor_dokumen' => $nomorDokumen,
+            'tanggal_dokumen' => $tanggalDokumen,
+            'file_path' => $filePath,
+            'keterangan' => $keterangan,
+        ]);
+        $this->line("[{$label}] {$employee->nama_lengkap}");
+
+        return true;
     }
 }

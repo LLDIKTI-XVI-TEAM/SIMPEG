@@ -24,8 +24,9 @@
         $canCreateEmployeeHistory = auth()->check()
             && auth()->user()->hasPermission('employee_histories.create');
         $canUpdateEmployeeHistory = auth()->check()
-            && (auth()->user()->hasPermission('employee_histories.update') || auth()->user()->hasPermission('employee_histories.create') || auth()->user()->getEffectiveRole() === 'super_admin');
-        $canDeleteEmployeeHistory = auth()->check() && auth()->user()->hasPermission('employee_histories.delete');
+            && auth()->user()->hasPermission('employee_histories.update');
+        $canDeleteEmployeeHistory = auth()->check()
+            && auth()->user()->hasPermission('employee_histories.delete');
         $hasEducationHistoryMutation = $canCreateEmployeeHistory || $canUpdateEmployeeHistory || $canDeleteEmployeeHistory;
 
         // Tabs granular: hanya tampil jika permission read tersedia (sesuai dashboard)

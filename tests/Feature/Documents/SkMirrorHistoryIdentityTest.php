@@ -120,4 +120,56 @@ class SkMirrorHistoryIdentityTest extends TestCase
             'is_latest' => false,
         ]);
     }
+
+    public function test_backfill_sk_mengklaim_row_legacy_dengan_history_id_null(): void
+    {
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::create(['kode' => 'III/d', 'nama' => 'Penata Tingkat I']);
+        $filePath = 'sk/pangkat-legacy.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($filePath, 'legacy-content');
+
+        $rank = $this->rankHistory($employee->id, $golongan->id, 'SK-LEGACY-001');
+        $rank->update(['file_sk' => $filePath]);
+
+        $legacyDoc = Document::create([
+            'employee_id' => $employee->id,
+            'history_id' => null,
+            'jenis_dokumen' => 'sk_pangkat',
+            'nama_dokumen' => 'SK Pangkat Legacy',
+            'nomor_dokumen' => 'SK-LEGACY-001',
+            'file_path' => $filePath,
+        ]);
+
+        $initialCount = Document::count();
+
+        $this->artisan('dokumen:backfill-sk')->assertSuccessful();
+
+        $this->assertSame($initialCount, Document::count());
+        $this->assertSame($rank->id, $legacyDoc->fresh()->history_id);
+    }
+
+    public function test_backfill_sk_dua_riwayat_berbagi_file_path_memperoleh_mirror_masing_masing(): void
+    {
+        $employee = Employee::factory()->create();
+        $golongan = RefGolongan::create(['kode' => 'IV/a', 'nama' => 'Pembina']);
+        $sharedPath = 'sk/shared.pdf';
+        Storage::disk(Document::STORAGE_DISK)->put($sharedPath, 'shared-content');
+
+        $first = $this->rankHistory($employee->id, $golongan->id, 'SK-SHARED-001');
+        $first->update(['file_sk' => $sharedPath]);
+
+        $second = $this->rankHistory($employee->id, $golongan->id, 'SK-SHARED-002');
+        $second->update(['file_sk' => $sharedPath]);
+
+        $this->artisan('dokumen:backfill-sk')->assertSuccessful();
+
+        $mirrors = Document::query()
+            ->where('employee_id', $employee->id)
+            ->where('jenis_dokumen', 'sk_pangkat')
+            ->get();
+
+        $this->assertCount(2, $mirrors);
+        $this->assertTrue($mirrors->contains('history_id', $first->id));
+        $this->assertTrue($mirrors->contains('history_id', $second->id));
+    }
 }

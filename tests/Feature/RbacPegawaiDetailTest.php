@@ -312,4 +312,49 @@ class RbacPegawaiDetailTest extends TestCase
         $this->actingAs($superAdmin)->get(route('pegawai.show', ['id' => $employee->id]))->assertOk();
         $this->actingAs($admin)->get(route('rbac.pegawai.show', $employee))->assertOk();
     }
+
+    public function test_ui_riwayat_pendidikan_granular_permissions(): void
+    {
+        $employee = $this->employeeWithReferences();
+        $user = User::factory()->adminKepegawaian()->create();
+
+        // Scenario A: create only (mempunyai create, tidak mempunyai update & delete)
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+            Permission::where('name', 'employee_histories.delete')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $responseA = $this->actingAs($user)->get(route('rbac.pegawai.show', $employee));
+        $responseA->assertOk();
+        $responseA->assertSee('Tambah Pendidikan');
+        $responseA->assertDontSee('title="Edit riwayat pendidikan"', false);
+        $responseA->assertDontSee('title="Hapus riwayat pendidikan"', false);
+
+        // Scenario B: update only (mempunyai update, tidak mempunyai create & delete)
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.create')->firstOrFail()->id,
+        ]);
+        Role::where('name', 'admin_kepegawaian')->firstOrFail()->permissions()->syncWithoutDetaching([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $user->refresh();
+
+        $responseB = $this->actingAs($user)->get(route('rbac.pegawai.show', $employee));
+        $responseB->assertOk();
+        $responseB->assertSee('title="Edit riwayat pendidikan"', false);
+        $responseB->assertDontSee('Tambah Pendidikan');
+        $responseB->assertDontSee('title="Hapus riwayat pendidikan"', false);
+
+        // Scenario C: super admin tanpa update tidak boleh bypass UI
+        $superAdmin = User::factory()->superAdmin()->create();
+        Role::where('name', 'super_admin')->firstOrFail()->permissions()->detach([
+            Permission::where('name', 'employee_histories.update')->firstOrFail()->id,
+        ]);
+        $superAdmin->refresh();
+
+        $responseC = $this->actingAs($superAdmin)->get(route('rbac.pegawai.show', $employee));
+        $responseC->assertOk();
+        $responseC->assertDontSee('title="Edit riwayat pendidikan"', false);
+    }
 }
