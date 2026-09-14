@@ -1,42 +1,45 @@
-<x-layouts.auth title="Akun Tidak Dapat Digunakan" heading="Akun Tidak Dapat Digunakan">
-    <div class="min-h-screen flex items-center justify-center bg-surface p-6">
-        <div class="w-full max-w-md rounded-2xl border border-danger/25 bg-white p-8 text-center shadow-lg">
-            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger/10">
-                <svg class="h-9 w-9 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+<x-layouts.auth title="Status Akun" heading="">
+    <section aria-labelledby="account-status-title" class="space-y-6">
+        <div class="flex items-start gap-3">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-danger/10 text-danger">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
                 </svg>
             </div>
-
-            <h2 class="text-xl font-bold text-ink">Akun Tidak Dapat Digunakan</h2>
-
-            <div class="mt-4 rounded-lg border border-danger/20 bg-danger/5 p-4">
-                <p class="text-sm font-semibold text-danger uppercase tracking-wide">Perhatian</p>
-                <p class="mt-1 text-sm text-muted">
-                    Status akun Anda sedang <strong class="text-ink">nonaktif atau belum dapat diverifikasi</strong>.
-                    Seluruh fitur aplikasi tidak dapat diakses sampai status akun diperbaiki oleh Admin Kepegawaian.
+            <div>
+                <h1 id="account-status-title" class="text-xl font-semibold text-ink">Akun Tidak Dapat Digunakan</h1>
+                <p class="mt-1 text-sm leading-5 text-muted">
+                    Akses ke fitur SIMPEG sementara dibatasi sampai data akun dapat diverifikasi.
                 </p>
             </div>
+        </div>
 
-            @if (filled($statusNote ?? null))
-                <div class="mt-3 rounded-lg border border-border bg-surface p-4 text-left">
-                    <p class="text-xs font-bold text-ink uppercase tracking-wide">Pesan dari Admin</p>
-                    <p class="mt-1 text-sm text-ink">{{ $statusNote }}</p>
-                </div>
-            @endif
+        <x-ui.alert variant="danger" title="Akses dibatasi">
+            Status akun Anda sedang <strong class="font-semibold text-danger">nonaktif atau belum dapat diverifikasi</strong>.
+            Seluruh fitur aplikasi tidak dapat diakses sampai status akun diperbaiki oleh Admin Kepegawaian.
+        </x-ui.alert>
 
-            <p class="mt-5 text-xs text-muted">
-                Silakan hubungi Admin Kepegawaian untuk informasi lebih lanjut.
+        @if (filled($statusNote ?? null))
+            <div class="border-t border-border pt-5">
+                <h2 class="text-sm font-semibold text-ink">Pesan dari Admin</h2>
+                <p class="mt-2 text-sm leading-6 text-muted">{{ $statusNote }}</p>
+            </div>
+        @endif
+
+        <div class="border-t border-border pt-5">
+            <p class="text-sm leading-5 text-muted">
+                Silakan hubungi Admin Kepegawaian untuk informasi lebih lanjut atau pembaruan status akun.
             </p>
 
-            <form method="POST" action="{{ route('logout') }}" class="mt-6">
+            <form method="POST" action="{{ route('logout') }}" class="mt-4">
                 @csrf
-                <button type="submit"
-                    class="inline-flex w-full items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-ink transition hover:bg-soft cursor-pointer font-sans">
-                    Keluar
-                </button>
+                <x-ui.button type="submit" variant="primary" full-width>
+                    <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6A2.25 2.25 0 0 0 5.25 5.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3-3H9m0 0 3-3m-3 3 3 3" />
+                    </svg>
+                    Keluar dari akun
+                </x-ui.button>
             </form>
         </div>
-    </div>
+    </section>
 </x-layouts.auth>
