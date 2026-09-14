@@ -111,7 +111,36 @@ class RbacEmployeeFormPrivacyTest extends TestCase
             $response = $this->actingAs($actor)->get(route('pegawai.edit', $employee))->assertOk();
             $response->assertSee('7171010101010001')->assertSee('7171010101019999');
             $this->assertSame(route('pegawai.update', $employee), $this->formDestination($response->getContent()));
+
+            Role::where('name', $role)->firstOrFail()->permissions()->detach(
+                Permission::where('name', 'employees.create')->firstOrFail()->id,
+            );
+            $this->get(route('pegawai.edit', $employee))->assertOk()
+                ->assertSee('7171010101010001')->assertSee('7171010101019999')
+                ->assertDontSee('@click="checkIdentity(\'nip\')"', false)
+                ->assertDontSee('@click="checkIdentity(\'nik\')"', false)
+                ->assertSee('Keunikan NIK diperiksa saat menyimpan.');
         }
+    }
+
+    public function test_operator_edit_saja_tidak_ditawari_cek_nip_yang_memerlukan_izin_tambah(): void
+    {
+        [$actor, $employee] = $this->delegatedFixture('pimpinan');
+        Role::where('name', 'pimpinan')->firstOrFail()->permissions()->detach(
+            Permission::where('name', 'employees.create')->firstOrFail()->id,
+        );
+        $other = Employee::factory()->create(['nip' => '198503122010011001']);
+
+        $this->actingAs($actor)->get(route('rbac.pegawai.edit', $employee))->assertOk()
+            ->assertDontSee('@click="checkIdentity(\'nip\')"', false)
+            ->assertSee('Keunikan NIP diperiksa saat menyimpan.');
+        $this->post(route('rbac.pegawai.update', $employee), ['nip' => $other->nip])
+            ->assertSessionHasErrors('nip');
+        $this->assertNotSame($other->nip, $employee->fresh()->nip);
+
+        $this->grant('pimpinan', 'employees.create');
+        $this->get(route('rbac.pegawai.edit', $employee))->assertOk()
+            ->assertSee('@click="checkIdentity(\'nip\')"', false);
     }
 
     private function delegatedFixture(string $role): array

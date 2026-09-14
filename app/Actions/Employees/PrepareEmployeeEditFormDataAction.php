@@ -35,6 +35,7 @@ class PrepareEmployeeEditFormDataAction
         $viewer = auth()->user();
         abort_unless($viewer !== null && $viewer->hasPermission('employees.update'), 403);
         $canEditSensitiveIdentifiers = EmployeeIdentifierPrivacy::canManage($viewer);
+        $canCheckIdentity = $viewer->hasPermission('employees.create');
         $canReadHistories = $viewer->hasPermission('employee_histories.read');
         $canReadDocuments = $viewer->hasPermission('dokumen_sk.read');
 
@@ -51,15 +52,16 @@ class PrepareEmployeeEditFormDataAction
         if ($canEditSensitiveIdentifiers) {
             $columns = [...$columns, 'nik', 'no_kk'];
         }
-        abort_unless($this->employeeScope->for($viewer)->whereKey($id)->exists(), 403);
-        $p = $this->employeeScope->for($viewer)->select($columns)->with([
-            'appointment' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0')),
-            'appointments' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0')),
+        abort_unless($this->employeeScope->forIdentity($viewer)->whereKey($id)->exists(), 403);
+        // Form hanya memakai riwayat terkini; pengangkatan awal tetap terpisah dari kontrak PPPK terbaru.
+        $p = $this->employeeScope->forIdentity($viewer)->select($columns)->with([
+            'appointment' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->limit(1),
+            'appointments' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))
+                ->where('jenis_pengangkatan', 'PPPK')->orderByRaw('tmt_pengangkatan DESC NULLS LAST')->limit(1),
             'jenisPegawai',
-            'positionHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with(['jabatan', 'unitKerja', 'jenisJabatan']),
-            'rankHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->with('golongan'),
-            'salaryHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0')),
-            'documents' => fn ($q) => $q->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0')),
+            'positionHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->where('is_latest', true)->with(['jabatan', 'unitKerja', 'jenisJabatan']),
+            'rankHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->where('is_latest', true)->with('golongan'),
+            'salaryHistories' => fn ($q) => $q->when(! $canReadHistories, fn ($q) => $q->whereRaw('1 = 0'))->where('is_latest', true),
         ])->findOrFail($id);
 
         $jenisPegawai = RefJenisPegawai::all();
@@ -105,13 +107,12 @@ class PrepareEmployeeEditFormDataAction
             ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_pangkat')
             ->orderByDesc('tanggal_dokumen')
-            ->get()
+            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
             ->map(fn ($d) => [
                 'id' => $d->id,
                 'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
                 'nama_dokumen' => $d->nama_dokumen,
             ]);
 
@@ -119,13 +120,12 @@ class PrepareEmployeeEditFormDataAction
             ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_jabatan')
             ->orderByDesc('tanggal_dokumen')
-            ->get()
+            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
             ->map(fn ($d) => [
                 'id' => $d->id,
                 'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
                 'nama_dokumen' => $d->nama_dokumen,
             ]);
 
@@ -133,13 +133,12 @@ class PrepareEmployeeEditFormDataAction
             ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_kgb')
             ->orderByDesc('tanggal_dokumen')
-            ->get()
+            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
             ->map(fn ($d) => [
                 'id' => $d->id,
                 'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
                 'nama_dokumen' => $d->nama_dokumen,
             ]);
 
@@ -147,18 +146,18 @@ class PrepareEmployeeEditFormDataAction
             ->when(! $canReadDocuments, fn ($q) => $q->whereRaw('1 = 0'))
             ->where('jenis_dokumen', 'sk_pengangkatan')
             ->orderByDesc('tanggal_dokumen')
-            ->get()
+            ->get(['id', 'nomor_dokumen', 'tanggal_dokumen', 'nama_dokumen'])
             ->map(fn ($d) => [
                 'id' => $d->id,
                 'label' => ($d->nomor_dokumen ?? 'Tanpa No.').($d->tanggal_dokumen ? ' — '.date('d/m/Y', strtotime($d->tanggal_dokumen)) : ''),
                 'nomor_dokumen' => $d->nomor_dokumen,
                 'tanggal_dokumen' => $d->tanggal_dokumen ? date('Y-m-d', strtotime($d->tanggal_dokumen)) : null,
-                'file_path' => $d->file_path,
                 'nama_dokumen' => $d->nama_dokumen,
             ]);
 
         return compact(
             'canEditSensitiveIdentifiers',
+            'canCheckIdentity',
             'p',
             'jenisPegawai',
             'agama',

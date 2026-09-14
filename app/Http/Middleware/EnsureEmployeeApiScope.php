@@ -3,16 +3,13 @@
 namespace App\Http\Middleware;
 
 use App\Models\Employee;
-use App\Services\Employees\KepalaBagianScopeService;
+use App\Services\Employees\EmployeeDashboardScopeService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureEmployeeApiScope
 {
-    /** Role ber-permission boleh memakai surface pegawai lintas pegawai. */
-    private const MANAGER_ROLES = ['super_admin', 'admin_kepegawaian', 'pimpinan'];
-
     /**
      * Role yang boleh memakai endpoint API mentah lintas pegawai.
      * Pimpinan sengaja tidak termasuk: payload mentah memuat NIK dan relasi
@@ -23,9 +20,9 @@ class EnsureEmployeeApiScope
 
     /**
      * RBAC menentukan aksi yang boleh dilakukan, sedangkan middleware ini
-     * menentukan rekam pegawai mana yang boleh menjadi target API. Pegawai
-     * hanya boleh memakai endpoint generik ini untuk data miliknya sendiri.
-     * Kepala Bagian dibatasi pada bawahan langsung via KepalaBagianScopeService.
+     * menentukan rekam pegawai mana yang boleh menjadi target API. Scope record
+     * berasal dari identitas asli dan tidak berubah selama simulasi role;
+     * permission efektif tetap diperiksa terpisah oleh middleware permission.
      *
      * Mode `strict` dipakai endpoint API mentah (payload NIK/relasi penuh):
      * Pimpinan ditolak (403) dan wajib memakai surface khusus yang dimasking.
@@ -65,30 +62,10 @@ class EnsureEmployeeApiScope
             abort(403);
         }
 
-        if (in_array($effectiveRole, self::MANAGER_ROLES, true)) {
-            return $next($request);
-        }
+        abort_unless(is_string($targetEmployeeId) && $targetEmployeeId !== '', 403);
+        $scope = app(EmployeeDashboardScopeService::class);
+        abort_unless($scope->forIdentity($user)->whereKey($targetEmployeeId)->exists(), 403);
 
-        if ($effectiveRole === 'kepala_bagian') {
-            abort_unless(is_string($targetEmployeeId) && $targetEmployeeId !== '', 403);
-
-            $scope = app(KepalaBagianScopeService::class);
-            abort_unless($scope->hasDirectReport($user, $targetEmployeeId), 403);
-
-            return $next($request);
-        }
-
-        if ($effectiveRole === 'pegawai') {
-            abort_unless(
-                is_string($user->employee_id)
-                    && is_string($targetEmployeeId)
-                    && hash_equals($user->employee_id, $targetEmployeeId),
-                403,
-            );
-
-            return $next($request);
-        }
-
-        abort(403);
+        return $next($request);
     }
 }

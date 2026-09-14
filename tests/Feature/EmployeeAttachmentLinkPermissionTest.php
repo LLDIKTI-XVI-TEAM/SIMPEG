@@ -41,6 +41,40 @@ class EmployeeAttachmentLinkPermissionTest extends TestCase
         ];
     }
 
+    /** @return array<string, array{string}> */
+    public static function adminRoles(): array
+    {
+        return ['Super Admin' => ['super_admin'], 'Admin Kepegawaian' => ['admin_kepegawaian']];
+    }
+
+    #[DataProvider('adminRoles')]
+    public function test_unduhan_admin_lama_menghormati_pencabutan_permission_dokumen(string $roleName): void
+    {
+        [$employee, $rank, , $discipline] = $this->attachmentFixture();
+        $viewer = User::factory()->create(['role' => $roleName]);
+        $role = Role::where('name', $roleName)->firstOrFail();
+        $permission = Permission::where('name', 'dokumen_sk.read')->firstOrFail();
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        $urls = [
+            route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'rank', 'history' => $rank]),
+            route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'discipline', 'history' => $discipline]),
+            route('pegawai.history-attachments.download', ['employee' => $employee, 'type' => 'status-snapshot', 'history' => $employee]),
+        ];
+        foreach ($urls as $url) {
+            $this->actingAs($viewer)->get($url)->assertOk()->assertDownload();
+        }
+
+        $role->permissions()->detach($permission->id);
+        foreach ($urls as $url) {
+            $this->actingAs($viewer)->get($url)->assertForbidden();
+        }
+
+        $role->permissions()->syncWithoutDetaching([$permission->id]);
+        foreach ($urls as $url) {
+            $this->actingAs($viewer)->get($url)->assertOk()->assertDownload();
+        }
+    }
+
     #[DataProvider('detailSurfaces')]
     public function test_pencabutan_hak_dokumen_menghilangkan_tautan_tanpa_menghilangkan_metadata_riwayat(string $surface): void
     {
@@ -135,6 +169,7 @@ class EmployeeAttachmentLinkPermissionTest extends TestCase
             $this->assertCount(0, $presented->rankHistories);
             $this->assertNull($presented->appointment);
             $this->assertCount(0, $presented->statusHistories);
+            $this->assertNull($presented->getAttribute($surface.'_status_attachment_download_url'));
             $response->assertDontSee('SK-PANGKAT-PERMISSION')->assertSee('Disiplin metadata tetap tersedia');
             $this->assertSame($urls[2], $presented->disciplineRecords->first()->getAttribute($attribute));
             $allowedIndexes = [2];

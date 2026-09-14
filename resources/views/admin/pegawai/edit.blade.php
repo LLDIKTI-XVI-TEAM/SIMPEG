@@ -372,6 +372,7 @@
                                 <input id="nip" name="nip" type="text" maxlength="18" x-model="nip"
                                     @input="validateNipLocal" value="{{ $p->nip }}" placeholder="198503122010011001"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2 pr-20 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                @if ($canCheckIdentity)
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-2">
                                     <button type="button" @click="checkIdentity('nip')"
                                         class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
@@ -380,7 +381,11 @@
                                         <span x-show="isCheckingNip">...</span>
                                     </button>
                                 </div>
+                                @endif
                             </div>
+                            @unless ($canCheckIdentity)
+                                <p class="text-xs text-muted">Keunikan NIP diperiksa saat menyimpan.</p>
+                            @endunless
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nipError" class="text-xs text-danger font-semibold mt-1 font-sans"
                                 x-text="nipError"></p>
@@ -629,6 +634,7 @@
                                 <input id="nik" name="nik" type="text" maxlength="16" x-model="nik"
                                     @input="validateNikLocal" placeholder="3273251203850002"
                                     class="w-full rounded-lg border border-border bg-surface px-4 py-2 pr-20 text-sm text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans">
+                                @if ($canCheckIdentity)
                                 <div class="absolute inset-y-0 right-0 flex items-center pr-2">
                                     <button type="button" @click="checkIdentity('nik')"
                                         class="rounded bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50"
@@ -637,7 +643,11 @@
                                         <span x-show="isCheckingNik">...</span>
                                     </button>
                                 </div>
+                                @endif
                             </div>
+                            @unless ($canCheckIdentity)
+                                <p class="text-xs text-muted">Keunikan NIK diperiksa saat menyimpan.</p>
+                            @endunless
                             <p class="text-xs text-muted">Data ini penting untuk dilengkapi.</p>
                             <p x-show="nikError" class="text-xs text-danger font-semibold mt-1 font-sans"
                                 x-text="nikError"></p>

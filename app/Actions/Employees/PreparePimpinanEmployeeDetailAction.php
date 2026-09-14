@@ -185,7 +185,7 @@ class PreparePimpinanEmployeeDetailAction
 
         // Hak membaca metadata riwayat tidak mencakup berkas SK atau lampirannya.
         if ($canReadDocuments) {
-            $this->prepareAttachmentDownloadUrls($employee);
+            $this->prepareAttachmentDownloadUrls($employee, $canReadHistories);
         }
         $latestStatusHistory = $employee->statusHistories->firstWhere('is_latest', true)
             ?? $employee->statusHistories->first();
@@ -269,7 +269,7 @@ class PreparePimpinanEmployeeDetailAction
      * Blade hanya membaca atribut presentasi ini sehingga tidak menjalankan pemeriksaan
      * storage berulang dan tidak menawarkan tautan mati kepada Pimpinan.
      */
-    private function prepareAttachmentDownloadUrls(Employee $employee): void
+    private function prepareAttachmentDownloadUrls(Employee $employee, bool $canReadHistories): void
     {
         $this->attachments->primeDocumentReferences(collect([
             ...$employee->rankHistories->pluck('file_sk'),
@@ -357,11 +357,11 @@ class PreparePimpinanEmployeeDetailAction
 
         $employee->setAttribute(
             'pimpinan_status_attachment_download_url',
-            $this->attachments->statusSnapshotDownloadUrl(
+            $canReadHistories ? $this->attachments->statusSnapshotDownloadUrl(
                 $employee,
                 'pimpinan.pegawai.status-attachments.download',
                 false,
-            ),
+            ) : null,
         );
     }
 

@@ -19,6 +19,7 @@ use App\Http\Requests\Employee\RestoreEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Models\Employee;
+use App\Support\Employees\EmployeeMutationPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,7 +46,7 @@ class EmployeeController extends Controller
             }
             $payload = [
                 'message' => $message,
-                'employee' => $employee,
+                'employee' => EmployeeMutationPayload::forActor($employee, $request->user()),
             ];
             if (! empty($warnings)) {
                 $payload['warnings'] = $warnings;
@@ -102,7 +103,7 @@ class EmployeeController extends Controller
             }
             $payload = [
                 'message' => $message,
-                'employee' => $employee,
+                'employee' => EmployeeMutationPayload::forActor($employee, $request->user()),
             ];
             if (! empty($warnings)) {
                 $payload['warnings'] = $warnings;
